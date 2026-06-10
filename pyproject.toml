@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scriptconv"
+dynamic = ["version", "dependencies"]
+description = "Shared script-conversion core — ISO-15924 detection, IPA↔ARPA/X-SAMPA, Buckwalter, Hangul→IPA"
+readme = "README.md"
+license = {text = "Apache-2.0"}
+requires-python = ">=3.9"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Topic :: Text Processing :: Linguistic",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+keywords = ["ipa", "arpabet", "x-sampa", "buckwalter", "hangul", "script", "iso15924", "tts", "g2p"]
+
+[tool.setuptools.dynamic]
+version = {attr = "scriptconv.version.VERSION_STR"}
+dependencies = {file = ["requirements.txt"]}
+
+[project.optional-dependencies]
+test = ["pytest", "pytest-timeout"]
+
+[project.urls]
+Homepage = "https://github.com/TigreGotico/scriptconv"
+Issues = "https://github.com/TigreGotico/scriptconv/issues"
+
+[tool.setuptools.packages.find]
+include = ["scriptconv*"]
