@@ -213,7 +213,7 @@ to the canonical X-SAMPA form on the way back.
 
 ## Buckwalter ↔ Arabic script
 
-Table derived from phoonnx `thirdparty/bw2ipa.py` and the standard Buckwalter
+Table follows Tim Buckwalter's transliteration scheme (via pyarabic) and the standard Buckwalter
 transliteration reference.
 
 ### buckwalter_to_arabic

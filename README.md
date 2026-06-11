@@ -92,6 +92,6 @@ Derived tables used internally:
 | Table | Source | License |
 |-------|--------|---------|
 | ARPABET ↔ IPA | [chorusai/arpa2ipa](https://github.com/chorusai/arpa2ipa) | Apache-2.0 |
-| Buckwalter ↔ Arabic | phoonnx `thirdparty/bw2ipa.py` (Mantoq/pyarabic knowledge) | — |
+| Buckwalter ↔ Arabic | Tim Buckwalter's transliteration scheme (via pyarabic) | — |
 | Lexique phoneme codes | New, B. & Pallier, C. — *Manuel de Lexique 3* v3.11, Tableau 2; [chrplr/openlexicon](https://github.com/chrplr/openlexicon) | CC BY-SA 4.0 |
 | Hangul jamo tables | [stannam/hangul_to_ipa](https://github.com/stannam/hangul_to_ipa) | — |
