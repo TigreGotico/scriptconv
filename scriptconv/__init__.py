@@ -8,7 +8,8 @@ scripts:
     character-range detection, ``lang_to_script``, ``normalize_script_tag``.
 notation:
     Phoneme-notation transcoding.  IPA ↔ ARPABET, IPA ↔ X-SAMPA,
-    Buckwalter ↔ Arabic script.  ``Notation`` enum + ``convert`` facade.
+    IPA ↔ Lexique, Buckwalter ↔ Arabic script.
+    ``Notation`` enum + ``convert`` facade.
 translit:
     Grapheme-to-IPA transliteration for table-driven scripts.
     Currently: Hangul → IPA.
@@ -33,6 +34,8 @@ from scriptconv.notation import (
     ipa_to_xsampa,
     buckwalter_to_arabic,
     arabic_to_buckwalter,
+    lexique_to_ipa,
+    ipa_to_lexique,
 )
 from scriptconv.translit import hangul_to_ipa
 
@@ -53,6 +56,8 @@ __all__ = [
     "ipa_to_xsampa",
     "buckwalter_to_arabic",
     "arabic_to_buckwalter",
+    "lexique_to_ipa",
+    "ipa_to_lexique",
     # translit
     "hangul_to_ipa",
 ]

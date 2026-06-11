@@ -219,6 +219,12 @@ SCRIPT_REGISTRY: dict[str, Script] = {
         direction="ltr",
         char_ranges=((0x0F00, 0x0FFF),),
     ),
+    "Laoo": Script(
+        iso15924="Laoo",
+        name="Lao",
+        direction="ltr",
+        char_ranges=((0x0E80, 0x0EFF),),
+    ),
     "Glag": Script(
         iso15924="Glag",
         name="Glagolitic",
@@ -353,6 +359,20 @@ _LANG_TO_SCRIPT: dict[str, str] = {
     "my": "Mymr",
     # Tibetan
     "bo": "Tibt",
+    # Lao
+    "lo": "Laoo",
+    # Latin-script languages shipped by orthography2ipa
+    "vi": "Latn",   # Vietnamese
+    "ha": "Latn",   # Hausa
+    "ig": "Latn",   # Igbo
+    "yo": "Latn",   # Yoruba
+    "zu": "Latn",   # Zulu
+    "xh": "Latn",   # Xhosa
+    "so": "Latn",   # Somali
+    "om": "Latn",   # Oromo (Latin orthography)
+    "rw": "Latn",   # Kinyarwanda
+    "tk": "Latn",   # Turkmen (Latin since 1993)
+    "eo": "Latn",   # Esperanto
 }
 
 
@@ -406,6 +426,7 @@ _LABEL_MAP: dict[str, str] = {
     "myanmar": "Mymr",
     "burmese": "Mymr",
     "tibetan": "Tibt",
+    "lao": "Laoo",
     "glagolitic": "Glag",
     "runic": "Runr",
     "ogham": "Ogam",

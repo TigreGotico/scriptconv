@@ -22,7 +22,7 @@ Writing-system identification and metadata.
 - `SCRIPT_REGISTRY` — registry of ~30 scripts the org handles.
 - `detect_script(text)` — dominant ISO-15924 code by character ranges.
 - `char_script(ch)` — script code for a single character.
-- `lang_to_script(lang)` — default script for a BCP-47 language tag (~65 languages).
+- `lang_to_script(lang)` — default script for a BCP-47 language tag (~80 languages).
 - `normalize_script_tag(label)` — free-form labels to ISO-15924 (`"latin"→"Latn"`,
   `"syllabics"→"Cans"`); ports phoonnx `_MMS_SCRIPTS` and extends it.
 
@@ -30,10 +30,17 @@ Writing-system identification and metadata.
 
 Phoneme-notation transcoding (pure data + converters).
 
-- `Notation` enum: `IPA`, `ARPA`, `XSAMPA`, `BUCKWALTER`, `ARABIC`.
+- `Notation` enum: `IPA`, `ARPA`, `XSAMPA`, `BUCKWALTER`, `ARABIC`, `LEXIQUE`.
 - `arpa_to_ipa` / `ipa_to_arpa` — ARPABET ↔ IPA, stress-digit aware.
+  `ipa_to_arpa` flags symbols outside the table with `"?"` (configurable via
+  the `unknown` parameter).
   Table derived from [chorusai/arpa2ipa](https://github.com/chorusai/arpa2ipa) (Apache-2.0).
 - `xsampa_to_ipa` / `ipa_to_xsampa` — X-SAMPA ↔ IPA, longest-first matching.
+- `lexique_to_ipa` / `ipa_to_lexique` — Lexique one-char-per-phoneme ↔ IPA.
+  Table: New & Pallier, *Manuel de Lexique 3* v3.11, Tableau 2 (CC BY-SA 4.0).
+  Key disambiguation: `N`=ɲ (palatal nasal, e.g. *agneau*),
+  `G`=ŋ (velar nasal, English loans, e.g. *camping*),
+  `°`=ə (schwa élidable), `3`=ə (schwa non-élidable).
 - `buckwalter_to_arabic` / `arabic_to_buckwalter` — Buckwalter ↔ Arabic script.
   Table derived from phoonnx `thirdparty/bw2ipa.py` and standard Buckwalter reference.
 - `convert(text, src, dst)` — facade routing through IPA where no direct map exists.
@@ -68,6 +75,7 @@ from scriptconv import (
     detect_script, lang_to_script, normalize_script_tag,
     arpa_to_ipa, ipa_to_arpa,
     xsampa_to_ipa, ipa_to_xsampa,
+    lexique_to_ipa, ipa_to_lexique,
     buckwalter_to_arabic, arabic_to_buckwalter,
     hangul_to_ipa,
     convert, Notation,
@@ -85,6 +93,9 @@ ipa_to_xsampa("ʃ")                 # "S"
 
 buckwalter_to_arabic("mrhbA")      # "مرحبا"
 arabic_to_buckwalter("مرحبا")     # "mrHbA"
+
+lexique_to_ipa("b§ZuR")           # "bɔ̃ʒuʁ"  (bonjour)
+ipa_to_lexique("vɛ̃")              # "v5"  (vin)
 
 hangul_to_ipa("한국어")             # Korean IPA
 

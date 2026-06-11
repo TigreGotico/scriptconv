@@ -119,6 +119,91 @@ def test_lang_to_script_unknown():
     assert lang_to_script("xyz") is None
 
 
+@pytest.mark.parametrize("lang, expected", [
+    # Non-Latin orthography2ipa languages
+    ("am", "Ethi"),   # Amharic → Ethiopic
+    ("ti", "Ethi"),   # Tigrinya → Ethiopic
+    ("mn", "Cyrl"),   # Mongolian → Cyrillic
+    ("bo", "Tibt"),   # Tibetan → Tibetan
+    ("km", "Khmr"),   # Khmer → Khmer
+    ("lo", "Laoo"),   # Lao → Lao
+    ("my", "Mymr"),   # Myanmar/Burmese → Myanmar
+    ("th", "Thai"),   # Thai → Thai
+    # Latin-script orthography2ipa languages
+    ("vi", "Latn"),   # Vietnamese
+    ("ha", "Latn"),   # Hausa
+    ("ig", "Latn"),   # Igbo
+    ("yo", "Latn"),   # Yoruba
+    ("zu", "Latn"),   # Zulu
+    ("xh", "Latn"),   # Xhosa
+    ("rw", "Latn"),   # Kinyarwanda
+    ("tk", "Latn"),   # Turkmen
+    ("eo", "Latn"),   # Esperanto
+    # Cyrillic-script languages
+    ("kk", "Cyrl"),   # Kazakh
+    ("ky", "Cyrl"),   # Kyrgyz
+    ("tt", "Cyrl"),   # Tatar
+    ("ba", "Cyrl"),   # Bashkir
+    ("cv", "Cyrl"),   # Chuvash
+    ("ce", "Cyrl"),   # Chechen
+    # Hebrew
+    ("he", "Hebr"),
+])
+def test_lang_to_script_extended(lang, expected):
+    assert lang_to_script(lang) == expected
+
+
+# ---------------------------------------------------------------------------
+# detect_script — mixed/empty behaviour
+# ---------------------------------------------------------------------------
+
+def test_detect_script_empty():
+    assert detect_script("") is None
+
+
+def test_detect_script_numbers_only():
+    assert detect_script("123 456") is None
+
+
+def test_detect_script_punctuation_only():
+    assert detect_script("!!! ???") is None
+
+
+def test_detect_script_mixed_returns_dominant():
+    # Mostly Arabic with one Latin word
+    text = "مرحبا hello مرحبا"
+    result = detect_script(text)
+    assert result == "Arab"
+
+
+def test_detect_script_lao():
+    assert detect_script("ສະບາຍດີ") == "Laoo"
+
+
+def test_detect_script_tibetan():
+    assert detect_script("བོད་སྐད།") == "Tibt"
+
+
+# ---------------------------------------------------------------------------
+# Script registry — extended scripts present
+# ---------------------------------------------------------------------------
+
+def test_registry_laoo_present():
+    assert "Laoo" in SCRIPT_REGISTRY
+
+
+def test_registry_tibt_present():
+    assert "Tibt" in SCRIPT_REGISTRY
+
+
+def test_registry_mymr_present():
+    assert "Mymr" in SCRIPT_REGISTRY
+
+
+def test_registry_thai_present():
+    assert "Thai" in SCRIPT_REGISTRY
+
+
 # ---------------------------------------------------------------------------
 # normalize_script_tag
 # ---------------------------------------------------------------------------
@@ -146,6 +231,11 @@ def test_lang_to_script_unknown():
     ("latn", "Latn"),       # lowercase ISO code
     ("Cyrl", "Cyrl"),
     ("arab", "Arab"),
+    ("lao", "Laoo"),
+    ("tibetan", "Tibt"),
+    ("myanmar", "Mymr"),
+    ("burmese", "Mymr"),
+    ("thai", "Thai"),
     ("unknown_xyz", None),
 ])
 def test_normalize_script_tag(label, expected):

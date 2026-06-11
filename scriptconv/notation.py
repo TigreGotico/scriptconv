@@ -1,11 +1,16 @@
 """Phoneme-notation transcoding — IPA ↔ ARPABET, IPA ↔ X-SAMPA,
-Buckwalter ↔ Arabic script.
+IPA ↔ Lexique, Buckwalter ↔ Arabic script.
 
 All tables are pure Python data; zero runtime dependencies.
 
 ARPABET table derived from chorusai/arpa2ipa
   (https://github.com/chorusai/arpa2ipa), licensed Apache-2.0.
 Mantoq/Buckwalter table derived from phoonnx thirdparty/bw2ipa.py.
+Lexique phoneme-code table from:
+  New, B. & Pallier, C. — Manuel de Lexique 3, v3.11, Tableau 2 (p. 12).
+  Lexique383, https://github.com/chrplr/openlexicon, CC BY-SA 4.0.
+  Key: N=ɲ (palatal nasal, e.g. agneau), G=ŋ (velar nasal, e.g. camping),
+  °=schwa élidable, 3=schwa non-élidable, x=/x/ (Spanish loanword jota).
 """
 from __future__ import annotations
 
@@ -22,6 +27,8 @@ __all__ = [
     "ipa_to_xsampa",
     "buckwalter_to_arabic",
     "arabic_to_buckwalter",
+    "lexique_to_ipa",
+    "ipa_to_lexique",
 ]
 
 
@@ -33,6 +40,7 @@ class Notation(str, Enum):
     XSAMPA = "x-sampa"
     BUCKWALTER = "buckwalter"
     ARABIC = "arabic"  # Arabic script (target/source for BW)
+    LEXIQUE = "lexique"  # Lexique one-char-per-phoneme French notation
 
 
 # ---------------------------------------------------------------------------
@@ -149,15 +157,19 @@ def arpa_to_ipa(arpa_sequence: str) -> str:
     return "".join(result)
 
 
-def ipa_to_arpa(ipa_string: str) -> str:
+def ipa_to_arpa(ipa_string: str, unknown: str = "?") -> str:
     """Convert an IPA string to a space-separated ARPABET sequence.
 
-    Matches longest IPA symbol first.  Unknown characters are dropped.
+    Matches longest IPA symbol first.  Characters outside the ARPABET table
+    are replaced by *unknown* (default ``"?"``); pass ``unknown=""`` to drop
+    them silently.
 
     Examples
     --------
     >>> ipa_to_arpa("həloʊ")
     'AH L OW'
+    >>> ipa_to_arpa("ɸ")
+    '?'
     """
     # Sort by descending length so multi-char IPA symbols match first
     sorted_ipa = sorted(_IPA_TO_ARPA.keys(), key=len, reverse=True)
@@ -170,8 +182,10 @@ def ipa_to_arpa(ipa_string: str) -> str:
             tokens.append(_IPA_TO_ARPA[m.group(0)])
             pos = m.end()
         else:
-            pos += 1  # skip unknown
-    return " ".join(tokens)
+            if unknown:
+                tokens.append(unknown)
+            pos += 1
+    return " ".join(t for t in tokens if t)
 
 
 # ---------------------------------------------------------------------------
@@ -425,6 +439,127 @@ def arabic_to_buckwalter(arabic: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Lexique ↔ IPA
+#
+# Lexique uses a one-character-per-phoneme code for French.
+# Source: New, B. & Pallier, C. — Manuel de Lexique 3 v3.11, Tableau 2
+# (https://github.com/chrplr/openlexicon), CC BY-SA 4.0.
+#
+# Critical disambiguation verified against the official table (p. 12):
+#   N → ɲ  (palatal nasal; examples: agneau, vigne)
+#   G → ŋ  (velar nasal, English loanwords; example: camping)
+#   ° → ə  (schwa élidable)
+#   3 → ə  (schwa non-élidable; distinct in input but same IPA target)
+#   x → x  (velar fricative, Spanish loanwords; example: jota)
+# ---------------------------------------------------------------------------
+
+_LEXIQUE_TO_IPA: dict[str, str] = {
+    # Vowels
+    "a": "a",    # bat, plat
+    "i": "i",    # lit, émis
+    "y": "y",    # lu
+    "u": "u",    # roue
+    "o": "o",    # peau, mot  (o fermé)
+    "O": "ɔ",    # éloge, fort  (o ouvert)
+    "e": "e",    # été  (e fermé)
+    "E": "ɛ",    # paire, treize  (e ouvert)
+    "°": "ə",    # schwa élidable (abordera)
+    "2": "ø",    # deux  (eu fermé)
+    "9": "œ",    # œuf, peur  (eu ouvert)
+    "5": "ɛ̃",   # cinq, linge  (voyelle nasale in)
+    "1": "œ̃",   # un, parfum  (voyelle nasale un)
+    "@": "ɑ̃",   # ange  (voyelle nasale an)
+    "§": "ɔ̃",   # on, savon  (voyelle nasale on)
+    "3": "ə",    # schwa non-élidable (parvenu)
+    # Semi-vowels (glides)
+    "j": "j",    # yeux, paille
+    "8": "ɥ",    # huit, lui
+    "w": "w",    # oui, nouer
+    # Consonants
+    "p": "p",    # père, soupe
+    "b": "b",    # bon, robe
+    "t": "t",    # terre, vite
+    "d": "d",    # dans, aide
+    "k": "k",    # carré, laque
+    "g": "ɡ",    # gare, bague
+    "f": "f",    # feu, neuf
+    "v": "v",    # vous, rêve
+    "s": "s",    # sale, dessous
+    "z": "z",    # zéro, maison
+    "S": "ʃ",    # chat, tâche
+    "Z": "ʒ",    # gilet, mijoter
+    "m": "m",    # main, femme
+    "n": "n",    # nous, tonne
+    "N": "ɲ",    # agneau, vigne  (consonne nasale palatale)
+    "l": "l",    # lent, sol
+    "R": "ʁ",    # rue, venir
+    "x": "x",    # jota (emprunt espagnol)
+    "G": "ŋ",    # camping  (ng, emprunt anglais)
+}
+
+# Reverse: IPA → Lexique (first-occurrence wins for ties like ə → °)
+_IPA_TO_LEXIQUE: dict[str, str] = {}
+for _lx, _ip in _LEXIQUE_TO_IPA.items():
+    if _ip not in _IPA_TO_LEXIQUE:
+        _IPA_TO_LEXIQUE[_ip] = _lx
+
+# Longest-first sorted keys
+_LX_KEYS_SORTED = sorted(_LEXIQUE_TO_IPA.keys(), key=len, reverse=True)
+_IPA_FOR_LX_SORTED = sorted(_IPA_TO_LEXIQUE.keys(), key=len, reverse=True)
+
+
+def lexique_to_ipa(lexique: str) -> str:
+    """Convert a Lexique phoneme-code string to IPA.
+
+    Each Lexique phoneme is exactly one character; they are read left-to-right
+    with no separator.  Unknown characters are passed through unchanged.
+
+    Source: New & Pallier, Manuel de Lexique 3 v3.11, Tableau 2 (CC BY-SA 4.0).
+
+    Examples
+    --------
+    >>> lexique_to_ipa("b§ZuR")
+    'bɔ̃ʒuʁ'
+    >>> lexique_to_ipa("v5")
+    'vɛ̃'
+    """
+    result = []
+    for ch in lexique:
+        result.append(_LEXIQUE_TO_IPA.get(ch, ch))
+    return "".join(result)
+
+
+def ipa_to_lexique(ipa: str) -> str:
+    """Convert an IPA string to Lexique phoneme codes.
+
+    Matches longest IPA symbol first.  Unknown characters are passed through
+    unchanged.  The conversion is French-centric; symbols outside the Lexique
+    inventory are not representable.
+
+    Source: New & Pallier, Manuel de Lexique 3 v3.11, Tableau 2 (CC BY-SA 4.0).
+
+    Examples
+    --------
+    >>> ipa_to_lexique("bɔ̃ʒuʁ")
+    'b§ZuR'
+    >>> ipa_to_lexique("dø")
+    'd2'
+    """
+    pattern = re.compile("|".join(re.escape(s) for s in _IPA_FOR_LX_SORTED))
+    result = []
+    pos = 0
+    while pos < len(ipa):
+        m = pattern.match(ipa, pos)
+        if m:
+            result.append(_IPA_TO_LEXIQUE[m.group(0)])
+            pos = m.end()
+        else:
+            result.append(ipa[pos])
+            pos += 1
+    return "".join(result)
+
+
+# ---------------------------------------------------------------------------
 # convert — facade routing through IPA where no direct map exists
 # ---------------------------------------------------------------------------
 
@@ -474,6 +609,10 @@ def convert(text: str, src: str | Notation, dst: str | Notation) -> str:
         return xsampa_to_ipa(text)
     if src == Notation.IPA and dst == Notation.XSAMPA:
         return ipa_to_xsampa(text)
+    if src == Notation.LEXIQUE and dst == Notation.IPA:
+        return lexique_to_ipa(text)
+    if src == Notation.IPA and dst == Notation.LEXIQUE:
+        return ipa_to_lexique(text)
     if src == Notation.BUCKWALTER and dst == Notation.ARABIC:
         return buckwalter_to_arabic(text)
     if src == Notation.ARABIC and dst == Notation.BUCKWALTER:
@@ -483,14 +622,14 @@ def convert(text: str, src: str | Notation, dst: str | Notation) -> str:
     _to_ipa = {
         Notation.ARPA: arpa_to_ipa,
         Notation.XSAMPA: xsampa_to_ipa,
+        Notation.LEXIQUE: lexique_to_ipa,
     }
     _from_ipa = {
         Notation.ARPA: ipa_to_arpa,
         Notation.XSAMPA: ipa_to_xsampa,
+        Notation.LEXIQUE: ipa_to_lexique,
     }
     if src in _to_ipa and dst in _from_ipa:
         return _from_ipa[dst](_to_ipa[src](text))
-    if src in _from_ipa and dst in _to_ipa:
-        raise ValueError(f"No conversion path from {src} to {dst}")
 
     raise ValueError(f"Unsupported conversion: {src!r} → {dst!r}")
