@@ -4,11 +4,23 @@ Shared script-conversion core for the TigreGotico voice-AI stack.
 
 Zero runtime dependencies (Python stdlib only).
 
+
+## Scope
+
+scriptconv is exclusively about **written scripts**: identification and
+metadata, script↔script transliteration, lossless phoneme-NOTATION
+transcoding (the same phonemes re-encoded between IPA, ARPABET,
+X-SAMPA, Buckwalter, Lexique — zero linguistic decisions), and
+orthographic decomposition. It never phonemizes: anything that requires
+knowing how a language *sounds in context* (grapheme-to-phoneme rules,
+allophony, sandhi) belongs in orthography2ipa or a downstream language
+engine, not here.
+
 ## Consumers
 
 | Library | What it replaces |
 |---------|-----------------|
-| **phoonnx** | vendored `thirdparty/arpa2ipa.py`, `bw2ipa.py`, `hangul2ipa.py`, `_MMS_SCRIPTS` in `util.py` |
+| **phoonnx** | vendored `thirdparty/arpa2ipa.py`, `bw2ipa.py`, `_MMS_SCRIPTS` in `util.py` |
 | **stressonnx** | `Script` enum and `LANG_SCRIPT` / `lang_to_script` in `accentor.py` |
 | **orthography2ipa** | optional notation-output layer (does not duplicate `script_distance` typology metrics) |
 
@@ -47,7 +59,7 @@ Phoneme-notation transcoding (pure data + converters).
 
 ### `scriptconv.translit`
 
-Grapheme-to-IPA transliteration for table-driven scripts.
+Script-level decomposition utilities (Hangul syllable→jamo).
 
 - `hangul_to_ipa(text)` — Hangul → IPA with full Korean phonological rules
   (palatalization, aspiration, assimilation, tensification, coda neutralization,

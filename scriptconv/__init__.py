@@ -11,7 +11,7 @@ notation:
     IPA ↔ Lexique, Buckwalter ↔ Arabic script.
     ``Notation`` enum + ``convert`` facade.
 translit:
-    Grapheme-to-IPA transliteration for table-driven scripts.
+    Script-level decomposition utilities (Hangul jamo).
     Currently: Hangul → IPA.
 
 Zero runtime dependencies (stdlib only).
@@ -37,7 +37,7 @@ from scriptconv.notation import (
     lexique_to_ipa,
     ipa_to_lexique,
 )
-from scriptconv.translit import hangul_to_ipa
+from scriptconv.translit import decompose_hangul
 
 __all__ = [
     # scripts
@@ -59,5 +59,5 @@ __all__ = [
     "lexique_to_ipa",
     "ipa_to_lexique",
     # translit
-    "hangul_to_ipa",
+    "decompose_hangul",
 ]
