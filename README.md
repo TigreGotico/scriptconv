@@ -1,78 +1,19 @@
 # scriptconv
 
-Shared script-conversion core for the TigreGotico voice-AI stack.
-
-Zero runtime dependencies (Python stdlib only).
-
+**scriptconv** is a zero-dependency Python library for written-script operations:
+ISO-15924 script identification and metadata, character-range detection, language-to-script
+mapping, lossless phoneme-notation transcoding (IPA ↔ ARPABET ↔ X-SAMPA, IPA ↔ Lexique,
+Buckwalter ↔ Arabic script), and orthographic decomposition of Hangul syllable blocks into
+jamo letters. Every conversion is a pure data table or arithmetic operation; no linguistic
+rules, no external files, no runtime dependencies beyond the Python standard library.
 
 ## Scope
 
-scriptconv is exclusively about **written scripts**: identification and
-metadata, script↔script transliteration, lossless phoneme-NOTATION
-transcoding (the same phonemes re-encoded between IPA, ARPABET,
-X-SAMPA, Buckwalter, Lexique — zero linguistic decisions), and
-orthographic decomposition. It never phonemizes: anything that requires
-knowing how a language *sounds in context* (grapheme-to-phoneme rules,
-allophony, sandhi) belongs in orthography2ipa or a downstream language
-engine, not here.
-
-## Consumers
-
-| Library | What it replaces |
-|---------|-----------------|
-| **phoonnx** | vendored `thirdparty/arpa2ipa.py`, `bw2ipa.py`, `_MMS_SCRIPTS` in `util.py` |
-| **stressonnx** | `Script` enum and `LANG_SCRIPT` / `lang_to_script` in `accentor.py` |
-| **orthography2ipa** | optional notation-output layer (does not duplicate `script_distance` typology metrics) |
-
-## Modules
-
-### `scriptconv.scripts`
-
-Writing-system identification and metadata.
-
-- `Script` — frozen dataclass: ISO-15924 code, name, direction, Unicode char ranges.
-- `SCRIPT_REGISTRY` — registry of ~30 scripts the org handles.
-- `detect_script(text)` — dominant ISO-15924 code by character ranges.
-- `char_script(ch)` — script code for a single character.
-- `lang_to_script(lang)` — default script for a BCP-47 language tag (~80 languages).
-- `normalize_script_tag(label)` — free-form labels to ISO-15924 (`"latin"→"Latn"`,
-  `"syllabics"→"Cans"`); ports phoonnx `_MMS_SCRIPTS` and extends it.
-
-### `scriptconv.notation`
-
-Phoneme-notation transcoding (pure data + converters).
-
-- `Notation` enum: `IPA`, `ARPA`, `XSAMPA`, `BUCKWALTER`, `ARABIC`, `LEXIQUE`.
-- `arpa_to_ipa` / `ipa_to_arpa` — ARPABET ↔ IPA, stress-digit aware.
-  `ipa_to_arpa` flags symbols outside the table with `"?"` (configurable via
-  the `unknown` parameter).
-  Table derived from [chorusai/arpa2ipa](https://github.com/chorusai/arpa2ipa) (Apache-2.0).
-- `xsampa_to_ipa` / `ipa_to_xsampa` — X-SAMPA ↔ IPA, longest-first matching.
-- `lexique_to_ipa` / `ipa_to_lexique` — Lexique one-char-per-phoneme ↔ IPA.
-  Table: New & Pallier, *Manuel de Lexique 3* v3.11, Tableau 2 (CC BY-SA 4.0).
-  Key disambiguation: `N`=ɲ (palatal nasal, e.g. *agneau*),
-  `G`=ŋ (velar nasal, English loans, e.g. *camping*),
-  `°`=ə (schwa élidable), `3`=ə (schwa non-élidable).
-- `buckwalter_to_arabic` / `arabic_to_buckwalter` — Buckwalter ↔ Arabic script.
-  Table derived from phoonnx `thirdparty/bw2ipa.py` and standard Buckwalter reference.
-- `convert(text, src, dst)` — facade routing through IPA where no direct map exists.
-
-### `scriptconv.translit`
-
-Script-level decomposition utilities (Hangul syllable→jamo).
-
-- `hangul_to_ipa(text)` — Hangul → IPA with full Korean phonological rules
-  (palatalization, aspiration, assimilation, tensification, coda neutralization,
-  H-deletion, non-coronalization, inter-sonorant voicing, l/ɾ alternation).
-  All conversion tables inlined; no external files.
-  Derived from [stannam/hangul_to_ipa](https://github.com/stannam/hangul_to_ipa).
-
-## What is intentionally NOT included
-
-- Romanizers (Hepburn, Pinyin, Yale) — notation-specific, belong in consumer libs.
-- Arabic diacritization / tashkeel — covered by `arbtok`.
-- Typological distance metrics — live in `orthography2ipa.script_distance`; not duplicated here.
-- IPA diacritic manipulation (stress insertion/removal) — belongs in `stressonnx`.
+scriptconv is exclusively about **written scripts**: identification and metadata,
+transliteration between script representations, lossless re-encoding of phoneme symbols
+between notation systems, and orthographic decomposition. It never phonemizes — anything
+that requires knowing how a language *sounds* (grapheme-to-phoneme rules, allophony,
+coarticulation, sandhi) is outside this library's scope.
 
 ## Installation
 
@@ -87,29 +28,70 @@ from scriptconv import (
     detect_script, lang_to_script, normalize_script_tag,
     arpa_to_ipa, ipa_to_arpa,
     xsampa_to_ipa, ipa_to_xsampa,
-    lexique_to_ipa, ipa_to_lexique,
     buckwalter_to_arabic, arabic_to_buckwalter,
-    hangul_to_ipa,
+    lexique_to_ipa, ipa_to_lexique,
+    decompose_hangul,
     convert, Notation,
 )
 
-detect_script("안녕하세요")          # "Hang"
-lang_to_script("ko")               # "Hang"
-normalize_script_tag("syllabics")  # "Cans"
+detect_script("안녕하세요")           # "Hang"
+lang_to_script("pt-BR")             # "Latn"
+normalize_script_tag("syllabics")   # "Cans"
 
-arpa_to_ipa("HH AH0 L OW1")       # "həloʊ"
-ipa_to_arpa("həloʊ")              # "AH L OW"
+arpa_to_ipa("HH AH0 L OW1")        # "həloʊ"
+ipa_to_arpa("həloʊ")               # "HH AX L OW"
 
-xsampa_to_ipa("S")                 # "ʃ"
-ipa_to_xsampa("ʃ")                 # "S"
+xsampa_to_ipa("tS")                 # "tʃ"
+ipa_to_xsampa("ɹ")                  # "r\\"
 
-buckwalter_to_arabic("mrhbA")      # "مرحبا"
-arabic_to_buckwalter("مرحبا")     # "mrHbA"
+buckwalter_to_arabic("mrHbA")       # "مرحبا"
+arabic_to_buckwalter("مرحبا")      # "mrHbA"
 
-lexique_to_ipa("b§ZuR")           # "bɔ̃ʒuʁ"  (bonjour)
-ipa_to_lexique("vɛ̃")              # "v5"  (vin)
+lexique_to_ipa("b§ZuR")            # "bɔ̃ʒuʁ"  (bonjour)
+ipa_to_lexique("vɛ̃")               # "v5"  (vin)
 
-hangul_to_ipa("한국어")             # Korean IPA
+decompose_hangul("국민")             # "ㄱㅜㄱㅁㅣㄴ"  (orthographic jamo, no assimilation)
 
-convert("HH AH0 L OW1", Notation.ARPA, Notation.XSAMPA)
+convert("NG", Notation.ARPA, Notation.XSAMPA)  # "N"
 ```
+
+## Modules
+
+| Module | Contents |
+|--------|----------|
+| `scriptconv.scripts` | `Script` dataclass, `SCRIPT_REGISTRY` (31 scripts), `detect_script`, `char_script`, `lang_to_script`, `normalize_script_tag` |
+| `scriptconv.notation` | `Notation` enum, `convert` facade, six pair-wise converters (ARPABET ↔ IPA, X-SAMPA ↔ IPA, Buckwalter ↔ Arabic, Lexique ↔ IPA) |
+| `scriptconv.translit` | `decompose_hangul` — Hangul syllable blocks → jamo (orthographic only) |
+
+## Documentation
+
+- [docs/scripts.md](docs/scripts.md) — Script registry, detection, language mapping, label normalisation
+- [docs/notation.md](docs/notation.md) — Notation enum, per-pair converter reference, round-trip guarantees
+- [docs/translit.md](docs/translit.md) — Hangul decomposition arithmetic and scope boundary
+
+## Examples
+
+Runnable scripts in [examples/](examples/):
+
+| File | Demonstrates |
+|------|-------------|
+| `01_detect_script.py` | Mixed-script text triage |
+| `02_lang_to_script.py` | Language tag → ISO-15924 mapping |
+| `03_arpabet_roundtrip.py` | CMUdict-style line → IPA and back |
+| `04_xsampa.py` | X-SAMPA ↔ IPA, multi-char longest-first cases |
+| `05_buckwalter.py` | Arabic ↔ Buckwalter both directions |
+| `06_lexique.py` | French Lexique codes → IPA |
+| `07_hangul_decompose.py` | Hangul syllable blocks → jamo letters |
+
+## License and attribution
+
+scriptconv is released under the **Apache-2.0** license.
+
+Derived tables used internally:
+
+| Table | Source | License |
+|-------|--------|---------|
+| ARPABET ↔ IPA | [chorusai/arpa2ipa](https://github.com/chorusai/arpa2ipa) | Apache-2.0 |
+| Buckwalter ↔ Arabic | phoonnx `thirdparty/bw2ipa.py` (Mantoq/pyarabic knowledge) | — |
+| Lexique phoneme codes | New, B. & Pallier, C. — *Manuel de Lexique 3* v3.11, Tableau 2; [chrplr/openlexicon](https://github.com/chrplr/openlexicon) | CC BY-SA 4.0 |
+| Hangul jamo tables | [stannam/hangul_to_ipa](https://github.com/stannam/hangul_to_ipa) | — |
