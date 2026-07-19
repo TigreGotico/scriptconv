@@ -1,27 +1,43 @@
 """Phoneme-notation transcoding — IPA ↔ ARPABET, IPA ↔ X-SAMPA,
-Buckwalter ↔ Arabic script.
+IPA ↔ Lexique, IPA ↔ Kirshenbaum, Buckwalter ↔ Arabic script.
 
 All tables are pure Python data; zero runtime dependencies.
 
 ARPABET table derived from chorusai/arpa2ipa
   (https://github.com/chorusai/arpa2ipa), licensed Apache-2.0.
-Mantoq/Buckwalter table derived from phoonnx thirdparty/bw2ipa.py.
+Buckwalter ↔ Arabic table follows Tim Buckwalter's transliteration scheme.
+Lexique phoneme-code table from:
+  New, B. & Pallier, C. — Manuel de Lexique 3, v3.11, Tableau 2 (p. 12).
+  Lexique383, https://github.com/chrplr/openlexicon, CC BY-SA 4.0.
+  Key: N=ɲ (palatal nasal, e.g. agneau), G=ŋ (velar nasal, e.g. camping),
+  °=schwa élidable, 3=schwa non-élidable, x=/x/ (Spanish loanword jota).
 """
 from __future__ import annotations
 
 import re
+import unicodedata
+from collections.abc import Generator, Iterable
+from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 __all__ = [
     "Notation",
+    "NotationInfo",
+    "NOTATION_INFO",
     "convert",
+    "can_convert",
+    "convert_batch",
     "arpa_to_ipa",
     "ipa_to_arpa",
     "xsampa_to_ipa",
     "ipa_to_xsampa",
     "buckwalter_to_arabic",
     "arabic_to_buckwalter",
+    "lexique_to_ipa",
+    "ipa_to_lexique",
+    "kirshenbaum_to_ipa",
+    "ipa_to_kirshenbaum",
+    "looks_like_ipa",
 ]
 
 
@@ -33,6 +49,11 @@ class Notation(str, Enum):
     XSAMPA = "x-sampa"
     BUCKWALTER = "buckwalter"
     ARABIC = "arabic"  # Arabic script (target/source for BW)
+    LEXIQUE = "lexique"  # Lexique one-char-per-phoneme French notation
+    KIRSHENBAUM = "kirshenbaum"  # ASCII-IPA (espeak-ng native notation)
+
+    def __repr__(self) -> str:
+        return f"Notation.{self.name}"
 
 
 # ---------------------------------------------------------------------------
@@ -73,7 +94,7 @@ _ARPA_BASE: dict[str, str] = {
     "T": "t",
     "D": "d",
     "K": "k",
-    "G": "g",
+    "G": "ɡ",   # script g U+0261 — canonical IPA, matches X-SAMPA/Lexique tables
     # Affricates
     "CH": "tʃ",
     "JH": "dʒ",
@@ -123,8 +144,12 @@ _IPA_TO_ARPA: dict[str, str] = {}
 for _arpa, _ipa in _ARPA_BASE.items():
     if _ipa not in _IPA_TO_ARPA:
         _IPA_TO_ARPA[_ipa] = _arpa
-# schwa
-_IPA_TO_ARPA.setdefault("ə", "AH")
+# Accept ASCII "g" (U+0067) as well as canonical script "ɡ" (U+0261) on input.
+_IPA_TO_ARPA.setdefault("g", "G")
+
+# Precompiled regex for IPA → ARPA (longest-first)
+_IPA_ARPA_KEYS_SORTED = sorted(_IPA_TO_ARPA.keys(), key=len, reverse=True)
+_IPA_ARPA_RE = re.compile("|".join(re.escape(s) for s in _IPA_ARPA_KEYS_SORTED))
 
 
 def arpa_to_ipa(arpa_sequence: str) -> str:
@@ -149,28 +174,36 @@ def arpa_to_ipa(arpa_sequence: str) -> str:
     return "".join(result)
 
 
-def ipa_to_arpa(ipa_string: str) -> str:
+def ipa_to_arpa(ipa_string: str, unknown: str = "?") -> str:
     """Convert an IPA string to a space-separated ARPABET sequence.
 
-    Matches longest IPA symbol first.  Unknown characters are dropped.
+    Matches longest IPA symbol first.  Characters outside the ARPABET table
+    are replaced by *unknown* (default ``"?"``); pass ``unknown=""`` to drop
+    them silently.
 
     Examples
     --------
     >>> ipa_to_arpa("həloʊ")
-    'AH L OW'
+    'HH AX L OW'
+    >>> ipa_to_arpa("ɸ")
+    '?'
     """
-    # Sort by descending length so multi-char IPA symbols match first
-    sorted_ipa = sorted(_IPA_TO_ARPA.keys(), key=len, reverse=True)
-    pattern = re.compile("|".join(re.escape(s) for s in sorted_ipa))
     tokens = []
     pos = 0
     while pos < len(ipa_string):
-        m = pattern.match(ipa_string, pos)
+        m = _IPA_ARPA_RE.match(ipa_string, pos)
         if m:
             tokens.append(_IPA_TO_ARPA[m.group(0)])
             pos = m.end()
         else:
-            pos += 1  # skip unknown
+            ch = ipa_string[pos]
+            # Diacritics and suprasegmentals (combining marks, length/stress
+            # modifier letters) have no ARPABET equivalent; they qualify the
+            # preceding phoneme rather than standing alone, so drop them
+            # instead of emitting a spurious *unknown* token.
+            if unknown and unicodedata.category(ch) not in ("Mn", "Mc", "Me", "Lm", "Sk"):
+                tokens.append(unknown)
+            pos += 1
     return " ".join(tokens)
 
 
@@ -194,13 +227,13 @@ _XSAMPA_TO_IPA: dict[str, str] = {
     "p\\": "ɸ",
     "B\\": "ʙ",
     "r\\": "ɹ",
-    "r`": "ɻ",
+    "r`": "ɽ",    # retroflex FLAP (not approximant)
     "R\\": "ʀ",
     "l`": "ɭ",
     "L\\": "ʎ",
-    "f\\": "ɸ",  # alias
+    "f\\": "ɸ",   # alias for p\
     "v\\": "ʋ",
-    "r\\`": "ɻ",
+    "r\\`": "ɻ",  # retroflex APPROXIMANT
     "s`": "ʂ",
     "z`": "ʐ",
     "S": "ʃ",
@@ -215,6 +248,23 @@ _XSAMPA_TO_IPA: dict[str, str] = {
     "h\\": "ɦ",
     "?": "ʔ",
     "H": "ɥ",
+    # Retroflex plosives
+    "t`": "ʈ",
+    "d`": "ɖ",
+    # Palatal plosives
+    "c": "c",
+    "J\\`": "ɟ",
+    # Uvular plosive
+    "q": "q",
+    # Alveolo-palatal fricatives
+    "s\\`": "ɕ",
+    "z\\`": "ʑ",
+    # Retroflex nasal
+    "n\\`": "ɳ",
+    # Pharyngeal fricative
+    "X\\`": "ħ",
+    # Lateral flap
+    "l\\`": "ɺ",
     # Nasals
     "F": "ɱ",
     "J": "ɲ",
@@ -264,7 +314,7 @@ _XSAMPA_TO_IPA: dict[str, str] = {
     "%": "ˌ",
     ":": "ː",
     "-.": ".",   # syllable boundary
-    "-\\": "’",  # linking
+    "-\\": "\u203F",  # undertie (U+203F)
 }
 
 # Reverse: IPA → X-SAMPA (first occurrence wins)
@@ -276,6 +326,10 @@ for _xs, _ip in _XSAMPA_TO_IPA.items():
 # Longest-first sorted keys for pattern matching
 _XS_KEYS_SORTED = sorted(_XSAMPA_TO_IPA.keys(), key=len, reverse=True)
 _IPA_KEYS_SORTED = sorted(_IPA_TO_XSAMPA.keys(), key=len, reverse=True)
+
+# Precompiled regexes
+_XS_RE = re.compile("|".join(re.escape(k) for k in _XS_KEYS_SORTED))
+_IPA_XS_RE = re.compile("|".join(re.escape(k) for k in _IPA_KEYS_SORTED))
 
 
 def xsampa_to_ipa(xsampa: str) -> str:
@@ -291,11 +345,10 @@ def xsampa_to_ipa(xsampa: str) -> str:
     >>> xsampa_to_ipa("@")
     'ə'
     """
-    pattern = re.compile("|".join(re.escape(k) for k in _XS_KEYS_SORTED))
     result = []
     pos = 0
     while pos < len(xsampa):
-        m = pattern.match(xsampa, pos)
+        m = _XS_RE.match(xsampa, pos)
         if m:
             result.append(_XSAMPA_TO_IPA[m.group(0)])
             pos = m.end()
@@ -318,11 +371,10 @@ def ipa_to_xsampa(ipa: str) -> str:
     >>> ipa_to_xsampa("ə")
     '@'
     """
-    pattern = re.compile("|".join(re.escape(k) for k in _IPA_KEYS_SORTED))
     result = []
     pos = 0
     while pos < len(ipa):
-        m = pattern.match(ipa, pos)
+        m = _IPA_XS_RE.match(ipa, pos)
         if m:
             result.append(_IPA_TO_XSAMPA[m.group(0)])
             pos = m.end()
@@ -333,14 +385,11 @@ def ipa_to_xsampa(ipa: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Buckwalter / Mantoq ↔ Arabic script
+# Buckwalter ↔ Arabic script
 #
-# The Mantoq notation used here is the tokenization scheme from
-# phoonnx/thirdparty/bw2ipa.py (itself a Mantoq→IPA converter).  We extend
-# it with a direct Buckwalter↔Arabic-script table, independent of IPA.
-#
-# Buckwalter transliteration table derived from phoonnx thirdparty/bw2ipa.py
-# and mantoq/pyarabic transliteration knowledge.
+# A direct Buckwalter ↔ Arabic-script table (independent of IPA) following
+# Tim Buckwalter's published Arabic transliteration scheme (a 1:1 factual
+# mapping between Arabic letters and ASCII characters).
 # ---------------------------------------------------------------------------
 
 # Standard Buckwalter → Arabic Unicode
@@ -396,6 +445,14 @@ _BW_TO_ARABIC: dict[str, str] = {
 }
 
 _ARABIC_TO_BW: dict[str, str] = {v: k for k, v in _BW_TO_ARABIC.items()}
+# Pre-composed lam-alef ligatures (single codepoints) → Buckwalter
+_ARABIC_TO_BW["\uFEFB"] = "lA"   # لا  lam + alef ligature
+_ARABIC_TO_BW["\uFEF9"] = "l<"   # لإ  lam + alef hamza below
+_ARABIC_TO_BW["\uFEF7"] = "l>"   # لأ  lam + alef hamza above
+_ARABIC_TO_BW["\uFEF8"] = "l|"   # لآ  lam + alef madda
+# The reverse comprehension lets the "^" shadda alias win over canonical "~";
+# restore the standard Buckwalter shadda so round-trips stay faithful.
+_ARABIC_TO_BW["\u0651"] = "~"   # shadda -> canonical "~", not the "^" alias
 
 
 def buckwalter_to_arabic(bw: str) -> str:
@@ -405,7 +462,7 @@ def buckwalter_to_arabic(bw: str) -> str:
 
     Examples
     --------
-    >>> buckwalter_to_arabic("mrhbA")
+    >>> buckwalter_to_arabic("mrHbA")
     'مرحبا'
     """
     return "".join(_BW_TO_ARABIC.get(ch, ch) for ch in bw)
@@ -425,6 +482,190 @@ def arabic_to_buckwalter(arabic: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Lexique ↔ IPA
+#
+# Lexique uses a one-character-per-phoneme code for French.
+# Source: New, B. & Pallier, C. — Manuel de Lexique 3 v3.11, Tableau 2
+# (https://github.com/chrplr/openlexicon), CC BY-SA 4.0.
+#
+# Critical disambiguation verified against the official table (p. 12):
+#   N → ɲ  (palatal nasal; examples: agneau, vigne)
+#   G → ŋ  (velar nasal, English loanwords; example: camping)
+#   ° → ə  (schwa élidable)
+#   3 → ə  (schwa non-élidable; distinct in input but same IPA target)
+#   x → x  (velar fricative, Spanish loanwords; example: jota)
+# ---------------------------------------------------------------------------
+
+_LEXIQUE_TO_IPA: dict[str, str] = {
+    # Vowels
+    "a": "a",    # bat, plat
+    "i": "i",    # lit, émis
+    "y": "y",    # lu
+    "u": "u",    # roue
+    "o": "o",    # peau, mot  (o fermé)
+    "O": "ɔ",    # éloge, fort  (o ouvert)
+    "e": "e",    # été  (e fermé)
+    "E": "ɛ",    # paire, treize  (e ouvert)
+    "°": "ə",    # schwa élidable (abordera)
+    "2": "ø",    # deux  (eu fermé)
+    "9": "œ",    # œuf, peur  (eu ouvert)
+    "5": "ɛ̃",   # cinq, linge  (voyelle nasale in)
+    "1": "œ̃",   # un, parfum  (voyelle nasale un)
+    "@": "ɑ̃",   # ange  (voyelle nasale an)
+    "§": "ɔ̃",   # on, savon  (voyelle nasale on)
+    "3": "ə",    # schwa non-élidable (parvenu)
+    # Semi-vowels (glides)
+    "j": "j",    # yeux, paille
+    "8": "ɥ",    # huit, lui
+    "w": "w",    # oui, nouer
+    # Consonants
+    "p": "p",    # père, soupe
+    "b": "b",    # bon, robe
+    "t": "t",    # terre, vite
+    "d": "d",    # dans, aide
+    "k": "k",    # carré, laque
+    "g": "ɡ",    # gare, bague
+    "f": "f",    # feu, neuf
+    "v": "v",    # vous, rêve
+    "s": "s",    # sale, dessous
+    "z": "z",    # zéro, maison
+    "S": "ʃ",    # chat, tâche
+    "Z": "ʒ",    # gilet, mijoter
+    "m": "m",    # main, femme
+    "n": "n",    # nous, tonne
+    "N": "ɲ",    # agneau, vigne  (consonne nasale palatale)
+    "l": "l",    # lent, sol
+    "R": "ʁ",    # rue, venir
+    "x": "x",    # jota (emprunt espagnol)
+    "G": "ŋ",    # camping  (ng, emprunt anglais)
+}
+
+# Reverse: IPA → Lexique (first-occurrence wins for ties like ə → °)
+_IPA_TO_LEXIQUE: dict[str, str] = {}
+for _lx, _ip in _LEXIQUE_TO_IPA.items():
+    if _ip not in _IPA_TO_LEXIQUE:
+        _IPA_TO_LEXIQUE[_ip] = _lx
+
+# Longest-first sorted keys
+_LX_KEYS_SORTED = sorted(_LEXIQUE_TO_IPA.keys(), key=len, reverse=True)
+_IPA_FOR_LX_SORTED = sorted(_IPA_TO_LEXIQUE.keys(), key=len, reverse=True)
+
+# Precompiled regex
+_IPA_LX_RE = re.compile("|".join(re.escape(s) for s in _IPA_FOR_LX_SORTED))
+
+
+def lexique_to_ipa(lexique: str) -> str:
+    """Convert a Lexique phoneme-code string to IPA.
+
+    Each Lexique phoneme is exactly one character; they are read left-to-right
+    with no separator.  Unknown characters are passed through unchanged.
+
+    Source: New & Pallier, Manuel de Lexique 3 v3.11, Tableau 2 (CC BY-SA 4.0).
+
+    Examples
+    --------
+    >>> lexique_to_ipa("b§ZuR")
+    'bɔ̃ʒuʁ'
+    >>> lexique_to_ipa("v5")
+    'vɛ̃'
+    """
+    result = []
+    for ch in lexique:
+        result.append(_LEXIQUE_TO_IPA.get(ch, ch))
+    return "".join(result)
+
+
+def ipa_to_lexique(ipa: str) -> str:
+    """Convert an IPA string to Lexique phoneme codes.
+
+    Matches longest IPA symbol first.  Unknown characters are passed through
+    unchanged.  The conversion is French-centric; symbols outside the Lexique
+    inventory are not representable.
+
+    Source: New & Pallier, Manuel de Lexique 3 v3.11, Tableau 2 (CC BY-SA 4.0).
+
+    Examples
+    --------
+    >>> ipa_to_lexique("bɔ̃ʒuʁ")
+    'b§ZuR'
+    >>> ipa_to_lexique("dø")
+    'd2'
+    """
+    result = []
+    pos = 0
+    while pos < len(ipa):
+        m = _IPA_LX_RE.match(ipa, pos)
+        if m:
+            result.append(_IPA_TO_LEXIQUE[m.group(0)])
+            pos = m.end()
+        else:
+            result.append(ipa[pos])
+            pos += 1
+    return "".join(result)
+
+
+# ---------------------------------------------------------------------------
+# Kirshenbaum (ASCII-IPA) ↔ IPA
+#
+# Kirshenbaum is the ASCII phonetic alphabet defined by Kirshenbaum 1993
+# (comp.speech), also used natively by espeak-ng. The single-character map
+# below is the factual ASCII → IPA codepoint correspondence of that standard
+# (index i → the IPA codepoint for ASCII 0x20+i), cross-checked against the
+# espeak-ng ``ipa1[96]`` table.
+# ---------------------------------------------------------------------------
+
+# ipa1[96]: IPA codepoint for each printable ASCII char, 0x20..0x7F.
+_KIRSHENBAUM_IPA1 = (
+    0x20, 0x21, 0x22, 0x2b0, 0x24, 0x25, 0x0e6, 0x2c8, 0x28, 0x29, 0x27e, 0x2b, 0x2cc, 0x2d, 0x2e, 0x2f,
+    0x252, 0x31, 0x32, 0x25c, 0x34, 0x35, 0x36, 0x37, 0x275, 0x39, 0x2d0, 0x2b2, 0x3c, 0x3d, 0x3e, 0x294,
+    0x259, 0x251, 0x3b2, 0xe7, 0xf0, 0x25b, 0x46, 0x262, 0x127, 0x26a, 0x25f, 0x4b, 0x26b, 0x271, 0x14b, 0x254,
+    0x3a6, 0x263, 0x280, 0x283, 0x3b8, 0x28a, 0x28c, 0x153, 0x3c7, 0xf8, 0x292, 0x32a, 0x5c, 0x5d, 0x5e, 0x5f,
+    0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x261, 0x68, 0x69, 0x6a, 0x6b, 0x6c, 0x6d, 0x6e, 0x6f,
+    0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7a, 0x7b, 0x7c, 0x7d, 0x303, 0x7f,
+)
+# Kirshenbaum symbols that map to an IPA character different from the ASCII
+# input carry real phonetic meaning; identity rows (letter → itself) are kept
+# so plain ASCII survives a round-trip.
+_KIRSHENBAUM_TO_IPA: dict[str, str] = {
+    chr(0x20 + _i): chr(_cp) for _i, _cp in enumerate(_KIRSHENBAUM_IPA1)
+}
+_IPA_TO_KIRSHENBAUM: dict[str, str] = {}
+for _k, _ip in _KIRSHENBAUM_TO_IPA.items():
+    _IPA_TO_KIRSHENBAUM.setdefault(_ip, _k)
+
+
+def kirshenbaum_to_ipa(kirshenbaum: str) -> str:
+    """Convert a Kirshenbaum (ASCII-IPA) string to IPA.
+
+    Each character is mapped independently. Characters outside the table
+    pass through unchanged.
+
+    Examples
+    --------
+    >>> kirshenbaum_to_ipa("S")
+    'ʃ'
+    >>> kirshenbaum_to_ipa("N")
+    'ŋ'
+    """
+    return "".join(_KIRSHENBAUM_TO_IPA.get(ch, ch) for ch in kirshenbaum)
+
+
+def ipa_to_kirshenbaum(ipa: str) -> str:
+    """Convert an IPA string to Kirshenbaum (ASCII-IPA).
+
+    Characters outside the table pass through unchanged.
+
+    Examples
+    --------
+    >>> ipa_to_kirshenbaum("ʃ")
+    'S'
+    >>> ipa_to_kirshenbaum("ŋ")
+    'N'
+    """
+    return "".join(_IPA_TO_KIRSHENBAUM.get(ch, ch) for ch in ipa)
+
+
+# ---------------------------------------------------------------------------
 # convert — facade routing through IPA where no direct map exists
 # ---------------------------------------------------------------------------
 
@@ -434,6 +675,7 @@ def convert(text: str, src: str | Notation, dst: str | Notation) -> str:
     Supported pairs (direct):
       - ``arpa`` ↔ ``ipa``
       - ``x-sampa`` ↔ ``ipa``
+      - ``lexique`` ↔ ``ipa``
       - ``buckwalter`` ↔ ``arabic``
 
     Indirect pairs route through IPA (e.g. ``arpa`` → ``x-sampa`` goes
@@ -465,32 +707,244 @@ def convert(text: str, src: str | Notation, dst: str | Notation) -> str:
     if src == dst:
         return text
 
-    # Direct paths
-    if src == Notation.ARPA and dst == Notation.IPA:
-        return arpa_to_ipa(text)
-    if src == Notation.IPA and dst == Notation.ARPA:
-        return ipa_to_arpa(text)
-    if src == Notation.XSAMPA and dst == Notation.IPA:
-        return xsampa_to_ipa(text)
-    if src == Notation.IPA and dst == Notation.XSAMPA:
-        return ipa_to_xsampa(text)
-    if src == Notation.BUCKWALTER and dst == Notation.ARABIC:
-        return buckwalter_to_arabic(text)
-    if src == Notation.ARABIC and dst == Notation.BUCKWALTER:
-        return arabic_to_buckwalter(text)
+    # IPA-pivot notations: <notation> → IPA → <notation>.
+    if src in _TO_IPA and dst == Notation.IPA:
+        return _TO_IPA[src](text)
+    if src == Notation.IPA and dst in _FROM_IPA:
+        return _FROM_IPA[dst](text)
+    if src in _TO_IPA and dst in _FROM_IPA:
+        return _FROM_IPA[dst](_TO_IPA[src](text))
 
-    # Indirect: route through IPA
-    _to_ipa = {
-        Notation.ARPA: arpa_to_ipa,
-        Notation.XSAMPA: xsampa_to_ipa,
-    }
-    _from_ipa = {
-        Notation.ARPA: ipa_to_arpa,
-        Notation.XSAMPA: ipa_to_xsampa,
-    }
-    if src in _to_ipa and dst in _from_ipa:
-        return _from_ipa[dst](_to_ipa[src](text))
-    if src in _from_ipa and dst in _to_ipa:
-        raise ValueError(f"No conversion path from {src} to {dst}")
+    # Buckwalter ↔ Arabic script is a direct pair (not IPA-routable).
+    if (src, dst) in _DIRECT_PAIRS:
+        return _DIRECT_PAIRS[(src, dst)](text)
 
     raise ValueError(f"Unsupported conversion: {src!r} → {dst!r}")
+
+
+# ---------------------------------------------------------------------------
+# Converter registry — the single source of truth for supported paths.
+#
+# _TO_IPA / _FROM_IPA hold the IPA-pivot notations; anything registered in
+# both can convert to anything else in the other (routed through IPA).
+# _DIRECT_PAIRS holds non-IPA pairs (Buckwalter ↔ Arabic script).
+# ---------------------------------------------------------------------------
+
+_TO_IPA: dict[Notation, "callable"] = {
+    Notation.ARPA: arpa_to_ipa,
+    Notation.XSAMPA: xsampa_to_ipa,
+    Notation.LEXIQUE: lexique_to_ipa,
+    Notation.KIRSHENBAUM: kirshenbaum_to_ipa,
+}
+_FROM_IPA: dict[Notation, "callable"] = {
+    Notation.ARPA: ipa_to_arpa,
+    Notation.XSAMPA: ipa_to_xsampa,
+    Notation.LEXIQUE: ipa_to_lexique,
+    Notation.KIRSHENBAUM: ipa_to_kirshenbaum,
+}
+_DIRECT_PAIRS: dict[tuple[Notation, Notation], "callable"] = {
+    (Notation.BUCKWALTER, Notation.ARABIC): buckwalter_to_arabic,
+    (Notation.ARABIC, Notation.BUCKWALTER): arabic_to_buckwalter,
+}
+
+
+# ---------------------------------------------------------------------------
+# can_convert — predicate for supported conversion paths
+# ---------------------------------------------------------------------------
+
+def _build_supported_pairs() -> set[tuple[Notation, Notation]]:
+    pairs: set[tuple[Notation, Notation]] = set(_DIRECT_PAIRS)
+    for _s in _TO_IPA:
+        pairs.add((_s, Notation.IPA))
+    for _d in _FROM_IPA:
+        pairs.add((Notation.IPA, _d))
+    for _s in _TO_IPA:
+        for _d in _FROM_IPA:
+            if _s != _d:
+                pairs.add((_s, _d))
+    return pairs
+
+
+_SUPPORTED_PAIRS: set[tuple[Notation, Notation]] = _build_supported_pairs()
+
+
+def can_convert(src: str | Notation, dst: str | Notation) -> bool:
+    """Return ``True`` if a conversion from *src* to *dst* is supported.
+
+    Parameters
+    ----------
+    src:
+        Source notation.
+    dst:
+        Target notation.
+
+    Examples
+    --------
+    >>> can_convert("arpa", "ipa")
+    True
+    >>> can_convert("arpa", "x-sampa")
+    True
+    >>> can_convert("buckwalter", "ipa")
+    False
+    """
+    src = Notation(src)
+    dst = Notation(dst)
+    return (src, dst) in _SUPPORTED_PAIRS
+
+
+# ---------------------------------------------------------------------------
+# NotationInfo — queryable fidelity metadata (fidelity is data, not prose)
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class NotationInfo:
+    """Fidelity metadata for a phoneme notation, relative to the IPA hub.
+
+    Attributes
+    ----------
+    notation:
+        The :class:`Notation` this describes.
+    lossless_to_ipa:
+        ``True`` if ``<notation> → IPA → <notation>`` reproduces every input
+        symbol exactly (round-trip safe from the notation's side).
+    lossless_from_ipa:
+        ``True`` if ``IPA → <notation> → IPA`` reproduces every IPA symbol —
+        i.e. the notation's inventory covers IPA. ``False`` for
+        restricted-inventory notations such as ARPABET.
+    token_separated:
+        ``True`` when symbols are whitespace-separated tokens (ARPABET) rather
+        than a contiguous string (IPA, X-SAMPA, Kirshenbaum, Lexique).
+    reference:
+        Citation for the mapping table.
+    """
+
+    notation: Notation
+    lossless_to_ipa: bool
+    lossless_from_ipa: bool
+    token_separated: bool
+    reference: str
+
+
+NOTATION_INFO: dict[Notation, NotationInfo] = {
+    Notation.ARPA: NotationInfo(
+        Notation.ARPA, lossless_to_ipa=False, lossless_from_ipa=False,
+        token_separated=True,
+        reference="https://github.com/chorusai/arpa2ipa",
+    ),
+    Notation.XSAMPA: NotationInfo(
+        Notation.XSAMPA, lossless_to_ipa=False, lossless_from_ipa=True,
+        token_separated=False,
+        reference="https://en.wikipedia.org/wiki/X-SAMPA",
+    ),
+    Notation.LEXIQUE: NotationInfo(
+        Notation.LEXIQUE, lossless_to_ipa=False, lossless_from_ipa=True,
+        token_separated=False,
+        reference="New & Pallier, Manuel de Lexique 3 v3.11, Tableau 2 (CC BY-SA 4.0)",
+    ),
+    Notation.KIRSHENBAUM: NotationInfo(
+        Notation.KIRSHENBAUM, lossless_to_ipa=True, lossless_from_ipa=False,
+        token_separated=False,
+        reference="Kirshenbaum 1993 ASCII-IPA standard (comp.speech)",
+    ),
+    Notation.BUCKWALTER: NotationInfo(
+        Notation.BUCKWALTER, lossless_to_ipa=True, lossless_from_ipa=False,
+        token_separated=False,
+        reference="Tim Buckwalter Arabic transliteration scheme",
+    ),
+}
+
+
+# ---------------------------------------------------------------------------
+# convert_batch — line-by-line generator
+# ---------------------------------------------------------------------------
+
+
+def convert_batch(
+    lines: Iterable[str],
+    src: str | Notation,
+    dst: str | Notation,
+) -> Generator[str, None, None]:
+    """Convert each line from *src* to *dst* notation, yielding results.
+
+    Blank lines are yielded unchanged (no conversion attempted).
+
+    Parameters
+    ----------
+    lines:
+        Iterable of input strings (e.g. file lines).
+    src:
+        Source notation.
+    dst:
+        Target notation.
+
+    Yields
+    ------
+    str
+        Converted string for each input line.
+
+    Examples
+    --------
+    >>> list(convert_batch(["HH AH0 L OW1", "", "AY1"], "arpa", "ipa"))
+    ['həloʊ', '', 'aɪ']
+    """
+    _src = Notation(src)
+    _dst = Notation(dst)
+    for line in lines:
+        stripped = line.rstrip("\n\r")
+        if not stripped:
+            yield stripped
+        else:
+            yield convert(stripped, _src, _dst)
+
+
+# ---------------------------------------------------------------------------
+# looks_like_ipa — heuristic notation detection
+# ---------------------------------------------------------------------------
+
+# Unicode blocks/characters that are distinctive to IPA transcription.  Basic
+# Latin letters (p, a, t, …) and the Greek letters IPA borrows (β, θ, χ) are
+# deliberately excluded: they are indistinguishable from ordinary Latin/Greek
+# text, so they carry no signal.
+_IPA_DISTINCTIVE_RANGES = (
+    (0x0250, 0x02AF),  # IPA Extensions
+    (0x02B0, 0x02FF),  # Spacing Modifier Letters (ˈ ˌ ː ˑ ʰ ʲ …)
+    (0x0363, 0x036F),  # Combining diacritics used in IPA
+    (0x1D00, 0x1D7F),  # Phonetic Extensions
+    (0x1D80, 0x1DBF),  # Phonetic Extensions Supplement
+)
+# Individual combining marks common in IPA (nasalisation, syllabicity, etc.).
+_IPA_DISTINCTIVE_CHARS = frozenset("̩̪̥̃̊͜͡")
+
+
+def _is_ipa_distinctive(ch: str) -> bool:
+    cp = ord(ch)
+    if ch in _IPA_DISTINCTIVE_CHARS:
+        return True
+    return any(lo <= cp <= hi for lo, hi in _IPA_DISTINCTIVE_RANGES)
+
+
+def looks_like_ipa(text: str) -> bool:
+    """Heuristically decide whether *text* is an IPA transcription.
+
+    Returns ``True`` when *text* contains at least one character that is
+    distinctive to IPA — from the IPA Extensions, Spacing Modifier Letters,
+    or Phonetic Extensions blocks, or an IPA combining diacritic (e.g.
+    ``ɑ``, ``ʃ``, ``ː``, ``ˈ``, nasalisation).
+
+    This is a positive-signal heuristic, not a classifier: a transcription
+    written only with characters IPA shares with the Latin alphabet
+    (``"pat"``, ``"bad"``) has no distinctive marker and returns ``False``.
+    It cannot be otherwise — those characters are the same codepoints as
+    ordinary text. Use it to *guard* against feeding IPA where orthography
+    is expected, not to prove a string is not IPA.
+
+    Examples
+    --------
+    >>> looks_like_ipa("pʰɑtʃ")
+    True
+    >>> looks_like_ipa("ˈhɛloʊ")
+    True
+    >>> looks_like_ipa("hello")
+    False
+    """
+    return any(_is_ipa_distinctive(ch) for ch in text)
