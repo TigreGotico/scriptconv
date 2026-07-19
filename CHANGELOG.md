@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.1a6](https://github.com/TigreGotico/scriptconv/tree/0.0.1a6) (2026-07-19)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.1a5...0.0.1a6)
+
+**Merged pull requests:**
+
+- feat: looks\_like\_ipa\(\) heuristic notation detector [\#12](https://github.com/TigreGotico/scriptconv/pull/12) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.1a5](https://github.com/TigreGotico/scriptconv/tree/0.0.1a5) (2026-07-19)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.1a4...0.0.1a5)
