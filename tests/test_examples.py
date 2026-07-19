@@ -5,7 +5,7 @@ from pathlib import Path
 
 EXAMPLES_DIR = Path(__file__).parent.parent / "examples"
 
-EXAMPLE_SCRIPTS = sorted(EXAMPLES_DIR.glob("0*.py"))
+EXAMPLE_SCRIPTS = sorted(EXAMPLES_DIR.glob("[0-9]*.py"))
 
 
 def _run(script: Path):
@@ -18,8 +18,8 @@ def _run(script: Path):
 
 
 def test_examples_exist():
-    assert len(EXAMPLE_SCRIPTS) >= 7, (
-        f"Expected at least 7 example scripts, found {len(EXAMPLE_SCRIPTS)}"
+    assert len(EXAMPLE_SCRIPTS) >= 11, (
+        f"Expected at least 11 example scripts, found {len(EXAMPLE_SCRIPTS)}"
     )
 
 
@@ -61,5 +61,29 @@ def test_06_lexique():
 
 def test_07_hangul_decompose():
     r = _run(EXAMPLES_DIR / "07_hangul_decompose.py")
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip()
+
+
+def test_08_script_distribution():
+    r = _run(EXAMPLES_DIR / "08_script_distribution.py")
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip()
+
+
+def test_09_script_to_langs():
+    r = _run(EXAMPLES_DIR / "09_script_to_langs.py")
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip()
+
+
+def test_10_new_labels():
+    r = _run(EXAMPLES_DIR / "10_new_labels.py")
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip()
+
+
+def test_11_cli():
+    r = _run(EXAMPLES_DIR / "11_cli.py")
     assert r.returncode == 0, r.stderr
     assert r.stdout.strip()

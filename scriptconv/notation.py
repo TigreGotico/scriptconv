@@ -15,12 +15,15 @@ Lexique phoneme-code table from:
 from __future__ import annotations
 
 import re
+import unicodedata
+from collections.abc import Generator, Iterable
 from enum import Enum
-from typing import Optional
 
 __all__ = [
     "Notation",
     "convert",
+    "can_convert",
+    "convert_batch",
     "arpa_to_ipa",
     "ipa_to_arpa",
     "xsampa_to_ipa",
@@ -41,6 +44,9 @@ class Notation(str, Enum):
     BUCKWALTER = "buckwalter"
     ARABIC = "arabic"  # Arabic script (target/source for BW)
     LEXIQUE = "lexique"  # Lexique one-char-per-phoneme French notation
+
+    def __repr__(self) -> str:
+        return f"Notation.{self.name}"
 
 
 # ---------------------------------------------------------------------------
@@ -81,7 +87,7 @@ _ARPA_BASE: dict[str, str] = {
     "T": "t",
     "D": "d",
     "K": "k",
-    "G": "g",
+    "G": "ɡ",   # script g U+0261 — canonical IPA, matches X-SAMPA/Lexique tables
     # Affricates
     "CH": "tʃ",
     "JH": "dʒ",
@@ -131,8 +137,12 @@ _IPA_TO_ARPA: dict[str, str] = {}
 for _arpa, _ipa in _ARPA_BASE.items():
     if _ipa not in _IPA_TO_ARPA:
         _IPA_TO_ARPA[_ipa] = _arpa
-# schwa
-_IPA_TO_ARPA.setdefault("ə", "AH")
+# Accept ASCII "g" (U+0067) as well as canonical script "ɡ" (U+0261) on input.
+_IPA_TO_ARPA.setdefault("g", "G")
+
+# Precompiled regex for IPA → ARPA (longest-first)
+_IPA_ARPA_KEYS_SORTED = sorted(_IPA_TO_ARPA.keys(), key=len, reverse=True)
+_IPA_ARPA_RE = re.compile("|".join(re.escape(s) for s in _IPA_ARPA_KEYS_SORTED))
 
 
 def arpa_to_ipa(arpa_sequence: str) -> str:
@@ -167,25 +177,27 @@ def ipa_to_arpa(ipa_string: str, unknown: str = "?") -> str:
     Examples
     --------
     >>> ipa_to_arpa("həloʊ")
-    'AH L OW'
+    'HH AX L OW'
     >>> ipa_to_arpa("ɸ")
     '?'
     """
-    # Sort by descending length so multi-char IPA symbols match first
-    sorted_ipa = sorted(_IPA_TO_ARPA.keys(), key=len, reverse=True)
-    pattern = re.compile("|".join(re.escape(s) for s in sorted_ipa))
     tokens = []
     pos = 0
     while pos < len(ipa_string):
-        m = pattern.match(ipa_string, pos)
+        m = _IPA_ARPA_RE.match(ipa_string, pos)
         if m:
             tokens.append(_IPA_TO_ARPA[m.group(0)])
             pos = m.end()
         else:
-            if unknown:
+            ch = ipa_string[pos]
+            # Diacritics and suprasegmentals (combining marks, length/stress
+            # modifier letters) have no ARPABET equivalent; they qualify the
+            # preceding phoneme rather than standing alone, so drop them
+            # instead of emitting a spurious *unknown* token.
+            if unknown and unicodedata.category(ch) not in ("Mn", "Mc", "Me", "Lm", "Sk"):
                 tokens.append(unknown)
             pos += 1
-    return " ".join(t for t in tokens if t)
+    return " ".join(tokens)
 
 
 # ---------------------------------------------------------------------------
@@ -208,13 +220,13 @@ _XSAMPA_TO_IPA: dict[str, str] = {
     "p\\": "ɸ",
     "B\\": "ʙ",
     "r\\": "ɹ",
-    "r`": "ɻ",
+    "r`": "ɽ",    # retroflex FLAP (not approximant)
     "R\\": "ʀ",
     "l`": "ɭ",
     "L\\": "ʎ",
-    "f\\": "ɸ",  # alias
+    "f\\": "ɸ",   # alias for p\
     "v\\": "ʋ",
-    "r\\`": "ɻ",
+    "r\\`": "ɻ",  # retroflex APPROXIMANT
     "s`": "ʂ",
     "z`": "ʐ",
     "S": "ʃ",
@@ -229,6 +241,23 @@ _XSAMPA_TO_IPA: dict[str, str] = {
     "h\\": "ɦ",
     "?": "ʔ",
     "H": "ɥ",
+    # Retroflex plosives
+    "t`": "ʈ",
+    "d`": "ɖ",
+    # Palatal plosives
+    "c": "c",
+    "J\\`": "ɟ",
+    # Uvular plosive
+    "q": "q",
+    # Alveolo-palatal fricatives
+    "s\\`": "ɕ",
+    "z\\`": "ʑ",
+    # Retroflex nasal
+    "n\\`": "ɳ",
+    # Pharyngeal fricative
+    "X\\`": "ħ",
+    # Lateral flap
+    "l\\`": "ɺ",
     # Nasals
     "F": "ɱ",
     "J": "ɲ",
@@ -278,7 +307,7 @@ _XSAMPA_TO_IPA: dict[str, str] = {
     "%": "ˌ",
     ":": "ː",
     "-.": ".",   # syllable boundary
-    "-\\": "’",  # linking
+    "-\\": "\u203F",  # undertie (U+203F)
 }
 
 # Reverse: IPA → X-SAMPA (first occurrence wins)
@@ -290,6 +319,10 @@ for _xs, _ip in _XSAMPA_TO_IPA.items():
 # Longest-first sorted keys for pattern matching
 _XS_KEYS_SORTED = sorted(_XSAMPA_TO_IPA.keys(), key=len, reverse=True)
 _IPA_KEYS_SORTED = sorted(_IPA_TO_XSAMPA.keys(), key=len, reverse=True)
+
+# Precompiled regexes
+_XS_RE = re.compile("|".join(re.escape(k) for k in _XS_KEYS_SORTED))
+_IPA_XS_RE = re.compile("|".join(re.escape(k) for k in _IPA_KEYS_SORTED))
 
 
 def xsampa_to_ipa(xsampa: str) -> str:
@@ -305,11 +338,10 @@ def xsampa_to_ipa(xsampa: str) -> str:
     >>> xsampa_to_ipa("@")
     'ə'
     """
-    pattern = re.compile("|".join(re.escape(k) for k in _XS_KEYS_SORTED))
     result = []
     pos = 0
     while pos < len(xsampa):
-        m = pattern.match(xsampa, pos)
+        m = _XS_RE.match(xsampa, pos)
         if m:
             result.append(_XSAMPA_TO_IPA[m.group(0)])
             pos = m.end()
@@ -332,11 +364,10 @@ def ipa_to_xsampa(ipa: str) -> str:
     >>> ipa_to_xsampa("ə")
     '@'
     """
-    pattern = re.compile("|".join(re.escape(k) for k in _IPA_KEYS_SORTED))
     result = []
     pos = 0
     while pos < len(ipa):
-        m = pattern.match(ipa, pos)
+        m = _IPA_XS_RE.match(ipa, pos)
         if m:
             result.append(_IPA_TO_XSAMPA[m.group(0)])
             pos = m.end()
@@ -410,6 +441,14 @@ _BW_TO_ARABIC: dict[str, str] = {
 }
 
 _ARABIC_TO_BW: dict[str, str] = {v: k for k, v in _BW_TO_ARABIC.items()}
+# Pre-composed lam-alef ligatures (single codepoints) → Buckwalter
+_ARABIC_TO_BW["\uFEFB"] = "lA"   # لا  lam + alef ligature
+_ARABIC_TO_BW["\uFEF9"] = "l<"   # لإ  lam + alef hamza below
+_ARABIC_TO_BW["\uFEF7"] = "l>"   # لأ  lam + alef hamza above
+_ARABIC_TO_BW["\uFEF8"] = "l|"   # لآ  lam + alef madda
+# The reverse comprehension lets the "^" shadda alias win over canonical "~";
+# restore the standard Buckwalter shadda so round-trips stay faithful.
+_ARABIC_TO_BW["\u0651"] = "~"   # shadda -> canonical "~", not the "^" alias
 
 
 def buckwalter_to_arabic(bw: str) -> str:
@@ -419,7 +458,7 @@ def buckwalter_to_arabic(bw: str) -> str:
 
     Examples
     --------
-    >>> buckwalter_to_arabic("mrhbA")
+    >>> buckwalter_to_arabic("mrHbA")
     'مرحبا'
     """
     return "".join(_BW_TO_ARABIC.get(ch, ch) for ch in bw)
@@ -507,6 +546,9 @@ for _lx, _ip in _LEXIQUE_TO_IPA.items():
 _LX_KEYS_SORTED = sorted(_LEXIQUE_TO_IPA.keys(), key=len, reverse=True)
 _IPA_FOR_LX_SORTED = sorted(_IPA_TO_LEXIQUE.keys(), key=len, reverse=True)
 
+# Precompiled regex
+_IPA_LX_RE = re.compile("|".join(re.escape(s) for s in _IPA_FOR_LX_SORTED))
+
 
 def lexique_to_ipa(lexique: str) -> str:
     """Convert a Lexique phoneme-code string to IPA.
@@ -545,11 +587,10 @@ def ipa_to_lexique(ipa: str) -> str:
     >>> ipa_to_lexique("dø")
     'd2'
     """
-    pattern = re.compile("|".join(re.escape(s) for s in _IPA_FOR_LX_SORTED))
     result = []
     pos = 0
     while pos < len(ipa):
-        m = pattern.match(ipa, pos)
+        m = _IPA_LX_RE.match(ipa, pos)
         if m:
             result.append(_IPA_TO_LEXIQUE[m.group(0)])
             pos = m.end()
@@ -569,6 +610,7 @@ def convert(text: str, src: str | Notation, dst: str | Notation) -> str:
     Supported pairs (direct):
       - ``arpa`` ↔ ``ipa``
       - ``x-sampa`` ↔ ``ipa``
+      - ``lexique`` ↔ ``ipa``
       - ``buckwalter`` ↔ ``arabic``
 
     Indirect pairs route through IPA (e.g. ``arpa`` → ``x-sampa`` goes
@@ -633,3 +675,92 @@ def convert(text: str, src: str | Notation, dst: str | Notation) -> str:
         return _from_ipa[dst](_to_ipa[src](text))
 
     raise ValueError(f"Unsupported conversion: {src!r} → {dst!r}")
+
+
+# ---------------------------------------------------------------------------
+# can_convert — predicate for supported conversion paths
+# ---------------------------------------------------------------------------
+
+# Build the set of supported (src, dst) pairs once
+_SUPPORTED_PAIRS: set[tuple[Notation, Notation]] = {
+    (Notation.ARPA, Notation.IPA),
+    (Notation.IPA, Notation.ARPA),
+    (Notation.XSAMPA, Notation.IPA),
+    (Notation.IPA, Notation.XSAMPA),
+    (Notation.LEXIQUE, Notation.IPA),
+    (Notation.IPA, Notation.LEXIQUE),
+    (Notation.BUCKWALTER, Notation.ARABIC),
+    (Notation.ARABIC, Notation.BUCKWALTER),
+}
+# Add all IPA-routable indirect paths
+for _s in (Notation.ARPA, Notation.XSAMPA, Notation.LEXIQUE):
+    for _d in (Notation.ARPA, Notation.XSAMPA, Notation.LEXIQUE):
+        if _s != _d:
+            _SUPPORTED_PAIRS.add((_s, _d))
+
+
+def can_convert(src: str | Notation, dst: str | Notation) -> bool:
+    """Return ``True`` if a conversion from *src* to *dst* is supported.
+
+    Parameters
+    ----------
+    src:
+        Source notation.
+    dst:
+        Target notation.
+
+    Examples
+    --------
+    >>> can_convert("arpa", "ipa")
+    True
+    >>> can_convert("arpa", "x-sampa")
+    True
+    >>> can_convert("buckwalter", "ipa")
+    False
+    """
+    src = Notation(src)
+    dst = Notation(dst)
+    return (src, dst) in _SUPPORTED_PAIRS
+
+
+# ---------------------------------------------------------------------------
+# convert_batch — line-by-line generator
+# ---------------------------------------------------------------------------
+
+
+def convert_batch(
+    lines: Iterable[str],
+    src: str | Notation,
+    dst: str | Notation,
+) -> Generator[str, None, None]:
+    """Convert each line from *src* to *dst* notation, yielding results.
+
+    Blank lines are yielded unchanged (no conversion attempted).
+
+    Parameters
+    ----------
+    lines:
+        Iterable of input strings (e.g. file lines).
+    src:
+        Source notation.
+    dst:
+        Target notation.
+
+    Yields
+    ------
+    str
+        Converted string for each input line.
+
+    Examples
+    --------
+    >>> list(convert_batch(["HH AH0 L OW1", "", "AY1"], "arpa", "ipa"))
+    ['həloʊ', '', 'aɪ']
+    """
+    _src = Notation(src)
+    _dst = Notation(dst)
+    for line in lines:
+        stripped = line.rstrip("\n\r")
+        if not stripped:
+            yield stripped
+        else:
+            yield convert(stripped, _src, _dst)
