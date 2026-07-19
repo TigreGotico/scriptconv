@@ -39,6 +39,8 @@ __all__ = [
     "ipa_to_kirshenbaum",
     "cotovia_to_ipa",
     "ipa_to_cotovia",
+    "rfe_to_ipa",
+    "ipa_to_rfe",
     "looks_like_ipa",
 ]
 
@@ -54,6 +56,7 @@ class Notation(str, Enum):
     LEXIQUE = "lexique"  # Lexique one-char-per-phoneme French notation
     KIRSHENBAUM = "kirshenbaum"  # ASCII-IPA (espeak-ng native notation)
     COTOVIA = "cotovia"  # Universidade de Vigo Cotovía TTS notation (gl)
+    RFE = "rfe"  # Revista de Filología Española phonetic alphabet
 
     def __repr__(self) -> str:
         return f"Notation.{self.name}"
@@ -787,6 +790,126 @@ def ipa_to_cotovia(ipa: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# RFE (Revista de Filología Española) ↔ IPA
+#
+# The RFE phonetic alphabet (Navarro Tomás, Revista de Filología Española,
+# 1915) is the traditional transcription system of Spanish and Romance
+# philology. This is its core, well-attested inventory; rare interdental and
+# variant diacritic symbols from the full standard are omitted. Symbols are
+# matched longest-first (combining-mark symbols before their base letters).
+# Reference: RFE Phonetic Alphabet
+# (https://en.wikipedia.org/wiki/RFE_Phonetic_Alphabet).
+# ---------------------------------------------------------------------------
+
+_RFE_TO_IPA: dict[str, str] = {
+    # Combining-mark symbols (longest-match first)
+    "r̄": "r",    # r + macron = alveolar trill (plain r = tap ɾ)
+    "n̮": "ɲ",   # n + breve below = palatal nasal ɲ
+    "l̮": "ʎ",   # l + breve below = palatal lateral ʎ
+    # Palatal / postalveolar
+    "ĉ": "tʃ",   # ĉ = tʃ
+    "š": "ʃ",    # š = ʃ
+    "ž": "ʒ",    # ž = ʒ
+    "ŷ": "ɟʝ",  # ŷ = ɟʝ (voiced palatal affricate)
+    "ñ": "ɲ",    # ñ = ɲ
+    "y": "ʝ",         # y = ʝ
+    "j": "j",              # j = j
+    # Spanish approximant/fricative allophones
+    "ƀ": "β",    # ƀ = β
+    "đ": "ð",    # đ = ð
+    "ǥ": "ɣ",    # ǥ = ɣ
+    # Other consonants
+    "θ": "θ",    # θ = θ
+    "x": "x",
+    "ł": "ɫ",    # ł = ɫ (velarized l)
+    "ŋ": "ŋ",    # ŋ = ŋ
+    "w": "w",
+    "h": "h",
+    "b": "b",
+    "p": "p",
+    "t": "t",
+    "d": "d",
+    "k": "k",
+    "g": "ɡ",         # g = ɡ (script g, matching the other tables)
+    "f": "f",
+    "v": "v",
+    "s": "s",
+    "z": "z",
+    "m": "m",
+    "n": "n",
+    "l": "l",
+    "r": "ɾ",         # r = tap ɾ
+    # Vowels
+    "a": "a", "e": "e", "i": "i", "o": "o", "u": "u",
+    "ə": "ə",    # ə = ə
+}
+
+# Reverse: IPA → RFE. First-wins deduplicates; pin the canonical RFE spellings
+# for the palatal nasal (ñ) and the trill/tap pair.
+_IPA_TO_RFE: dict[str, str] = {}
+for _rfe, _ip in _RFE_TO_IPA.items():
+    _IPA_TO_RFE.setdefault(_ip, _rfe)
+_IPA_TO_RFE["ɲ"] = "ñ"   # ɲ → ñ (canonical, not the n̮ variant)
+
+_RFE_KEYS_SORTED = sorted(_RFE_TO_IPA.keys(), key=len, reverse=True)
+_RFE_RE = re.compile("|".join(re.escape(x) for x in _RFE_KEYS_SORTED))
+_IPA_RFE_KEYS_SORTED = sorted(_IPA_TO_RFE.keys(), key=len, reverse=True)
+_IPA_RFE_RE = re.compile("|".join(re.escape(x) for x in _IPA_RFE_KEYS_SORTED))
+
+
+def rfe_to_ipa(rfe: str) -> str:
+    """Convert an RFE (Revista de Filología Española) string to IPA.
+
+    Multi-character symbols are matched longest-first. Characters outside the
+    table pass through unchanged.
+
+    Examples
+    --------
+    >>> rfe_to_ipa("š")
+    'ʃ'
+    >>> rfe_to_ipa("kaša")
+    'kaʃa'
+    """
+    result = []
+    pos = 0
+    while pos < len(rfe):
+        m = _RFE_RE.match(rfe, pos)
+        if m:
+            result.append(_RFE_TO_IPA[m.group(0)])
+            pos = m.end()
+        else:
+            result.append(rfe[pos])
+            pos += 1
+    return "".join(result)
+
+
+def ipa_to_rfe(ipa: str) -> str:
+    """Convert an IPA string to RFE (Revista de Filología Española) notation.
+
+    Multi-character IPA symbols are matched longest-first. Characters outside
+    the table pass through unchanged.
+
+    Examples
+    --------
+    >>> ipa_to_rfe("ʃ")
+    'š'
+    >>> ipa_to_rfe("ɲ")
+    'ñ'
+    """
+    result = []
+    pos = 0
+    while pos < len(ipa):
+        m = _IPA_RFE_RE.match(ipa, pos)
+        if m:
+            result.append(_IPA_TO_RFE[m.group(0)])
+            pos = m.end()
+        else:
+            result.append(ipa[pos])
+            pos += 1
+    return "".join(result)
+
+
+# ---------------------------------------------------------------------------
 # convert — facade routing through IPA where no direct map exists
 # ---------------------------------------------------------------------------
 
@@ -857,6 +980,7 @@ _TO_IPA: dict[Notation, "callable"] = {
     Notation.LEXIQUE: lexique_to_ipa,
     Notation.KIRSHENBAUM: kirshenbaum_to_ipa,
     Notation.COTOVIA: cotovia_to_ipa,
+    Notation.RFE: rfe_to_ipa,
 }
 _FROM_IPA: dict[Notation, "callable"] = {
     Notation.ARPA: ipa_to_arpa,
@@ -864,6 +988,7 @@ _FROM_IPA: dict[Notation, "callable"] = {
     Notation.LEXIQUE: ipa_to_lexique,
     Notation.KIRSHENBAUM: ipa_to_kirshenbaum,
     Notation.COTOVIA: ipa_to_cotovia,
+    Notation.RFE: ipa_to_rfe,
 }
 _DIRECT_PAIRS: dict[tuple[Notation, Notation], "callable"] = {
     (Notation.BUCKWALTER, Notation.ARABIC): buckwalter_to_arabic,
@@ -973,6 +1098,11 @@ NOTATION_INFO: dict[Notation, NotationInfo] = {
         Notation.COTOVIA, lossless_to_ipa=False, lossless_from_ipa=False,
         token_separated=False,
         reference="Universidade de Vigo GTM Cotovía TTS (fonemas.cpp)",
+    ),
+    Notation.RFE: NotationInfo(
+        Notation.RFE, lossless_to_ipa=False, lossless_from_ipa=False,
+        token_separated=False,
+        reference="RFE phonetic alphabet (Revista de Filología Española, 1915)",
     ),
     Notation.BUCKWALTER: NotationInfo(
         Notation.BUCKWALTER, lossless_to_ipa=True, lossless_from_ipa=False,
