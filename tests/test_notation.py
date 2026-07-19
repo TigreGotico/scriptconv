@@ -1027,3 +1027,33 @@ def test_lossless_to_ipa_flag_backed_by_round_trip():
         if info.lossless_to_ipa and notation in samples:
             for ch in samples[notation]:
                 assert from_ipa[notation](to_ipa[notation](ch)) == ch, notation
+
+
+# ---------------------------------------------------------------------------
+# looks_like_ipa — heuristic notation detection
+# ---------------------------------------------------------------------------
+
+from scriptconv.notation import looks_like_ipa  # noqa: E402
+
+
+@pytest.mark.parametrize("text", [
+    "pʰɑtʃ",       # IPA Extensions + modifier
+    "ˈhɛloʊ",      # stress mark + IPA Extensions
+    "ɑ",           # single IPA Extensions char
+    "næ̃",          # combining nasalisation
+    "kat̪",         # combining dental diacritic
+])
+def test_looks_like_ipa_true(text):
+    assert looks_like_ipa(text) is True
+
+
+@pytest.mark.parametrize("text", [
+    "",            # empty
+    "hello",       # plain Latin — ambiguous, no distinctive marker
+    "att",         # overlaps Latin
+    "café",        # accented Latin is not IPA-distinctive
+    "θaβ",         # bare Greek letters carry no IPA signal
+    "مرحبا",       # Arabic
+])
+def test_looks_like_ipa_false(text):
+    assert looks_like_ipa(text) is False

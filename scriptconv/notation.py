@@ -37,6 +37,7 @@ __all__ = [
     "ipa_to_lexique",
     "kirshenbaum_to_ipa",
     "ipa_to_kirshenbaum",
+    "looks_like_ipa",
 ]
 
 
@@ -894,3 +895,56 @@ def convert_batch(
             yield stripped
         else:
             yield convert(stripped, _src, _dst)
+
+
+# ---------------------------------------------------------------------------
+# looks_like_ipa — heuristic notation detection
+# ---------------------------------------------------------------------------
+
+# Unicode blocks/characters that are distinctive to IPA transcription.  Basic
+# Latin letters (p, a, t, …) and the Greek letters IPA borrows (β, θ, χ) are
+# deliberately excluded: they are indistinguishable from ordinary Latin/Greek
+# text, so they carry no signal.
+_IPA_DISTINCTIVE_RANGES = (
+    (0x0250, 0x02AF),  # IPA Extensions
+    (0x02B0, 0x02FF),  # Spacing Modifier Letters (ˈ ˌ ː ˑ ʰ ʲ …)
+    (0x0363, 0x036F),  # Combining diacritics used in IPA
+    (0x1D00, 0x1D7F),  # Phonetic Extensions
+    (0x1D80, 0x1DBF),  # Phonetic Extensions Supplement
+)
+# Individual combining marks common in IPA (nasalisation, syllabicity, etc.).
+_IPA_DISTINCTIVE_CHARS = frozenset("̩̪̥̃̊͜͡")
+
+
+def _is_ipa_distinctive(ch: str) -> bool:
+    cp = ord(ch)
+    if ch in _IPA_DISTINCTIVE_CHARS:
+        return True
+    return any(lo <= cp <= hi for lo, hi in _IPA_DISTINCTIVE_RANGES)
+
+
+def looks_like_ipa(text: str) -> bool:
+    """Heuristically decide whether *text* is an IPA transcription.
+
+    Returns ``True`` when *text* contains at least one character that is
+    distinctive to IPA — from the IPA Extensions, Spacing Modifier Letters,
+    or Phonetic Extensions blocks, or an IPA combining diacritic (e.g.
+    ``ɑ``, ``ʃ``, ``ː``, ``ˈ``, nasalisation).
+
+    This is a positive-signal heuristic, not a classifier: a transcription
+    written only with characters IPA shares with the Latin alphabet
+    (``"pat"``, ``"bad"``) has no distinctive marker and returns ``False``.
+    It cannot be otherwise — those characters are the same codepoints as
+    ordinary text. Use it to *guard* against feeding IPA where orthography
+    is expected, not to prove a string is not IPA.
+
+    Examples
+    --------
+    >>> looks_like_ipa("pʰɑtʃ")
+    True
+    >>> looks_like_ipa("ˈhɛloʊ")
+    True
+    >>> looks_like_ipa("hello")
+    False
+    """
+    return any(_is_ipa_distinctive(ch) for ch in text)
