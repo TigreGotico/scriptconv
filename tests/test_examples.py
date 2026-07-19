@@ -87,3 +87,21 @@ def test_11_cli():
     r = _run(EXAMPLES_DIR / "11_cli.py")
     assert r.returncode == 0, r.stderr
     assert r.stdout.strip()
+
+
+def test_12_kirshenbaum():
+    r = _run(EXAMPLES_DIR / "12_kirshenbaum.py")
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip()
+
+
+def test_13_script_runs():
+    r = _run(EXAMPLES_DIR / "13_script_runs.py")
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip()
+
+
+def test_14_kana_transliteration():
+    r = _run(EXAMPLES_DIR / "14_kana_transliteration.py")
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip()

@@ -24,6 +24,7 @@ from scriptconv.scripts import (
     char_script,
     detect_script,
     script_distribution,
+    script_runs,
     base_direction,
     lang_to_script,
     script_to_langs,
@@ -31,6 +32,8 @@ from scriptconv.scripts import (
 )
 from scriptconv.notation import (
     Notation,
+    NotationInfo,
+    NOTATION_INFO,
     convert,
     can_convert,
     convert_batch,
@@ -42,8 +45,14 @@ from scriptconv.notation import (
     arabic_to_buckwalter,
     lexique_to_ipa,
     ipa_to_lexique,
+    kirshenbaum_to_ipa,
+    ipa_to_kirshenbaum,
 )
-from scriptconv.translit import decompose_hangul
+from scriptconv.translit import (
+    decompose_hangul,
+    hira_to_kana,
+    kana_to_hira,
+)
 
 __all__ = [
     # scripts
@@ -52,12 +61,15 @@ __all__ = [
     "char_script",
     "detect_script",
     "script_distribution",
+    "script_runs",
     "base_direction",
     "lang_to_script",
     "script_to_langs",
     "normalize_script_tag",
     # notation
     "Notation",
+    "NotationInfo",
+    "NOTATION_INFO",
     "convert",
     "can_convert",
     "convert_batch",
@@ -69,6 +81,10 @@ __all__ = [
     "arabic_to_buckwalter",
     "lexique_to_ipa",
     "ipa_to_lexique",
+    "kirshenbaum_to_ipa",
+    "ipa_to_kirshenbaum",
     # translit
     "decompose_hangul",
+    "hira_to_kana",
+    "kana_to_hira",
 ]
