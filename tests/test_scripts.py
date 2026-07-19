@@ -674,3 +674,71 @@ def test_script_to_langs_case_sensitive():
 ])
 def test_hangul_extended_b(ch, expected):
     assert char_script(ch) == expected
+
+
+# ---------------------------------------------------------------------------
+# script_type typological metadata
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("code, expected", [
+    ("Latn", "alphabet"),
+    ("Cyrl", "alphabet"),
+    ("Arab", "abjad"),
+    ("Hebr", "abjad"),
+    ("Deva", "abugida"),
+    ("Thai", "abugida"),
+    ("Hira", "syllabary"),
+    ("Kana", "syllabary"),
+    ("Hani", "logographic"),
+    ("Hang", "featural"),
+])
+def test_script_type(code, expected):
+    assert SCRIPT_REGISTRY[code].script_type == expected
+
+
+def test_every_registered_script_is_typed():
+    # No entry should be left with the default "other".
+    untyped = [c for c, s in SCRIPT_REGISTRY.items() if s.script_type == "other"]
+    assert untyped == []
+
+
+def test_script_type_values_are_from_the_closed_set():
+    allowed = {"alphabet", "abjad", "abugida", "syllabary",
+               "logographic", "featural", "other"}
+    assert all(s.script_type in allowed for s in SCRIPT_REGISTRY.values())
+
+
+# ---------------------------------------------------------------------------
+# script_runs — mixed-script segmentation
+# ---------------------------------------------------------------------------
+
+from scriptconv.scripts import script_runs  # noqa: E402
+
+
+def test_script_runs_mixed():
+    assert script_runs("привет hello") == [("Cyrl", "привет "), ("Latn", "hello")]
+
+
+def test_script_runs_three_scripts():
+    assert script_runs("Hello مرحبا world") == [
+        ("Latn", "Hello "), ("Arab", "مرحبا "), ("Latn", "world"),
+    ]
+
+
+def test_script_runs_combining_mark_never_splits():
+    # Combining acute (U+0301) attaches to the preceding Cyrillic run.
+    assert script_runs("приве́т") == [("Cyrl", "приве́т")]
+
+
+def test_script_runs_leading_neutrals_are_none():
+    assert script_runs("  hi") == [(None, "  "), ("Latn", "hi")]
+
+
+def test_script_runs_empty_and_pure_punctuation():
+    assert script_runs("") == []
+    assert script_runs("!!! ???") == [(None, "!!! ???")]
+
+
+def test_script_runs_reconstructs_input():
+    for text in ["привет hello", "Hello مرحبا world", "приве́т", "  hi", "日本語 abc"]:
+        assert "".join(t for _, t in script_runs(text)) == text

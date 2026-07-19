@@ -42,20 +42,23 @@ package — install with `-e` first.
 
 ```python
 from scriptconv import (
-    detect_script, char_script, script_distribution, base_direction,
-    lang_to_script, script_to_langs, normalize_script_tag,
+    detect_script, char_script, script_distribution, script_runs, base_direction,
+    lang_to_script, script_to_langs, normalize_script_tag, SCRIPT_REGISTRY,
     arpa_to_ipa, ipa_to_arpa,
     xsampa_to_ipa, ipa_to_xsampa,
     buckwalter_to_arabic, arabic_to_buckwalter,
     lexique_to_ipa, ipa_to_lexique,
-    decompose_hangul,
-    convert, can_convert, convert_batch, Notation,
+    kirshenbaum_to_ipa, ipa_to_kirshenbaum,
+    decompose_hangul, hira_to_kana, kana_to_hira,
+    convert, can_convert, convert_batch, Notation, NOTATION_INFO,
 )
 
 detect_script("안녕하세요")           # "Hang"
 char_script("ɑ")                    # "Latn" (IPA Extensions)
 script_distribution("Hello مرحبا")   # {'Latn': 5, 'Arab': 5}
+script_runs("привет hello")          # [('Cyrl', 'привет '), ('Latn', 'hello')]
 base_direction("مرحبا بالعالم")      # "rtl"
+SCRIPT_REGISTRY["Arab"].script_type  # "abjad"  (typological class)
 
 lang_to_script("pt-BR")             # "Latn"
 script_to_langs("Cyrl")             # ['av', 'ba', 'be', 'bg', ...]
@@ -74,12 +77,20 @@ arabic_to_buckwalter("مرحبا")      # "mrHbA"
 lexique_to_ipa("b§ZuR")            # "bɔ̃ʒuʁ"  (bonjour)
 ipa_to_lexique("vɛ̃")               # "v5"  (vin)
 
+kirshenbaum_to_ipa("S")             # "ʃ"   (espeak-ng ASCII-IPA)
+ipa_to_kirshenbaum("ŋ")             # "N"
+
 decompose_hangul("국민")             # "ㄱㅜㄱㅁㅣㄴ"  (orthographic jamo, no assimilation)
+hira_to_kana("ひらがな")             # "ヒラガナ"
+kana_to_hira("カタカナ")             # "かたかな"
 
 convert("NG", Notation.ARPA, Notation.XSAMPA)  # "N"
+convert("HH AH0 L OW1", "arpa", "kirshenbaum") # "h@loU"
 can_convert("arpa", "x-sampa")                 # True
 can_convert("buckwalter", "ipa")               # False
 list(convert_batch(["HH AH0", "AY1"], "arpa", "ipa"))  # ['hə', 'aɪ']
+
+NOTATION_INFO[Notation.ARPA].lossless_from_ipa  # False (restricted inventory)
 ```
 
 ### CLI
@@ -97,9 +108,9 @@ python -m scriptconv lang ko
 
 | Module | Contents |
 |--------|----------|
-| `scriptconv.scripts` | `Script` dataclass, `SCRIPT_REGISTRY` (34 scripts), `detect_script`, `char_script`, `script_distribution`, `base_direction`, `lang_to_script`, `script_to_langs`, `normalize_script_tag` |
-| `scriptconv.notation` | `Notation` enum, `convert` facade, `can_convert` predicate, `convert_batch` generator, six pair-wise converters (ARPABET ↔ IPA, X-SAMPA ↔ IPA, Buckwalter ↔ Arabic, Lexique ↔ IPA) |
-| `scriptconv.translit` | `decompose_hangul` — Hangul syllable blocks → jamo (orthographic only) |
+| `scriptconv.scripts` | `Script` dataclass (with `script_type`), `SCRIPT_REGISTRY` (34 scripts), `detect_script`, `char_script`, `script_distribution`, `script_runs`, `base_direction`, `lang_to_script`, `script_to_langs`, `normalize_script_tag` |
+| `scriptconv.notation` | `Notation` enum, `NotationInfo`/`NOTATION_INFO` fidelity registry, `convert` facade, `can_convert` predicate, `convert_batch` generator, pair-wise converters (ARPABET ↔ IPA, X-SAMPA ↔ IPA, Buckwalter ↔ Arabic, Lexique ↔ IPA, Kirshenbaum ↔ IPA) |
+| `scriptconv.translit` | `decompose_hangul` (Hangul blocks → jamo, compatibility or conjoining), `hira_to_kana`/`kana_to_hira` — all orthographic only |
 
 ## Documentation
 
@@ -124,6 +135,9 @@ Runnable scripts in [examples/](examples/):
 | `09_script_to_langs.py` | Reverse lookup: script → languages |
 | `10_new_labels.py` | New normalize_script_tag labels (japanese, jamo, cjk…) |
 | `11_cli.py` | CLI interface: detect, distribution, direction, decompose, lang |
+| `12_kirshenbaum.py` | Kirshenbaum (ASCII-IPA) ↔ IPA, and ARPABET → Kirshenbaum routing |
+| `13_script_runs.py` | Per-script segmentation of mixed-script text |
+| `14_kana_transliteration.py` | Hiragana ↔ Katakana |
 
 ## Fidelity guarantees
 
@@ -137,6 +151,11 @@ round-trip is exact and what happens to a symbol the table does not know.
 | **X-SAMPA** | Exact for all canonical symbols | Exact except aliases (`f\`→ɸ, `&`→æ) normalise to their canonical spelling | Passed through unchanged |
 | **Buckwalter ↔ Arabic** | Exact (the `^` shadda alias normalises to canonical `~`; precomposed lam-alef ligatures decompose to two chars, visually identical) | Exact | Passed through unchanged |
 | **Lexique ↔ IPA** | Exact except the `°`/`3` schwa pair (both → `ə`; reverse always → `°`) | Exact | Passed through unchanged |
+| **Kirshenbaum ↔ IPA** | Exact | **Lossy** — restricted ASCII inventory; IPA outside it passes through | Passed through unchanged |
+
+This table is also available programmatically via `NOTATION_INFO`
+(`NotationInfo` records with `lossless_to_ipa`, `lossless_from_ipa`,
+`token_separated`, and a `reference` citation per notation).
 
 Notes:
 
@@ -157,4 +176,5 @@ Derived tables used internally:
 | ARPABET ↔ IPA | [chorusai/arpa2ipa](https://github.com/chorusai/arpa2ipa) | Apache-2.0 |
 | Buckwalter ↔ Arabic | Tim Buckwalter's transliteration scheme (via pyarabic) | — |
 | Lexique phoneme codes | New, B. & Pallier, C. — *Manuel de Lexique 3* v3.11, Tableau 2; [chrplr/openlexicon](https://github.com/chrplr/openlexicon) | CC BY-SA 4.0 |
+| Kirshenbaum ↔ IPA | espeak-ng 1.52.0 `dictionary.c` `ipa1[96]`; Kirshenbaum 1993 | GPL-3.0 (table of codepoints) |
 | Hangul jamo tables | [stannam/hangul_to_ipa](https://github.com/stannam/hangul_to_ipa) | — |

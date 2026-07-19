@@ -71,3 +71,25 @@ assimilation). Mapping from jamo to IPA with phonological rules is phonemization
 is outside scriptconv's scope.
 
 Jamo tables derived from [stannam/hangul_to_ipa](https://github.com/stannam/hangul_to_ipa).
+
+## Decomposition forms
+
+`decompose_hangul(text, form=..., drop_silent_initial=...)`:
+
+- `form="compatibility"` (default) emits Hangul Compatibility Jamo (`ㄱ`).
+- `form="conjoining"` emits conjoining jamo (U+1100/1161/11A8) that recombine
+  into the original syllables under Unicode NFC.
+- `drop_silent_initial=True` omits the placeholder onset `ㅇ` (ieung) in
+  syllable-initial position.
+
+## Kana transliteration
+
+Hiragana and Katakana are two encodings of the same syllabary, separated by a
+fixed `+0x60` codepoint offset. `hira_to_kana` and `kana_to_hira` swap between
+them; the katakana-only long-vowel mark `ー` (U+30FC) has no hiragana form and
+passes through unchanged.
+
+```python
+hira_to_kana("ひらがな")   # "ヒラガナ"
+kana_to_hira("カタカナ")   # "かたかな"
+```

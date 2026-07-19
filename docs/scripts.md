@@ -319,3 +319,33 @@ Passing the ISO code `"laoo"` (lowercase) also works via the code-normalisation 
 
 **Gotcha — case**: lookup is case-insensitive for both the label map and the ISO code
 map. `"LATIN"` → lowercased to `"latin"` → found in label map → `"Latn"`.
+
+## Typological metadata — `script_type`
+
+Each `Script` in `SCRIPT_REGISTRY` carries a `script_type`: one of `alphabet`,
+`abjad`, `abugida`, `syllabary`, `logographic`, `featural`, or `other`
+(classification per Daniels & Bright, *The World's Writing Systems*, 1996). It
+describes how the script encodes sounds structurally — not how any language is
+pronounced.
+
+```python
+SCRIPT_REGISTRY["Arab"].script_type   # "abjad"
+SCRIPT_REGISTRY["Deva"].script_type   # "abugida"
+SCRIPT_REGISTRY["Hani"].script_type   # "logographic"
+```
+
+## Mixed-script segmentation — `script_runs`
+
+`detect_script` flattens text to one dominant script; `script_runs` preserves
+structure by returning contiguous `(script, substring)` runs. Script-neutral
+characters (spaces, punctuation, combining marks) attach to the preceding run,
+following the resolution model of Unicode UAX #24.
+
+```python
+script_runs("привет hello")
+# [('Cyrl', 'привет '), ('Latn', 'hello')]
+```
+
+`lang_to_script` honours an explicit ISO-15924 script subtag when present
+(`sr-Latn` → `Latn`), falling back to the language's default script otherwise.
+The returned script strings are stable API.
