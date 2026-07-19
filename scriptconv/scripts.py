@@ -14,7 +14,7 @@ who expect phonetic symbols to be unrecognised.
 from __future__ import annotations
 
 from bisect import bisect_right
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Optional
 
 __all__ = [
@@ -23,6 +23,7 @@ __all__ = [
     "char_script",
     "detect_script",
     "script_distribution",
+    "script_runs",
     "base_direction",
     "lang_to_script",
     "script_to_langs",
@@ -49,12 +50,18 @@ class Script:
     char_ranges:
         Tuple of ``(start, end)`` inclusive Unicode codepoint ranges that
         predominantly belong to this script (e.g. ``((0x0041, 0x005A),)``).
+    script_type:
+        Typological class of the writing system — one of ``"alphabet"``,
+        ``"abjad"``, ``"abugida"``, ``"syllabary"``, ``"logographic"``,
+        ``"featural"``, or ``"other"``. Describes how the script encodes
+        sounds structurally; it is not a pronunciation claim.
     """
 
     iso15924: str
     name: str
     direction: str  # "ltr" | "rtl"
     char_ranges: tuple[tuple[int, int], ...]
+    script_type: str = "other"
 
 
 # ---------------------------------------------------------------------------
@@ -338,6 +345,28 @@ SCRIPT_REGISTRY: dict[str, Script] = {
     ),
 }
 
+# Typological class per script (Daniels & Bright, *The World's Writing
+# Systems*, 1996). Kept as a compact map so the registry literal above stays
+# focused on codepoint ranges; applied to each entry below.
+_SCRIPT_TYPES: dict[str, str] = {
+    "Latn": "alphabet", "Cyrl": "alphabet", "Grek": "alphabet",
+    "Armn": "alphabet", "Geor": "alphabet", "Glag": "alphabet",
+    "Runr": "alphabet", "Ogam": "alphabet", "Tfng": "alphabet",
+    "Arab": "abjad", "Hebr": "abjad", "Phnx": "abjad",
+    "Deva": "abugida", "Beng": "abugida", "Guru": "abugida",
+    "Gujr": "abugida", "Orya": "abugida", "Taml": "abugida",
+    "Telu": "abugida", "Knda": "abugida", "Mlym": "abugida",
+    "Sinh": "abugida", "Thai": "abugida", "Laoo": "abugida",
+    "Mymr": "abugida", "Tibt": "abugida", "Khmr": "abugida",
+    "Ethi": "abugida", "Cans": "abugida",
+    "Hira": "syllabary", "Kana": "syllabary", "Cprt": "syllabary",
+    "Hani": "logographic",
+    "Hang": "featural",
+}
+for _code, _stype in _SCRIPT_TYPES.items():
+    if _code in SCRIPT_REGISTRY:
+        SCRIPT_REGISTRY[_code] = replace(SCRIPT_REGISTRY[_code], script_type=_stype)
+
 
 # ---------------------------------------------------------------------------
 # Optimised char_script — flat sorted interval list with bisect
@@ -457,6 +486,37 @@ def script_distribution(text: str) -> dict[str, int]:
         if s is not None:
             counts[s] = counts.get(s, 0) + 1
     return dict(sorted(counts.items(), key=lambda kv: kv[1], reverse=True))
+
+
+def script_runs(text: str) -> list[tuple[Optional[str], str]]:
+    """Segment *text* into contiguous runs of a single script.
+
+    Returns a list of ``(script, substring)`` pairs in text order, where
+    *script* is an ISO-15924 code or ``None``. Script-neutral characters
+    (spaces, punctuation, digits, combining marks — anything
+    :func:`char_script` maps to ``None``) attach to the preceding run
+    rather than starting a new one, following the resolution model of
+    Unicode UAX #24; a run of leading neutrals carries ``None``.
+
+    Unlike :func:`detect_script` (which flattens to one dominant script),
+    this preserves the structure of mixed-script text — e.g. a Cyrillic
+    word embedded in a Latin sentence.
+
+    Examples
+    --------
+    >>> script_runs("привет hello")
+    [('Cyrl', 'привет '), ('Latn', 'hello')]
+    >>> script_runs("")
+    []
+    """
+    runs: list[list] = []
+    for ch in text:
+        s = char_script(ch)
+        if runs and (s is None or s == runs[-1][0]):
+            runs[-1][1] += ch
+        else:
+            runs.append([s, ch])
+    return [(s, t) for s, t in runs]
 
 
 def base_direction(text: str) -> str:
