@@ -4,12 +4,21 @@
 [![Build Tests](https://github.com/TigreGotico/scriptconv/actions/workflows/build-tests.yml/badge.svg?branch=dev)](https://github.com/TigreGotico/scriptconv/actions/workflows/build-tests.yml)
 [![PyPI version](https://img.shields.io/pypi/v/scriptconv.svg)](https://pypi.org/project/scriptconv/)
 
-**scriptconv** is a zero-dependency Python library for written-script operations:
-ISO-15924 script identification and metadata, character-range detection, language-to-script
-mapping, phoneme-notation transcoding (IPA ↔ ARPABET / X-SAMPA / Lexique / Kirshenbaum / Cotovía / RFE,
-Buckwalter ↔ Arabic script), and orthographic decomposition of Hangul syllable blocks into
-jamo letters. Every conversion is a pure data table or arithmetic operation; no linguistic
-rules, no external files, no runtime dependencies beyond the Python standard library.
+**scriptconv** is a zero-dependency Python library for written-script and
+phoneme-notation operations:
+
+- **Script identification & metadata** — ISO-15924 detection, character-range
+  lookup, typological `script_type`, base direction, mixed-script segmentation
+  (`script_runs`), and language ↔ script mapping.
+- **Phoneme-notation transcoding** — IPA ↔ ARPABET, X-SAMPA, Lexique,
+  Kirshenbaum, Cotovía and RFE, routed through IPA, with queryable per-notation
+  fidelity metadata (`NOTATION_INFO`) and a `looks_like_ipa` detector.
+- **Script transliteration & decomposition** — Buckwalter ↔ Arabic script,
+  Hangul → jamo (compatibility or conjoining), Hiragana ↔ Katakana.
+
+Every conversion is a pure data table or arithmetic operation — **no
+phonemization**, no linguistic rules, no external files, and no runtime
+dependencies beyond the Python standard library.
 
 Transcoding is reversible where the target inventory permits — see
 [Fidelity guarantees](#fidelity-guarantees) for the exact per-notation guarantees.
