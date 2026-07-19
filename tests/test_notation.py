@@ -947,7 +947,7 @@ def test_notation_enum_values():
 
 
 def test_notation_enum_count():
-    assert len(Notation) == 8
+    assert len(Notation) == 9
 
 
 def test_notation_str():
@@ -1108,3 +1108,43 @@ def test_cotovia_pause_marker_not_a_phoneme():
     assert cotovia_to_ipa("#") == "#"
     # p/a/u are ordinary phonemes, converted independently.
     assert cotovia_to_ipa("pau") == "pau"
+
+
+# ---------------------------------------------------------------------------
+# RFE (Revista de Filología Española) ↔ IPA
+# ---------------------------------------------------------------------------
+
+from scriptconv.notation import rfe_to_ipa, ipa_to_rfe  # noqa: E402
+
+
+@pytest.mark.parametrize("rfe, ipa", [
+    ("š", "ʃ"), ("ž", "ʒ"), ("ĉ", "tʃ"), ("y", "ʝ"), ("ŷ", "ɟʝ"),
+    ("ñ", "ɲ"), ("n̮", "ɲ"), ("l̮", "ʎ"),
+    ("ƀ", "β"), ("đ", "ð"), ("ǥ", "ɣ"), ("θ", "θ"), ("ł", "ɫ"),
+    ("r", "ɾ"), ("r̄", "r"),
+    ("g", "ɡ"),
+    ("kaša", "kaʃa"),
+])
+def test_rfe_to_ipa(rfe, ipa):
+    assert rfe_to_ipa(rfe) == ipa
+
+
+@pytest.mark.parametrize("ipa, rfe", [
+    ("ʃ", "š"), ("ʒ", "ž"), ("tʃ", "ĉ"), ("ʝ", "y"),
+    ("ɲ", "ñ"),      # canonical, not the n̮ variant
+    ("ʎ", "l̮"),
+    ("β", "ƀ"), ("ð", "đ"), ("ɣ", "ǥ"),
+    ("ɾ", "r"), ("r", "r̄"),
+])
+def test_ipa_to_rfe(ipa, rfe):
+    assert ipa_to_rfe(ipa) == rfe
+
+
+def test_rfe_tap_trill_round_trip():
+    assert ipa_to_rfe(rfe_to_ipa("far̄a")) == "far̄a"   # trill
+    assert ipa_to_rfe(rfe_to_ipa("kara")) == "kara"     # tap
+
+
+def test_convert_routes_through_rfe():
+    assert convert("š", "rfe", "x-sampa") == "S"
+    assert convert("ʃ", "ipa", "rfe") == "š"

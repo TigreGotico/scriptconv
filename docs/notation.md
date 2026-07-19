@@ -525,3 +525,20 @@ ipa_to_cotovia("ʎ")       # "L"     (canonical palatal-lateral symbol)
 The silence/pause marker (`#`) is a boundary token, not a phoneme, and is
 excluded from the table. Three source symbols (`L`, `Z`, `jj`) map to `ʎ`; the
 reverse direction emits the standard Cotovía `L`.
+
+
+## RFE (Revista de Filología Española) ↔ IPA
+
+The RFE phonetic alphabet (Navarro Tomás, *Revista de Filología Española*,
+1915) is the traditional transcription system of Spanish and Romance
+philology. scriptconv provides its core, well-attested inventory (rare
+interdental and variant diacritic symbols from the full standard are omitted).
+
+```python
+rfe_to_ipa("kaša")   # "kaʃa"
+ipa_to_rfe("ɲ")      # "ñ"     (canonical; n̮ is also accepted on input)
+rfe_to_ipa("far̄a")  # trill r (r̄); single r is the tap ɾ
+```
+
+The palatal nasal accepts both `ñ` and `n̮` on input and emits `ñ`; the
+tap/trill distinction (`r` = ɾ, `r̄` = r) round-trips exactly.
