@@ -48,7 +48,7 @@ from scriptconv import (
     xsampa_to_ipa, ipa_to_xsampa,
     buckwalter_to_arabic, arabic_to_buckwalter,
     lexique_to_ipa, ipa_to_lexique,
-    kirshenbaum_to_ipa, ipa_to_kirshenbaum,
+    kirshenbaum_to_ipa, ipa_to_kirshenbaum, looks_like_ipa,
     decompose_hangul, hira_to_kana, kana_to_hira,
     convert, can_convert, convert_batch, Notation, NOTATION_INFO,
 )
@@ -80,6 +80,9 @@ ipa_to_lexique("vɛ̃")               # "v5"  (vin)
 kirshenbaum_to_ipa("S")             # "ʃ"   (espeak-ng ASCII-IPA)
 ipa_to_kirshenbaum("ŋ")             # "N"
 
+looks_like_ipa("pʰɑtʃ")             # True  (heuristic: has IPA-distinctive symbols)
+looks_like_ipa("hello")             # False
+
 decompose_hangul("국민")             # "ㄱㅜㄱㅁㅣㄴ"  (orthographic jamo, no assimilation)
 hira_to_kana("ひらがな")             # "ヒラガナ"
 kana_to_hira("カタカナ")             # "かたかな"
@@ -109,7 +112,7 @@ python -m scriptconv lang ko
 | Module | Contents |
 |--------|----------|
 | `scriptconv.scripts` | `Script` dataclass (with `script_type`), `SCRIPT_REGISTRY` (34 scripts), `detect_script`, `char_script`, `script_distribution`, `script_runs`, `base_direction`, `lang_to_script`, `script_to_langs`, `normalize_script_tag` |
-| `scriptconv.notation` | `Notation` enum, `NotationInfo`/`NOTATION_INFO` fidelity registry, `convert` facade, `can_convert` predicate, `convert_batch` generator, pair-wise converters (ARPABET ↔ IPA, X-SAMPA ↔ IPA, Buckwalter ↔ Arabic, Lexique ↔ IPA, Kirshenbaum ↔ IPA) |
+| `scriptconv.notation` | `Notation` enum, `NotationInfo`/`NOTATION_INFO` fidelity registry, `convert` facade, `can_convert` predicate, `convert_batch` generator, pair-wise converters (ARPABET ↔ IPA, X-SAMPA ↔ IPA, Buckwalter ↔ Arabic, Lexique ↔ IPA, Kirshenbaum ↔ IPA), `looks_like_ipa` detector |
 | `scriptconv.translit` | `decompose_hangul` (Hangul blocks → jamo, compatibility or conjoining), `hira_to_kana`/`kana_to_hira` — all orthographic only |
 
 ## Documentation

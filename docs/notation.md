@@ -487,3 +487,24 @@ info.reference           # citation URL/string
 
 Each `NotationInfo` carries `lossless_to_ipa`, `lossless_from_ipa`,
 `token_separated`, and `reference`.
+
+## Notation detection — `looks_like_ipa`
+
+`looks_like_ipa(text)` is a heuristic guard, not a classifier. It returns
+`True` when the text contains a character *distinctive* to IPA — from the IPA
+Extensions, Spacing Modifier Letters, or Phonetic Extensions blocks, or an IPA
+combining diacritic:
+
+```python
+looks_like_ipa("pʰɑtʃ")   # True
+looks_like_ipa("ˈhɛloʊ")  # True
+looks_like_ipa("hello")   # False — no distinctive marker
+```
+
+A transcription written only with characters IPA shares with the Latin
+alphabet (`"pat"`, `"bad"`) has no distinctive marker and returns `False` —
+those are the same codepoints as ordinary text, so no function can prove they
+are IPA. Use it to *guard* against feeding IPA where orthography is expected,
+not to prove a string is not IPA. (This is also why IPA is not a distinct
+script: it borrows codepoints from Latin, Greek, and the modifier blocks —
+`char_script("ɑ")` is `Latn`, `char_script("θ")` is `Grek`.)
