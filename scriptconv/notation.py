@@ -17,10 +17,13 @@ from __future__ import annotations
 import re
 import unicodedata
 from collections.abc import Generator, Iterable
+from dataclasses import dataclass
 from enum import Enum
 
 __all__ = [
     "Notation",
+    "NotationInfo",
+    "NOTATION_INFO",
     "convert",
     "can_convert",
     "convert_batch",
@@ -32,6 +35,8 @@ __all__ = [
     "arabic_to_buckwalter",
     "lexique_to_ipa",
     "ipa_to_lexique",
+    "kirshenbaum_to_ipa",
+    "ipa_to_kirshenbaum",
 ]
 
 
@@ -44,6 +49,7 @@ class Notation(str, Enum):
     BUCKWALTER = "buckwalter"
     ARABIC = "arabic"  # Arabic script (target/source for BW)
     LEXIQUE = "lexique"  # Lexique one-char-per-phoneme French notation
+    KIRSHENBAUM = "kirshenbaum"  # ASCII-IPA (espeak-ng native notation)
 
     def __repr__(self) -> str:
         return f"Notation.{self.name}"
@@ -601,6 +607,66 @@ def ipa_to_lexique(ipa: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Kirshenbaum (ASCII-IPA) ↔ IPA
+#
+# Kirshenbaum is the ASCII phonetic alphabet used natively by espeak-ng.
+# The single-character map is the verbatim ``ipa1[96]`` table from espeak-ng
+# 1.52.0 ``dictionary.c`` (index i → the IPA codepoint for ASCII 0x20+i).
+# Reference: Kirshenbaum 1993 (comp.speech), espeak-ng phoneme docs.
+# ---------------------------------------------------------------------------
+
+# ipa1[96]: IPA codepoint for each printable ASCII char, 0x20..0x7F.
+_KIRSHENBAUM_IPA1 = (
+    0x20, 0x21, 0x22, 0x2b0, 0x24, 0x25, 0x0e6, 0x2c8, 0x28, 0x29, 0x27e, 0x2b, 0x2cc, 0x2d, 0x2e, 0x2f,
+    0x252, 0x31, 0x32, 0x25c, 0x34, 0x35, 0x36, 0x37, 0x275, 0x39, 0x2d0, 0x2b2, 0x3c, 0x3d, 0x3e, 0x294,
+    0x259, 0x251, 0x3b2, 0xe7, 0xf0, 0x25b, 0x46, 0x262, 0x127, 0x26a, 0x25f, 0x4b, 0x26b, 0x271, 0x14b, 0x254,
+    0x3a6, 0x263, 0x280, 0x283, 0x3b8, 0x28a, 0x28c, 0x153, 0x3c7, 0xf8, 0x292, 0x32a, 0x5c, 0x5d, 0x5e, 0x5f,
+    0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x261, 0x68, 0x69, 0x6a, 0x6b, 0x6c, 0x6d, 0x6e, 0x6f,
+    0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7a, 0x7b, 0x7c, 0x7d, 0x303, 0x7f,
+)
+# Kirshenbaum symbols that map to an IPA character different from the ASCII
+# input carry real phonetic meaning; identity rows (letter → itself) are kept
+# so plain ASCII survives a round-trip.
+_KIRSHENBAUM_TO_IPA: dict[str, str] = {
+    chr(0x20 + _i): chr(_cp) for _i, _cp in enumerate(_KIRSHENBAUM_IPA1)
+}
+_IPA_TO_KIRSHENBAUM: dict[str, str] = {}
+for _k, _ip in _KIRSHENBAUM_TO_IPA.items():
+    _IPA_TO_KIRSHENBAUM.setdefault(_ip, _k)
+
+
+def kirshenbaum_to_ipa(kirshenbaum: str) -> str:
+    """Convert a Kirshenbaum (ASCII-IPA) string to IPA.
+
+    Each character is mapped independently. Characters outside the table
+    pass through unchanged.
+
+    Examples
+    --------
+    >>> kirshenbaum_to_ipa("S")
+    'ʃ'
+    >>> kirshenbaum_to_ipa("N")
+    'ŋ'
+    """
+    return "".join(_KIRSHENBAUM_TO_IPA.get(ch, ch) for ch in kirshenbaum)
+
+
+def ipa_to_kirshenbaum(ipa: str) -> str:
+    """Convert an IPA string to Kirshenbaum (ASCII-IPA).
+
+    Characters outside the table pass through unchanged.
+
+    Examples
+    --------
+    >>> ipa_to_kirshenbaum("ʃ")
+    'S'
+    >>> ipa_to_kirshenbaum("ŋ")
+    'N'
+    """
+    return "".join(_IPA_TO_KIRSHENBAUM.get(ch, ch) for ch in ipa)
+
+
+# ---------------------------------------------------------------------------
 # convert — facade routing through IPA where no direct map exists
 # ---------------------------------------------------------------------------
 
@@ -642,61 +708,65 @@ def convert(text: str, src: str | Notation, dst: str | Notation) -> str:
     if src == dst:
         return text
 
-    # Direct paths
-    if src == Notation.ARPA and dst == Notation.IPA:
-        return arpa_to_ipa(text)
-    if src == Notation.IPA and dst == Notation.ARPA:
-        return ipa_to_arpa(text)
-    if src == Notation.XSAMPA and dst == Notation.IPA:
-        return xsampa_to_ipa(text)
-    if src == Notation.IPA and dst == Notation.XSAMPA:
-        return ipa_to_xsampa(text)
-    if src == Notation.LEXIQUE and dst == Notation.IPA:
-        return lexique_to_ipa(text)
-    if src == Notation.IPA and dst == Notation.LEXIQUE:
-        return ipa_to_lexique(text)
-    if src == Notation.BUCKWALTER and dst == Notation.ARABIC:
-        return buckwalter_to_arabic(text)
-    if src == Notation.ARABIC and dst == Notation.BUCKWALTER:
-        return arabic_to_buckwalter(text)
+    # IPA-pivot notations: <notation> → IPA → <notation>.
+    if src in _TO_IPA and dst == Notation.IPA:
+        return _TO_IPA[src](text)
+    if src == Notation.IPA and dst in _FROM_IPA:
+        return _FROM_IPA[dst](text)
+    if src in _TO_IPA and dst in _FROM_IPA:
+        return _FROM_IPA[dst](_TO_IPA[src](text))
 
-    # Indirect: route through IPA
-    _to_ipa = {
-        Notation.ARPA: arpa_to_ipa,
-        Notation.XSAMPA: xsampa_to_ipa,
-        Notation.LEXIQUE: lexique_to_ipa,
-    }
-    _from_ipa = {
-        Notation.ARPA: ipa_to_arpa,
-        Notation.XSAMPA: ipa_to_xsampa,
-        Notation.LEXIQUE: ipa_to_lexique,
-    }
-    if src in _to_ipa and dst in _from_ipa:
-        return _from_ipa[dst](_to_ipa[src](text))
+    # Buckwalter ↔ Arabic script is a direct pair (not IPA-routable).
+    if (src, dst) in _DIRECT_PAIRS:
+        return _DIRECT_PAIRS[(src, dst)](text)
 
     raise ValueError(f"Unsupported conversion: {src!r} → {dst!r}")
+
+
+# ---------------------------------------------------------------------------
+# Converter registry — the single source of truth for supported paths.
+#
+# _TO_IPA / _FROM_IPA hold the IPA-pivot notations; anything registered in
+# both can convert to anything else in the other (routed through IPA).
+# _DIRECT_PAIRS holds non-IPA pairs (Buckwalter ↔ Arabic script).
+# ---------------------------------------------------------------------------
+
+_TO_IPA: dict[Notation, "callable"] = {
+    Notation.ARPA: arpa_to_ipa,
+    Notation.XSAMPA: xsampa_to_ipa,
+    Notation.LEXIQUE: lexique_to_ipa,
+    Notation.KIRSHENBAUM: kirshenbaum_to_ipa,
+}
+_FROM_IPA: dict[Notation, "callable"] = {
+    Notation.ARPA: ipa_to_arpa,
+    Notation.XSAMPA: ipa_to_xsampa,
+    Notation.LEXIQUE: ipa_to_lexique,
+    Notation.KIRSHENBAUM: ipa_to_kirshenbaum,
+}
+_DIRECT_PAIRS: dict[tuple[Notation, Notation], "callable"] = {
+    (Notation.BUCKWALTER, Notation.ARABIC): buckwalter_to_arabic,
+    (Notation.ARABIC, Notation.BUCKWALTER): arabic_to_buckwalter,
+}
 
 
 # ---------------------------------------------------------------------------
 # can_convert — predicate for supported conversion paths
 # ---------------------------------------------------------------------------
 
-# Build the set of supported (src, dst) pairs once
-_SUPPORTED_PAIRS: set[tuple[Notation, Notation]] = {
-    (Notation.ARPA, Notation.IPA),
-    (Notation.IPA, Notation.ARPA),
-    (Notation.XSAMPA, Notation.IPA),
-    (Notation.IPA, Notation.XSAMPA),
-    (Notation.LEXIQUE, Notation.IPA),
-    (Notation.IPA, Notation.LEXIQUE),
-    (Notation.BUCKWALTER, Notation.ARABIC),
-    (Notation.ARABIC, Notation.BUCKWALTER),
-}
-# Add all IPA-routable indirect paths
-for _s in (Notation.ARPA, Notation.XSAMPA, Notation.LEXIQUE):
-    for _d in (Notation.ARPA, Notation.XSAMPA, Notation.LEXIQUE):
-        if _s != _d:
-            _SUPPORTED_PAIRS.add((_s, _d))
+def _build_supported_pairs() -> set[tuple[Notation, Notation]]:
+    pairs: set[tuple[Notation, Notation]] = set(_DIRECT_PAIRS)
+    for _s in _TO_IPA:
+        pairs.add((_s, Notation.IPA))
+    for _d in _FROM_IPA:
+        pairs.add((Notation.IPA, _d))
+    for _s in _TO_IPA:
+        for _d in _FROM_IPA:
+            if _s != _d:
+                pairs.add((_s, _d))
+    return pairs
+
+
+_SUPPORTED_PAIRS: set[tuple[Notation, Notation]] = _build_supported_pairs()
 
 
 def can_convert(src: str | Notation, dst: str | Notation) -> bool:
@@ -721,6 +791,68 @@ def can_convert(src: str | Notation, dst: str | Notation) -> bool:
     src = Notation(src)
     dst = Notation(dst)
     return (src, dst) in _SUPPORTED_PAIRS
+
+
+# ---------------------------------------------------------------------------
+# NotationInfo — queryable fidelity metadata (fidelity is data, not prose)
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class NotationInfo:
+    """Fidelity metadata for a phoneme notation, relative to the IPA hub.
+
+    Attributes
+    ----------
+    notation:
+        The :class:`Notation` this describes.
+    lossless_to_ipa:
+        ``True`` if ``<notation> → IPA → <notation>`` reproduces every input
+        symbol exactly (round-trip safe from the notation's side).
+    lossless_from_ipa:
+        ``True`` if ``IPA → <notation> → IPA`` reproduces every IPA symbol —
+        i.e. the notation's inventory covers IPA. ``False`` for
+        restricted-inventory notations such as ARPABET.
+    token_separated:
+        ``True`` when symbols are whitespace-separated tokens (ARPABET) rather
+        than a contiguous string (IPA, X-SAMPA, Kirshenbaum, Lexique).
+    reference:
+        Citation for the mapping table.
+    """
+
+    notation: Notation
+    lossless_to_ipa: bool
+    lossless_from_ipa: bool
+    token_separated: bool
+    reference: str
+
+
+NOTATION_INFO: dict[Notation, NotationInfo] = {
+    Notation.ARPA: NotationInfo(
+        Notation.ARPA, lossless_to_ipa=False, lossless_from_ipa=False,
+        token_separated=True,
+        reference="https://github.com/chorusai/arpa2ipa",
+    ),
+    Notation.XSAMPA: NotationInfo(
+        Notation.XSAMPA, lossless_to_ipa=False, lossless_from_ipa=True,
+        token_separated=False,
+        reference="https://en.wikipedia.org/wiki/X-SAMPA",
+    ),
+    Notation.LEXIQUE: NotationInfo(
+        Notation.LEXIQUE, lossless_to_ipa=False, lossless_from_ipa=True,
+        token_separated=False,
+        reference="New & Pallier, Manuel de Lexique 3 v3.11, Tableau 2 (CC BY-SA 4.0)",
+    ),
+    Notation.KIRSHENBAUM: NotationInfo(
+        Notation.KIRSHENBAUM, lossless_to_ipa=True, lossless_from_ipa=False,
+        token_separated=False,
+        reference="espeak-ng 1.52.0 dictionary.c ipa1[96]; Kirshenbaum 1993",
+    ),
+    Notation.BUCKWALTER: NotationInfo(
+        Notation.BUCKWALTER, lossless_to_ipa=True, lossless_from_ipa=False,
+        token_separated=False,
+        reference="Tim Buckwalter transliteration scheme (via pyarabic)",
+    ),
+}
 
 
 # ---------------------------------------------------------------------------

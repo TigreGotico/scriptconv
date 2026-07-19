@@ -455,3 +455,35 @@ lines = ["HH AH0 L OW1", "", "AY1"]
 list(convert_batch(lines, "arpa", "ipa"))
 # ['həloʊ', '', 'aɪ']
 ```
+
+## Kirshenbaum (ASCII-IPA) ↔ IPA
+
+Kirshenbaum is the ASCII phonetic alphabet used natively by espeak-ng. The
+single-character mapping is the verbatim `ipa1[96]` table from espeak-ng 1.52.0
+`dictionary.c` (index *i* → the IPA codepoint for ASCII `0x20+i`); the standard
+itself is Kirshenbaum 1993 (comp.speech).
+
+```python
+kirshenbaum_to_ipa("S")   # "ʃ"
+ipa_to_kirshenbaum("ŋ")   # "N"
+```
+
+Each character maps independently; characters outside the table pass through.
+`<notation> → IPA → <notation>` round-trips are exact from the Kirshenbaum side;
+`IPA → Kirshenbaum → IPA` is lossy for IPA outside the ASCII inventory.
+
+## Queryable fidelity — `NOTATION_INFO`
+
+The fidelity guarantees are exposed as data so callers can branch on them
+instead of reading prose:
+
+```python
+from scriptconv import NOTATION_INFO, Notation
+info = NOTATION_INFO[Notation.ARPA]
+info.lossless_from_ipa   # False — restricted English inventory
+info.token_separated     # True  — space-separated ARPABET tokens
+info.reference           # citation URL/string
+```
+
+Each `NotationInfo` carries `lossless_to_ipa`, `lossless_from_ipa`,
+`token_separated`, and `reference`.

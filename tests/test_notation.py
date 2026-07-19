@@ -947,8 +947,83 @@ def test_notation_enum_values():
 
 
 def test_notation_enum_count():
-    assert len(Notation) == 6
+    assert len(Notation) == 7
 
 
 def test_notation_str():
     assert str(Notation.IPA) == "Notation.IPA"
+
+
+# ---------------------------------------------------------------------------
+# Kirshenbaum (ASCII-IPA) ↔ IPA
+# ---------------------------------------------------------------------------
+
+from scriptconv.notation import (  # noqa: E402
+    kirshenbaum_to_ipa, ipa_to_kirshenbaum, NotationInfo, NOTATION_INFO,
+)
+
+
+@pytest.mark.parametrize("k, ipa", [
+    ("S", "ʃ"), ("Z", "ʒ"), ("N", "ŋ"), ("T", "θ"), ("D", "ð"),
+    ("A", "ɑ"), ("g", "ɡ"), ("tS", "tʃ"), ("@", "ə"),
+])
+def test_kirshenbaum_to_ipa(k, ipa):
+    assert kirshenbaum_to_ipa(k) == ipa
+
+
+@pytest.mark.parametrize("ipa, k", [
+    ("ʃ", "S"), ("ŋ", "N"), ("θ", "T"), ("ɑ", "A"), ("ə", "@"),
+])
+def test_ipa_to_kirshenbaum(ipa, k):
+    assert ipa_to_kirshenbaum(ipa) == k
+
+
+def test_kirshenbaum_passthrough_and_empty():
+    assert kirshenbaum_to_ipa("") == ""
+    assert ipa_to_kirshenbaum("") == ""
+
+
+def test_convert_routes_through_kirshenbaum():
+    # arpa → ipa → kirshenbaum
+    assert convert("HH AH0 L OW1", "arpa", "kirshenbaum") == "h@loU"
+    # kirshenbaum → ipa → x-sampa
+    assert convert("S", "kirshenbaum", "x-sampa") == "S"
+
+
+def test_can_convert_kirshenbaum():
+    assert can_convert("kirshenbaum", "ipa")
+    assert can_convert("ipa", "kirshenbaum")
+    assert can_convert("kirshenbaum", "arpa")
+
+
+# ---------------------------------------------------------------------------
+# NotationInfo fidelity metadata
+# ---------------------------------------------------------------------------
+
+def test_notation_info_shape():
+    info = NOTATION_INFO[Notation.ARPA]
+    assert isinstance(info, NotationInfo)
+    assert info.lossless_from_ipa is False   # restricted English inventory
+    assert info.token_separated is True      # space-separated ARPABET tokens
+    assert info.reference                     # non-empty citation
+
+
+def test_every_notation_info_has_a_citation():
+    assert all(i.reference for i in NOTATION_INFO.values())
+
+
+def test_lossless_to_ipa_flag_backed_by_round_trip():
+    # A lossless_to_ipa=True claim must actually round-trip a representative
+    # symbol set through IPA and back.
+    samples = {
+        Notation.KIRSHENBAUM: "SNTDpbtdkg",
+        Notation.BUCKWALTER: "AbtmrHlwnhyk",
+    }
+    to_ipa = {Notation.KIRSHENBAUM: kirshenbaum_to_ipa,
+              Notation.BUCKWALTER: buckwalter_to_arabic}
+    from_ipa = {Notation.KIRSHENBAUM: ipa_to_kirshenbaum,
+                Notation.BUCKWALTER: arabic_to_buckwalter}
+    for notation, info in NOTATION_INFO.items():
+        if info.lossless_to_ipa and notation in samples:
+            for ch in samples[notation]:
+                assert from_ipa[notation](to_ipa[notation](ch)) == ch, notation
