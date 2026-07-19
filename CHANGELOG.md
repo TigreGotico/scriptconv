@@ -1,20 +1,12 @@
 # Changelog
 
-## [0.0.2a2](https://github.com/TigreGotico/scriptconv/tree/0.0.2a2) (2026-07-19)
+## [0.0.3a1](https://github.com/TigreGotico/scriptconv/tree/0.0.3a1) (2026-07-19)
 
-[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.2a1...0.0.2a2)
-
-**Merged pull requests:**
-
-- feat: RFE \(Revista de Filología Española\) ↔ IPA notation converter [\#16](https://github.com/TigreGotico/scriptconv/pull/16) ([JarbasAl](https://github.com/JarbasAl))
-
-## [0.0.2a1](https://github.com/TigreGotico/scriptconv/tree/0.0.2a1) (2026-07-19)
-
-[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.1...0.0.2a1)
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.2...0.0.3a1)
 
 **Merged pull requests:**
 
-- feat: Cotovía \(Galician TTS\) ↔ IPA notation converter [\#14](https://github.com/TigreGotico/scriptconv/pull/14) ([JarbasAl](https://github.com/JarbasAl))
+- docs: refresh README and package metadata for the full notation set [\#18](https://github.com/TigreGotico/scriptconv/pull/18) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
