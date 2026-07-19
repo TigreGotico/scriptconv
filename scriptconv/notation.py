@@ -15,6 +15,7 @@ Lexique phoneme-code table from:
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections.abc import Generator, Iterable
 from enum import Enum
 
@@ -188,7 +189,12 @@ def ipa_to_arpa(ipa_string: str, unknown: str = "?") -> str:
             tokens.append(_IPA_TO_ARPA[m.group(0)])
             pos = m.end()
         else:
-            if unknown:
+            ch = ipa_string[pos]
+            # Diacritics and suprasegmentals (combining marks, length/stress
+            # modifier letters) have no ARPABET equivalent; they qualify the
+            # preceding phoneme rather than standing alone, so drop them
+            # instead of emitting a spurious *unknown* token.
+            if unknown and unicodedata.category(ch) not in ("Mn", "Mc", "Me", "Lm", "Sk"):
                 tokens.append(unknown)
             pos += 1
     return " ".join(tokens)
@@ -440,6 +446,9 @@ _ARABIC_TO_BW["\uFEFB"] = "lA"   # لا  lam + alef ligature
 _ARABIC_TO_BW["\uFEF9"] = "l<"   # لإ  lam + alef hamza below
 _ARABIC_TO_BW["\uFEF7"] = "l>"   # لأ  lam + alef hamza above
 _ARABIC_TO_BW["\uFEF8"] = "l|"   # لآ  lam + alef madda
+# The reverse comprehension lets the "^" shadda alias win over canonical "~";
+# restore the standard Buckwalter shadda so round-trips stay faithful.
+_ARABIC_TO_BW["\u0651"] = "~"   # shadda -> canonical "~", not the "^" alias
 
 
 def buckwalter_to_arabic(bw: str) -> str:

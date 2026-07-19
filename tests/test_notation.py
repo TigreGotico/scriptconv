@@ -64,6 +64,26 @@ def test_cross_converter_g_xsampa_to_arpa():
     assert convert("g", "x-sampa", "arpa") == "G"
 
 
+@pytest.mark.parametrize("ipa, expected", [
+    ("iː", "IY"),    # length mark (U+02D0, Lm) is not a standalone phoneme
+    ("ɑ̃", "AA"),     # combining tilde (U+0303, Mn) qualifies the vowel
+    ("ˈhʌ", "HH AH"),  # primary-stress modifier letter dropped, not "?"
+])
+def test_ipa_to_arpa_drops_diacritics_not_phonemes(ipa, expected):
+    assert ipa_to_arpa(ipa) == expected
+
+
+def test_ipa_to_arpa_still_flags_real_unknown_phoneme():
+    # A genuine out-of-inventory phoneme (ɸ, Ll) must still surface as unknown.
+    assert ipa_to_arpa("ɸ") == "?"
+
+
+def test_buckwalter_shadda_round_trips_to_canonical_tilde():
+    from scriptconv import arabic_to_buckwalter, buckwalter_to_arabic
+    # Standard Buckwalter shadda "~" must survive a round-trip (not become "^").
+    assert arabic_to_buckwalter(buckwalter_to_arabic("Al~a")) == "Al~a"
+
+
 # ---------------------------------------------------------------------------
 # IPA → ARPABET  (spot gold checks)
 # ---------------------------------------------------------------------------
@@ -345,7 +365,7 @@ _BW_ARABIC_EXTENDED = [
     ("hamza on waw", "&", "ؤ"),
     ("hamza on ya", "}", "ئ"),
     ("alef madda", "|", "آ"),
-    ("shadda", "^", "ّ"),   # ^ is the canonical reverse (alias ~ also maps to shadda)
+    ("shadda", "~", "ّ"),   # "~" is canonical Buckwalter shadda; "^" is an alias
     ("fatha", "a", "َ"),
     ("damma", "u", "ُ"),
     ("kasra", "i", "ِ"),
@@ -805,8 +825,11 @@ def test_buckwalter_tatweel():
 
 
 def test_buckwalter_shadda_alias():
-    # ~ maps to shadda in forward, but ^ is the canonical reverse
+    # Both "~" (canonical) and "^" (alias) map forward to shadda; the reverse
+    # yields the canonical "~".
     assert buckwalter_to_arabic("~") == "ّ"
+    assert buckwalter_to_arabic("^") == "ّ"
+    assert arabic_to_buckwalter("ّ") == "~"
 
 
 def test_buckwalter_unknown_passthrough():
@@ -904,7 +927,7 @@ def test_ipa_to_lexique_vowels(ipa, expected):
 @pytest.mark.parametrize("ipa, expected", [
     ("ɸɸ", "? ?"),
     ("pɸt", "P ? T"),
-    ("həˈloʊ", "HH AX ? L OW"),  # ˈ not in IPA→ARPA table
+    ("həˈloʊ", "HH AX L OW"),  # ˈ is a suprasegmental modifier, dropped not flagged
 ])
 def test_ipa_to_arpa_unknown_chars(ipa, expected):
     assert ipa_to_arpa(ipa) == expected

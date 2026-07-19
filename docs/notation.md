@@ -312,8 +312,9 @@ arabic_to_buckwalter("ا")       # "A"
 | `^` | ّ | shadda (alias for `~`) |
 
 **Shadda alias note**: both `~` and `^` map to the shadda character (U+0651) in the
-forward direction. In the reverse direction, shadda maps to `^` (the last alias wins
-via dict comprehension overwrite). Round-trips involving `~` will produce `^`.
+forward direction. In the reverse direction, shadda maps to the canonical `~`, so
+standard Buckwalter round-trips (`~` → ّ → `~`) are exact; the `^` alias is accepted on
+input but not emitted.
 
 ---
 

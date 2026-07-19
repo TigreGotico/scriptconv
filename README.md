@@ -133,9 +133,9 @@ round-trip is exact and what happens to a symbol the table does not know.
 
 | Notation | `to_ipa` → `from_ipa` round-trip | `from_ipa` → `to_ipa` round-trip | Unknown-token behaviour |
 |----------|----------------------------------|----------------------------------|-------------------------|
-| **ARPABET** | Exact for base symbols; **stress digits are dropped** and `AH0`↔`AX` (schwa) is not distinguished | **Lossy** — ARPABET is an English-only inventory, so any IPA symbol outside it becomes the *unknown* placeholder | `arpa_to_ipa`: passed through unchanged. `ipa_to_arpa`: replaced with `?` by default (`unknown=` param; `unknown=""` drops) |
+| **ARPABET** | Exact for base symbols; **stress digits are dropped** and `AH0`↔`AX` (schwa) is not distinguished | **Lossy** — ARPABET is an English-only inventory, so any IPA symbol outside it becomes the *unknown* placeholder | `arpa_to_ipa`: passed through unchanged. `ipa_to_arpa`: diacritics and suprasegmentals (combining marks, length/stress modifiers) are dropped; other out-of-inventory symbols are replaced with `?` by default (`unknown=` param; `unknown=""` drops) |
 | **X-SAMPA** | Exact for all canonical symbols | Exact except aliases (`f\`→ɸ, `&`→æ) normalise to their canonical spelling | Passed through unchanged |
-| **Buckwalter ↔ Arabic** | Exact except the shadda `~` normalises to the `^` alias, and precomposed lam-alef ligatures decompose to two chars (visually identical) | Exact | Passed through unchanged |
+| **Buckwalter ↔ Arabic** | Exact (the `^` shadda alias normalises to canonical `~`; precomposed lam-alef ligatures decompose to two chars, visually identical) | Exact | Passed through unchanged |
 | **Lexique ↔ IPA** | Exact except the `°`/`3` schwa pair (both → `ə`; reverse always → `°`) | Exact | Passed through unchanged |
 
 Notes:
