@@ -6,7 +6,7 @@
 
 **scriptconv** is a zero-dependency Python library for written-script operations:
 ISO-15924 script identification and metadata, character-range detection, language-to-script
-mapping, phoneme-notation transcoding (IPA ↔ ARPABET ↔ X-SAMPA, IPA ↔ Lexique,
+mapping, phoneme-notation transcoding (IPA ↔ ARPABET / X-SAMPA / Lexique / Kirshenbaum / Cotovía / RFE,
 Buckwalter ↔ Arabic script), and orthographic decomposition of Hangul syllable blocks into
 jamo letters. Every conversion is a pure data table or arithmetic operation; no linguistic
 rules, no external files, no runtime dependencies beyond the Python standard library.
@@ -48,7 +48,8 @@ from scriptconv import (
     xsampa_to_ipa, ipa_to_xsampa,
     buckwalter_to_arabic, arabic_to_buckwalter,
     lexique_to_ipa, ipa_to_lexique,
-    kirshenbaum_to_ipa, ipa_to_kirshenbaum, looks_like_ipa,
+    kirshenbaum_to_ipa, ipa_to_kirshenbaum, cotovia_to_ipa, ipa_to_cotovia,
+    rfe_to_ipa, ipa_to_rfe, looks_like_ipa,
     decompose_hangul, hira_to_kana, kana_to_hira,
     convert, can_convert, convert_batch, Notation, NOTATION_INFO,
 )
@@ -79,6 +80,12 @@ ipa_to_lexique("vɛ̃")               # "v5"  (vin)
 
 kirshenbaum_to_ipa("S")             # "ʃ"   (espeak-ng ASCII-IPA)
 ipa_to_kirshenbaum("ŋ")             # "N"
+
+cotovia_to_ipa("karro")             # "karo"  (Galician Cotovía TTS notation)
+ipa_to_cotovia("ʎ")                 # "L"
+
+rfe_to_ipa("kaša")                  # "kaʃa"  (Spanish/Romance RFE alphabet)
+ipa_to_rfe("ɲ")                     # "ñ"
 
 looks_like_ipa("pʰɑtʃ")             # True  (heuristic: has IPA-distinctive symbols)
 looks_like_ipa("hello")             # False
@@ -112,7 +119,7 @@ python -m scriptconv lang ko
 | Module | Contents |
 |--------|----------|
 | `scriptconv.scripts` | `Script` dataclass (with `script_type`), `SCRIPT_REGISTRY` (34 scripts), `detect_script`, `char_script`, `script_distribution`, `script_runs`, `base_direction`, `lang_to_script`, `script_to_langs`, `normalize_script_tag` |
-| `scriptconv.notation` | `Notation` enum, `NotationInfo`/`NOTATION_INFO` fidelity registry, `convert` facade, `can_convert` predicate, `convert_batch` generator, pair-wise converters (ARPABET ↔ IPA, X-SAMPA ↔ IPA, Buckwalter ↔ Arabic, Lexique ↔ IPA, Kirshenbaum ↔ IPA), `looks_like_ipa` detector |
+| `scriptconv.notation` | `Notation` enum, `NotationInfo`/`NOTATION_INFO` fidelity registry, `convert` facade, `can_convert` predicate, `convert_batch` generator, pair-wise converters (ARPABET ↔ IPA, X-SAMPA ↔ IPA, Buckwalter ↔ Arabic, Lexique ↔ IPA, Kirshenbaum ↔ IPA, Cotovía ↔ IPA, RFE ↔ IPA), `looks_like_ipa` detector |
 | `scriptconv.translit` | `decompose_hangul` (Hangul blocks → jamo, compatibility or conjoining), `hira_to_kana`/`kana_to_hira` — all orthographic only |
 
 ## Documentation
@@ -141,6 +148,8 @@ Runnable scripts in [examples/](examples/):
 | `12_kirshenbaum.py` | Kirshenbaum (ASCII-IPA) ↔ IPA, and ARPABET → Kirshenbaum routing |
 | `13_script_runs.py` | Per-script segmentation of mixed-script text |
 | `14_kana_transliteration.py` | Hiragana ↔ Katakana |
+| `15_cotovia.py` | Cotovía (Galician TTS notation) ↔ IPA |
+| `16_rfe.py` | RFE (Spanish/Romance philology alphabet) ↔ IPA |
 
 ## Fidelity guarantees
 
@@ -155,6 +164,8 @@ round-trip is exact and what happens to a symbol the table does not know.
 | **Buckwalter ↔ Arabic** | Exact (the `^` shadda alias normalises to canonical `~`; precomposed lam-alef ligatures decompose to two chars, visually identical) | Exact | Passed through unchanged |
 | **Lexique ↔ IPA** | Exact except the `°`/`3` schwa pair (both → `ə`; reverse always → `°`) | Exact | Passed through unchanged |
 | **Kirshenbaum ↔ IPA** | Exact | **Lossy** — restricted ASCII inventory; IPA outside it passes through | Passed through unchanged |
+| **Cotovía ↔ IPA** | Exact except the three `L`/`Z`/`jj` symbols for `ʎ` normalise to `L` | **Lossy** — Galician/Spanish inventory; IPA outside it passes through | Passed through unchanged |
+| **RFE ↔ IPA** | Exact except `ñ`/`n̮` for `ɲ` normalise to `ñ` | **Lossy** — core Spanish/Romance inventory; IPA outside it passes through | Passed through unchanged |
 
 This table is also available programmatically via `NOTATION_INFO`
 (`NotationInfo` records with `lossless_to_ipa`, `lossless_from_ipa`,
@@ -180,4 +191,6 @@ Derived tables used internally:
 | Buckwalter ↔ Arabic | Tim Buckwalter's Arabic transliteration scheme | — (factual 1:1 mapping) |
 | Lexique phoneme codes | New, B. & Pallier, C. — *Manuel de Lexique 3* v3.11, Tableau 2; [chrplr/openlexicon](https://github.com/chrplr/openlexicon) | CC BY-SA 4.0 |
 | Kirshenbaum ↔ IPA | Kirshenbaum 1993 ASCII-IPA standard (comp.speech), cross-checked against espeak-ng | — (factual symbol mapping) |
+| Cotovía ↔ IPA | Universidade de Vigo GTM Cotovía TTS project (`fonemas.cpp`) | — (factual symbol mapping) |
+| RFE ↔ IPA | RFE phonetic alphabet (Revista de Filología Española, 1915) | — (factual symbol mapping) |
 | Hangul jamo tables | [stannam/hangul_to_ipa](https://github.com/stannam/hangul_to_ipa) | — |

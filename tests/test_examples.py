@@ -105,3 +105,15 @@ def test_14_kana_transliteration():
     r = _run(EXAMPLES_DIR / "14_kana_transliteration.py")
     assert r.returncode == 0, r.stderr
     assert r.stdout.strip()
+
+
+def test_15_cotovia():
+    r = _run(EXAMPLES_DIR / "15_cotovia.py")
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip()
+
+
+def test_16_rfe():
+    r = _run(EXAMPLES_DIR / "16_rfe.py")
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip()

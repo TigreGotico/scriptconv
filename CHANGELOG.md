@@ -1,52 +1,20 @@
 # Changelog
 
-## [0.0.1a6](https://github.com/TigreGotico/scriptconv/tree/0.0.1a6) (2026-07-19)
+## [0.0.2a2](https://github.com/TigreGotico/scriptconv/tree/0.0.2a2) (2026-07-19)
 
-[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.1a5...0.0.1a6)
-
-**Merged pull requests:**
-
-- feat: looks\_like\_ipa\(\) heuristic notation detector [\#12](https://github.com/TigreGotico/scriptconv/pull/12) ([JarbasAl](https://github.com/JarbasAl))
-
-## [0.0.1a5](https://github.com/TigreGotico/scriptconv/tree/0.0.1a5) (2026-07-19)
-
-[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.1a4...0.0.1a5)
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.2a1...0.0.2a2)
 
 **Merged pull requests:**
 
-- docs: cite Buckwalter standard directly, drop GPL pyarabic reference [\#10](https://github.com/TigreGotico/scriptconv/pull/10) ([JarbasAl](https://github.com/JarbasAl))
+- feat: RFE \(Revista de Filología Española\) ↔ IPA notation converter [\#16](https://github.com/TigreGotico/scriptconv/pull/16) ([JarbasAl](https://github.com/JarbasAl))
 
-## [0.0.1a4](https://github.com/TigreGotico/scriptconv/tree/0.0.1a4) (2026-07-19)
+## [0.0.2a1](https://github.com/TigreGotico/scriptconv/tree/0.0.2a1) (2026-07-19)
 
-[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.1a3...0.0.1a4)
-
-**Merged pull requests:**
-
-- Configure Renovate [\#1](https://github.com/TigreGotico/scriptconv/pull/1) ([renovate[bot]](https://github.com/apps/renovate))
-
-## [0.0.1a3](https://github.com/TigreGotico/scriptconv/tree/0.0.1a3) (2026-07-19)
-
-[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.1a2...0.0.1a3)
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.1...0.0.2a1)
 
 **Merged pull requests:**
 
-- docs: standalone, external-only provenance for public release [\#6](https://github.com/TigreGotico/scriptconv/pull/6) ([JarbasAl](https://github.com/JarbasAl))
-
-## [0.0.1a2](https://github.com/TigreGotico/scriptconv/tree/0.0.1a2) (2026-07-19)
-
-[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.1a1...0.0.1a2)
-
-**Merged pull requests:**
-
-- feat: Kirshenbaum, NotationInfo, script typology, script\_runs, kana + hangul forms [\#4](https://github.com/TigreGotico/scriptconv/pull/4) ([JarbasAl](https://github.com/JarbasAl))
-
-## [0.0.1a1](https://github.com/TigreGotico/scriptconv/tree/0.0.1a1) (2026-07-19)
-
-[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.0...0.0.1a1)
-
-**Merged pull requests:**
-
-- chore: release prep — LICENSE, py.typed, CLI, fidelity docs [\#2](https://github.com/TigreGotico/scriptconv/pull/2) ([JarbasAl](https://github.com/JarbasAl))
+- feat: Cotovía \(Galician TTS\) ↔ IPA notation converter [\#14](https://github.com/TigreGotico/scriptconv/pull/14) ([JarbasAl](https://github.com/JarbasAl))
 
 
 

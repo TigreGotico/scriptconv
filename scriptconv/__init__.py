@@ -50,6 +50,10 @@ from scriptconv.notation import (
     ipa_to_lexique,
     kirshenbaum_to_ipa,
     ipa_to_kirshenbaum,
+    cotovia_to_ipa,
+    ipa_to_cotovia,
+    rfe_to_ipa,
+    ipa_to_rfe,
     looks_like_ipa,
 )
 from scriptconv.translit import (
@@ -87,6 +91,10 @@ __all__ = [
     "ipa_to_lexique",
     "kirshenbaum_to_ipa",
     "ipa_to_kirshenbaum",
+    "cotovia_to_ipa",
+    "ipa_to_cotovia",
+    "rfe_to_ipa",
+    "ipa_to_rfe",
     "looks_like_ipa",
     # translit
     "decompose_hangul",
