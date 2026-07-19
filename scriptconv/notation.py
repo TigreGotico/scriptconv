@@ -387,8 +387,8 @@ def ipa_to_xsampa(ipa: str) -> str:
 # Buckwalter ↔ Arabic script
 #
 # A direct Buckwalter ↔ Arabic-script table (independent of IPA) following
-# Tim Buckwalter's Arabic transliteration scheme, as also implemented by
-# pyarabic.
+# Tim Buckwalter's published Arabic transliteration scheme (a 1:1 factual
+# mapping between Arabic letters and ASCII characters).
 # ---------------------------------------------------------------------------
 
 # Standard Buckwalter → Arabic Unicode
@@ -848,7 +848,7 @@ NOTATION_INFO: dict[Notation, NotationInfo] = {
     Notation.BUCKWALTER: NotationInfo(
         Notation.BUCKWALTER, lossless_to_ipa=True, lossless_from_ipa=False,
         token_separated=False,
-        reference="Tim Buckwalter transliteration scheme (via pyarabic)",
+        reference="Tim Buckwalter Arabic transliteration scheme",
     ),
 }
 

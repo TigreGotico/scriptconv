@@ -228,8 +228,8 @@ ipa_to_xsampa("ɸ")   # "p\\"  (not "f\\")
 
 ## Buckwalter ↔ Arabic script
 
-Table follows Tim Buckwalter's transliteration scheme (via pyarabic) and the standard Buckwalter
-transliteration reference.
+Table follows Tim Buckwalter's published Arabic transliteration scheme — a
+1:1 factual mapping between Arabic letters and ASCII characters.
 
 ### buckwalter_to_arabic
 
