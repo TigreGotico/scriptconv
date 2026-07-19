@@ -45,3 +45,54 @@ class TestDecomposeHangul:
     def test_compatibility_jamo_passthrough(self):
         """Compatibility jamo (U+3130–U+318F) pass through unchanged."""
         assert decompose_hangul("ㄱㅎ") == "ㄱㅎ"
+
+
+class TestDecomposeHangulForms:
+    def test_conjoining_recombines_via_nfc(self):
+        import unicodedata
+        conj = decompose_hangul("국민", form="conjoining")
+        # Conjoining jamo recombine into the original syllables under NFC.
+        assert unicodedata.normalize("NFC", conj) == "국민"
+        assert conj != "국민"  # decomposed, not a no-op
+
+    def test_drop_silent_initial_compatibility(self):
+        # ㅇ (ieung) placeholder onset is dropped, coda ㅇ is kept.
+        assert decompose_hangul("안", drop_silent_initial=True) == "ㅏㄴ"
+        assert decompose_hangul("강", drop_silent_initial=True) == "ㄱㅏㅇ"
+
+    def test_drop_silent_initial_conjoining(self):
+        import unicodedata
+        out = decompose_hangul("안", form="conjoining", drop_silent_initial=True)
+        assert "ᄋ" not in out  # no conjoining ieung
+        # vowel + final n present
+        assert unicodedata.normalize("NFC", "ᄋ" + out) == "안"
+
+    def test_invalid_form_raises(self):
+        with pytest.raises(ValueError):
+            decompose_hangul("가", form="bogus")
+
+
+class TestKanaTransliteration:
+    def test_hira_to_kana(self):
+        from scriptconv.translit import hira_to_kana
+        assert hira_to_kana("ひらがな") == "ヒラガナ"
+        assert hira_to_kana("こんにちは") == "コンニチハ"
+
+    def test_kana_to_hira(self):
+        from scriptconv.translit import kana_to_hira
+        assert kana_to_hira("カタカナ") == "かたかな"
+
+    def test_round_trip(self):
+        from scriptconv.translit import hira_to_kana, kana_to_hira
+        for s in ["こんにちは", "ありがとう", "さようなら"]:
+            assert kana_to_hira(hira_to_kana(s)) == s
+
+    def test_long_vowel_mark_passthrough(self):
+        from scriptconv.translit import kana_to_hira
+        # ー (U+30FC) has no hiragana form, stays as-is.
+        assert kana_to_hira("ラーメン") == "らーめん"
+
+    def test_non_kana_passthrough(self):
+        from scriptconv.translit import hira_to_kana, kana_to_hira
+        assert hira_to_kana("abc 123") == "abc 123"
+        assert kana_to_hira("") == ""
