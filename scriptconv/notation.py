@@ -37,6 +37,8 @@ __all__ = [
     "ipa_to_lexique",
     "kirshenbaum_to_ipa",
     "ipa_to_kirshenbaum",
+    "cotovia_to_ipa",
+    "ipa_to_cotovia",
     "looks_like_ipa",
 ]
 
@@ -51,6 +53,7 @@ class Notation(str, Enum):
     ARABIC = "arabic"  # Arabic script (target/source for BW)
     LEXIQUE = "lexique"  # Lexique one-char-per-phoneme French notation
     KIRSHENBAUM = "kirshenbaum"  # ASCII-IPA (espeak-ng native notation)
+    COTOVIA = "cotovia"  # Universidade de Vigo Cotovía TTS notation (gl)
 
     def __repr__(self) -> str:
         return f"Notation.{self.name}"
@@ -666,6 +669,124 @@ def ipa_to_kirshenbaum(ipa: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Cotovía ↔ IPA
+#
+# Cotovía is the internal phoneme notation of the Universidade de Vigo GTM
+# Cotovía TTS system (Galician/Spanish). The table is the phoneme symbol map
+# from its ``fonemas.cpp``. Symbols are matched longest-first (``tS``, ``rr``
+# before single characters). The silence/pause marker (``#``) is a boundary
+# token, not a phoneme, and is intentionally excluded.
+# ---------------------------------------------------------------------------
+
+_COTOVIA_TO_IPA: dict[str, str] = {
+    # Double-character symbols first (longest-match ordering)
+    "tS": "tʃ",
+    "rr": "r",    # trill (single "r" is the tap ɾ)
+    "jj": "ʎ",
+    # Consonants
+    "B": "β",
+    "D": "ð",
+    "G": "ɣ",
+    "J": "ɲ",
+    "N": "ŋ",
+    "S": "ʃ",
+    "T": "θ",
+    "Z": "ʎ",
+    "L": "ʎ",     # canonical Cotovía symbol for the palatal lateral
+    "b": "b",
+    "d": "d",
+    "f": "f",
+    "g": "ɡ",
+    "k": "k",
+    "l": "l",
+    "m": "m",
+    "n": "n",
+    "p": "p",
+    "r": "ɾ",     # tap
+    "s": "s",
+    "t": "t",
+    "x": "x",
+    "X": "x",
+    # Vowels
+    "E": "ɛ",
+    "O": "ɔ",
+    "a": "a",
+    "e": "e",
+    "i": "i",
+    "o": "o",
+    "u": "u",
+    # Glides
+    "j": "j",
+    "w": "w",
+}
+
+# Reverse: IPA → Cotovía. First-wins deduplicates the symbols that share an IPA
+# value; pin ʎ → "L" (the standard Cotovía palatal-lateral symbol) and x → "x".
+_IPA_TO_COTOVIA: dict[str, str] = {}
+for _cv, _ip in _COTOVIA_TO_IPA.items():
+    _IPA_TO_COTOVIA.setdefault(_ip, _cv)
+_IPA_TO_COTOVIA["ʎ"] = "L"
+_IPA_TO_COTOVIA["x"] = "x"
+
+_CV_KEYS_SORTED = sorted(_COTOVIA_TO_IPA.keys(), key=len, reverse=True)
+_CV_RE = re.compile("|".join(re.escape(s) for s in _CV_KEYS_SORTED))
+_IPA_CV_KEYS_SORTED = sorted(_IPA_TO_COTOVIA.keys(), key=len, reverse=True)
+_IPA_CV_RE = re.compile("|".join(re.escape(s) for s in _IPA_CV_KEYS_SORTED))
+
+
+def cotovia_to_ipa(cotovia: str) -> str:
+    """Convert a Cotovía phoneme string to IPA.
+
+    Multi-character symbols are matched longest-first. Characters outside the
+    table pass through unchanged.
+
+    Examples
+    --------
+    >>> cotovia_to_ipa("tS")
+    'tʃ'
+    >>> cotovia_to_ipa("karro")
+    'karo'
+    """
+    result = []
+    pos = 0
+    while pos < len(cotovia):
+        m = _CV_RE.match(cotovia, pos)
+        if m:
+            result.append(_COTOVIA_TO_IPA[m.group(0)])
+            pos = m.end()
+        else:
+            result.append(cotovia[pos])
+            pos += 1
+    return "".join(result)
+
+
+def ipa_to_cotovia(ipa: str) -> str:
+    """Convert an IPA string to Cotovía notation.
+
+    Multi-character IPA symbols are matched longest-first. Characters outside
+    the table pass through unchanged.
+
+    Examples
+    --------
+    >>> ipa_to_cotovia("tʃ")
+    'tS'
+    >>> ipa_to_cotovia("ʎ")
+    'L'
+    """
+    result = []
+    pos = 0
+    while pos < len(ipa):
+        m = _IPA_CV_RE.match(ipa, pos)
+        if m:
+            result.append(_IPA_TO_COTOVIA[m.group(0)])
+            pos = m.end()
+        else:
+            result.append(ipa[pos])
+            pos += 1
+    return "".join(result)
+
+
+# ---------------------------------------------------------------------------
 # convert — facade routing through IPA where no direct map exists
 # ---------------------------------------------------------------------------
 
@@ -735,12 +856,14 @@ _TO_IPA: dict[Notation, "callable"] = {
     Notation.XSAMPA: xsampa_to_ipa,
     Notation.LEXIQUE: lexique_to_ipa,
     Notation.KIRSHENBAUM: kirshenbaum_to_ipa,
+    Notation.COTOVIA: cotovia_to_ipa,
 }
 _FROM_IPA: dict[Notation, "callable"] = {
     Notation.ARPA: ipa_to_arpa,
     Notation.XSAMPA: ipa_to_xsampa,
     Notation.LEXIQUE: ipa_to_lexique,
     Notation.KIRSHENBAUM: ipa_to_kirshenbaum,
+    Notation.COTOVIA: ipa_to_cotovia,
 }
 _DIRECT_PAIRS: dict[tuple[Notation, Notation], "callable"] = {
     (Notation.BUCKWALTER, Notation.ARABIC): buckwalter_to_arabic,
@@ -845,6 +968,11 @@ NOTATION_INFO: dict[Notation, NotationInfo] = {
         Notation.KIRSHENBAUM, lossless_to_ipa=True, lossless_from_ipa=False,
         token_separated=False,
         reference="Kirshenbaum 1993 ASCII-IPA standard (comp.speech)",
+    ),
+    Notation.COTOVIA: NotationInfo(
+        Notation.COTOVIA, lossless_to_ipa=False, lossless_from_ipa=False,
+        token_separated=False,
+        reference="Universidade de Vigo GTM Cotovía TTS (fonemas.cpp)",
     ),
     Notation.BUCKWALTER: NotationInfo(
         Notation.BUCKWALTER, lossless_to_ipa=True, lossless_from_ipa=False,
