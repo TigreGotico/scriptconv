@@ -25,3 +25,23 @@ class TestDecomposeHangul:
         # 국민 pronounced [ɡuŋmin] (ㄱ→ㅇ assimilation) — decomposition
         # must NOT apply it
         assert decompose_hangul("국민") == "ㄱㅜㄱㅁㅣㄴ"
+
+    def test_first_syllable(self):
+        """가 (U+AC00) is the first valid Hangul syllable."""
+        assert decompose_hangul("가") == "ㄱㅏ"
+
+    def test_last_syllable(self):
+        """힣 (U+D7A3) is the last valid Hangul syllable."""
+        assert decompose_hangul("힣") == "ㅎㅣㅎ"
+
+    def test_out_of_range_passthrough(self):
+        """U+D7A4 is unassigned — should pass through."""
+        assert decompose_hangul("\uD7A4") == "\uD7A4"
+
+    def test_jamo_passthrough(self):
+        """Precomposed jamo (U+1100–U+11FF) pass through unchanged."""
+        assert decompose_hangul("ㅎㅏㄴ") == "ㅎㅏㄴ"
+
+    def test_compatibility_jamo_passthrough(self):
+        """Compatibility jamo (U+3130–U+318F) pass through unchanged."""
+        assert decompose_hangul("ㄱㅎ") == "ㄱㅎ"

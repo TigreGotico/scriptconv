@@ -3,6 +3,8 @@ import pytest
 from scriptconv.notation import (
     Notation,
     convert,
+    can_convert,
+    convert_batch,
     arpa_to_ipa,
     ipa_to_arpa,
     xsampa_to_ipa,
@@ -41,6 +43,25 @@ def test_arpa_to_ipa_gold(arpa, expected_ipa):
 def test_arpa_to_ipa_unknown_passthrough():
     result = arpa_to_ipa("UNKNOWN")
     assert "UNKNOWN" in result
+
+
+def test_arpa_g_is_canonical_script_g():
+    # ARPA "G" must emit script ɡ (U+0261), the canonical IPA used by the
+    # X-SAMPA and Lexique tables — not ASCII "g" (U+0067).
+    out = arpa_to_ipa("G")
+    assert out == "ɡ"
+    assert ord(out) == 0x0261
+
+
+@pytest.mark.parametrize("ipa_g", ["ɡ", "g"])  # script U+0261 and ASCII U+0067
+def test_ipa_g_both_spellings_to_arpa(ipa_g):
+    assert ipa_to_arpa(ipa_g) == "G"
+
+
+def test_cross_converter_g_xsampa_to_arpa():
+    # Regression: voiced velar stop must survive X-SAMPA → ARPA via IPA hub.
+    from scriptconv import convert
+    assert convert("g", "x-sampa", "arpa") == "G"
 
 
 # ---------------------------------------------------------------------------
@@ -171,8 +192,7 @@ def test_buckwalter_to_arabic_gold(bw, arabic):
 ])
 def test_buckwalter_word(bw, arabic):
     result = buckwalter_to_arabic(bw)
-    # Each BW char should map to the corresponding Arabic char
-    assert len(result) == len(bw)
+    assert result == arabic
 
 
 # ---------------------------------------------------------------------------
@@ -396,12 +416,11 @@ def test_lexique_to_ipa_gold(lexique, expected_ipa):
     ("dø", "d2"),
     ("pœʁ", "p9R"),
     ("ɥit", "8it"),
-    ("aɲo", "aN o"),  # placeholder — see note below
+    ("aɲo",    "aNo"),    # ɲ→N, a→a, o→o
 ])
 def test_ipa_to_lexique_gold(ipa, expected_lexique):
-    # ɲ → N, o → o  (no space in Lexique; join expected without space)
     result = ipa_to_lexique(ipa)
-    assert result == expected_lexique.replace(" ", "")
+    assert result == expected_lexique
 
 
 # ---------------------------------------------------------------------------
@@ -448,3 +467,465 @@ def test_convert_lexique_enum():
 def test_convert_lexique_to_xsampa_via_ipa():
     result = convert("Sa", "lexique", "x-sampa")
     assert result == "Sa"  # ʃ→S, a→a
+
+
+# ---------------------------------------------------------------------------
+# B1 regression — Buckwalter docstring example mrHbA
+# ---------------------------------------------------------------------------
+
+def test_buckwalter_docstring_example():
+    """B1: buckwalter_to_arabic('mrHbA') must produce 'مرحبا'."""
+    assert buckwalter_to_arabic("mrHbA") == "مرحبا"
+
+
+# ---------------------------------------------------------------------------
+# B3 regression — X-SAMPA ɻ canonical reverse
+# ---------------------------------------------------------------------------
+
+def test_xsampa_61b_reverse_canonical():
+    """B3: ipa_to_xsampa('ɻ') must return a form that round-trips."""
+    xs = ipa_to_xsampa("ɻ")
+    back = xsampa_to_ipa(xs)
+    assert back == "ɻ", f"ɻ round-trip failed: ɻ → {xs!r} → {back!r}"
+
+
+def test_xsampa_r_backtick_and_r_backslash():
+    r"""r` -> ɽ (retroflex flap), r\` -> ɻ (retroflex approximant), r\\ -> ɹ (alveolar approximant)."""
+    assert xsampa_to_ipa("r`") == "ɽ"
+    assert xsampa_to_ipa("r\\`") == "ɻ"
+    assert xsampa_to_ipa("r\\") == "ɹ"
+
+
+# ---------------------------------------------------------------------------
+# New X-SAMPA symbols — retroflex, palatal, uvular, alveolo-palatal
+# ---------------------------------------------------------------------------
+
+def test_xsampa_new_symbols():
+    """Regression: newly added X-SAMPA symbols map correctly."""
+    # Retroflex plosives
+    assert xsampa_to_ipa("t`") == "ʈ"
+    assert xsampa_to_ipa("d`") == "ɖ"
+    # Palatal plosive
+    assert xsampa_to_ipa("J\\`") == "ɟ"
+    # Uvular plosive
+    assert xsampa_to_ipa("q") == "q"
+    # Alveolo-palatal fricatives
+    assert xsampa_to_ipa("s\\`") == "ɕ"
+    assert xsampa_to_ipa("z\\`") == "ʑ"
+    # Lateral flap
+    assert xsampa_to_ipa("l\\`") == "ɺ"
+
+
+def test_xsampa_new_symbols_roundtrip():
+    """Round-trip all new X-SAMPA symbols through IPA."""
+    symbols = ["ʈ", "ɖ", "ɟ", "q", "ɕ", "ʑ", "ɺ"]
+    for ipa in symbols:
+        xs = ipa_to_xsampa(ipa)
+        back = xsampa_to_ipa(xs)
+        assert back == ipa, f"Round-trip failed for {ipa}: -> {xs!r} -> {back!r}"
+
+
+# ---------------------------------------------------------------------------
+# B4 regression — ipa_to_arpa works correctly (regex caching)
+# ---------------------------------------------------------------------------
+
+def test_ipa_to_arpa_simple():
+    """B4: Basic ipa_to_arpa should work regardless of regex caching."""
+    assert ipa_to_arpa("p") == "P"
+    assert ipa_to_arpa("k") == "K"
+
+
+def test_ipa_to_arpa_multi_char():
+    """B4: Multi-char IPA symbols match correctly."""
+    assert ipa_to_arpa("tʃ") == "CH"
+    assert ipa_to_arpa("dʒ") == "JH"
+
+
+# ---------------------------------------------------------------------------
+# M4 regression — Notation repr
+# ---------------------------------------------------------------------------
+
+def test_notation_repr():
+    """M4: Notation members have clean repr."""
+    assert repr(Notation.IPA) == "Notation.IPA"
+    assert repr(Notation.ARPA) == "Notation.ARPA"
+    assert repr(Notation.XSAMPA) == "Notation.XSAMPA"
+
+
+# ---------------------------------------------------------------------------
+# B7 regression — __init__.py translit docstring (jamo, not IPA)
+# ---------------------------------------------------------------------------
+
+def test_translit_docstring_says_jamo():
+    """B7: The translit module docstring should mention 'jamo', not 'IPA'."""
+    from scriptconv import translit
+    assert "jamo" in translit.__doc__.lower()
+
+
+# ---------------------------------------------------------------------------
+# B5 regression — lam-alef ligatures in Buckwalter
+# ---------------------------------------------------------------------------
+
+def test_buckwalter_lam_alef_ligature():
+    """B5: Pre-composed lam-alef ligatures (single codepoints) convert correctly."""
+    # Pre-composed ligatures (U+FEFB etc.)
+    assert arabic_to_buckwalter("\uFEFB") == "lA"   # لا ligature
+    assert arabic_to_buckwalter("\uFEF9") == "l<"   # لإ ligature
+    assert arabic_to_buckwalter("\uFEF7") == "l>"   # لأ ligature
+    assert arabic_to_buckwalter("\uFEF8") == "l|"   # لآ ligature
+    # Decomposed forms (lam + alef as separate chars) also work
+    assert arabic_to_buckwalter("لا") == "lA"
+    assert arabic_to_buckwalter("لأ") == "l>"
+
+
+def test_buckwalter_lam_alef_roundtrip():
+    """B5: lam-alef ligatures survive Buckwalter→Arabic→Buckwalter."""
+    assert arabic_to_buckwalter(buckwalter_to_arabic("lA")) == "lA"
+
+
+# ---------------------------------------------------------------------------
+# MO1 regression — can_convert predicate
+# ---------------------------------------------------------------------------
+
+def test_can_convert_direct():
+    assert can_convert("arpa", "ipa") is True
+    assert can_convert("ipa", "arpa") is True
+    assert can_convert("x-sampa", "ipa") is True
+    assert can_convert("buckwalter", "arabic") is True
+
+
+def test_can_convert_indirect():
+    assert can_convert("arpa", "x-sampa") is True
+    assert can_convert("lexique", "arpa") is True
+
+
+def test_can_convert_unsupported():
+    assert can_convert("buckwalter", "ipa") is False
+    assert can_convert("arabic", "ipa") is False
+
+
+def test_can_convert_identity_false():
+    # Identity is not a "conversion path" — use convert() for that
+    assert can_convert("ipa", "ipa") is False
+
+
+# ---------------------------------------------------------------------------
+# convert_batch
+# ---------------------------------------------------------------------------
+
+def test_convert_batch_basic():
+    lines = ["HH AH0 L OW1", "", "AY1"]
+    result = list(convert_batch(lines, "arpa", "ipa"))
+    assert result == ["həloʊ", "", "aɪ"]
+
+
+def test_convert_batch_blank_lines_preserved():
+    lines = ["", "", "HH"]
+    result = list(convert_batch(lines, "arpa", "ipa"))
+    assert result == ["", "", "h"]
+
+
+# ---------------------------------------------------------------------------
+# Empty string edge cases
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("fn", [
+    arpa_to_ipa, ipa_to_arpa, xsampa_to_ipa, ipa_to_xsampa,
+    buckwalter_to_arabic, arabic_to_buckwalter,
+    lexique_to_ipa, ipa_to_lexique,
+])
+def test_empty_string_passthrough(fn):
+    assert fn("") == ""
+
+
+# ---------------------------------------------------------------------------
+# can_convert with Notation enum arguments
+# ---------------------------------------------------------------------------
+
+def test_can_convert_enum_direct():
+    assert can_convert(Notation.ARPA, Notation.IPA) is True
+    assert can_convert(Notation.IPA, Notation.XSAMPA) is True
+    assert can_convert(Notation.BUCKWALTER, Notation.ARABIC) is True
+    assert can_convert(Notation.LEXIQUE, Notation.IPA) is True
+
+
+def test_can_convert_enum_indirect():
+    assert can_convert(Notation.ARPA, Notation.XSAMPA) is True
+    assert can_convert(Notation.XSAMPA, Notation.LEXIQUE) is True
+
+
+def test_can_convert_enum_unsupported():
+    assert can_convert(Notation.BUCKWALTER, Notation.IPA) is False
+
+
+# ---------------------------------------------------------------------------
+# convert() with invalid notation name
+# ---------------------------------------------------------------------------
+
+def test_convert_invalid_notation_name():
+    with pytest.raises(ValueError):
+        convert("x", "foobar", "ipa")
+
+
+# ---------------------------------------------------------------------------
+# ipa_to_arpa — multi-character IPA
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("ipa, expected", [
+    ("həloʊ", "HH AX L OW"),
+    ("tʃɛ", "CH ?"),       # ɛ not in IPA→ARPA → flagged
+    ("dʒʌst", "JH AH S T"),
+    ("θæŋks", "TH AE NG K S"),
+    ("ʃoʊ", "SH OW"),
+])
+def test_ipa_to_arpa_multi(ipa, expected):
+    # ɛ is not in the IPA→ARPA table, so it gets flagged as ?
+    assert ipa_to_arpa(ipa) == expected
+
+
+# ---------------------------------------------------------------------------
+# ipa_to_arpa — r-colored vowels and syllabics
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("ipa, expected", [
+    ("ɜr", "ER"),
+    ("ər", "AXR"),
+    ("ɾ", "DX"),
+    ("ɫ̩", "EL"),
+    ("m̩", "EM"),
+    ("n̩", "EN"),
+])
+def test_ipa_to_arpa_r_colored_syllabic(ipa, expected):
+    assert ipa_to_arpa(ipa) == expected
+
+
+# ---------------------------------------------------------------------------
+# arpa_to_ipa — diphthongs and special tokens
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("arpa, expected", [
+    ("EY1", "eɪ"),
+    ("AY1", "aɪ"),
+    ("OW1", "oʊ"),
+    ("AW1", "aʊ"),
+    ("OY1", "ɔɪ"),
+    ("ENG", "ŋ̍"),
+    ("DX", "ɾ"),
+    ("NX", "ɾ̃"),
+])
+def test_arpa_to_ipa_diphthongs_special(arpa, expected):
+    assert arpa_to_ipa(arpa) == expected
+
+
+# ---------------------------------------------------------------------------
+# X-SAMPA — unknown character passthrough
+# ---------------------------------------------------------------------------
+
+def test_xsampa_passthrough():
+    # Truly unknown characters pass through
+    assert xsampa_to_ipa("!#$") == "!#$"
+    assert xsampa_to_ipa("xyz") == "xyz"
+
+
+def test_ipa_to_xsampa_passthrough():
+    assert ipa_to_xsampa("!@#") == "!@#"
+    assert ipa_to_xsampa("xyz") == "xyz"
+
+
+# ---------------------------------------------------------------------------
+# X-SAMPA — alias and suprasegmental symbols
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("xs, expected", [
+    ("&", "æ"),      # alias for {
+    ("f\\", "ɸ"),    # alias for p\
+    ("%", "ˌ"),      # secondary stress
+    ("-.", "."),     # syllable boundary
+    ("-", "-"),      # hyphen (pass-through)
+])
+def test_xsampa_aliases_suprasegmentals(xs, expected):
+    assert xsampa_to_ipa(xs) == expected
+
+
+# ---------------------------------------------------------------------------
+# X-SAMPA — backslash-combo symbols n\` and X\`
+# ---------------------------------------------------------------------------
+
+def test_xsampa_n_backtick():
+    assert xsampa_to_ipa("n\\`") == "ɳ"
+    assert ipa_to_xsampa("ɳ") == "n\\`"
+
+
+def test_xsampa_X_backtick():
+    assert xsampa_to_ipa("X\\`") == "ħ"
+    assert ipa_to_xsampa("ħ") == "X\\`"
+
+
+# ---------------------------------------------------------------------------
+# X-SAMPA — vowel symbols coverage
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("xs, expected", [
+    ("1", "ɨ"),
+    ("2", "ø"),
+    ("4", "ɾ"),
+    ("5", "ɫ"),
+    ("6", "ɐ"),
+    ("7", "ɤ"),
+    ("8", "ɵ"),
+    ("9", "œ"),
+    ("A", "ɑ"),
+    ("Q", "ɒ"),
+    ("M", "ɯ"),
+    ("U", "ʊ"),
+    ("W", "ʍ"),
+    ("Y", "ʏ"),
+    ("I\\", "ᵻ"),
+    ("U\\", "ᵿ"),
+    ("M\\", "ɰ"),
+    ("3\\", "ɞ"),
+    ("B\\", "ʙ"),
+    ("H\\", "ʜ"),
+    ("?\\", "ʕ"),
+    ("h\\", "ɦ"),
+    ("K\\", "ɮ"),
+    ("L\\", "ʎ"),
+    ("R\\", "ʀ"),
+])
+def test_xsampa_vowels_coverage(xs, expected):
+    assert xsampa_to_ipa(xs) == expected
+
+
+# ---------------------------------------------------------------------------
+# Buckwalter — tatweel, shadda alias, unknown passthrough
+# ---------------------------------------------------------------------------
+
+def test_buckwalter_tatweel():
+    assert buckwalter_to_arabic("_") == "ـ"
+
+
+def test_buckwalter_shadda_alias():
+    # ~ maps to shadda in forward, but ^ is the canonical reverse
+    assert buckwalter_to_arabic("~") == "ّ"
+
+
+def test_buckwalter_unknown_passthrough():
+    # Digits are not in the BW table, so they pass through
+    assert buckwalter_to_arabic("123") == "123"
+
+
+# ---------------------------------------------------------------------------
+# convert_batch — generator protocol and line stripping
+# ---------------------------------------------------------------------------
+
+def test_convert_batch_is_generator():
+    result = convert_batch(["HH"], "arpa", "ipa")
+    import types
+    assert isinstance(result, types.GeneratorType)
+
+
+def test_convert_batch_lazy_next():
+    lines = ["HH", "AH0"]
+    gen = convert_batch(lines, "arpa", "ipa")
+    assert next(gen) == "h"
+    assert next(gen) == "ə"
+
+
+def test_convert_batch_strips_newlines():
+    lines = ["HH\n", "AH0\r\n", "OW1\r"]
+    result = list(convert_batch(lines, "arpa", "ipa"))
+    assert result == ["h", "ə", "oʊ"]
+
+
+def test_convert_batch_with_enum():
+    lines = ["S", "Z"]
+    result = list(convert_batch(lines, Notation.XSAMPA, Notation.IPA))
+    assert result == ["ʃ", "ʒ"]
+
+
+# ---------------------------------------------------------------------------
+# IPA → X-SAMPA round-trip — multi-character IPA
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("ipa", [
+    "tʃ",
+    "dʒ",
+    "eɪ",
+    "aɪ",
+    "oʊ",
+    "aʊ",
+    "ɔɪ",
+    "ɜr",
+    "ər",
+])
+def test_ipa_xsampa_roundtrip_multi(ipa):
+    xs = ipa_to_xsampa(ipa)
+    back = xsampa_to_ipa(xs)
+    assert back == ipa, f"Round-trip failed: {ipa!r} -> {xs!r} -> {back!r}"
+
+
+# ---------------------------------------------------------------------------
+# ARPA round-trip — diphthongs, r-colored, affricates
+# ---------------------------------------------------------------------------
+
+_ROUND_TRIP_ARPA_EXTENDED = [
+    "EY", "AY", "OW", "AW", "OY",
+    "CH", "JH", "ER",
+]
+
+
+@pytest.mark.parametrize("arpa", _ROUND_TRIP_ARPA_EXTENDED)
+def test_arpa_roundtrip_extended(arpa):
+    ipa = arpa_to_ipa(arpa)
+    back = ipa_to_arpa(ipa)
+    assert back == arpa, f"Round-trip failed: {arpa!r} -> {ipa!r} -> {back!r}"
+
+
+# ---------------------------------------------------------------------------
+# Lexique — isolated vowel gold checks
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("ipa, expected", [
+    ("ø", "2"),
+    ("œ", "9"),
+    ("ɑ̃", "@"),
+    ("ɔ̃", "§"),
+    ("ɛ̃", "5"),
+    ("œ̃", "1"),
+])
+def test_ipa_to_lexique_vowels(ipa, expected):
+    assert ipa_to_lexique(ipa) == expected
+
+
+# ---------------------------------------------------------------------------
+# ipa_to_arpa — unknown chars flagged
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("ipa, expected", [
+    ("ɸɸ", "? ?"),
+    ("pɸt", "P ? T"),
+    ("həˈloʊ", "HH AX ? L OW"),  # ˈ not in IPA→ARPA table
+])
+def test_ipa_to_arpa_unknown_chars(ipa, expected):
+    assert ipa_to_arpa(ipa) == expected
+
+
+# ---------------------------------------------------------------------------
+# Notation enum — basic properties
+# ---------------------------------------------------------------------------
+
+def test_notation_enum_values():
+    assert Notation.IPA.value == "ipa"
+    assert Notation.ARPA.value == "arpa"
+    assert Notation.XSAMPA.value == "x-sampa"
+    assert Notation.BUCKWALTER.value == "buckwalter"
+    assert Notation.ARABIC.value == "arabic"
+    assert Notation.LEXIQUE.value == "lexique"
+
+
+def test_notation_enum_count():
+    assert len(Notation) == 6
+
+
+def test_notation_str():
+    assert str(Notation.IPA) == "Notation.IPA"

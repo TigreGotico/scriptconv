@@ -12,7 +12,7 @@ samples = [
     ("Korean",     "안녕하세요"),
     ("Greek",      "ελληνικά"),
     ("Chinese",    "中文测试"),
-    ("Mixed (Cyrillic dominant)", "Привет A world"),
+    ("Tie (Cyrillic + Latin)", "Привет A world"),
     ("Mixed (Arabic dominant)",   "مرحبا hello مرحبا"),
     ("Lao",        "ສະບາຍດີ"),
     ("Tibetan",    "བོད་སྐད།"),

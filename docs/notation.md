@@ -4,7 +4,7 @@ Phoneme-notation transcoding. All tables are pure Python data; zero runtime depe
 
 ```python
 from scriptconv.notation import (
-    Notation, convert,
+    Notation, convert, can_convert, convert_batch,
     arpa_to_ipa, ipa_to_arpa,
     xsampa_to_ipa, ipa_to_xsampa,
     buckwalter_to_arabic, arabic_to_buckwalter,
@@ -209,6 +209,21 @@ IPA → X-SAMPA → IPA is lossless for all symbols in the table. X-SAMPA → IP
 is lossless for symbols with a unique IPA counterpart; aliases (`&` = `{` = `æ`) map
 to the canonical X-SAMPA form on the way back.
 
+**Alias collisions** — several X-SAMPA symbols map to the same IPA value. The reverse
+table uses the canonical form (first defined), so round-tripping non-canonical aliases
+produces the canonical form:
+
+| X-SAMPA aliases | IPA | Canonical X-SAMPA |
+|-----------------|-----|--------------------|
+| `{` or `&` | æ | `{` |
+| `f\` or `p\` | ɸ | `p\` |
+| `r\` or `4` | ɹ | `r\` |
+
+```python
+ipa_to_xsampa("æ")   # "{"  (canonical, not "&")
+ipa_to_xsampa("ɸ")   # "p\\"  (not "f\\")
+```
+
 ---
 
 ## Buckwalter ↔ Arabic script
@@ -297,8 +312,8 @@ arabic_to_buckwalter("ا")       # "A"
 | `^` | ّ | shadda (alias for `~`) |
 
 **Shadda alias note**: both `~` and `^` map to the shadda character (U+0651) in the
-forward direction. In the reverse direction, shadda maps to `^` (the first occurrence
-in the reverse-lookup dict construction). Round-trips involving `~` will produce `^`.
+forward direction. In the reverse direction, shadda maps to `^` (the last alias wins
+via dict comprehension overwrite). Round-trips involving `~` will produce `^`.
 
 ---
 
@@ -400,3 +415,42 @@ Verified against *Manuel de Lexique 3* v3.11, Tableau 2.
 
 Lexique → IPA → Lexique is lossless except for the `°`/`3` schwa pair (both map to `ə`
 in IPA; reverse always produces `°`). All other phonemes round-trip exactly.
+
+---
+
+## can_convert — predicate
+
+```python
+def can_convert(src: str | Notation, dst: str | Notation) -> bool
+```
+
+Returns `True` if a conversion from *src* to *dst* is supported (direct or indirect
+through IPA). Does not perform any conversion.
+
+```python
+can_convert("arpa", "ipa")         # True  (direct)
+can_convert("arpa", "x-sampa")     # True  (indirect: arpa→ipa→x-sampa)
+can_convert("buckwalter", "ipa")   # False (not supported)
+can_convert("ipa", "ipa")          # False (identity — use convert() instead)
+```
+
+---
+
+## convert_batch — line-by-line generator
+
+```python
+def convert_batch(
+    lines: Iterable[str],
+    src: str | Notation,
+    dst: str | Notation,
+) -> Generator[str, None, None]
+```
+
+Converts each line from *src* to *dst* notation, yielding results. Blank lines are
+yielded unchanged. Useful for processing files or piped input.
+
+```python
+lines = ["HH AH0 L OW1", "", "AY1"]
+list(convert_batch(lines, "arpa", "ipa"))
+# ['həloʊ', '', 'aɪ']
+```
