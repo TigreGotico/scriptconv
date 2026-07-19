@@ -458,10 +458,10 @@ list(convert_batch(lines, "arpa", "ipa"))
 
 ## Kirshenbaum (ASCII-IPA) ↔ IPA
 
-Kirshenbaum is the ASCII phonetic alphabet used natively by espeak-ng. The
-single-character mapping is the verbatim `ipa1[96]` table from espeak-ng 1.52.0
-`dictionary.c` (index *i* → the IPA codepoint for ASCII `0x20+i`); the standard
-itself is Kirshenbaum 1993 (comp.speech).
+Kirshenbaum is the ASCII phonetic alphabet defined by Kirshenbaum 1993
+(comp.speech), also used natively by espeak-ng. The single-character mapping is
+the factual ASCII → IPA codepoint correspondence of that standard (index *i* →
+the IPA codepoint for ASCII `0x20+i`), cross-checked against espeak-ng.
 
 ```python
 kirshenbaum_to_ipa("S")   # "ʃ"

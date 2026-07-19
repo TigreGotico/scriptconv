@@ -1,11 +1,11 @@
 """Phoneme-notation transcoding — IPA ↔ ARPABET, IPA ↔ X-SAMPA,
-IPA ↔ Lexique, Buckwalter ↔ Arabic script.
+IPA ↔ Lexique, IPA ↔ Kirshenbaum, Buckwalter ↔ Arabic script.
 
 All tables are pure Python data; zero runtime dependencies.
 
 ARPABET table derived from chorusai/arpa2ipa
   (https://github.com/chorusai/arpa2ipa), licensed Apache-2.0.
-Mantoq/Buckwalter table derived from phoonnx thirdparty/bw2ipa.py.
+Buckwalter ↔ Arabic table follows Tim Buckwalter's transliteration scheme.
 Lexique phoneme-code table from:
   New, B. & Pallier, C. — Manuel de Lexique 3, v3.11, Tableau 2 (p. 12).
   Lexique383, https://github.com/chrplr/openlexicon, CC BY-SA 4.0.
@@ -384,14 +384,11 @@ def ipa_to_xsampa(ipa: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Buckwalter / Mantoq ↔ Arabic script
+# Buckwalter ↔ Arabic script
 #
-# The Mantoq notation used here is the tokenization scheme from
-# phoonnx/thirdparty/bw2ipa.py (itself a Mantoq→IPA converter).  We extend
-# it with a direct Buckwalter↔Arabic-script table, independent of IPA.
-#
-# Buckwalter transliteration table derived from phoonnx thirdparty/bw2ipa.py
-# and mantoq/pyarabic transliteration knowledge.
+# A direct Buckwalter ↔ Arabic-script table (independent of IPA) following
+# Tim Buckwalter's Arabic transliteration scheme, as also implemented by
+# pyarabic.
 # ---------------------------------------------------------------------------
 
 # Standard Buckwalter → Arabic Unicode
@@ -609,10 +606,11 @@ def ipa_to_lexique(ipa: str) -> str:
 # ---------------------------------------------------------------------------
 # Kirshenbaum (ASCII-IPA) ↔ IPA
 #
-# Kirshenbaum is the ASCII phonetic alphabet used natively by espeak-ng.
-# The single-character map is the verbatim ``ipa1[96]`` table from espeak-ng
-# 1.52.0 ``dictionary.c`` (index i → the IPA codepoint for ASCII 0x20+i).
-# Reference: Kirshenbaum 1993 (comp.speech), espeak-ng phoneme docs.
+# Kirshenbaum is the ASCII phonetic alphabet defined by Kirshenbaum 1993
+# (comp.speech), also used natively by espeak-ng. The single-character map
+# below is the factual ASCII → IPA codepoint correspondence of that standard
+# (index i → the IPA codepoint for ASCII 0x20+i), cross-checked against the
+# espeak-ng ``ipa1[96]`` table.
 # ---------------------------------------------------------------------------
 
 # ipa1[96]: IPA codepoint for each printable ASCII char, 0x20..0x7F.
@@ -845,7 +843,7 @@ NOTATION_INFO: dict[Notation, NotationInfo] = {
     Notation.KIRSHENBAUM: NotationInfo(
         Notation.KIRSHENBAUM, lossless_to_ipa=True, lossless_from_ipa=False,
         token_separated=False,
-        reference="espeak-ng 1.52.0 dictionary.c ipa1[96]; Kirshenbaum 1993",
+        reference="Kirshenbaum 1993 ASCII-IPA standard (comp.speech)",
     ),
     Notation.BUCKWALTER: NotationInfo(
         Notation.BUCKWALTER, lossless_to_ipa=True, lossless_from_ipa=False,

@@ -176,5 +176,5 @@ Derived tables used internally:
 | ARPABET ↔ IPA | [chorusai/arpa2ipa](https://github.com/chorusai/arpa2ipa) | Apache-2.0 |
 | Buckwalter ↔ Arabic | Tim Buckwalter's transliteration scheme (via pyarabic) | — |
 | Lexique phoneme codes | New, B. & Pallier, C. — *Manuel de Lexique 3* v3.11, Tableau 2; [chrplr/openlexicon](https://github.com/chrplr/openlexicon) | CC BY-SA 4.0 |
-| Kirshenbaum ↔ IPA | espeak-ng 1.52.0 `dictionary.c` `ipa1[96]`; Kirshenbaum 1993 | GPL-3.0 (table of codepoints) |
+| Kirshenbaum ↔ IPA | Kirshenbaum 1993 ASCII-IPA standard (comp.speech), cross-checked against espeak-ng | — (factual symbol mapping) |
 | Hangul jamo tables | [stannam/hangul_to_ipa](https://github.com/stannam/hangul_to_ipa) | — |

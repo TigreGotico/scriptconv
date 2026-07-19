@@ -1,19 +1,22 @@
-"""scriptconv — shared script-conversion core for phoonnx, stressonnx,
-and orthography2ipa.
+"""scriptconv — a zero-dependency core for written-script operations.
+
+Script identification and metadata, phoneme-notation transcoding, and
+orthographic decomposition — no phonemization.
 
 Modules
 -------
 scripts:
     Writing-system identification and metadata.  ISO-15924 script codes,
     character-range detection, ``lang_to_script``, ``normalize_script_tag``,
-    ``script_distribution``, ``base_direction``, ``script_to_langs``.
+    ``script_distribution``, ``script_runs``, ``base_direction``,
+    ``script_to_langs``.
 notation:
     Phoneme-notation transcoding.  IPA ↔ ARPABET, IPA ↔ X-SAMPA,
-    IPA ↔ Lexique, Buckwalter ↔ Arabic script.
-    ``Notation`` enum + ``convert`` facade.
+    IPA ↔ Lexique, IPA ↔ Kirshenbaum, Buckwalter ↔ Arabic script.
+    ``Notation`` enum, ``convert`` facade, ``NOTATION_INFO`` fidelity registry.
 translit:
-    Script-level decomposition utilities (Hangul jamo).
-    Currently: Hangul → jamo.
+    Script-level decomposition and transliteration (Hangul → jamo,
+    Hiragana ↔ Katakana).
 
 Zero runtime dependencies (stdlib only).
 """

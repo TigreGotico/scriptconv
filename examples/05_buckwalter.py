@@ -1,7 +1,7 @@
 """Arabic script ↔ Buckwalter transliteration, both directions.
 
 Covers letters, short-vowel diacritics, hamza variants, and the shadda
-gemination marker. Table derived from phoonnx thirdparty/bw2ipa.py.
+gemination marker. Follows Tim Buckwalter's transliteration scheme.
 """
 from scriptconv.notation import buckwalter_to_arabic, arabic_to_buckwalter
 

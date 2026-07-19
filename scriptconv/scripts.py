@@ -65,7 +65,7 @@ class Script:
 
 
 # ---------------------------------------------------------------------------
-# Registry — the scripts the org actually handles
+# Registry — the supported writing systems
 # ---------------------------------------------------------------------------
 
 SCRIPT_REGISTRY: dict[str, Script] = {
@@ -568,9 +568,8 @@ def base_direction(text: str) -> str:
 # ---------------------------------------------------------------------------
 # lang_to_script — default script per language primary subtag
 #
-# Seeded from:
-#   - stressonnx LANG_SCRIPT mapping
-#   - phoonnx _MMS_SCRIPTS knowledge + general BCP-47 defaults
+# Default script per language, from ISO 15924 / BCP-47 conventions and
+# the language coverage of Meta's MMS (Massively Multilingual Speech).
 # ---------------------------------------------------------------------------
 
 _LANG_TO_SCRIPT: dict[str, str] = {
@@ -641,7 +640,7 @@ _LANG_TO_SCRIPT: dict[str, str] = {
     "bo": "Tibt",
     # Lao
     "lo": "Laoo",
-    # Latin-script languages shipped by orthography2ipa
+    # Additional Latin-script languages
     "vi": "Latn",   # Vietnamese
     "ha": "Latn",   # Hausa
     "ig": "Latn",   # Igbo
@@ -721,11 +720,11 @@ def script_to_langs(code: str) -> list[str]:
 # ---------------------------------------------------------------------------
 # normalize_script_tag — free-form labels → ISO-15924
 #
-# Ported from phoonnx._MMS_SCRIPTS and extended.
+# Free-form and MMS-style labels mapped to ISO 15924.
 # ---------------------------------------------------------------------------
 
 _LABEL_MAP: dict[str, str] = {
-    # MMS labels (phoonnx._MMS_SCRIPTS)
+    # MMS-style lowercase labels
     "latin": "Latn",
     "cyrillic": "Cyrl",
     "arabic": "Arab",
