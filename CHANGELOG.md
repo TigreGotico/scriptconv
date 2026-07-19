@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.1a5](https://github.com/TigreGotico/scriptconv/tree/0.0.1a5) (2026-07-19)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.1a4...0.0.1a5)
+
+**Merged pull requests:**
+
+- docs: cite Buckwalter standard directly, drop GPL pyarabic reference [\#10](https://github.com/TigreGotico/scriptconv/pull/10) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.1a4](https://github.com/TigreGotico/scriptconv/tree/0.0.1a4) (2026-07-19)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.1a3...0.0.1a4)
