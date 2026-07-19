@@ -67,8 +67,12 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _do_convert(args: argparse.Namespace) -> None:
-    from scriptconv.notation import convert
-    print(convert(args.text, args.src, args.dst))
+    from scriptconv.notation import Notation, convert
+    try:
+        print(convert(args.text, args.src, args.dst))
+    except ValueError as e:
+        valid = ", ".join(n.value for n in Notation)
+        raise SystemExit(f"error: {e} (valid notations: {valid})")
 
 
 def _do_detect(args: argparse.Namespace) -> None:

@@ -20,12 +20,12 @@ def test_convert_xsampa_ipa(capsys):
 
 
 def test_convert_invalid_pair(capsys):
-    with pytest.raises(ValueError):
+    with pytest.raises(SystemExit):
         main(["convert", "buckwalter", "ipa", "x"])
 
 
 def test_convert_unknown_notation(capsys):
-    with pytest.raises(ValueError):
+    with pytest.raises(SystemExit):
         main(["convert", "foobar", "ipa", "x"])
 
 
@@ -77,3 +77,12 @@ def test_lang(capsys):
 def test_lang_unknown(capsys):
     assert main(["lang", "xyz"]) == 0
     assert capsys.readouterr().out.strip() == "(unknown)"
+
+
+def test_convert_bad_notation_clean_error(capsys):
+    # An invalid notation must produce a clean message, not a raw traceback.
+    with pytest.raises(SystemExit) as exc:
+        main(["convert", "arpa", "bogus", "AH0"])
+    msg = str(exc.value)
+    assert msg.startswith("error:")
+    assert "valid notations:" in msg
