@@ -547,6 +547,23 @@ def test_lang_to_script_underscore_separator():
     assert lang_to_script("ru_RU") == "Cyrl"
 
 
+@pytest.mark.parametrize("tag, expected", [
+    ("sr-Latn", "Latn"),   # Serbian written in Latin, not its default Cyrillic
+    ("uz-Cyrl", "Cyrl"),   # Uzbek written in Cyrillic, not its default Latin
+    ("az-Arab", "Arab"),   # Azerbaijani in Arabic script
+    ("ku-Latn", "Latn"),
+    ("sr_Latn", "Latn"),   # underscore separator
+])
+def test_lang_to_script_honours_explicit_script_subtag(tag, expected):
+    assert lang_to_script(tag) == expected
+
+
+def test_lang_to_script_ignores_region_and_variant_subtags():
+    # Non-script subtags must not be mistaken for a script.
+    assert lang_to_script("pt-BR") == "Latn"
+    assert lang_to_script("en-US") == "Latn"
+
+
 # ---------------------------------------------------------------------------
 # normalize_script_tag — new labels and edge cases
 # ---------------------------------------------------------------------------

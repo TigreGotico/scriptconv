@@ -599,9 +599,11 @@ _LANG_TO_SCRIPT: dict[str, str] = {
 def lang_to_script(lang: str) -> Optional[str]:
     """Return the ISO-15924 code of the default script for *lang*.
 
-    *lang* may be a BCP-47 tag or bare ISO 639 code.  Only the primary
-    subtag is used (``"pt-BR"`` → ``"pt"``).  Returns ``None`` when the
-    language is unknown.
+    *lang* may be a BCP-47 tag or bare ISO 639 code.  An explicit ISO-15924
+    script subtag is authoritative and is honoured when present
+    (``"sr-Latn"`` → ``"Latn"``, ``"uz-Cyrl"`` → ``"Cyrl"``); otherwise the
+    default script for the primary subtag is returned (``"pt-BR"`` → ``"pt"``).
+    Returns ``None`` when the language is unknown.
 
     Examples
     --------
@@ -609,9 +611,18 @@ def lang_to_script(lang: str) -> Optional[str]:
     'Latn'
     >>> lang_to_script("ru")
     'Cyrl'
+    >>> lang_to_script("sr-Latn")
+    'Latn'
     """
-    primary = lang.split("-")[0].split("_")[0].lower()
-    return _LANG_TO_SCRIPT.get(primary)
+    subtags = lang.replace("_", "-").split("-")
+    # An explicit script subtag (4 letters, e.g. "Latn") overrides the
+    # language's default script.
+    for sub in subtags[1:]:
+        if len(sub) == 4 and sub.isalpha():
+            resolved = normalize_script_tag(sub)
+            if resolved is not None:
+                return resolved
+    return _LANG_TO_SCRIPT.get(subtags[0].lower())
 
 
 # ---------------------------------------------------------------------------
