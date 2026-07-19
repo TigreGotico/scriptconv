@@ -508,3 +508,20 @@ are IPA. Use it to *guard* against feeding IPA where orthography is expected,
 not to prove a string is not IPA. (This is also why IPA is not a distinct
 script: it borrows codepoints from Latin, Greek, and the modifier blocks —
 `char_script("ɑ")` is `Latn`, `char_script("θ")` is `Grek`.)
+
+## Cotovía ↔ IPA
+
+Cotovía is the internal phoneme notation of the Universidade de Vigo GTM
+Cotovía TTS system (Galician/Spanish). The table is the phoneme symbol map from
+its `fonemas.cpp`; symbols are matched longest-first (`tS`, `rr` before single
+characters).
+
+```python
+cotovia_to_ipa("tS")      # "tʃ"
+cotovia_to_ipa("karro")   # "karo"  (rr = trill r; single r = tap ɾ)
+ipa_to_cotovia("ʎ")       # "L"     (canonical palatal-lateral symbol)
+```
+
+The silence/pause marker (`#`) is a boundary token, not a phoneme, and is
+excluded from the table. Three source symbols (`L`, `Z`, `jj`) map to `ʎ`; the
+reverse direction emits the standard Cotovía `L`.
