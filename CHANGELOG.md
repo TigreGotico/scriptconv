@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.3a22](https://github.com/TigreGotico/scriptconv/tree/0.0.3a22) (2026-07-21)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a21...0.0.3a22)
+
+**Merged pull requests:**
+
+- fix: restore mantoq phonemizer historical contract [\#60](https://github.com/TigreGotico/scriptconv/pull/60) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.3a21](https://github.com/TigreGotico/scriptconv/tree/0.0.3a21) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a20...0.0.3a21)
