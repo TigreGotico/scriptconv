@@ -1,0 +1,33 @@
+from scriptconv.phonemizers.base import BasePhonemizer
+from scriptconv.phonemizers.enums import Alphabet
+
+
+class VIPhonemePhonemizer(BasePhonemizer):
+    """https://github.com/v-nhandt21/Viphoneme"""
+    def __init__(self):
+        from viphoneme import vi2IPA
+        self.g2p = vi2IPA
+        super().__init__(Alphabet.IPA)
+
+    @classmethod
+    def get_lang(cls, target_lang: str) -> str:
+        """
+        Validates and returns the closest supported language code.
+
+        Args:
+            target_lang (str): The language code to validate.
+
+        Returns:
+            str: The validated language code.
+
+        Raises:
+            ValueError: If the language code is unsupported.
+        """
+        # this check is here only to throw an exception if invalid language is provided
+        return cls.match_lang(target_lang, ["vi"])
+
+    def phonemize_string(self, text: str, lang: str = "vi") -> str:
+        """
+        """
+        lang = self.get_lang(lang)
+        return self.g2p(text)
