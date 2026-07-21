@@ -1,4 +1,4 @@
-"""Dictionary-backed script respelling (Japanese kanji → kana).
+"""Dictionary-backed script respelling (Japanese kanji → kana, Chinese hanzi → pinyin/bopomofo).
 
 Unlike the table-driven modules (:mod:`scriptconv.translit`,
 :mod:`scriptconv.notation`), converting kanji to kana is not a codepoint
@@ -8,15 +8,21 @@ dictionary's segmentation.  This is still orthography — the output is how the
 word is written in kana, exactly as an IME or furigana would render it — not
 phonemization; no sound rules are applied.
 
-Because it needs a reading dictionary, this module requires the optional
-``pykakasi`` dependency (``pip install scriptconv[ja]``).  Importing the
+The same reasoning covers Chinese: a hanzi's pinyin or bopomofo spelling is a
+lexical property with genuinely ambiguous readings (heteronyms such as 行
+xíng/háng) resolved by a phrase dictionary — standard orthographic respelling,
+not phonemization.
+
+Because it needs reading dictionaries, this module requires optional
+dependencies: ``pykakasi`` for Japanese (``pip install scriptconv[ja]``) and
+``pypinyin`` for Chinese (``pip install scriptconv[zh]``).  Importing the
 module is always safe; the dependency is resolved on first conversion and a
 missing dictionary raises :class:`ImportError` rather than silently returning
 unconverted text.
 """
 from __future__ import annotations
 
-__all__ = ["to_hiragana", "to_katakana"]
+__all__ = ["to_hiragana", "to_katakana", "to_pinyin", "to_bopomofo"]
 
 _kakasi = None
 
@@ -69,3 +75,45 @@ def to_katakana(text: str) -> str:
 def _is_japanese(ch: str) -> bool:
     cp = ord(ch)
     return cp in _HIRA or cp in _KANA or 0x4E00 <= cp <= 0x9FFF
+
+
+_PINYIN_STYLES = None
+
+
+def _pinyin(text: str, style_name: str) -> str:
+    global _PINYIN_STYLES
+    if _PINYIN_STYLES is None:
+        try:
+            from pypinyin import Style, lazy_pinyin
+        except ImportError:
+            raise ImportError(
+                "hanzi→pinyin/bopomofo conversion needs the phrase dictionary "
+                "from pypinyin — install with `pip install scriptconv[zh]`"
+            ) from None
+        _PINYIN_STYLES = {"mark": Style.TONE, "number": Style.TONE3,
+                          "none": Style.NORMAL, "bopomofo": Style.BOPOMOFO,
+                          "_fn": lazy_pinyin}
+    if style_name not in _PINYIN_STYLES:
+        raise ValueError(f"tone must be one of 'mark', 'number', 'none' — got {style_name!r}")
+    tokens = _PINYIN_STYLES["_fn"](text, style=_PINYIN_STYLES[style_name])
+    return " ".join(" ".join(tokens).split())
+
+
+def to_pinyin(text: str, tone: str = "mark") -> str:
+    """Respell Chinese text in pinyin, syllables space-separated.
+
+    Hanzi are resolved to their dictionary reading (heteronyms decided by
+    pypinyin's phrase dictionary); non-Chinese characters pass through.
+    ``tone`` selects the tone spelling: ``"mark"`` (``zhōng``, default),
+    ``"number"`` (``zhong1``) or ``"none"`` (``zhong``).
+    """
+    return _pinyin(text, tone)
+
+
+def to_bopomofo(text: str) -> str:
+    """Respell Chinese text in bopomofo (zhuyin), syllables space-separated.
+
+    Hanzi are resolved to their dictionary reading; non-Chinese characters
+    pass through.  Tone marks follow zhuyin convention (first tone unmarked).
+    """
+    return _pinyin(text, "bopomofo")

@@ -34,7 +34,8 @@ dependencies = {file = ["requirements.txt"]}
 
 [project.optional-dependencies]
 ja = ["pykakasi>=2.3,<3"]
-test = ["pytest", "pytest-timeout", "pykakasi>=2.3,<3"]
+zh = ["pypinyin>=0.50,<1"]
+test = ["pytest", "pytest-timeout", "pykakasi>=2.3,<3", "pypinyin>=0.50,<1"]
 
 [project.urls]
 Homepage = "https://github.com/TigreGotico/scriptconv"
