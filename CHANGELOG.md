@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.3a18](https://github.com/TigreGotico/scriptconv/tree/0.0.3a18) (2026-07-21)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a17...0.0.3a18)
+
+**Merged pull requests:**
+
+- feat: mantoq phonetic notation with IPA conversion; complete Buckwalter table [\#52](https://github.com/TigreGotico/scriptconv/pull/52) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.3a17](https://github.com/TigreGotico/scriptconv/tree/0.0.3a17) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a16...0.0.3a17)
