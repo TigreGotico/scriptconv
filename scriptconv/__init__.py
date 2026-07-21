@@ -20,6 +20,8 @@ translit:
 readings:
     Dictionary-backed respelling (Japanese kanji → kana via the ``ja``
     extra; Chinese hanzi → pinyin/bopomofo via the ``zh`` extra).
+cangjie:
+    Hanzi → Cangjie5 input codes (shape decomposition, vendored table).
 
 Zero required runtime dependencies (stdlib only); the readings module
 needs the optional ``ja``/``zh`` extras.
@@ -71,6 +73,10 @@ from scriptconv.readings import (
     to_pinyin,
     to_bopomofo,
 )
+from scriptconv.cangjie import (
+    cangjie_code,
+    to_cangjie,
+)
 
 __all__ = [
     # scripts
@@ -113,6 +119,9 @@ __all__ = [
     # readings (dictionary-backed, needs scriptconv[ja])
     "to_hiragana",
     "to_katakana",
+    # cangjie (vendored Cangjie5 table)
+    "cangjie_code",
+    "to_cangjie",
     "to_pinyin",
     "to_bopomofo",
 ]
