@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.3a3](https://github.com/TigreGotico/scriptconv/tree/0.0.3a3) (2026-07-21)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a2...0.0.3a3)
+
+**Merged pull requests:**
+
+- feat: Chinese hanzi→pinyin/bopomofo readings [\#22](https://github.com/TigreGotico/scriptconv/pull/22) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.3a2](https://github.com/TigreGotico/scriptconv/tree/0.0.3a2) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a1...0.0.3a2)
