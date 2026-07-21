@@ -12,6 +12,7 @@ Usage
     python -m scriptconv restyle <convention> <style> <text>
     python -m scriptconv conventions [--script CODE]
     python -m scriptconv route <src> <dst>
+    python -m scriptconv phonemize <lang> <text> [--phonemizer ID] [--alphabet A]
 
 Examples
 --------
@@ -69,6 +70,12 @@ def main(argv: list[str] | None = None) -> int:
     rt.add_argument("src", help="Source representation id")
     rt.add_argument("dst", help="Target representation id")
 
+    ph = sub.add_parser("phonemize", help="Phonemize text (per-language default backend)")
+    ph.add_argument("lang", help="Language code")
+    ph.add_argument("text", help="Text to phonemize")
+    ph.add_argument("--phonemizer", default=None, help="Backend override (Phonemizer value)")
+    ph.add_argument("--alphabet", default="ipa", help="Output alphabet (default ipa)")
+
     args = p.parse_args(argv)
 
     if args.command is None:
@@ -86,6 +93,7 @@ def main(argv: list[str] | None = None) -> int:
         "restyle": lambda: _do_restyle(args),
         "conventions": lambda: _do_conventions(args),
         "route": lambda: _do_route(args),
+        "phonemize": lambda: _do_phonemize(args),
     }
     dispatch[args.command]()
     return 0
@@ -106,6 +114,16 @@ def _do_convert(args: argparse.Namespace) -> None:
         valid = ", ".join(n.value for n in Notation)
         raise SystemExit(f"error: {e} (valid notations: {valid}; "
                          f"graph nodes: {', '.join(DEFAULT_GRAPH.nodes)})")
+
+
+def _do_phonemize(args: argparse.Namespace) -> None:
+    from scriptconv.phonemizers import Alphabet, Phonemizer, phonemize
+    try:
+        override = Phonemizer(args.phonemizer) if args.phonemizer else None
+        print(phonemize(args.text, args.lang, Alphabet(args.alphabet),
+                        override=override))
+    except (ValueError, ImportError) as e:
+        raise SystemExit(f"error: {e}")
 
 
 def _do_route(args: argparse.Namespace) -> None:
