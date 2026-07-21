@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.3a9](https://github.com/TigreGotico/scriptconv/tree/0.0.3a9) (2026-07-21)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a8...0.0.3a9)
+
+**Merged pull requests:**
+
+- feat: codecs-style errors= policy on all notation converters [\#34](https://github.com/TigreGotico/scriptconv/pull/34) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.3a8](https://github.com/TigreGotico/scriptconv/tree/0.0.3a8) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a7...0.0.3a8)
