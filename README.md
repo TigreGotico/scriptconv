@@ -179,7 +179,8 @@ below describes the per-converter default.
 |----------|----------------------------------|----------------------------------|-------------------------|
 | **ARPABET** | **Lossless with `stress=True`** (digits ↔ IPA `ˈ`/`ˌ` before the stressed vowel; residues: extended-ARPABET `AX` normalises to CMUdict's `AH0` spelling, and `AH0 R` fuses to the r-colored `AXR0` — stable from the IPA side). Default `stress=False` drops digits and merges `AH0`↔`AX` | **Lossy** — ARPABET is an English-only inventory, so any IPA symbol outside it becomes the *unknown* placeholder | `arpa_to_ipa`: passed through unchanged. `ipa_to_arpa`: diacritics and suprasegmentals are dropped; other out-of-inventory symbols follow `errors=` (default `"replace"` → `?`) |
 | **X-SAMPA** | Exact for all canonical symbols | Exact except aliases (`f\`→ɸ, `&`→æ) normalise to their canonical spelling | Passed through unchanged |
-| **Buckwalter ↔ Arabic** | Exact (the `^` shadda alias normalises to canonical `~`; precomposed lam-alef ligatures decompose to two chars, visually identical) | Exact | Passed through unchanged |
+| **Buckwalter ↔ Arabic** | Exact (precomposed lam-alef ligatures decompose to two chars, visually identical) | Exact | Follows `errors=` (default: passed through) |
+| **Mantoq → IPA** | One-directional (gemination/word markers consumed; no IPA→Mantoq) | — | Follows `errors=` (default: passed through) |
 | **Lexique ↔ IPA** | Exact except the `°`/`3` schwa pair (both → `ə`; reverse always → `°`) | Exact | Passed through unchanged |
 | **Kirshenbaum ↔ IPA** | Exact | **Lossy** — restricted ASCII inventory; IPA outside it passes through | Passed through unchanged |
 | **Cotovía ↔ IPA** | Exact except the three `L`/`Z`/`jj` symbols for `ʎ` normalise to `L` | **Lossy** — Galician/Spanish inventory; IPA outside it passes through | Passed through unchanged |

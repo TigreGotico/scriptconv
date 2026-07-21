@@ -56,7 +56,8 @@ class Notation(str, Enum):
     LEXIQUE = "lexique"  # Lexique one-char-per-phoneme French notation
     KIRSHENBAUM = "kirshenbaum"  # ASCII-IPA (espeak-ng native notation)
     COTOVIA = "cotovia"  # Universidade de Vigo Cotovía TTS notation (gl)
-    RFE = "rfe"  # Revista de Filología Española phonetic alphabet
+    RFE = "rfe"
+    MANTOQ = "mantoq"  # Revista de Filología Española phonetic alphabet
 
     def __repr__(self) -> str:
         return f"Notation.{self.name}"
@@ -523,7 +524,8 @@ _BW_TO_ARABIC: dict[str, str] = {
     "K": "ٍ",  # tanwin kasr
     # Special
     "_": "ـ",  # tatweel
-    "^": "ّ",  # shadda alias
+    "{": "ٱ",  # alef wasla
+    "`": "ٰ",  # dagger (superscript) alef
 }
 
 _ARABIC_TO_BW: dict[str, str] = {v: k for k, v in _BW_TO_ARABIC.items()}
@@ -532,9 +534,6 @@ _ARABIC_TO_BW["\uFEFB"] = "lA"   # لا  lam + alef ligature
 _ARABIC_TO_BW["\uFEF9"] = "l<"   # لإ  lam + alef hamza below
 _ARABIC_TO_BW["\uFEF7"] = "l>"   # لأ  lam + alef hamza above
 _ARABIC_TO_BW["\uFEF8"] = "l|"   # لآ  lam + alef madda
-# The reverse comprehension lets the "^" shadda alias win over canonical "~";
-# restore the standard Buckwalter shadda so round-trips stay faithful.
-_ARABIC_TO_BW["\u0651"] = "~"   # shadda -> canonical "~", not the "^" alias
 
 
 def buckwalter_to_arabic(bw: str, errors: str = "pass") -> str:
@@ -1005,6 +1004,104 @@ def ipa_to_rfe(ipa: str, errors: str = "pass") -> str:
     return "".join(result)
 
 
+
+# ---------------------------------------------------------------------------
+# Mantoq → IPA
+#
+# Mantoq is the phonetic alphabet of Nawar Halabi's Arabic-Phonetiser (the
+# inventory emitted by the mantoq G2P pipeline): an ASCII phoneme notation
+# with Buckwalter-derived consonant letters (deviating where the phoneme set
+# requires — "^" is θ here, "v" a loan phoneme), stress/emphatic-free short
+# and long vowels ("a"/"aa"/"aaaa"), a gemination marker ``_dbl_`` and a word
+# separator ``_+_``.  The token→IPA mapping below is authored in-house from
+# the inventory's phonetic values — the phonetiser CODE is CC BY-NC and lives
+# elsewhere; a factual symbol table is not encumbered by it.  Published
+# models trained on mantoq sequences make this notation worth transcoding.
+# One-directional: IPA → mantoq is not defined.
+# ---------------------------------------------------------------------------
+
+_MANTOQ_CONSONANTS: dict[str, str] = {
+    "b": "b", "t": "t", "^": "θ", "j": "d͡ʒ", "H": "ħ", "x": "x",
+    "d": "d", "*": "ð", "r": "r", "z": "z", "s": "s", "$": "ʃ",
+    "S": "sˤ", "D": "dˤ", "T": "tˤ", "Z": "ðˤ", "E": "ʕ", "g": "ɣ",
+    "f": "f", "q": "q", "k": "k", "l": "l", "m": "m", "n": "n",
+    "h": "h", "w": "w", "y": "j", "v": "v",
+}
+
+_MANTOQ_VOWELS: dict[str, str] = {
+    "a": "a", "aa": "aː", "aaaa": "aːː",
+    "i": "i", "ii": "iː",
+    "u": "u", "uu": "uː",
+}
+
+_MANTOQ_MULTI = ("_dbl_", "_+_", "aaaa", "aa", "ii", "uu")
+
+
+def _tokenize_mantoq(text: str) -> list[str]:
+    tokens = []
+    i = 0
+    while i < len(text):
+        for sym in _MANTOQ_MULTI:
+            if text.startswith(sym, i):
+                tokens.append(sym)
+                i += len(sym)
+                break
+        else:
+            tokens.append(text[i])
+            i += 1
+    return tokens
+
+
+def mantoq_to_ipa(mantoq: str, errors: str = "pass") -> str:
+    """Convert a Mantoq phoneme string to IPA.
+
+    ``_dbl_`` lengthens/geminates the preceding symbol (``ː``), ``_+_``
+    becomes a space, ``<`` is the glottal stop.  Unknown characters follow
+    the ``errors`` policy.
+
+    Examples
+    --------
+    >>> mantoq_to_ipa("s a l aa m")
+    's a l aː m'
+    >>> mantoq_to_ipa("b_dbl_a")
+    'bːa'
+    """
+    out: list[str] = []
+    last_tok = None
+    for pos, tok in enumerate(_tokenize_mantoq(mantoq)):
+        if tok == "_dbl_":
+            # vowels lengthen cumulatively (aa + _dbl_ -> aːː); consonants
+            # geminate once
+            if out and last_tok is not None:
+                if last_tok in _MANTOQ_VOWELS or not out[-1].endswith("ː"):
+                    out[-1] += "ː"
+            continue
+        if tok == "_+_":
+            out.append(" ")
+            last_tok = None
+            continue
+        if tok == "<":
+            out.append("ʔ")
+            last_tok = tok
+            continue
+        if tok in _MANTOQ_VOWELS:
+            out.append(_MANTOQ_VOWELS[tok])
+        elif tok in _MANTOQ_CONSONANTS:
+            out.append(_MANTOQ_CONSONANTS[tok])
+        elif tok.isspace() or tok in ".,;:!?()[]{}\"'":
+            out.append(tok)
+            last_tok = None
+            continue
+        else:
+            res = _unknown(tok, pos, "mantoq", errors)
+            if res:
+                out.append(res)
+            last_tok = None
+            continue
+        last_tok = tok
+    return "".join(out)
+
+
 # ---------------------------------------------------------------------------
 # convert — facade routing through IPA where no direct map exists
 # ---------------------------------------------------------------------------
@@ -1069,6 +1166,7 @@ def convert(text: str, src: str | Notation, dst: str | Notation,
 # ---------------------------------------------------------------------------
 
 _TO_IPA: dict[Notation, "callable"] = {
+    Notation.MANTOQ: mantoq_to_ipa,
     Notation.ARPA: arpa_to_ipa,
     Notation.XSAMPA: xsampa_to_ipa,
     Notation.LEXIQUE: lexique_to_ipa,
@@ -1193,6 +1291,12 @@ NOTATION_INFO: dict[Notation, NotationInfo] = {
         Notation.RFE, lossless_to_ipa=False, lossless_from_ipa=False,
         token_separated=False,
         reference="RFE phonetic alphabet (Revista de Filología Española, 1915)",
+    ),
+    Notation.MANTOQ: NotationInfo(
+        Notation.MANTOQ, lossless_to_ipa=False, lossless_from_ipa=False,
+        token_separated=False,
+        reference="Phonetic alphabet of Nawar Halabi's Arabic-Phonetiser "
+                  "(mantoq G2P inventory); one-directional to IPA",
     ),
     Notation.BUCKWALTER: NotationInfo(
         Notation.BUCKWALTER, lossless_to_ipa=True, lossless_from_ipa=False,
