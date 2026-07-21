@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.3a6](https://github.com/TigreGotico/scriptconv/tree/0.0.3a6) (2026-07-21)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a5...0.0.3a6)
+
+**Merged pull requests:**
+
+- feat: token-level Japanese reading API and wakachigaki segmentation [\#28](https://github.com/TigreGotico/scriptconv/pull/28) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.3a5](https://github.com/TigreGotico/scriptconv/tree/0.0.3a5) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a4...0.0.3a5)
