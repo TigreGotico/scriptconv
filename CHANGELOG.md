@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.3a12](https://github.com/TigreGotico/scriptconv/tree/0.0.3a12) (2026-07-21)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a11...0.0.3a12)
+
+**Merged pull requests:**
+
+- feat: phonemizer wrapper layer with lazy registry and per-language defaults [\#40](https://github.com/TigreGotico/scriptconv/pull/40) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.3a11](https://github.com/TigreGotico/scriptconv/tree/0.0.3a11) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a10...0.0.3a11)
