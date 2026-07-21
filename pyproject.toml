@@ -57,9 +57,9 @@ ja-phonemizers = ["scriptconv[phonemizers]", "pyopenjtalk", "cutlet", "pykakasi>
 ko = ["scriptconv[phonemizers]", "g2pk", "regex"]
 zh-phonemizers = ["scriptconv[phonemizers]", "jieba", "pypinyin>=0.50,<1", "xpinyin", "g2pM", "pinyin_to_ipa"]
 en-phonemizers = ["scriptconv[phonemizers]", "g2p_en", "openphonemizer", "deep-phonemizer"]
-ar-phonemizers = ["scriptconv[phonemizers]", "arbtok"]
+ar-phonemizers = ["scriptconv[phonemizers]", "arbtok", "ovos-number-parser"]
 shami = ["scriptconv[phonemizers]", "regex"]
-test = ["pytest", "pytest-timeout", "pykakasi>=2.3,<3", "pypinyin>=0.50,<1", "quebra-frases", "langcodes", "regex"]
+test = ["pytest", "pytest-timeout", "pykakasi>=2.3,<3", "pypinyin>=0.50,<1", "quebra-frases", "langcodes", "regex", "ovos-number-parser"]
 
 [project.urls]
 Homepage = "https://github.com/TigreGotico/scriptconv"
@@ -72,6 +72,8 @@ include = ["scriptconv*"]
 scriptconv = ["py.typed"]
 "scriptconv.data" = ["*.tsv.gz"]
 "scriptconv.phonemizers._thirdparty" = ["ko_tables/*.csv", "ko_tables/*.tsv"]
+"scriptconv.phonemizers._vendored.kog2p" = ["rulebook.txt", "LICENSE.md"]
+"scriptconv.phonemizers._vendored.mantoq" = ["LICENSE.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

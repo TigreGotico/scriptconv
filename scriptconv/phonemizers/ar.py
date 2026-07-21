@@ -7,14 +7,11 @@ from scriptconv.phonemizers.base import BasePhonemizer
 class MantoqPhonemizer(BasePhonemizer):
     """Arabic phonemizer wrapping the external ``mantoq`` package.
 
-    mantoq (github.com/mush42/mantoq) bundles Nawar Halabi's Arabic-Phonetiser,
-    whose phonetisation core is CC BY-NC 4.0 — a license incompatible with
-    vendoring in this Apache-2.0 library, so the package is imported at
-    runtime and must be installed separately by a user who accepts its terms:
-
-        pip install git+https://github.com/mush42/mantoq
-
-    Kept for compatibility with published models trained on mantoq phoneme
+    Uses an externally-installed ``mantoq`` when present, otherwise the
+    quarantined vendored copy under ``_vendored/mantoq`` — distributed under
+    its OWN license (the phonetisation core is CC BY-NC 4.0, non-commercial;
+    see its LICENSE.md), NOT this library's Apache-2.0.  Never selected
+    automatically.  Kept for compatibility with published models trained on mantoq phoneme
     sequences; the Arabic default is :class:`ArbtokPhonemizer`.  Output is
     IPA (via :func:`scriptconv.notation.mantoq_to_ipa`) or the raw mantoq
     inventory with ``alphabet=Alphabet.MANTOQ``.
@@ -25,13 +22,14 @@ class MantoqPhonemizer(BasePhonemizer):
             raise ValueError("MantoqPhonemizer outputs IPA or MANTOQ")
         super().__init__(alphabet)
         try:
+            # an externally-installed upstream mantoq wins
             import mantoq
         except ImportError:
-            raise ImportError(
-                "the mantoq package is not installed (and not vendored here: "
-                "its phonetisation core is CC BY-NC 4.0). Install it "
-                "separately, accepting its license terms: "
-                "pip install git+https://github.com/mush42/mantoq") from None
+            # quarantined vendored copy under its OWN license (the
+            # phonetisation core is CC BY-NC 4.0 — see
+            # _vendored/mantoq/LICENSE.md); using it is an explicit opt-in
+            # by requesting this phonemizer
+            from scriptconv.phonemizers._vendored import mantoq
         self._g2p = mantoq.g2p
 
     @classmethod

@@ -41,28 +41,45 @@ class TestShamiFrontend(unittest.TestCase):
 
 
 class TestLicensingStubs(unittest.TestCase):
-    def test_mantoq_wrapper_requires_external_package(self):
+    def test_mantoq_wrapper_constructs_from_vendored_copy(self):
         cls = get_phonemizer_class(Phonemizer.MANTOQ)
-        with self.assertRaises(ImportError) as ctx:
-            cls()
-        self.assertIn("BY-NC", str(ctx.exception).replace("CC BY-NC", "BY-NC"))
+        p = cls()
+        out = p.phonemize_string("مرحبا", "ar")
+        self.assertTrue(out)
+        self.assertNotIn("_", out)
 
-    def test_kog2p_wrapper_requires_external_package(self):
+    def test_kog2p_wrapper_constructs_from_vendored_copy(self):
         cls = get_phonemizer_class(Phonemizer.KOG2PK)
-        with self.assertRaises(ImportError) as ctx:
-            cls()
-        self.assertIn("GPL", str(ctx.exception))
+        p = cls()
+        self.assertTrue(callable(p.g2p))
 
-    def test_no_gpl_or_nc_files_in_tree(self):
+    def test_encumbered_licenses_only_inside_quarantine(self):
         import pathlib, re
         root = pathlib.Path("scriptconv")
         offenders = []
         for f in root.rglob("*.py"):
+            if "_vendored" in f.parts:
+                continue
             head = f.read_text(errors="ignore")[:800]
             if re.search(r"@license:\s*GPL|Creative Commons Attribution-NonCommercial"
                          r"|creativecommons\.org/licenses/by-nc", head):
                 offenders.append(str(f))
         self.assertEqual(offenders, [])
+
+    def test_quarantine_carries_license_notices(self):
+        import pathlib
+        base = pathlib.Path("scriptconv/phonemizers/_vendored")
+        self.assertTrue((base / "mantoq" / "LICENSE.md").is_file())
+        self.assertTrue((base / "kog2p" / "LICENSE.md").is_file())
+
+    def test_quarantine_not_imported_at_package_import(self):
+        import subprocess, sys
+        code = ("import sys, scriptconv, scriptconv.phonemizers; "
+                "bad=[m for m in sys.modules if '_vendored' in m]; "
+                "print(bad); sys.exit(1 if bad else 0)")
+        proc = subprocess.run([sys.executable, "-c", code],
+                              capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, proc.stdout)
 
 
 if __name__ == "__main__":

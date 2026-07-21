@@ -49,22 +49,22 @@ class G2PKPhonemizer(BasePhonemizer):
 class KoG2PPhonemizer(BasePhonemizer):
     """Korean phonemizer wrapping an external ``kog2p`` distribution.
 
-    Upstream KoG2P (github.com/scarletcho/KoG2P) is GPL-3.0 — a license
-    incompatible with vendoring in this Apache-2.0 library, so a ``kog2p``
-    module providing ``runKoG2P`` must be installed separately by a user who
-    accepts its terms.  :class:`G2PKPhonemizer` is the unencumbered
-    alternative.
+    Uses an externally-installed ``kog2p`` when present, otherwise the
+    quarantined vendored copy under ``_vendored/kog2p`` — GPL-3.0 under its
+    own license, NOT this library's Apache-2.0.  Never selected
+    automatically; :class:`G2PKPhonemizer` is the unencumbered default.
     """
 
     def __init__(self, alphabet: Alphabet = Alphabet.IPA):
         super().__init__(alphabet)
         try:
+            # an externally-installed kog2p distribution wins
             from kog2p import runKoG2P
         except ImportError:
-            raise ImportError(
-                "no kog2p module installed (KoG2P is GPL-3.0 and not "
-                "vendored here). Install a distribution providing it, "
-                "accepting its license, or use G2PKPhonemizer") from None
+            # quarantined vendored copy, GPL-3.0 under its own license
+            # (see _vendored/kog2p/LICENSE.md); explicit opt-in by
+            # requesting this phonemizer
+            from scriptconv.phonemizers._vendored.kog2p import runKoG2P
         self.g2p = runKoG2P
 
     @classmethod
