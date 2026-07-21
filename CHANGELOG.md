@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.3a10](https://github.com/TigreGotico/scriptconv/tree/0.0.3a10) (2026-07-21)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a9...0.0.3a10)
+
+**Merged pull requests:**
+
+- feat: guarantee script-tag stability for downstream enums [\#35](https://github.com/TigreGotico/scriptconv/pull/35) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.3a9](https://github.com/TigreGotico/scriptconv/tree/0.0.3a9) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a8...0.0.3a9)
