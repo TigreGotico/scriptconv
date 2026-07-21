@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.3a7](https://github.com/TigreGotico/scriptconv/tree/0.0.3a7) (2026-07-21)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a6...0.0.3a7)
+
+**Merged pull requests:**
+
+- feat: first-class orthographic-convention axis [\#30](https://github.com/TigreGotico/scriptconv/pull/30) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.3a6](https://github.com/TigreGotico/scriptconv/tree/0.0.3a6) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a5...0.0.3a6)
