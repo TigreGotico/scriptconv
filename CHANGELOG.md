@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.3a15](https://github.com/TigreGotico/scriptconv/tree/0.0.3a15) (2026-07-21)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a14...0.0.3a15)
+
+**Merged pull requests:**
+
+- fix: accept a callable phonikud model resolver [\#46](https://github.com/TigreGotico/scriptconv/pull/46) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.3a14](https://github.com/TigreGotico/scriptconv/tree/0.0.3a14) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a13...0.0.3a14)
