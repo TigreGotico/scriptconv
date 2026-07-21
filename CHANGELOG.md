@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.3a11](https://github.com/TigreGotico/scriptconv/tree/0.0.3a11) (2026-07-21)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a10...0.0.3a11)
+
+**Merged pull requests:**
+
+- feat: optional stress preservation in ARPABET conversion [\#38](https://github.com/TigreGotico/scriptconv/pull/38) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.3a10](https://github.com/TigreGotico/scriptconv/tree/0.0.3a10) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a9...0.0.3a10)
