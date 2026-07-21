@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.3a4](https://github.com/TigreGotico/scriptconv/tree/0.0.3a4) (2026-07-21)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a3...0.0.3a4)
+
+**Merged pull requests:**
+
+- feat: hanzi→Cangjie5 code transcoding with vendored table [\#23](https://github.com/TigreGotico/scriptconv/pull/23) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.3a3](https://github.com/TigreGotico/scriptconv/tree/0.0.3a3) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a2...0.0.3a3)
