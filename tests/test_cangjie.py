@@ -24,6 +24,13 @@ class TestCangjieCode(unittest.TestCase):
         self.assertTrue(all(c.isalpha() and c.islower() for c in sample))
 
 
+class TestTableIsPackaged(unittest.TestCase):
+    def test_data_file_resolvable_via_importlib_resources(self):
+        from importlib.resources import files
+        raw = files("scriptconv.data").joinpath("cangjie5_tc.tsv.gz").read_bytes()
+        self.assertGreater(len(raw), 100000)
+
+
 class TestToCangjie(unittest.TestCase):
     def test_all_hanzi_sentence(self):
         self.assertEqual(to_cangjie("倉頡"), "oiar grmbc")

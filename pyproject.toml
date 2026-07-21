@@ -46,6 +46,7 @@ include = ["scriptconv*"]
 
 [tool.setuptools.package-data]
 scriptconv = ["py.typed"]
+"scriptconv.data" = ["*.tsv.gz"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
