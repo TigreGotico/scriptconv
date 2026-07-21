@@ -47,19 +47,30 @@ class G2PKPhonemizer(BasePhonemizer):
 
 
 class KoG2PPhonemizer(BasePhonemizer):
-    """KoG2P-backed Korean phonemizer — NOT distributable with scriptconv.
+    """Korean phonemizer wrapping an external ``kog2p`` distribution.
 
-    Upstream KoG2P (github.com/scarletcho/KoG2P) is GPL-3.0, incompatible
-    with this library's Apache-2.0 distribution, so the implementation is not
-    vendored here.  Use :class:`G2PKPhonemizer` or the hangul2ipa-backed
-    pipeline instead, or a GPL-compatible package that ships KoG2P itself.
+    Upstream KoG2P (github.com/scarletcho/KoG2P) is GPL-3.0 — a license
+    incompatible with vendoring in this Apache-2.0 library, so a ``kog2p``
+    module providing ``runKoG2P`` must be installed separately by a user who
+    accepts its terms.  :class:`G2PKPhonemizer` is the unencumbered
+    alternative.
     """
 
-    def __init__(self, *args, **kwargs):
-        raise ImportError(
-            "KoG2P is GPL-3.0 and not vendored in scriptconv — use "
-            "G2PKPhonemizer, or install a GPL-licensed distribution that "
-            "provides it")
+    def __init__(self, alphabet: Alphabet = Alphabet.IPA):
+        super().__init__(alphabet)
+        try:
+            from kog2p import runKoG2P
+        except ImportError:
+            raise ImportError(
+                "no kog2p module installed (KoG2P is GPL-3.0 and not "
+                "vendored here). Install a distribution providing it, "
+                "accepting its license, or use G2PKPhonemizer") from None
+        self.g2p = runKoG2P
+
+    @classmethod
+    def get_lang(cls, target_lang: str) -> str:
+        return cls.match_lang(target_lang, ["ko"])
 
     def phonemize_string(self, text: str, lang: str) -> str:
-        raise NotImplementedError
+        # contract: the installed module's runKoG2P(text) -> phoneme string
+        return self.g2p(text)

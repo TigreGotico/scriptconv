@@ -41,13 +41,13 @@ class TestShamiFrontend(unittest.TestCase):
 
 
 class TestLicensingStubs(unittest.TestCase):
-    def test_mantoq_stub_explains_licensing(self):
+    def test_mantoq_wrapper_requires_external_package(self):
         cls = get_phonemizer_class(Phonemizer.MANTOQ)
         with self.assertRaises(ImportError) as ctx:
             cls()
         self.assertIn("BY-NC", str(ctx.exception).replace("CC BY-NC", "BY-NC"))
 
-    def test_kog2p_stub_explains_licensing(self):
+    def test_kog2p_wrapper_requires_external_package(self):
         cls = get_phonemizer_class(Phonemizer.KOG2PK)
         with self.assertRaises(ImportError) as ctx:
             cls()
@@ -67,3 +67,20 @@ class TestLicensingStubs(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestMantoqTokensToIpa(unittest.TestCase):
+    def test_pretokenized_sequence_accepted(self):
+        # the mantoq package's g2p returns a token LIST; joining is ambiguous
+        # so mantoq_to_ipa consumes sequences directly
+        from scriptconv.notation import mantoq_to_ipa
+        tokens = ["m", "a", "r", "H", "a", "b", "a", "n", "aa",
+                  "_+_", "b", "i", "l", "E", "aa", "l", "a", "m", "i"]
+        out = mantoq_to_ipa(tokens)
+        self.assertIn("ħ", out)
+        self.assertIn(" ", out)
+        self.assertNotIn("_", out)
+
+    def test_pretokenized_dbl_geminate(self):
+        from scriptconv.notation import mantoq_to_ipa
+        self.assertEqual(mantoq_to_ipa(["b", "_dbl_", "a"]), "bːa")
