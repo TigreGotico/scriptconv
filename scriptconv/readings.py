@@ -77,7 +77,9 @@ def to_hiragana(text: str, keep_katakana: bool = False,
     katakana tokens keep their original script (useful when katakana marks
     loanwords deliberately) instead of being folded into hiragana.  With
     ``segment=True``, dictionary tokens are joined with spaces (wakachigaki,
-    the spaced orthographic mode) instead of concatenated.
+    the spaced orthographic mode) instead of concatenated — equivalent to
+    ``scriptconv.apply(..., "wakachigaki")`` over this token stream
+    (:mod:`scriptconv.conventions`).
     """
     out = []
     for tok in tokens(text):
@@ -134,7 +136,10 @@ def to_pinyin(text: str, tone: str = "mark") -> str:
     Hanzi are resolved to their dictionary reading (heteronyms decided by
     pypinyin's phrase dictionary); non-Chinese characters pass through.
     ``tone`` selects the tone spelling: ``"mark"`` (``zhōng``, default),
-    ``"number"`` (``zhong1``) or ``"none"`` (``zhong``).
+    ``"number"`` (``zhong1``) or ``"none"`` (``zhong``) — the styles of the
+    ``pinyin-tone`` convention (:mod:`scriptconv.conventions`); use
+    :func:`scriptconv.restyle` to convert existing pinyin between them
+    without the ``zh`` extra.
     """
     return _pinyin(text, tone)
 

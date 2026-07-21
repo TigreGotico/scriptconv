@@ -86,3 +86,25 @@ def test_convert_bad_notation_clean_error(capsys):
     msg = str(exc.value)
     assert msg.startswith("error:")
     assert "valid notations:" in msg
+
+
+def test_strip_tashkeel(capsys):
+    assert main(["strip", "tashkeel", "مُحَمَّد"]) == 0
+    assert capsys.readouterr().out.strip() == "محمد"
+
+
+def test_restyle_pinyin(capsys):
+    assert main(["restyle", "pinyin-tone", "mark", "zhong1 guo2"]) == 0
+    assert capsys.readouterr().out.strip() == "zhōng guó"
+
+
+def test_conventions_listing_filtered(capsys):
+    assert main(["conventions", "--script", "Arab"]) == 0
+    out = capsys.readouterr().out
+    assert "tashkeel" in out and "kashida" in out and "niqqud" not in out
+
+
+def test_strip_unknown_convention_clean_error():
+    with pytest.raises(SystemExit) as exc:
+        main(["strip", "bogus", "text"])
+    assert str(exc.value).startswith("error:")
