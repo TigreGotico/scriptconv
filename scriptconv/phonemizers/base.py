@@ -45,8 +45,9 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         # optional (text, lang) -> str hook run before chunking; see module
         # docstring — scriptconv performs no normalization of its own
         self.normalizer = normalizer
-        # local path to a phonikud ONNX model (Hebrew diacritization);
-        # scriptconv never downloads — the consumer resolves the file
+        # local path to a phonikud ONNX model (Hebrew diacritization), or a
+        # zero-arg callable resolving one lazily; scriptconv never downloads
+        # — the consumer resolves the file
         self.phonikud_model = phonikud_model
 
         # diacritizer model name, for languages that need one. Arabic uses
@@ -59,7 +60,9 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
     @property
     def phonikud(self):
         if self._phonikud is None:
-            if not self.phonikud_model:
+            model = self.phonikud_model() if callable(self.phonikud_model) \
+                else self.phonikud_model
+            if not model:
                 raise ValueError(
                     "Hebrew diacritization needs a local phonikud ONNX model: "
                     "pass phonikud_model=<path> (scriptconv never downloads "
@@ -70,7 +73,7 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
                 raise ImportError(
                     "Hebrew diacritization needs phonikud-onnx — install "
                     "with `pip install scriptconv[he]`") from None
-            self._phonikud = Phonikud(self.phonikud_model)
+            self._phonikud = Phonikud(model)
         return self._phonikud
 
     def tashkeel(self, model: Optional[str] = None):
