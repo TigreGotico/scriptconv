@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.3a21](https://github.com/TigreGotico/scriptconv/tree/0.0.3a21) (2026-07-21)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a20...0.0.3a21)
+
+**Merged pull requests:**
+
+- feat: vendor unpublished licensed backends in a quarantined subpackage [\#58](https://github.com/TigreGotico/scriptconv/pull/58) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.3a20](https://github.com/TigreGotico/scriptconv/tree/0.0.3a20) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a19...0.0.3a20)
