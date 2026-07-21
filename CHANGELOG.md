@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.3a2](https://github.com/TigreGotico/scriptconv/tree/0.0.3a2) (2026-07-21)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a1...0.0.3a2)
+
+**Merged pull requests:**
+
+- feat: dictionary-backed Japanese kanji→kana readings module [\#20](https://github.com/TigreGotico/scriptconv/pull/20) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.3a1](https://github.com/TigreGotico/scriptconv/tree/0.0.3a1) (2026-07-19)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.2...0.0.3a1)
