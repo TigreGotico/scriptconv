@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.3a19](https://github.com/TigreGotico/scriptconv/tree/0.0.3a19) (2026-07-21)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a18...0.0.3a19)
+
+**Merged pull requests:**
+
+- fix: align mantoq conversion with upstream token semantics [\#54](https://github.com/TigreGotico/scriptconv/pull/54) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.3a18](https://github.com/TigreGotico/scriptconv/tree/0.0.3a18) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a17...0.0.3a18)
