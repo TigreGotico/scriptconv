@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.3a17](https://github.com/TigreGotico/scriptconv/tree/0.0.3a17) (2026-07-21)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a16...0.0.3a17)
+
+**Merged pull requests:**
+
+- fix: forward model selector to backend-specific constructor parameter [\#50](https://github.com/TigreGotico/scriptconv/pull/50) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.3a16](https://github.com/TigreGotico/scriptconv/tree/0.0.3a16) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a15...0.0.3a16)
