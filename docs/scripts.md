@@ -349,3 +349,14 @@ script_runs("привет hello")
 `lang_to_script` honours an explicit ISO-15924 script subtag when present
 (`sr-Latn` → `Latn`), falling back to the language's default script otherwise.
 The returned script strings are stable API.
+
+## Stability guarantee: script tags are a wire format
+
+The ISO-15924 strings returned by `char_script`, `detect_script`,
+`script_runs` and `lang_to_script` (`"Latn"`, `"Cyrl"`, `"Armn"`, `"Geor"`,
+…) are **stable API**: downstream libraries (stressonnx, phoonnx, o2i)
+compare against them directly, so their spelling never changes within a
+major version. `lang_to_script` accepts ISO 639-1 codes, ISO 639-2/3 codes
+including bibliographic variants (`ger`, `gre`, `arm`), BCP-47 tags with an
+authoritative script subtag (`sr-Latn`), and the widespread informal
+`_cyr`/`_lat` variant suffixes (`uzb_cyr`).
