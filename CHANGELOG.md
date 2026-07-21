@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.3a13](https://github.com/TigreGotico/scriptconv/tree/0.0.3a13) (2026-07-21)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a12...0.0.3a13)
+
+**Merged pull requests:**
+
+- feat: CJK and Arabic phonemizer wrappers with vendored permissive G2P [\#42](https://github.com/TigreGotico/scriptconv/pull/42) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.3a12](https://github.com/TigreGotico/scriptconv/tree/0.0.3a12) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a11...0.0.3a12)
