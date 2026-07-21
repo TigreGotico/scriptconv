@@ -1,0 +1,103 @@
+import unittest
+
+from scriptconv.phonemizers import Phonemizer, get_phonemizer_class
+
+
+class TestVendoredKorean(unittest.TestCase):
+    def test_hangul2ipa_pipeline(self):
+        from scriptconv.phonemizers._thirdparty.hangul2ipa import hangul2ipa
+        out = hangul2ipa("안녕하세요")
+        self.assertTrue(out and all(ord(c) > 64 for c in out))
+
+    def test_ko_tables_packaged_via_resources(self):
+        import os
+        from scriptconv.phonemizers import _thirdparty
+        tables = os.path.join(os.path.dirname(_thirdparty.__file__), "ko_tables")
+        self.assertTrue(os.path.isfile(os.path.join(tables, "ipa.csv")))
+
+
+class TestVendoredChinese(unittest.TestCase):
+    def test_zh_num(self):
+        from scriptconv.phonemizers._thirdparty.zh_num import num2str
+        self.assertEqual(num2str("123"), "一百二十三")
+
+
+class TestShamiFrontend(unittest.TestCase):
+    def test_codeswitch_language_ids_align(self):
+        from scriptconv.phonemizers.shami import ShamiPhonemizer
+        p = ShamiPhonemizer()
+        phonemes, lang_ids = p.phonemize_with_language_ids("مرحبا hello", "ar")
+        self.assertEqual(len(phonemes), len(lang_ids))
+        for ph, ids in zip(phonemes, lang_ids):
+            self.assertEqual(len(ph), len(ids))
+
+    def test_lazy_matches_eager(self):
+        from scriptconv.phonemizers.shami import ShamiPhonemizer
+        p = ShamiPhonemizer()
+        text = "مرحبا. كيف حالك؟"
+        eager = p.phonemize_with_language_ids(text, "ar")
+        lazy = list(p.phonemize_with_language_ids_lazy(text, "ar"))
+        self.assertEqual(eager[0], [ph for ph, _ in lazy])
+
+
+class TestLicensingStubs(unittest.TestCase):
+    def test_mantoq_wrapper_constructs_from_vendored_copy(self):
+        cls = get_phonemizer_class(Phonemizer.MANTOQ)
+        p = cls()
+        out = p.phonemize_string("مرحبا", "ar")
+        self.assertTrue(out)
+        self.assertNotIn("_", out)
+
+    def test_kog2p_wrapper_constructs_from_vendored_copy(self):
+        cls = get_phonemizer_class(Phonemizer.KOG2PK)
+        p = cls()
+        self.assertTrue(callable(p.g2p))
+
+    def test_encumbered_licenses_only_inside_quarantine(self):
+        import pathlib, re
+        root = pathlib.Path("scriptconv")
+        offenders = []
+        for f in root.rglob("*.py"):
+            if "_vendored" in f.parts:
+                continue
+            head = f.read_text(errors="ignore")[:800]
+            if re.search(r"@license:\s*GPL|Creative Commons Attribution-NonCommercial"
+                         r"|creativecommons\.org/licenses/by-nc", head):
+                offenders.append(str(f))
+        self.assertEqual(offenders, [])
+
+    def test_quarantine_carries_license_notices(self):
+        import pathlib
+        base = pathlib.Path("scriptconv/phonemizers/_vendored")
+        self.assertTrue((base / "mantoq" / "LICENSE.md").is_file())
+        self.assertTrue((base / "kog2p" / "LICENSE.md").is_file())
+
+    def test_quarantine_not_imported_at_package_import(self):
+        import subprocess, sys
+        code = ("import sys, scriptconv, scriptconv.phonemizers; "
+                "bad=[m for m in sys.modules if '_vendored' in m]; "
+                "print(bad); sys.exit(1 if bad else 0)")
+        proc = subprocess.run([sys.executable, "-c", code],
+                              capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, proc.stdout)
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+class TestMantoqTokensToIpa(unittest.TestCase):
+    def test_pretokenized_sequence_accepted(self):
+        # the mantoq package's g2p returns a token LIST; joining is ambiguous
+        # so mantoq_to_ipa consumes sequences directly
+        from scriptconv.notation import mantoq_to_ipa
+        tokens = ["m", "a", "r", "H", "a", "b", "a", "n", "aa",
+                  "_+_", "b", "i", "l", "E", "aa", "l", "a", "m", "i"]
+        out = mantoq_to_ipa(tokens)
+        self.assertIn("ħ", out)
+        self.assertIn(" ", out)
+        self.assertNotIn("_", out)
+
+    def test_pretokenized_dbl_geminate(self):
+        from scriptconv.notation import mantoq_to_ipa
+        self.assertEqual(mantoq_to_ipa(["b", "_dbl_", "a"]), "bːa")

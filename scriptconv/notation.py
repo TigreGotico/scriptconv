@@ -56,7 +56,8 @@ class Notation(str, Enum):
     LEXIQUE = "lexique"  # Lexique one-char-per-phoneme French notation
     KIRSHENBAUM = "kirshenbaum"  # ASCII-IPA (espeak-ng native notation)
     COTOVIA = "cotovia"  # Universidade de Vigo Cotovía TTS notation (gl)
-    RFE = "rfe"  # Revista de Filología Española phonetic alphabet
+    RFE = "rfe"
+    MANTOQ = "mantoq"  # Revista de Filología Española phonetic alphabet
 
     def __repr__(self) -> str:
         return f"Notation.{self.name}"
@@ -157,11 +158,53 @@ _IPA_TO_ARPA.setdefault("g", "G")
 _IPA_ARPA_KEYS_SORTED = sorted(_IPA_TO_ARPA.keys(), key=len, reverse=True)
 _IPA_ARPA_RE = re.compile("|".join(re.escape(s) for s in _IPA_ARPA_KEYS_SORTED))
 
+# ARPABET vowel class — the symbols that carry stress digits.
+_ARPA_VOWELS = {"AO", "AA", "IY", "UW", "EH", "IH", "UH", "AH", "AE", "AX",
+                "EY", "AY", "OW", "AW", "OY", "ER", "AXR"}
+_STRESS_MARKS = {"ˈ": "1", "ˌ": "2"}  # IPA primary/secondary stress
 
-def arpa_to_ipa(arpa_sequence: str) -> str:
+
+
+class UnknownSymbolError(ValueError):
+    """A symbol has no mapping in the requested notation (``errors="strict"``)."""
+
+    def __init__(self, symbol: str, position: int, notation: str):
+        self.symbol = symbol
+        self.position = position
+        self.notation = notation
+        super().__init__(
+            f"no {notation} mapping for {symbol!r} at position {position}")
+
+
+_ERROR_POLICIES = ("pass", "replace", "strict", "ignore")
+
+
+def _unknown(symbol: str, position: int, notation: str, errors: str,
+             replacement: str = "?") -> str:
+    """Resolve one unmapped symbol according to the codecs-style policy."""
+    if errors == "pass":
+        return symbol
+    if errors == "replace":
+        return replacement
+    if errors == "ignore":
+        return ""
+    if errors == "strict":
+        raise UnknownSymbolError(symbol, position, notation)
+    raise ValueError(f"errors must be one of {_ERROR_POLICIES}, not {errors!r}")
+
+
+def arpa_to_ipa(arpa_sequence: str, errors: str = "pass",
+                stress: bool = False) -> str:
     """Convert a space-separated ARPABET sequence to an IPA string.
 
-    Stress digits are stripped.  Unknown tokens are passed through.
+    With ``stress=True``, ARPABET stress digits are preserved as IPA stress
+    marks placed immediately before the stressed vowel's symbol: ``AH1`` →
+    ``ˈʌ``, ``AH2`` → ``ˌʌ``, ``AH0`` → unmarked (a purely notational,
+    reversible convention — no syllabification is performed).  The default
+    ``stress=False`` keeps the historical behavior of stripping the digits.
+    ``errors`` selects the unknown-token policy: ``"pass"`` (default) keeps
+    the token, ``"replace"`` substitutes ``?``, ``"ignore"`` drops it,
+    ``"strict"`` raises :class:`UnknownSymbolError`.
 
     Examples
     --------
@@ -170,22 +213,35 @@ def arpa_to_ipa(arpa_sequence: str) -> str:
     """
     tokens = arpa_sequence.strip().split()
     result = []
-    for tok in tokens:
+    for i, tok in enumerate(tokens):
+        mark = ""
+        if stress and tok[-1:] in ("1", "2") and tok[:-1] in _ARPA_VOWELS:
+            mark = "ˈ" if tok[-1] == "1" else "ˌ"
         ipa = _ARPA_TO_IPA.get(tok)
         if ipa is None:
             # strip trailing digit and retry
             stripped = tok.rstrip("012")
-            ipa = _ARPA_TO_IPA.get(stripped, tok)
-        result.append(ipa)
+            ipa = _ARPA_TO_IPA.get(stripped)
+        if ipa is None:
+            ipa = _unknown(tok, i, "arpa", errors)
+            mark = ""
+        result.append(mark + ipa)
     return "".join(result)
 
 
-def ipa_to_arpa(ipa_string: str, unknown: str = "?") -> str:
+def ipa_to_arpa(ipa_string: str, unknown: str = "?",
+                errors: str = "replace", stress: bool = False) -> str:
     """Convert an IPA string to a space-separated ARPABET sequence.
 
-    Matches longest IPA symbol first.  Characters outside the ARPABET table
-    are replaced by *unknown* (default ``"?"``); pass ``unknown=""`` to drop
-    them silently.
+    Matches longest IPA symbol first.  With ``stress=True``, IPA stress
+    marks (``ˈ``/``ˌ``) preceding a vowel-class symbol are emitted as that
+    vowel's stress digit (``1``/``2``) and unmarked vowels receive ``0`` —
+    the reverse of :func:`arpa_to_ipa`'s ``stress=True`` convention.
+    ``errors`` selects the unknown-symbol policy (default ``"replace"``,
+    preserving the historical behavior of substituting *unknown*, ``"?"``);
+    ``unknown=""`` still drops silently.  Combining marks and modifier
+    letters qualify the preceding phoneme and are always dropped rather
+    than treated as unknowns.
 
     Examples
     --------
@@ -195,11 +251,25 @@ def ipa_to_arpa(ipa_string: str, unknown: str = "?") -> str:
     '?'
     """
     tokens = []
+    pending_stress = ""
     pos = 0
     while pos < len(ipa_string):
+        if stress and ipa_string[pos] in _STRESS_MARKS:
+            pending_stress = _STRESS_MARKS[ipa_string[pos]]
+            pos += 1
+            continue
         m = _IPA_ARPA_RE.match(ipa_string, pos)
         if m:
-            tokens.append(_IPA_TO_ARPA[m.group(0)])
+            tok = _IPA_TO_ARPA[m.group(0)]
+            if stress and tok in _ARPA_VOWELS:
+                # CMUdict spells schwa as AH0 (it has no AX), so stress-aware
+                # output uses AH for exact round-trips; extended-ARPABET AX
+                # input still normalizes to AH0 (documented residue).
+                if m.group(0) == "ə":
+                    tok = "AH"
+                tok += pending_stress or "0"
+            pending_stress = ""
+            tokens.append(tok)
             pos = m.end()
         else:
             ch = ipa_string[pos]
@@ -207,8 +277,11 @@ def ipa_to_arpa(ipa_string: str, unknown: str = "?") -> str:
             # modifier letters) have no ARPABET equivalent; they qualify the
             # preceding phoneme rather than standing alone, so drop them
             # instead of emitting a spurious *unknown* token.
-            if unknown and unicodedata.category(ch) not in ("Mn", "Mc", "Me", "Lm", "Sk"):
-                tokens.append(unknown)
+            if unicodedata.category(ch) not in ("Mn", "Mc", "Me", "Lm", "Sk"):
+                effective = "ignore" if (errors == "replace" and not unknown) else errors
+                out = _unknown(ch, pos, "arpa", effective, replacement=unknown)
+                if out:
+                    tokens.append(out)
             pos += 1
     return " ".join(tokens)
 
@@ -338,7 +411,7 @@ _XS_RE = re.compile("|".join(re.escape(k) for k in _XS_KEYS_SORTED))
 _IPA_XS_RE = re.compile("|".join(re.escape(k) for k in _IPA_KEYS_SORTED))
 
 
-def xsampa_to_ipa(xsampa: str) -> str:
+def xsampa_to_ipa(xsampa: str, errors: str = "pass") -> str:
     """Convert an X-SAMPA string to IPA.
 
     Multi-character symbols are matched longest-first.  Unknown characters
@@ -359,12 +432,14 @@ def xsampa_to_ipa(xsampa: str) -> str:
             result.append(_XSAMPA_TO_IPA[m.group(0)])
             pos = m.end()
         else:
-            result.append(xsampa[pos])
+            out = _unknown(xsampa[pos], pos, "x-sampa", errors)
+            if out:
+                result.append(out)
             pos += 1
     return "".join(result)
 
 
-def ipa_to_xsampa(ipa: str) -> str:
+def ipa_to_xsampa(ipa: str, errors: str = "pass") -> str:
     """Convert an IPA string to X-SAMPA.
 
     Multi-character IPA symbols are matched longest-first.  Unknown
@@ -385,7 +460,9 @@ def ipa_to_xsampa(ipa: str) -> str:
             result.append(_IPA_TO_XSAMPA[m.group(0)])
             pos = m.end()
         else:
-            result.append(ipa[pos])
+            out = _unknown(ipa[pos], pos, "x-sampa", errors)
+            if out:
+                result.append(out)
             pos += 1
     return "".join(result)
 
@@ -447,7 +524,8 @@ _BW_TO_ARABIC: dict[str, str] = {
     "K": "ٍ",  # tanwin kasr
     # Special
     "_": "ـ",  # tatweel
-    "^": "ّ",  # shadda alias
+    "{": "ٱ",  # alef wasla
+    "`": "ٰ",  # dagger (superscript) alef
 }
 
 _ARABIC_TO_BW: dict[str, str] = {v: k for k, v in _BW_TO_ARABIC.items()}
@@ -456,12 +534,9 @@ _ARABIC_TO_BW["\uFEFB"] = "lA"   # لا  lam + alef ligature
 _ARABIC_TO_BW["\uFEF9"] = "l<"   # لإ  lam + alef hamza below
 _ARABIC_TO_BW["\uFEF7"] = "l>"   # لأ  lam + alef hamza above
 _ARABIC_TO_BW["\uFEF8"] = "l|"   # لآ  lam + alef madda
-# The reverse comprehension lets the "^" shadda alias win over canonical "~";
-# restore the standard Buckwalter shadda so round-trips stay faithful.
-_ARABIC_TO_BW["\u0651"] = "~"   # shadda -> canonical "~", not the "^" alias
 
 
-def buckwalter_to_arabic(bw: str) -> str:
+def buckwalter_to_arabic(bw: str, errors: str = "pass") -> str:
     """Convert a Buckwalter-encoded string to Arabic Unicode.
 
     Unknown characters are passed through unchanged.
@@ -471,10 +546,12 @@ def buckwalter_to_arabic(bw: str) -> str:
     >>> buckwalter_to_arabic("mrHbA")
     'مرحبا'
     """
-    return "".join(_BW_TO_ARABIC.get(ch, ch) for ch in bw)
+    return "".join(_BW_TO_ARABIC[ch] if ch in _BW_TO_ARABIC
+                   else _unknown(ch, i, "buckwalter", errors)
+                   for i, ch in enumerate(bw))
 
 
-def arabic_to_buckwalter(arabic: str) -> str:
+def arabic_to_buckwalter(arabic: str, errors: str = "pass") -> str:
     """Convert an Arabic Unicode string to Buckwalter transliteration.
 
     Unknown characters are passed through unchanged.
@@ -484,7 +561,9 @@ def arabic_to_buckwalter(arabic: str) -> str:
     >>> arabic_to_buckwalter("مرحبا")
     'mrHbA'
     """
-    return "".join(_ARABIC_TO_BW.get(ch, ch) for ch in arabic)
+    return "".join(_ARABIC_TO_BW[ch] if ch in _ARABIC_TO_BW
+                   else _unknown(ch, i, "arabic", errors)
+                   for i, ch in enumerate(arabic))
 
 
 # ---------------------------------------------------------------------------
@@ -560,7 +639,7 @@ _IPA_FOR_LX_SORTED = sorted(_IPA_TO_LEXIQUE.keys(), key=len, reverse=True)
 _IPA_LX_RE = re.compile("|".join(re.escape(s) for s in _IPA_FOR_LX_SORTED))
 
 
-def lexique_to_ipa(lexique: str) -> str:
+def lexique_to_ipa(lexique: str, errors: str = "pass") -> str:
     """Convert a Lexique phoneme-code string to IPA.
 
     Each Lexique phoneme is exactly one character; they are read left-to-right
@@ -576,12 +655,14 @@ def lexique_to_ipa(lexique: str) -> str:
     'vɛ̃'
     """
     result = []
-    for ch in lexique:
-        result.append(_LEXIQUE_TO_IPA.get(ch, ch))
+    for i, ch in enumerate(lexique):
+        mapped = _LEXIQUE_TO_IPA.get(ch)
+        result.append(mapped if mapped is not None
+                      else _unknown(ch, i, "lexique", errors))
     return "".join(result)
 
 
-def ipa_to_lexique(ipa: str) -> str:
+def ipa_to_lexique(ipa: str, errors: str = "pass") -> str:
     """Convert an IPA string to Lexique phoneme codes.
 
     Matches longest IPA symbol first.  Unknown characters are passed through
@@ -605,7 +686,9 @@ def ipa_to_lexique(ipa: str) -> str:
             result.append(_IPA_TO_LEXIQUE[m.group(0)])
             pos = m.end()
         else:
-            result.append(ipa[pos])
+            out = _unknown(ipa[pos], pos, "lexique", errors)
+            if out:
+                result.append(out)
             pos += 1
     return "".join(result)
 
@@ -640,7 +723,7 @@ for _k, _ip in _KIRSHENBAUM_TO_IPA.items():
     _IPA_TO_KIRSHENBAUM.setdefault(_ip, _k)
 
 
-def kirshenbaum_to_ipa(kirshenbaum: str) -> str:
+def kirshenbaum_to_ipa(kirshenbaum: str, errors: str = "pass") -> str:
     """Convert a Kirshenbaum (ASCII-IPA) string to IPA.
 
     Each character is mapped independently. Characters outside the table
@@ -653,10 +736,12 @@ def kirshenbaum_to_ipa(kirshenbaum: str) -> str:
     >>> kirshenbaum_to_ipa("N")
     'ŋ'
     """
-    return "".join(_KIRSHENBAUM_TO_IPA.get(ch, ch) for ch in kirshenbaum)
+    return "".join(_KIRSHENBAUM_TO_IPA[ch] if ch in _KIRSHENBAUM_TO_IPA
+                   else _unknown(ch, i, "kirshenbaum", errors)
+                   for i, ch in enumerate(kirshenbaum))
 
 
-def ipa_to_kirshenbaum(ipa: str) -> str:
+def ipa_to_kirshenbaum(ipa: str, errors: str = "pass") -> str:
     """Convert an IPA string to Kirshenbaum (ASCII-IPA).
 
     Characters outside the table pass through unchanged.
@@ -668,7 +753,9 @@ def ipa_to_kirshenbaum(ipa: str) -> str:
     >>> ipa_to_kirshenbaum("ŋ")
     'N'
     """
-    return "".join(_IPA_TO_KIRSHENBAUM.get(ch, ch) for ch in ipa)
+    return "".join(_IPA_TO_KIRSHENBAUM[ch] if ch in _IPA_TO_KIRSHENBAUM
+                   else _unknown(ch, i, "kirshenbaum", errors)
+                   for i, ch in enumerate(ipa))
 
 
 # ---------------------------------------------------------------------------
@@ -737,7 +824,7 @@ _IPA_CV_KEYS_SORTED = sorted(_IPA_TO_COTOVIA.keys(), key=len, reverse=True)
 _IPA_CV_RE = re.compile("|".join(re.escape(s) for s in _IPA_CV_KEYS_SORTED))
 
 
-def cotovia_to_ipa(cotovia: str) -> str:
+def cotovia_to_ipa(cotovia: str, errors: str = "pass") -> str:
     """Convert a Cotovía phoneme string to IPA.
 
     Multi-character symbols are matched longest-first. Characters outside the
@@ -758,12 +845,14 @@ def cotovia_to_ipa(cotovia: str) -> str:
             result.append(_COTOVIA_TO_IPA[m.group(0)])
             pos = m.end()
         else:
-            result.append(cotovia[pos])
+            out = _unknown(cotovia[pos], pos, "cotovia", errors)
+            if out:
+                result.append(out)
             pos += 1
     return "".join(result)
 
 
-def ipa_to_cotovia(ipa: str) -> str:
+def ipa_to_cotovia(ipa: str, errors: str = "pass") -> str:
     """Convert an IPA string to Cotovía notation.
 
     Multi-character IPA symbols are matched longest-first. Characters outside
@@ -784,7 +873,9 @@ def ipa_to_cotovia(ipa: str) -> str:
             result.append(_IPA_TO_COTOVIA[m.group(0)])
             pos = m.end()
         else:
-            result.append(ipa[pos])
+            out = _unknown(ipa[pos], pos, "cotovia", errors)
+            if out:
+                result.append(out)
             pos += 1
     return "".join(result)
 
@@ -857,7 +948,7 @@ _IPA_RFE_KEYS_SORTED = sorted(_IPA_TO_RFE.keys(), key=len, reverse=True)
 _IPA_RFE_RE = re.compile("|".join(re.escape(x) for x in _IPA_RFE_KEYS_SORTED))
 
 
-def rfe_to_ipa(rfe: str) -> str:
+def rfe_to_ipa(rfe: str, errors: str = "pass") -> str:
     """Convert an RFE (Revista de Filología Española) string to IPA.
 
     Multi-character symbols are matched longest-first. Characters outside the
@@ -878,12 +969,14 @@ def rfe_to_ipa(rfe: str) -> str:
             result.append(_RFE_TO_IPA[m.group(0)])
             pos = m.end()
         else:
-            result.append(rfe[pos])
+            out = _unknown(rfe[pos], pos, "rfe", errors)
+            if out:
+                result.append(out)
             pos += 1
     return "".join(result)
 
 
-def ipa_to_rfe(ipa: str) -> str:
+def ipa_to_rfe(ipa: str, errors: str = "pass") -> str:
     """Convert an IPA string to RFE (Revista de Filología Española) notation.
 
     Multi-character IPA symbols are matched longest-first. Characters outside
@@ -904,16 +997,135 @@ def ipa_to_rfe(ipa: str) -> str:
             result.append(_IPA_TO_RFE[m.group(0)])
             pos = m.end()
         else:
-            result.append(ipa[pos])
+            out = _unknown(ipa[pos], pos, "rfe", errors)
+            if out:
+                result.append(out)
             pos += 1
     return "".join(result)
+
+
+
+# ---------------------------------------------------------------------------
+# Mantoq → IPA
+#
+# Mantoq is the phonetic alphabet of Nawar Halabi's Arabic-Phonetiser (the
+# inventory emitted by the mantoq G2P pipeline): an ASCII phoneme notation
+# with Buckwalter-derived consonant letters (deviating where the phoneme set
+# requires — "^" is θ here, "v" a loan phoneme), stress/emphatic-free short
+# and long vowels ("a"/"aa"/"aaaa"), a gemination marker ``_dbl_`` and a word
+# separator ``_+_``.  The token→IPA mapping below is authored in-house from
+# the inventory's phonetic values — the phonetiser CODE is CC BY-NC and lives
+# elsewhere; a factual symbol table is not encumbered by it.  Published
+# models trained on mantoq sequences make this notation worth transcoding.
+# One-directional: IPA → mantoq is not defined.
+# ---------------------------------------------------------------------------
+
+_MANTOQ_CONSONANTS: dict[str, str] = {
+    "b": "b", "t": "t", "^": "θ", "j": "d͡ʒ", "H": "ħ", "x": "x",
+    "d": "d", "*": "ð", "r": "r", "z": "z", "s": "s", "$": "ʃ",
+    "S": "sˤ", "D": "dˤ", "T": "tˤ", "Z": "ðˤ", "E": "ʕ", "g": "ɣ",
+    "f": "f", "q": "q", "k": "k", "l": "l", "m": "m", "n": "n",
+    "h": "h", "w": "w", "y": "j", "v": "v",
+}
+
+_MANTOQ_VOWELS: dict[str, str] = {
+    "a": "a", "aa": "aː", "aaaa": "aːː",
+    "i": "i", "ii": "iː",
+    "u": "u", "uu": "uː",
+}
+
+_MANTOQ_MULTI = ("_dbl_", "_+_", "_sil_", "_eos_", "_pad_",
+                 "aaaa", "aa", "ii", "uu")
+
+
+def _tokenize_mantoq(text: str) -> list[str]:
+    tokens = []
+    i = 0
+    while i < len(text):
+        for sym in _MANTOQ_MULTI:
+            if text.startswith(sym, i):
+                tokens.append(sym)
+                i += len(sym)
+                break
+        else:
+            tokens.append(text[i])
+            i += 1
+    return tokens
+
+
+def mantoq_to_ipa(mantoq, errors: str = "pass") -> str:
+    """Convert a Mantoq phoneme string to IPA.
+
+    ``_dbl_`` lengthens/geminates the preceding symbol (``ː``), ``_+_``
+    becomes a space, ``<`` is the glottal stop.  Unknown characters follow
+    the ``errors`` policy.
+
+    Examples
+    --------
+    >>> mantoq_to_ipa("s a l aa m")
+    's a l aː m'
+    >>> mantoq_to_ipa("b_dbl_a")
+    'bːa'
+
+    The inventory's special tokens are honoured: ``_sil_`` becomes a space,
+    ``_eos_``/``_pad_`` are dropped.
+    """
+    # a pre-tokenized sequence (as returned by the mantoq package's g2p)
+    # is consumed directly — joining tokens into a string is ambiguous
+    # ("a"+"aa" and "aa"+"a" both join to "aaa")
+    tokens = _tokenize_mantoq(mantoq) if isinstance(mantoq, str) else mantoq
+    out: list[str] = []
+    last_tok = None
+    for pos, tok in enumerate(tokens):
+        if tok == "_dbl_":
+            # upstream emits _dbl_ only by splitting a doubled CONSONANT
+            # (mantoq buck/tokenization.py: `phon not in vowels and
+            # phon[0] == phon[1]`); geminate it with a length mark.  A
+            # vowel+_dbl_ sequence does not occur in genuine mantoq output
+            # and is left unchanged.
+            if out and last_tok in _MANTOQ_CONSONANTS \
+                    and not out[-1].endswith("ː"):
+                out[-1] += "ː"
+            continue
+        if tok == "_sil_":
+            out.append(" ")
+            last_tok = None
+            continue
+        if tok in ("_eos_", "_pad_"):
+            last_tok = None
+            continue
+        if tok == "_+_":
+            out.append(" ")
+            last_tok = None
+            continue
+        if tok == "<":
+            out.append("ʔ")
+            last_tok = tok
+            continue
+        if tok in _MANTOQ_VOWELS:
+            out.append(_MANTOQ_VOWELS[tok])
+        elif tok in _MANTOQ_CONSONANTS:
+            out.append(_MANTOQ_CONSONANTS[tok])
+        elif tok.isspace() or tok in ".,;:!?()[]{}\"'":
+            out.append(tok)
+            last_tok = None
+            continue
+        else:
+            res = _unknown(tok, pos, "mantoq", errors)
+            if res:
+                out.append(res)
+            last_tok = None
+            continue
+        last_tok = tok
+    return "".join(out)
 
 
 # ---------------------------------------------------------------------------
 # convert — facade routing through IPA where no direct map exists
 # ---------------------------------------------------------------------------
 
-def convert(text: str, src: str | Notation, dst: str | Notation) -> str:
+def convert(text: str, src: str | Notation, dst: str | Notation,
+            errors: str = "pass") -> str:
     """Convert *text* from *src* notation to *dst* notation.
 
     Supported pairs (direct):
@@ -951,19 +1163,16 @@ def convert(text: str, src: str | Notation, dst: str | Notation) -> str:
     if src == dst:
         return text
 
-    # IPA-pivot notations: <notation> → IPA → <notation>.
-    if src in _TO_IPA and dst == Notation.IPA:
-        return _TO_IPA[src](text)
-    if src == Notation.IPA and dst in _FROM_IPA:
-        return _FROM_IPA[dst](text)
-    if src in _TO_IPA and dst in _FROM_IPA:
-        return _FROM_IPA[dst](_TO_IPA[src](text))
-
-    # Buckwalter ↔ Arabic script is a direct pair (not IPA-routable).
-    if (src, dst) in _DIRECT_PAIRS:
-        return _DIRECT_PAIRS[(src, dst)](text)
-
-    raise ValueError(f"Unsupported conversion: {src!r} → {dst!r}")
+    # Routing lives on the shared conversion graph; the notation tables below
+    # are registered there as edges (IPA-pivot pairs route through the "ipa"
+    # node, Buckwalter <-> Arabic is a direct edge).
+    from scriptconv.graph import DEFAULT_GRAPH
+    try:
+        return DEFAULT_GRAPH.convert(text, src.value, dst.value, errors=errors)
+    except UnknownSymbolError:
+        raise
+    except ValueError:
+        raise ValueError(f"Unsupported conversion: {src!r} → {dst!r}") from None
 
 
 # ---------------------------------------------------------------------------
@@ -975,6 +1184,7 @@ def convert(text: str, src: str | Notation, dst: str | Notation) -> str:
 # ---------------------------------------------------------------------------
 
 _TO_IPA: dict[Notation, "callable"] = {
+    Notation.MANTOQ: mantoq_to_ipa,
     Notation.ARPA: arpa_to_ipa,
     Notation.XSAMPA: xsampa_to_ipa,
     Notation.LEXIQUE: lexique_to_ipa,
@@ -1000,20 +1210,7 @@ _DIRECT_PAIRS: dict[tuple[Notation, Notation], "callable"] = {
 # can_convert — predicate for supported conversion paths
 # ---------------------------------------------------------------------------
 
-def _build_supported_pairs() -> set[tuple[Notation, Notation]]:
-    pairs: set[tuple[Notation, Notation]] = set(_DIRECT_PAIRS)
-    for _s in _TO_IPA:
-        pairs.add((_s, Notation.IPA))
-    for _d in _FROM_IPA:
-        pairs.add((Notation.IPA, _d))
-    for _s in _TO_IPA:
-        for _d in _FROM_IPA:
-            if _s != _d:
-                pairs.add((_s, _d))
-    return pairs
-
-
-_SUPPORTED_PAIRS: set[tuple[Notation, Notation]] = _build_supported_pairs()
+_NOTATION_VALUES = {n.value for n in Notation}
 
 
 def can_convert(src: str | Notation, dst: str | Notation) -> bool:
@@ -1037,7 +1234,16 @@ def can_convert(src: str | Notation, dst: str | Notation) -> bool:
     """
     src = Notation(src)
     dst = Notation(dst)
-    return (src, dst) in _SUPPORTED_PAIRS
+    if src == dst:
+        # historical contract: identity is not a "conversion"
+        return False
+    from scriptconv.graph import DEFAULT_GRAPH
+    if not DEFAULT_GRAPH.can_convert(src.value, dst.value):
+        return False
+    # only notation-to-notation reachability counts here; guard against paths
+    # that would leave the notation node set (none exist today, cheap to keep)
+    return all(e.src in _NOTATION_VALUES and e.dst in _NOTATION_VALUES
+               for e in DEFAULT_GRAPH.route(src.value, dst.value))
 
 
 # ---------------------------------------------------------------------------
@@ -1103,6 +1309,12 @@ NOTATION_INFO: dict[Notation, NotationInfo] = {
         Notation.RFE, lossless_to_ipa=False, lossless_from_ipa=False,
         token_separated=False,
         reference="RFE phonetic alphabet (Revista de Filología Española, 1915)",
+    ),
+    Notation.MANTOQ: NotationInfo(
+        Notation.MANTOQ, lossless_to_ipa=False, lossless_from_ipa=False,
+        token_separated=False,
+        reference="Phonetic alphabet of Nawar Halabi's Arabic-Phonetiser "
+                  "(mantoq G2P inventory); one-directional to IPA",
     ),
     Notation.BUCKWALTER: NotationInfo(
         Notation.BUCKWALTER, lossless_to_ipa=True, lossless_from_ipa=False,

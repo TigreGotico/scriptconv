@@ -52,6 +52,8 @@ def decompose_hangul(
     text:
         Input string.
     form:
+        A style of the ``jamo-form`` convention
+        (:mod:`scriptconv.conventions`);
         ``"compatibility"`` (default) emits Hangul Compatibility Jamo
         (U+3130 block, e.g. ``ㄱ``); ``"conjoining"`` emits conjoining
         jamo (U+1100/1161/11A8 blocks) that recombine into syllables.

@@ -542,3 +542,49 @@ rfe_to_ipa("far̄a")  # trill r (r̄); single r is the tap ɾ
 
 The palatal nasal accepts both `ñ` and `n̮` on input and emits `ñ`; the
 tap/trill distinction (`r` = ɾ, `r̄` = r) round-trips exactly.
+
+## ARPABET stress convention (`stress=True`)
+
+Stress digits map to IPA stress marks placed **immediately before the stressed
+vowel's symbol** — a purely notational, reversible convention; no
+syllabification is performed. Worked examples:
+
+- `HH AH0 L OW1` ↔ `həlˈoʊ` (primary stress on `OW`)
+- `K AE1 T` ↔ `kˈæt`
+- `P ER0 M IH2 T` ↔ `pɜrmˌɪt` (secondary stress on `IH`)
+
+Unmarked vowels round-trip as digit `0`; consonants never carry digits.
+Residues (all stable from the IPA side): extended-ARPABET `AX` normalises to
+CMUdict's `AH0` spelling of schwa, and symbol sequences that concatenate to a
+single IPA symbol fuse to it — `AH0 R` → `AXR0` (r-colored schwa),
+`T SH` → `CH`, `D ZH` → `JH` (affricates), `EH1 IH0` → `EY1` (diphthongs);
+contiguous IPA carries no token boundary, so this fusion is inherent and
+applies in default mode too. The general contract: round-trips are exact up
+to IPA-equivalence — a fused spelling always produces the identical IPA.
+
+## Mantoq → IPA (Halabi Arabic-Phonetiser inventory)
+
+Mantoq is the phonetic alphabet emitted by the mantoq Arabic G2P pipeline —
+ASCII consonant letters with the inventory's own conventions (`^` is θ, `v` a
+loan phoneme), plain short/long vowels (`a`/`aa`/`aaaa`), a gemination marker
+`_dbl_`, a word separator `_+_`, and `<` for the glottal stop. Published
+models trained on mantoq sequences make the notation worth transcoding, so it
+is a first-class `Notation` member with a one-directional converter:
+
+```python
+from scriptconv.notation import mantoq_to_ipa
+from scriptconv import convert, can_convert
+
+mantoq_to_ipa("s a l aa m")        # 's a l aː m'
+mantoq_to_ipa("b_dbl_a")           # 'bːa'      (consonant gemination)
+convert("mrHbaa", "mantoq", "x-sampa")   # routes mantoq → ipa → x-sampa
+can_convert("ipa", "mantoq")       # False — one-directional by design
+```
+
+The inventory's semantics are honoured precisely: `_dbl_` geminates only
+consonants (the pipeline never emits it after a vowel), `_sil_` becomes a
+pause, `_eos_`/`_pad_` are dropped, and a pre-tokenized sequence (as returned
+by the mantoq package's `g2p`) is accepted directly, since joining tokens
+into a string is ambiguous. The token → IPA table maps the inventory's
+phonetic values; the phonetiser *engine* itself lives in
+[phonemizers](phonemizers.md) under its own license.

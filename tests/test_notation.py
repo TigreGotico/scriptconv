@@ -365,7 +365,7 @@ _BW_ARABIC_EXTENDED = [
     ("hamza on waw", "&", "ؤ"),
     ("hamza on ya", "}", "ئ"),
     ("alef madda", "|", "آ"),
-    ("shadda", "~", "ّ"),   # "~" is canonical Buckwalter shadda; "^" is an alias
+    ("shadda", "~", "ّ"),   # "~" is the canonical (and only) Buckwalter shadda
     ("fatha", "a", "َ"),
     ("damma", "u", "ُ"),
     ("kasra", "i", "ِ"),
@@ -825,10 +825,11 @@ def test_buckwalter_tatweel():
 
 
 def test_buckwalter_shadda_alias():
-    # Both "~" (canonical) and "^" (alias) map forward to shadda; the reverse
+    # "~" is the only shadda spelling; "^" is NOT Buckwalter (mantoq uses it
+    # for θ) and passes through as an unknown.
     # yields the canonical "~".
     assert buckwalter_to_arabic("~") == "ّ"
-    assert buckwalter_to_arabic("^") == "ّ"
+    assert buckwalter_to_arabic("^") == "^"
     assert arabic_to_buckwalter("ّ") == "~"
 
 
@@ -947,7 +948,7 @@ def test_notation_enum_values():
 
 
 def test_notation_enum_count():
-    assert len(Notation) == 9
+    assert len(Notation) == 10
 
 
 def test_notation_str():
@@ -1148,3 +1149,70 @@ def test_rfe_tap_trill_round_trip():
 def test_convert_routes_through_rfe():
     assert convert("š", "rfe", "x-sampa") == "S"
     assert convert("ʃ", "ipa", "rfe") == "š"
+
+
+# ---------------------------------------------------------------------------
+# Mantoq → IPA (Halabi Arabic-Phonetiser inventory; one-directional)
+# ---------------------------------------------------------------------------
+
+from scriptconv.notation import mantoq_to_ipa, UnknownSymbolError  # noqa: E402
+
+def test_mantoq_basic_word():
+    assert mantoq_to_ipa("salaam") == "salaːm"
+
+
+def test_mantoq_theta_is_caret_not_shadda():
+    # mantoq's "^" is θ — the same character is NOT a Buckwalter shadda here
+    assert mantoq_to_ipa("^") == "θ"
+
+
+def test_mantoq_gemination_marker():
+    assert mantoq_to_ipa("b_dbl_a") == "bːa"
+
+
+def test_mantoq_dbl_after_vowel_is_inert():
+    # upstream only emits _dbl_ after consonants (tokenization.py splits
+    # doubled consonant phonemes); a vowel+_dbl_ input is left unchanged
+    assert mantoq_to_ipa("aa_dbl_") == "aː"
+
+
+def test_mantoq_special_tokens():
+    # inventory special tokens: _sil_ -> pause (space), _eos_/_pad_ dropped —
+    # and never shredded into letter phonemes
+    assert mantoq_to_ipa("m_sil_n") == "m n"
+    assert mantoq_to_ipa("m a_eos_") == "m a"
+    assert mantoq_to_ipa("_pad_b") == "b"
+
+
+def test_mantoq_word_separator_and_glottal():
+    assert mantoq_to_ipa("m_+_<a") == "m ʔa"
+
+
+def test_mantoq_emphatics_and_superlong():
+    assert mantoq_to_ipa("SaaaaD") == "sˤaːːdˤ"
+
+
+def test_mantoq_via_convert_facade():
+    assert convert("salaam", "mantoq", "ipa") == "salaːm"
+    assert can_convert("mantoq", "ipa") is True
+    assert can_convert("ipa", "mantoq") is False
+
+
+def test_mantoq_chains_to_xsampa_via_graph():
+    # mantoq -> ipa -> x-sampa multi-hop through the conversion graph
+    out = convert("salaam", "mantoq", "x-sampa")
+    assert "a:" in out
+
+
+def test_mantoq_errors_strict():
+    import pytest as _pytest
+    with _pytest.raises(UnknownSymbolError):
+        mantoq_to_ipa("Q", errors="strict")
+
+
+def test_buckwalter_wasla_and_dagger_alef():
+    from scriptconv.notation import arabic_to_buckwalter, buckwalter_to_arabic
+    assert buckwalter_to_arabic("{") == "ٱ"
+    assert buckwalter_to_arabic("`") == "ٰ"
+    assert arabic_to_buckwalter("رحمٰن") == "rHm`n"
+    assert arabic_to_buckwalter("ٱ") == "{"

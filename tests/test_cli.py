@@ -86,3 +86,42 @@ def test_convert_bad_notation_clean_error(capsys):
     msg = str(exc.value)
     assert msg.startswith("error:")
     assert "valid notations:" in msg
+
+
+def test_strip_tashkeel(capsys):
+    assert main(["strip", "tashkeel", "مُحَمَّد"]) == 0
+    assert capsys.readouterr().out.strip() == "محمد"
+
+
+def test_restyle_pinyin(capsys):
+    assert main(["restyle", "pinyin-tone", "mark", "zhong1 guo2"]) == 0
+    assert capsys.readouterr().out.strip() == "zhōng guó"
+
+
+def test_conventions_listing_filtered(capsys):
+    assert main(["conventions", "--script", "Arab"]) == 0
+    out = capsys.readouterr().out
+    assert "tashkeel" in out and "kashida" in out and "niqqud" not in out
+
+
+def test_strip_unknown_convention_clean_error():
+    with pytest.raises(SystemExit) as exc:
+        main(["strip", "bogus", "text"])
+    assert str(exc.value).startswith("error:")
+
+
+def test_route_notation_pair(capsys):
+    assert main(["route", "arpa", "x-sampa"]) == 0
+    out = capsys.readouterr().out
+    assert "arpa -> ipa" in out and "ipa -> x-sampa" in out
+
+
+def test_convert_orthography_pair_via_graph(capsys):
+    assert main(["convert", "hira", "kana", "こんにちは"]) == 0
+    assert capsys.readouterr().out.strip() == "コンニチハ"
+
+
+def test_route_unroutable_clean_error():
+    with pytest.raises(SystemExit) as exc:
+        main(["route", "ipa", "hangul"])
+    assert str(exc.value).startswith("error:")

@@ -8,6 +8,11 @@ Usage
     python -m scriptconv direction <text>
     python -m scriptconv decompose <text>
     python -m scriptconv lang <code>
+    python -m scriptconv strip <convention> <text>
+    python -m scriptconv restyle <convention> <style> <text>
+    python -m scriptconv conventions [--script CODE]
+    python -m scriptconv route <src> <dst>
+    python -m scriptconv phonemize <lang> <text> [--phonemizer ID] [--alphabet A]
 
 Examples
 --------
@@ -48,6 +53,29 @@ def main(argv: list[str] | None = None) -> int:
     lang = sub.add_parser("lang", help="Map language code to script")
     lang.add_argument("code", help="BCP-47 or ISO 639 language code")
 
+    st = sub.add_parser("strip", help="Remove an orthographic convention's decoration")
+    st.add_argument("convention", help="Convention id (see `conventions`)")
+    st.add_argument("text", help="Text to strip")
+
+    rs = sub.add_parser("restyle", help="Rewrite text between a convention's styles")
+    rs.add_argument("convention", help="Convention id (see `conventions`)")
+    rs.add_argument("to", help="Target style")
+    rs.add_argument("text", help="Text to restyle")
+    rs.add_argument("--from", dest="frm", default=None, help="Source style")
+
+    cv = sub.add_parser("conventions", help="List orthographic conventions")
+    cv.add_argument("--script", default=None, help="Filter by ISO-15924 script code")
+
+    rt = sub.add_parser("route", help="Show the conversion path between representations")
+    rt.add_argument("src", help="Source representation id")
+    rt.add_argument("dst", help="Target representation id")
+
+    ph = sub.add_parser("phonemize", help="Phonemize text (per-language default backend)")
+    ph.add_argument("lang", help="Language code")
+    ph.add_argument("text", help="Text to phonemize")
+    ph.add_argument("--phonemizer", default=None, help="Backend override (Phonemizer value)")
+    ph.add_argument("--alphabet", default="ipa", help="Output alphabet (default ipa)")
+
     args = p.parse_args(argv)
 
     if args.command is None:
@@ -61,6 +89,11 @@ def main(argv: list[str] | None = None) -> int:
         "direction": lambda: _do_direction(args),
         "decompose": lambda: _do_decompose(args),
         "lang": lambda: _do_lang(args),
+        "strip": lambda: _do_strip(args),
+        "restyle": lambda: _do_restyle(args),
+        "conventions": lambda: _do_conventions(args),
+        "route": lambda: _do_route(args),
+        "phonemize": lambda: _do_phonemize(args),
     }
     dispatch[args.command]()
     return 0
@@ -70,9 +103,41 @@ def _do_convert(args: argparse.Namespace) -> None:
     from scriptconv.notation import Notation, convert
     try:
         print(convert(args.text, args.src, args.dst))
+        return
+    except ValueError:
+        pass
+    # not a notation pair — try any representation pair on the default graph
+    from scriptconv.graph import DEFAULT_GRAPH
+    try:
+        print(DEFAULT_GRAPH.convert(args.text, args.src, args.dst))
     except ValueError as e:
         valid = ", ".join(n.value for n in Notation)
-        raise SystemExit(f"error: {e} (valid notations: {valid})")
+        raise SystemExit(f"error: {e} (valid notations: {valid}; "
+                         f"graph nodes: {', '.join(DEFAULT_GRAPH.nodes)})")
+
+
+def _do_phonemize(args: argparse.Namespace) -> None:
+    from scriptconv.phonemizers import Alphabet, Phonemizer, phonemize
+    try:
+        override = Phonemizer(args.phonemizer) if args.phonemizer else None
+        print(phonemize(args.text, args.lang, Alphabet(args.alphabet),
+                        override=override))
+    except (ValueError, ImportError) as e:
+        raise SystemExit(f"error: {e}")
+
+
+def _do_route(args: argparse.Namespace) -> None:
+    from scriptconv.graph import DEFAULT_GRAPH
+    try:
+        path = DEFAULT_GRAPH.route(args.src, args.dst)
+    except ValueError as e:
+        raise SystemExit(f"error: {e}")
+    if not path:
+        print("(identity)")
+    for e in path:
+        flags = "lossless" if e.lossless else "lossy"
+        extra = f", needs scriptconv[{e.requires}]" if e.requires else ""
+        print(f"  {e.src} -> {e.dst}  ({flags}, cost {e.cost:g}{extra})")
 
 
 def _do_detect(args: argparse.Namespace) -> None:
@@ -98,6 +163,34 @@ def _do_direction(args: argparse.Namespace) -> None:
 def _do_decompose(args: argparse.Namespace) -> None:
     from scriptconv.translit import decompose_hangul
     print(decompose_hangul(args.text))
+
+
+def _do_strip(args: argparse.Namespace) -> None:
+    from scriptconv.conventions import strip
+    try:
+        print(strip(args.text, args.convention))
+    except ValueError as e:
+        raise SystemExit(f"error: {e}")
+
+
+def _do_restyle(args: argparse.Namespace) -> None:
+    from scriptconv.conventions import restyle
+    try:
+        print(restyle(args.text, args.convention, args.to, frm=args.frm))
+    except ValueError as e:
+        raise SystemExit(f"error: {e}")
+
+
+def _do_conventions(args: argparse.Namespace) -> None:
+    from scriptconv.conventions import CONVENTION_REGISTRY, conventions_for
+    convs = (conventions_for(args.script) if args.script
+             else list(CONVENTION_REGISTRY.values()))
+    if not convs:
+        print("(no conventions registered for that script)")
+    for c in convs:
+        system = f" [{c.system}]" if c.system else ""
+        print(f"  {c.id}{system}  scripts={','.join(c.scripts)}  "
+              f"styles={','.join(c.styles)}  — {c.name}")
 
 
 def _do_lang(args: argparse.Namespace) -> None:
