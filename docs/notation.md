@@ -561,3 +561,30 @@ single IPA symbol fuse to it — `AH0 R` → `AXR0` (r-colored schwa),
 contiguous IPA carries no token boundary, so this fusion is inherent and
 applies in default mode too. The general contract: round-trips are exact up
 to IPA-equivalence — a fused spelling always produces the identical IPA.
+
+## Mantoq → IPA (Halabi Arabic-Phonetiser inventory)
+
+Mantoq is the phonetic alphabet emitted by the mantoq Arabic G2P pipeline —
+ASCII consonant letters with the inventory's own conventions (`^` is θ, `v` a
+loan phoneme), plain short/long vowels (`a`/`aa`/`aaaa`), a gemination marker
+`_dbl_`, a word separator `_+_`, and `<` for the glottal stop. Published
+models trained on mantoq sequences make the notation worth transcoding, so it
+is a first-class `Notation` member with a one-directional converter:
+
+```python
+from scriptconv.notation import mantoq_to_ipa
+from scriptconv import convert, can_convert
+
+mantoq_to_ipa("s a l aa m")        # 's a l aː m'
+mantoq_to_ipa("b_dbl_a")           # 'bːa'      (consonant gemination)
+convert("mrHbaa", "mantoq", "x-sampa")   # routes mantoq → ipa → x-sampa
+can_convert("ipa", "mantoq")       # False — one-directional by design
+```
+
+The inventory's semantics are honoured precisely: `_dbl_` geminates only
+consonants (the pipeline never emits it after a vowel), `_sil_` becomes a
+pause, `_eos_`/`_pad_` are dropped, and a pre-tokenized sequence (as returned
+by the mantoq package's `g2p`) is accepted directly, since joining tokens
+into a string is ambiguous. The token → IPA table maps the inventory's
+phonetic values; the phonetiser *engine* itself lives in
+[phonemizers](phonemizers.md) under its own license.

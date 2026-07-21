@@ -93,3 +93,23 @@ passes through unchanged.
 hira_to_kana("ひらがな")   # "ヒラガナ"
 kana_to_hira("カタカナ")   # "かたかな"
 ```
+
+## Hanzi → Cangjie input codes
+
+Cangjie codes encode a glyph's **shape** — its decomposition into geometric
+radicals — not its reading: 日 is `a` because of what it looks like, however
+it is pronounced. That makes this a deterministic, table-driven transcode
+like the rest of this page. The 103,601-glyph traditional-Chinese table
+(from the Cangjie5 project, MIT) ships gzipped inside the wheel and loads
+lazily on first use, so no download and no dependency are involved.
+
+```python
+from scriptconv import cangjie_code, to_cangjie
+
+cangjie_code("日")            # 'a'
+to_cangjie("倉頡")            # 'oiar grmbc'
+to_cangjie("我有ABC 123")     # 'hqi kb ABC 123'   (unmapped runs pass through)
+```
+
+Where the upstream table lists alternative codes for a glyph, the primary
+code is kept; `cangjie_code` returns `None` for unmapped characters.
