@@ -112,6 +112,14 @@ def get_phonemizer(phonemizer: Phonemizer,
         params = inspect.signature(cls.__init__).parameters
         if "alphabet" in params:
             kwargs.setdefault("alphabet", alphabet)
+        if model is not None:
+            # backends name their variant/model selector differently
+            # (AhoTTS: engine=, arbtok: model=, ...) — forward to whichever
+            # parameter the constructor declares
+            for name in ("model", "engine"):
+                if name in params:
+                    kwargs.setdefault(name, model)
+                    break
         inst = cls(**kwargs)
     if normalizer is not None:
         inst.normalizer = normalizer

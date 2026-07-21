@@ -196,3 +196,17 @@ class TestPhonikudModelResolver(unittest.TestCase):
         with self.assertRaises(ValueError):
             g.add_diacritics("שלום", "he")
         self.assertEqual(calls, [1])
+
+
+class TestModelForwarding(unittest.TestCase):
+    def test_model_forwards_to_engine_param(self):
+        from scriptconv.phonemizers.eu import AhoTTSPhonemizer
+        from unittest import mock
+        with mock.patch.object(AhoTTSPhonemizer, "__init__",
+                               return_value=None) as init:
+            get_phonemizer(Phonemizer.AHOTTS, model="classic")
+            self.assertEqual(init.call_args.kwargs.get("engine"), "classic")
+
+    def test_model_none_forwards_nothing(self):
+        g = get_phonemizer(Phonemizer.GRAPHEMES, model=None)
+        self.assertIsInstance(g, GraphemePhonemizer)
