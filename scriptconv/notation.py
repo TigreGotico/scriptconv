@@ -157,6 +157,11 @@ _IPA_TO_ARPA.setdefault("g", "G")
 _IPA_ARPA_KEYS_SORTED = sorted(_IPA_TO_ARPA.keys(), key=len, reverse=True)
 _IPA_ARPA_RE = re.compile("|".join(re.escape(s) for s in _IPA_ARPA_KEYS_SORTED))
 
+# ARPABET vowel class — the symbols that carry stress digits.
+_ARPA_VOWELS = {"AO", "AA", "IY", "UW", "EH", "IH", "UH", "AH", "AE", "AX",
+                "EY", "AY", "OW", "AW", "OY", "ER", "AXR"}
+_STRESS_MARKS = {"ˈ": "1", "ˌ": "2"}  # IPA primary/secondary stress
+
 
 
 class UnknownSymbolError(ValueError):
@@ -187,12 +192,18 @@ def _unknown(symbol: str, position: int, notation: str, errors: str,
     raise ValueError(f"errors must be one of {_ERROR_POLICIES}, not {errors!r}")
 
 
-def arpa_to_ipa(arpa_sequence: str, errors: str = "pass") -> str:
+def arpa_to_ipa(arpa_sequence: str, errors: str = "pass",
+                stress: bool = False) -> str:
     """Convert a space-separated ARPABET sequence to an IPA string.
 
-    Stress digits are stripped.  ``errors`` selects the unknown-token policy:
-    ``"pass"`` (default) keeps the token, ``"replace"`` substitutes ``?``,
-    ``"ignore"`` drops it, ``"strict"`` raises :class:`UnknownSymbolError`.
+    With ``stress=True``, ARPABET stress digits are preserved as IPA stress
+    marks placed immediately before the stressed vowel's symbol: ``AH1`` →
+    ``ˈʌ``, ``AH2`` → ``ˌʌ``, ``AH0`` → unmarked (a purely notational,
+    reversible convention — no syllabification is performed).  The default
+    ``stress=False`` keeps the historical behavior of stripping the digits.
+    ``errors`` selects the unknown-token policy: ``"pass"`` (default) keeps
+    the token, ``"replace"`` substitutes ``?``, ``"ignore"`` drops it,
+    ``"strict"`` raises :class:`UnknownSymbolError`.
 
     Examples
     --------
@@ -202,6 +213,9 @@ def arpa_to_ipa(arpa_sequence: str, errors: str = "pass") -> str:
     tokens = arpa_sequence.strip().split()
     result = []
     for i, tok in enumerate(tokens):
+        mark = ""
+        if stress and tok[-1:] in ("1", "2") and tok[:-1] in _ARPA_VOWELS:
+            mark = "ˈ" if tok[-1] == "1" else "ˌ"
         ipa = _ARPA_TO_IPA.get(tok)
         if ipa is None:
             # strip trailing digit and retry
@@ -209,19 +223,24 @@ def arpa_to_ipa(arpa_sequence: str, errors: str = "pass") -> str:
             ipa = _ARPA_TO_IPA.get(stripped)
         if ipa is None:
             ipa = _unknown(tok, i, "arpa", errors)
-        result.append(ipa)
+            mark = ""
+        result.append(mark + ipa)
     return "".join(result)
 
 
 def ipa_to_arpa(ipa_string: str, unknown: str = "?",
-                errors: str = "replace") -> str:
+                errors: str = "replace", stress: bool = False) -> str:
     """Convert an IPA string to a space-separated ARPABET sequence.
 
-    Matches longest IPA symbol first.  ``errors`` selects the unknown-symbol
-    policy (default ``"replace"``, preserving the historical behavior of
-    substituting *unknown*, ``"?"``); ``unknown=""`` still drops silently.
-    Combining marks and modifier letters qualify the preceding phoneme and
-    are always dropped rather than treated as unknowns.
+    Matches longest IPA symbol first.  With ``stress=True``, IPA stress
+    marks (``ˈ``/``ˌ``) preceding a vowel-class symbol are emitted as that
+    vowel's stress digit (``1``/``2``) and unmarked vowels receive ``0`` —
+    the reverse of :func:`arpa_to_ipa`'s ``stress=True`` convention.
+    ``errors`` selects the unknown-symbol policy (default ``"replace"``,
+    preserving the historical behavior of substituting *unknown*, ``"?"``);
+    ``unknown=""`` still drops silently.  Combining marks and modifier
+    letters qualify the preceding phoneme and are always dropped rather
+    than treated as unknowns.
 
     Examples
     --------
@@ -231,11 +250,25 @@ def ipa_to_arpa(ipa_string: str, unknown: str = "?",
     '?'
     """
     tokens = []
+    pending_stress = ""
     pos = 0
     while pos < len(ipa_string):
+        if stress and ipa_string[pos] in _STRESS_MARKS:
+            pending_stress = _STRESS_MARKS[ipa_string[pos]]
+            pos += 1
+            continue
         m = _IPA_ARPA_RE.match(ipa_string, pos)
         if m:
-            tokens.append(_IPA_TO_ARPA[m.group(0)])
+            tok = _IPA_TO_ARPA[m.group(0)]
+            if stress and tok in _ARPA_VOWELS:
+                # CMUdict spells schwa as AH0 (it has no AX), so stress-aware
+                # output uses AH for exact round-trips; extended-ARPABET AX
+                # input still normalizes to AH0 (documented residue).
+                if m.group(0) == "ə":
+                    tok = "AH"
+                tok += pending_stress or "0"
+            pending_stress = ""
+            tokens.append(tok)
             pos = m.end()
         else:
             ch = ipa_string[pos]
