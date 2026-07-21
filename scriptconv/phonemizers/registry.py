@@ -114,9 +114,9 @@ def get_phonemizer(phonemizer: Phonemizer,
             kwargs.setdefault("alphabet", alphabet)
         if model is not None:
             # backends name their variant/model selector differently
-            # (AhoTTS: engine=, arbtok: model=, ...) — forward to whichever
+            # (AhoTTS: engine=, arbtok: register=, ...) — forward to whichever
             # parameter the constructor declares
-            for name in ("model", "engine"):
+            for name in ("model", "engine", "register"):
                 if name in params:
                     kwargs.setdefault(name, model)
                     break

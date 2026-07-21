@@ -199,13 +199,24 @@ class TestPhonikudModelResolver(unittest.TestCase):
 
 
 class TestModelForwarding(unittest.TestCase):
-    def test_model_forwards_to_engine_param(self):
-        from scriptconv.phonemizers.eu import AhoTTSPhonemizer
+    def test_model_forwards_to_variant_param(self):
         from unittest import mock
-        with mock.patch.object(AhoTTSPhonemizer, "__init__",
-                               return_value=None) as init:
-            get_phonemizer(Phonemizer.AHOTTS, model="classic")
-            self.assertEqual(init.call_args.kwargs.get("engine"), "classic")
+        import scriptconv.phonemizers.registry as reg
+
+        seen = {}
+
+        class FakeEngineBackend(BasePhonemizer):
+            def __init__(self, engine=None, alphabet=Alphabet.IPA):
+                seen["engine"] = engine
+                super().__init__(alphabet)
+
+            def phonemize_string(self, text, lang):
+                return text
+
+        with mock.patch.object(reg, "get_phonemizer_class",
+                               return_value=FakeEngineBackend):
+            reg.get_phonemizer(Phonemizer.AHOTTS, model="classic")
+        self.assertEqual(seen["engine"], "classic")
 
     def test_model_none_forwards_nothing(self):
         g = get_phonemizer(Phonemizer.GRAPHEMES, model=None)
