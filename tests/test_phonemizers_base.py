@@ -96,12 +96,34 @@ class TestLangDefaults(unittest.TestCase):
         self.assertEqual(LANG_DEFAULTS["ar"], (Phonemizer.ARBTOK,))
 
     def test_cotovia_only_for_cotovia_alphabet(self):
+        # requesting IPA must never yield Cotovía (it emits its own notation);
+        # the in-house chain falls through to orthography2ipa (or espeak)
         gl_ipa = phonemizer_for_lang("gl", alphabet=Alphabet.IPA)
-        self.assertEqual(type(gl_ipa).__name__, "EspeakPhonemizer")
+        self.assertIn(type(gl_ipa).__name__,
+                      ("Orthography2IPAPhonemizer", "EspeakPhonemizer"))
+        self.assertNotEqual(type(gl_ipa).__name__, "CotoviaPhonemizer")
+        gl_ctv = phonemizer_for_lang("gl", alphabet=Alphabet.COTOVIA)
+        self.assertEqual(type(gl_ctv).__name__, "CotoviaPhonemizer")
 
-    def test_fallback_is_espeak(self):
-        de = phonemizer_for_lang("de-DE")
-        self.assertEqual(type(de).__name__, "EspeakPhonemizer")
+    def test_fallback_prefers_o2i_then_espeak(self):
+        # in-house first: orthography2ipa is the usual default when it has a
+        # spec for the language; espeak only as last resort
+        from unittest import mock
+        import scriptconv.phonemizers.registry as reg
+        with mock.patch.object(reg, "_o2i_supports", return_value=True):
+            with mock.patch.object(reg, "get_phonemizer") as gp:
+                reg.phonemizer_for_lang("de-DE")
+                self.assertEqual(gp.call_args[0][0], Phonemizer.ORTHOGRAPHY2IPA)
+        with mock.patch.object(reg, "_o2i_supports", return_value=False):
+            de = reg.phonemizer_for_lang("de-DE")
+            self.assertEqual(type(de).__name__, "EspeakPhonemizer")
+
+    def test_arabic_never_falls_through(self):
+        # hard org rule: Arabic IPA only via arbtok — with arbtok ineligible
+        # (wrong alphabet), the resolver raises instead of degrading to
+        # o2i/espeak
+        with self.assertRaises((ValueError, ImportError)):
+            phonemizer_for_lang("ar", alphabet=Alphabet.ARPA)
 
     def test_override_wins(self):
         g = phonemizer_for_lang("de", override=Phonemizer.GRAPHEMES)
