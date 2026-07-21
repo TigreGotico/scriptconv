@@ -951,19 +951,14 @@ def convert(text: str, src: str | Notation, dst: str | Notation) -> str:
     if src == dst:
         return text
 
-    # IPA-pivot notations: <notation> → IPA → <notation>.
-    if src in _TO_IPA and dst == Notation.IPA:
-        return _TO_IPA[src](text)
-    if src == Notation.IPA and dst in _FROM_IPA:
-        return _FROM_IPA[dst](text)
-    if src in _TO_IPA and dst in _FROM_IPA:
-        return _FROM_IPA[dst](_TO_IPA[src](text))
-
-    # Buckwalter ↔ Arabic script is a direct pair (not IPA-routable).
-    if (src, dst) in _DIRECT_PAIRS:
-        return _DIRECT_PAIRS[(src, dst)](text)
-
-    raise ValueError(f"Unsupported conversion: {src!r} → {dst!r}")
+    # Routing lives on the shared conversion graph; the notation tables below
+    # are registered there as edges (IPA-pivot pairs route through the "ipa"
+    # node, Buckwalter <-> Arabic is a direct edge).
+    from scriptconv.graph import DEFAULT_GRAPH
+    try:
+        return DEFAULT_GRAPH.convert(text, src.value, dst.value)
+    except ValueError:
+        raise ValueError(f"Unsupported conversion: {src!r} → {dst!r}") from None
 
 
 # ---------------------------------------------------------------------------
@@ -1000,20 +995,7 @@ _DIRECT_PAIRS: dict[tuple[Notation, Notation], "callable"] = {
 # can_convert — predicate for supported conversion paths
 # ---------------------------------------------------------------------------
 
-def _build_supported_pairs() -> set[tuple[Notation, Notation]]:
-    pairs: set[tuple[Notation, Notation]] = set(_DIRECT_PAIRS)
-    for _s in _TO_IPA:
-        pairs.add((_s, Notation.IPA))
-    for _d in _FROM_IPA:
-        pairs.add((Notation.IPA, _d))
-    for _s in _TO_IPA:
-        for _d in _FROM_IPA:
-            if _s != _d:
-                pairs.add((_s, _d))
-    return pairs
-
-
-_SUPPORTED_PAIRS: set[tuple[Notation, Notation]] = _build_supported_pairs()
+_NOTATION_VALUES = {n.value for n in Notation}
 
 
 def can_convert(src: str | Notation, dst: str | Notation) -> bool:
@@ -1037,7 +1019,16 @@ def can_convert(src: str | Notation, dst: str | Notation) -> bool:
     """
     src = Notation(src)
     dst = Notation(dst)
-    return (src, dst) in _SUPPORTED_PAIRS
+    if src == dst:
+        # historical contract: identity is not a "conversion"
+        return False
+    from scriptconv.graph import DEFAULT_GRAPH
+    if not DEFAULT_GRAPH.can_convert(src.value, dst.value):
+        return False
+    # only notation-to-notation reachability counts here; guard against paths
+    # that would leave the notation node set (none exist today, cheap to keep)
+    return all(e.src in _NOTATION_VALUES and e.dst in _NOTATION_VALUES
+               for e in DEFAULT_GRAPH.route(src.value, dst.value))
 
 
 # ---------------------------------------------------------------------------

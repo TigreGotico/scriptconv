@@ -11,6 +11,7 @@ Usage
     python -m scriptconv strip <convention> <text>
     python -m scriptconv restyle <convention> <style> <text>
     python -m scriptconv conventions [--script CODE]
+    python -m scriptconv route <src> <dst>
 
 Examples
 --------
@@ -64,6 +65,10 @@ def main(argv: list[str] | None = None) -> int:
     cv = sub.add_parser("conventions", help="List orthographic conventions")
     cv.add_argument("--script", default=None, help="Filter by ISO-15924 script code")
 
+    rt = sub.add_parser("route", help="Show the conversion path between representations")
+    rt.add_argument("src", help="Source representation id")
+    rt.add_argument("dst", help="Target representation id")
+
     args = p.parse_args(argv)
 
     if args.command is None:
@@ -80,6 +85,7 @@ def main(argv: list[str] | None = None) -> int:
         "strip": lambda: _do_strip(args),
         "restyle": lambda: _do_restyle(args),
         "conventions": lambda: _do_conventions(args),
+        "route": lambda: _do_route(args),
     }
     dispatch[args.command]()
     return 0
@@ -89,9 +95,31 @@ def _do_convert(args: argparse.Namespace) -> None:
     from scriptconv.notation import Notation, convert
     try:
         print(convert(args.text, args.src, args.dst))
+        return
+    except ValueError:
+        pass
+    # not a notation pair — try any representation pair on the default graph
+    from scriptconv.graph import DEFAULT_GRAPH
+    try:
+        print(DEFAULT_GRAPH.convert(args.text, args.src, args.dst))
     except ValueError as e:
         valid = ", ".join(n.value for n in Notation)
-        raise SystemExit(f"error: {e} (valid notations: {valid})")
+        raise SystemExit(f"error: {e} (valid notations: {valid}; "
+                         f"graph nodes: {', '.join(DEFAULT_GRAPH.nodes)})")
+
+
+def _do_route(args: argparse.Namespace) -> None:
+    from scriptconv.graph import DEFAULT_GRAPH
+    try:
+        path = DEFAULT_GRAPH.route(args.src, args.dst)
+    except ValueError as e:
+        raise SystemExit(f"error: {e}")
+    if not path:
+        print("(identity)")
+    for e in path:
+        flags = "lossless" if e.lossless else "lossy"
+        extra = f", needs scriptconv[{e.requires}]" if e.requires else ""
+        print(f"  {e.src} -> {e.dst}  ({flags}, cost {e.cost:g}{extra})")
 
 
 def _do_detect(args: argparse.Namespace) -> None:
