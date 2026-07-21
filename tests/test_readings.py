@@ -71,3 +71,45 @@ class TestDependencyBoundary(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestTokens(unittest.TestCase):
+    def test_yields_reading_tokens_with_all_forms(self):
+        from scriptconv import ReadingToken, tokens
+        toks = list(tokens("東京タワー"))
+        self.assertTrue(all(isinstance(t, ReadingToken) for t in toks))
+        origs = [t.orig for t in toks]
+        self.assertIn("東京", origs)
+        tokyo = toks[origs.index("東京")]
+        self.assertEqual(tokyo.hira, "とうきょう")
+        self.assertEqual(tokyo.kana, "トウキョウ")
+
+    def test_tokens_cover_input_exactly(self):
+        from scriptconv import tokens
+        text = "私はcoffeeが好き"
+        self.assertEqual("".join(t.orig for t in tokens(text)), text)
+
+    def test_empty_string_yields_nothing(self):
+        from scriptconv import tokens
+        self.assertEqual(list(tokens("")), [])
+
+
+class TestSegmentFlag(unittest.TestCase):
+    def test_hiragana_wakachigaki(self):
+        from scriptconv import to_hiragana
+        self.assertEqual(to_hiragana("私は学生です", segment=True),
+                         "わたし は がくせい です")
+
+    def test_katakana_wakachigaki(self):
+        from scriptconv import to_katakana
+        self.assertEqual(to_katakana("私は学生です", segment=True),
+                         "ワタシ ハ ガクセイ デス")
+
+    def test_segment_false_is_default_concatenation(self):
+        from scriptconv import to_hiragana
+        self.assertEqual(to_hiragana("私は学生です"), "わたしはがくせいです")
+
+    def test_segment_collapses_original_whitespace(self):
+        from scriptconv import to_hiragana
+        out = to_hiragana("東京 大阪", segment=True)
+        self.assertNotIn("  ", out)

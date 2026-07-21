@@ -68,6 +68,8 @@ from scriptconv.translit import (
     kana_to_hira,
 )
 from scriptconv.readings import (
+    ReadingToken,
+    tokens,
     to_hiragana,
     to_katakana,
     to_pinyin,
@@ -117,6 +119,8 @@ __all__ = [
     "hira_to_kana",
     "kana_to_hira",
     # readings (dictionary-backed, needs scriptconv[ja])
+    "ReadingToken",
+    "tokens",
     "to_hiragana",
     "to_katakana",
     # cangjie (vendored Cangjie5 table)
