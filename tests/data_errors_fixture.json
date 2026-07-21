@@ -1,0 +1,74 @@
+{
+ "arpa_to_ipa": {
+  "HH AH0 L OW1": "həloʊ",
+  "K AE1 T": "kæt",
+  "ZZZ Q9": "ZZZQ9",
+  "": ""
+ },
+ "ipa_to_arpa": {
+  "həloʊ": "HH AX L OW",
+  "kæt": "K AE T",
+  "χψ": "? ?",
+  "ɡ": "G",
+  "": ""
+ },
+ "xsampa_to_ipa": {
+  "h@\"loU": "həˈloʊ",
+  "k{t": "kæt",
+  "??unknown": "ʔʔunknown",
+  "": ""
+ },
+ "ipa_to_xsampa": {
+  "həloʊ": "h@loU",
+  "χ": "X",
+  "": ""
+ },
+ "lexique_to_ipa": {
+  "kat": "kat",
+  "": ""
+ },
+ "ipa_to_lexique": {
+  "kat": "kat",
+  "χψ": "χψ",
+  "": ""
+ },
+ "kirshenbaum_to_ipa": {
+  "h@'loU": "həˈloʊ",
+  "": ""
+ },
+ "ipa_to_kirshenbaum": {
+  "həloʊ": "h@loU",
+  "ꟼ": "ꟼ",
+  "": ""
+ },
+ "cotovia_to_ipa": {
+  "kasa": "kasa",
+  "": ""
+ },
+ "ipa_to_cotovia": {
+  "kasa": "kasa",
+  "χ": "χ",
+  "": ""
+ },
+ "rfe_to_ipa": {
+  "kasa": "kasa",
+  "": ""
+ },
+ "ipa_to_rfe": {
+  "kasa": "kasa",
+  "χ": "χ",
+  "": ""
+ },
+ "buckwalter_to_arabic": {
+  ">an~a": "أَنَّ",
+  "mHmd": "محمد",
+  "ZZ##": "ظظ##",
+  "": ""
+ },
+ "arabic_to_buckwalter": {
+  "محمد": "mHmd",
+  "أنَّ": ">na~",
+  "xyz": "xyz",
+  "": ""
+ }
+}

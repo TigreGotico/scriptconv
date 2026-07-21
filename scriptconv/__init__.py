@@ -49,6 +49,7 @@ from scriptconv.scripts import (
 )
 from scriptconv.notation import (
     Notation,
+    UnknownSymbolError,
     NotationInfo,
     NOTATION_INFO,
     convert,
@@ -119,6 +120,7 @@ __all__ = [
     "normalize_script_tag",
     # notation
     "Notation",
+    "UnknownSymbolError",
     "NotationInfo",
     "NOTATION_INFO",
     "convert",
