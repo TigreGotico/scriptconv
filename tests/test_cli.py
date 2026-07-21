@@ -108,3 +108,20 @@ def test_strip_unknown_convention_clean_error():
     with pytest.raises(SystemExit) as exc:
         main(["strip", "bogus", "text"])
     assert str(exc.value).startswith("error:")
+
+
+def test_route_notation_pair(capsys):
+    assert main(["route", "arpa", "x-sampa"]) == 0
+    out = capsys.readouterr().out
+    assert "arpa -> ipa" in out and "ipa -> x-sampa" in out
+
+
+def test_convert_orthography_pair_via_graph(capsys):
+    assert main(["convert", "hira", "kana", "こんにちは"]) == 0
+    assert capsys.readouterr().out.strip() == "コンニチハ"
+
+
+def test_route_unroutable_clean_error():
+    with pytest.raises(SystemExit) as exc:
+        main(["route", "ipa", "hangul"])
+    assert str(exc.value).startswith("error:")

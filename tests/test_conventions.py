@@ -208,3 +208,31 @@ class TestRestyleContract(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestEncapsulation(unittest.TestCase):
+    """Operations are fully driven by a convention's own transitions/detector."""
+
+    def test_ad_hoc_convention_works_through_generic_operations(self):
+        from scriptconv.conventions import Convention, Transition
+        rot = Convention(
+            "x-demo", "demo", ("Latn",), None, ("upper", "none"), "none", (),
+            "test fixture",
+            transitions=(Transition("none", "upper", str.upper),
+                         Transition("upper", "none", str.lower)),
+            detector=lambda t: "upper" if t.isupper() else "none")
+        self.assertEqual(rot.apply("abc"), "ABC")
+        self.assertEqual(rot.strip("ABC"), "abc")
+        self.assertEqual(rot.detect("ABC"), "upper")
+        self.assertEqual(rot.restyle("ABC", "none"), "abc")
+
+    def test_wakachigaki_apply_requires_is_queryable(self):
+        conv = CONVENTION_REGISTRY["wakachigaki"]
+        self.assertEqual(conv.apply_requires, "ja")
+        self.assertIsNone(CONVENTION_REGISTRY["tashkeel"].apply_requires)
+
+    def test_jamo_form_strip_lossless_derived_from_transitions(self):
+        self.assertFalse(CONVENTION_REGISTRY["tashkeel"].strip_lossless)
+        self.assertFalse(CONVENTION_REGISTRY["jamo-form"].strip_lossless)  # no "none" transitions
+        self.assertTrue(all(t.lossless for t in
+                            CONVENTION_REGISTRY["jamo-form"].transitions))

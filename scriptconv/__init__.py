@@ -22,6 +22,10 @@ readings:
     extra; Chinese hanzi → pinyin/bopomofo via the ``zh`` extra).
 cangjie:
     Hanzi → Cangjie5 input codes (shape decomposition, vendored table).
+graph:
+    Conversion-graph engine: representations (notations and orthographies)
+    as nodes, registered transforms as edges, lossless-preferring routing.
+    External packages extend graph instances explicitly.
 conventions:
     Orthographic conventions — script-scoped decorations orthogonal to
     identity (tashkeel, niqqud, wakachigaki, pinyin tone spelling…).
@@ -81,12 +85,20 @@ from scriptconv.readings import (
 )
 from scriptconv.conventions import (
     Convention,
+    Transition,
     CONVENTION_REGISTRY,
     conventions_for,
     restyle,
     strip,
     apply,
     detect as detect_convention,
+)
+from scriptconv.graph import (
+    Representation,
+    Edge,
+    ConversionGraph,
+    DEFAULT_GRAPH,
+    REPRESENTATIONS,
 )
 from scriptconv.cangjie import (
     cangjie_code,
@@ -138,12 +150,19 @@ __all__ = [
     "to_katakana",
     # conventions (orthographic decorations, orthogonal to script identity)
     "Convention",
+    "Transition",
     "CONVENTION_REGISTRY",
     "conventions_for",
     "restyle",
     "strip",
     "apply",
     "detect_convention",
+    # graph (conversion routing engine over representations)
+    "Representation",
+    "Edge",
+    "ConversionGraph",
+    "DEFAULT_GRAPH",
+    "REPRESENTATIONS",
     # cangjie (vendored Cangjie5 table)
     "cangjie_code",
     "to_cangjie",
