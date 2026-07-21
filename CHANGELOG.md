@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.3a5](https://github.com/TigreGotico/scriptconv/tree/0.0.3a5) (2026-07-21)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a4...0.0.3a5)
+
+**Merged pull requests:**
+
+- fix: include cangjie table in built distributions [\#26](https://github.com/TigreGotico/scriptconv/pull/26) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.3a4](https://github.com/TigreGotico/scriptconv/tree/0.0.3a4) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a3...0.0.3a4)
