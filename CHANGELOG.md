@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.3a20](https://github.com/TigreGotico/scriptconv/tree/0.0.3a20) (2026-07-21)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a19...0.0.3a20)
+
+**Merged pull requests:**
+
+- feat: wrap license-encumbered backends as external runtime dependencies [\#56](https://github.com/TigreGotico/scriptconv/pull/56) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.3a19](https://github.com/TigreGotico/scriptconv/tree/0.0.3a19) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a18...0.0.3a19)
