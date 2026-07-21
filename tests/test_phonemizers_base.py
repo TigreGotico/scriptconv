@@ -23,7 +23,7 @@ class TestEnums(unittest.TestCase):
         self.assertEqual(Phonemizer.KOG2PK.value, "kog2p")
         self.assertEqual(Alphabet.XSAMPA.value, "x-sampa")
         self.assertEqual(len(list(Phonemizer)), 41)
-        self.assertEqual(len(list(Alphabet)), 20)
+        self.assertEqual(len(list(Alphabet)), 21)  # incl. MANTOQ
 
 
 class TestRegistryCompleteness(unittest.TestCase):

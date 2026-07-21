@@ -27,7 +27,8 @@ class Alphabet(str, Enum):
     ERAAB = "eraab" # fa
     COTOVIA = "cotovia" # gl
     HANZI = "hanzi" # zh
-    BUCKWALTER = "buckwalter" # ar
+    BUCKWALTER = "buckwalter"
+    MANTOQ = "mantoq"  # ar — Halabi Arabic-Phonetiser inventory # ar
     CANGJIE = "cangjie" # zh (Cangjie input method)
     GRAPHEMES = "graphemes"  # plain text / grapheme input (user-side)
 
