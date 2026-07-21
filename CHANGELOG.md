@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.3a8](https://github.com/TigreGotico/scriptconv/tree/0.0.3a8) (2026-07-21)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a7...0.0.3a8)
+
+**Merged pull requests:**
+
+- feat: conversion-graph engine and convention behavior encapsulation [\#32](https://github.com/TigreGotico/scriptconv/pull/32) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.3a7](https://github.com/TigreGotico/scriptconv/tree/0.0.3a7) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a6...0.0.3a7)
