@@ -159,3 +159,18 @@ class TestFacadeAndGraph(unittest.TestCase):
         from scriptconv import phonemizers
         g = DEFAULT_GRAPH.extend(phonemizers.register)
         self.assertTrue(g.can_convert("text", "arpa"))
+
+
+class TestPhonikudModelResolver(unittest.TestCase):
+    def test_callable_resolver_invoked_lazily(self):
+        calls = []
+
+        def resolver():
+            calls.append(1)
+            return ""  # resolves to nothing -> still the explicit ValueError
+
+        g = GraphemePhonemizer(phonikud_model=resolver)
+        self.assertEqual(calls, [])  # not resolved at construction
+        with self.assertRaises(ValueError):
+            g.add_diacritics("שלום", "he")
+        self.assertEqual(calls, [1])
