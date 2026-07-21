@@ -33,7 +33,8 @@ version = {attr = "scriptconv.version.VERSION_STR"}
 dependencies = {file = ["requirements.txt"]}
 
 [project.optional-dependencies]
-test = ["pytest", "pytest-timeout"]
+ja = ["pykakasi>=2.3,<3"]
+test = ["pytest", "pytest-timeout", "pykakasi>=2.3,<3"]
 
 [project.urls]
 Homepage = "https://github.com/TigreGotico/scriptconv"
