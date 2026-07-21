@@ -197,17 +197,23 @@ def _notation_edges() -> List[Edge]:
     from scriptconv.notation import (_TO_IPA, _FROM_IPA, _DIRECT_PAIRS,
                                      NOTATION_INFO)
     edges = []
+    def _wrap(fn):
+        # forward only the errors= policy from routing context; other context
+        # keys (lang, engine options) are not the notation layer's business
+        def _edge(text, errors=None, **_):
+            return fn(text, errors=errors) if errors is not None else fn(text)
+        return _edge
+
     for notation, fn in _TO_IPA.items():
         info = NOTATION_INFO[notation]
-        edges.append(Edge(notation.value, "ipa", (lambda f: lambda t, **_: f(t))(fn),
+        edges.append(Edge(notation.value, "ipa", _wrap(fn),
                           lossless=info.lossless_to_ipa))
     for notation, fn in _FROM_IPA.items():
         info = NOTATION_INFO[notation]
-        edges.append(Edge("ipa", notation.value, (lambda f: lambda t, **_: f(t))(fn),
+        edges.append(Edge("ipa", notation.value, _wrap(fn),
                           lossless=info.lossless_from_ipa))
     for (src, dst), fn in _DIRECT_PAIRS.items():
-        edges.append(Edge(src.value, dst.value, (lambda f: lambda t, **_: f(t))(fn),
-                          lossless=True))
+        edges.append(Edge(src.value, dst.value, _wrap(fn), lossless=True))
     return edges
 
 

@@ -166,6 +166,15 @@ Transcoding faithfulness depends on the target notation's inventory. IPA is the 
 notation↔notation goes through IPA. The table below states, for each notation, whether a
 round-trip is exact and what happens to a symbol the table does not know.
 
+Every converter (and `convert()`) accepts a codecs-style `errors=` policy for
+symbols outside its table: `"pass"` keeps the symbol (the default everywhere
+except `ipa_to_arpa`), `"replace"` substitutes the notation's placeholder
+(`?`; the historical `ipa_to_arpa` default, tunable via `unknown=`),
+`"ignore"` drops it, and `"strict"` raises `UnknownSymbolError` naming the
+symbol, its position, and the notation. The "Unknown-token behaviour" column
+below describes the per-converter default.
+
+
 | Notation | `to_ipa` → `from_ipa` round-trip | `from_ipa` → `to_ipa` round-trip | Unknown-token behaviour |
 |----------|----------------------------------|----------------------------------|-------------------------|
 | **ARPABET** | Exact for base symbols; **stress digits are dropped** and `AH0`↔`AX` (schwa) is not distinguished | **Lossy** — ARPABET is an English-only inventory, so any IPA symbol outside it becomes the *unknown* placeholder | `arpa_to_ipa`: passed through unchanged. `ipa_to_arpa`: diacritics and suprasegmentals (combining marks, length/stress modifiers) are dropped; other out-of-inventory symbols are replaced with `?` by default (`unknown=` param; `unknown=""` drops) |
