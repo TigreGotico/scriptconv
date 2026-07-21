@@ -20,6 +20,8 @@ translit:
 readings:
     Dictionary-backed respelling (Japanese kanji → kana).  Needs the
     optional ``pykakasi`` dependency (``pip install scriptconv[ja]``).
+cangjie:
+    Hanzi → Cangjie5 input codes (shape decomposition, vendored table).
 
 Zero required runtime dependencies (stdlib only); the readings module
 needs the optional ``ja`` extra.
@@ -69,6 +71,10 @@ from scriptconv.readings import (
     to_hiragana,
     to_katakana,
 )
+from scriptconv.cangjie import (
+    cangjie_code,
+    to_cangjie,
+)
 
 __all__ = [
     # scripts
@@ -111,4 +117,7 @@ __all__ = [
     # readings (dictionary-backed, needs scriptconv[ja])
     "to_hiragana",
     "to_katakana",
+    # cangjie (vendored Cangjie5 table)
+    "cangjie_code",
+    "to_cangjie",
 ]
