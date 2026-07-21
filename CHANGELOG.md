@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.3a23](https://github.com/TigreGotico/scriptconv/tree/0.0.3a23) (2026-07-21)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a22...0.0.3a23)
+
+**Merged pull requests:**
+
+- docs: full documentation pass — narrative README and per-module guide [\#62](https://github.com/TigreGotico/scriptconv/pull/62) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.3a22](https://github.com/TigreGotico/scriptconv/tree/0.0.3a22) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a21...0.0.3a22)
