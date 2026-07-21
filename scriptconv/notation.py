@@ -1053,7 +1053,7 @@ def _tokenize_mantoq(text: str) -> list[str]:
     return tokens
 
 
-def mantoq_to_ipa(mantoq: str, errors: str = "pass") -> str:
+def mantoq_to_ipa(mantoq, errors: str = "pass") -> str:
     """Convert a Mantoq phoneme string to IPA.
 
     ``_dbl_`` lengthens/geminates the preceding symbol (``ː``), ``_+_``
@@ -1070,9 +1070,13 @@ def mantoq_to_ipa(mantoq: str, errors: str = "pass") -> str:
     The inventory's special tokens are honoured: ``_sil_`` becomes a space,
     ``_eos_``/``_pad_`` are dropped.
     """
+    # a pre-tokenized sequence (as returned by the mantoq package's g2p)
+    # is consumed directly — joining tokens into a string is ambiguous
+    # ("a"+"aa" and "aa"+"a" both join to "aaa")
+    tokens = _tokenize_mantoq(mantoq) if isinstance(mantoq, str) else mantoq
     out: list[str] = []
     last_tok = None
-    for pos, tok in enumerate(_tokenize_mantoq(mantoq)):
+    for pos, tok in enumerate(tokens):
         if tok == "_dbl_":
             # upstream emits _dbl_ only by splitting a doubled CONSONANT
             # (mantoq buck/tokenization.py: `phon not in vowels and

@@ -5,21 +5,46 @@ from scriptconv.phonemizers.base import BasePhonemizer
 
 
 class MantoqPhonemizer(BasePhonemizer):
-    """mantoq-backed Arabic phonemizer — NOT distributable with scriptconv.
+    """Arabic phonemizer wrapping the external ``mantoq`` package.
 
-    mantoq's phonetise_buckwalter is CC BY-NC 4.0 (non-commercial) and its
-    vendored pyarabic is GPL — both incompatible with this library's
-    Apache-2.0 distribution, so the implementation is not vendored here.
-    Use :class:`ArbtokPhonemizer` (the Arabic default) instead.
+    mantoq (github.com/mush42/mantoq) bundles Nawar Halabi's Arabic-Phonetiser,
+    whose phonetisation core is CC BY-NC 4.0 — a license incompatible with
+    vendoring in this Apache-2.0 library, so the package is imported at
+    runtime and must be installed separately by a user who accepts its terms:
+
+        pip install git+https://github.com/mush42/mantoq
+
+    Kept for compatibility with published models trained on mantoq phoneme
+    sequences; the Arabic default is :class:`ArbtokPhonemizer`.  Output is
+    IPA (via :func:`scriptconv.notation.mantoq_to_ipa`) or the raw mantoq
+    inventory with ``alphabet=Alphabet.MANTOQ``.
     """
 
-    def __init__(self, *args, **kwargs):
-        raise ImportError(
-            "mantoq is CC BY-NC / GPL licensed and not vendored in "
-            "scriptconv — use ArbtokPhonemizer (the Arabic default)")
+    def __init__(self, alphabet: Alphabet = Alphabet.IPA):
+        if alphabet not in (Alphabet.IPA, Alphabet.MANTOQ):
+            raise ValueError("MantoqPhonemizer outputs IPA or MANTOQ")
+        super().__init__(alphabet)
+        try:
+            import mantoq
+        except ImportError:
+            raise ImportError(
+                "the mantoq package is not installed (and not vendored here: "
+                "its phonetisation core is CC BY-NC 4.0). Install it "
+                "separately, accepting its license terms: "
+                "pip install git+https://github.com/mush42/mantoq") from None
+        self._g2p = mantoq.g2p
+
+    @classmethod
+    def get_lang(cls, target_lang: str) -> str:
+        return cls.match_lang(target_lang, ["ar"])
 
     def phonemize_string(self, text: str, lang: str) -> str:
-        raise NotImplementedError
+        _, tokens = self._g2p(text)
+        if self.alphabet == Alphabet.MANTOQ:
+            return " ".join(tokens)
+        from scriptconv.notation import mantoq_to_ipa
+        return mantoq_to_ipa(tokens)
+
 
 
 class ArbtokPhonemizer(BasePhonemizer):
