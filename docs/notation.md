@@ -542,3 +542,22 @@ rfe_to_ipa("far̄a")  # trill r (r̄); single r is the tap ɾ
 
 The palatal nasal accepts both `ñ` and `n̮` on input and emits `ñ`; the
 tap/trill distinction (`r` = ɾ, `r̄` = r) round-trips exactly.
+
+## ARPABET stress convention (`stress=True`)
+
+Stress digits map to IPA stress marks placed **immediately before the stressed
+vowel's symbol** — a purely notational, reversible convention; no
+syllabification is performed. Worked examples:
+
+- `HH AH0 L OW1` ↔ `həlˈoʊ` (primary stress on `OW`)
+- `K AE1 T` ↔ `kˈæt`
+- `P ER0 M IH2 T` ↔ `pɜrmˌɪt` (secondary stress on `IH`)
+
+Unmarked vowels round-trip as digit `0`; consonants never carry digits.
+Residues (all stable from the IPA side): extended-ARPABET `AX` normalises to
+CMUdict's `AH0` spelling of schwa, and symbol sequences that concatenate to a
+single IPA symbol fuse to it — `AH0 R` → `AXR0` (r-colored schwa),
+`T SH` → `CH`, `D ZH` → `JH` (affricates), `EH1 IH0` → `EY1` (diphthongs);
+contiguous IPA carries no token boundary, so this fusion is inherent and
+applies in default mode too. The general contract: round-trips are exact up
+to IPA-equivalence — a fused spelling always produces the identical IPA.
