@@ -22,6 +22,10 @@ readings:
     extra; Chinese hanzi → pinyin/bopomofo via the ``zh`` extra).
 cangjie:
     Hanzi → Cangjie5 input codes (shape decomposition, vendored table).
+conventions:
+    Orthographic conventions — script-scoped decorations orthogonal to
+    identity (tashkeel, niqqud, wakachigaki, pinyin tone spelling…).
+    Scripts are nodes; conventions are parameters, never nodes.
 
 Zero required runtime dependencies (stdlib only); the readings module
 needs the optional ``ja``/``zh`` extras.
@@ -75,6 +79,15 @@ from scriptconv.readings import (
     to_pinyin,
     to_bopomofo,
 )
+from scriptconv.conventions import (
+    Convention,
+    CONVENTION_REGISTRY,
+    conventions_for,
+    restyle,
+    strip,
+    apply,
+    detect as detect_convention,
+)
 from scriptconv.cangjie import (
     cangjie_code,
     to_cangjie,
@@ -123,6 +136,14 @@ __all__ = [
     "tokens",
     "to_hiragana",
     "to_katakana",
+    # conventions (orthographic decorations, orthogonal to script identity)
+    "Convention",
+    "CONVENTION_REGISTRY",
+    "conventions_for",
+    "restyle",
+    "strip",
+    "apply",
+    "detect_convention",
     # cangjie (vendored Cangjie5 table)
     "cangjie_code",
     "to_cangjie",
