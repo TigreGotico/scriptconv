@@ -133,14 +133,28 @@ _EMITS: Dict[Phonemizer, Tuple[Alphabet, ...]] = {
 }
 
 LANG_DEFAULTS: Dict[str, Tuple[Phonemizer, ...]] = {
-    # Arabic IPA always goes through arbtok (hard org rule)
+    # Arabic IPA always goes through arbtok (hard org rule — never falls
+    # through to orthography2ipa or espeak)
     "ar": (_P.ARBTOK,),
     "eu": (_P.EUSKAPHONE,),
     "mwl": (_P.MIRANDESE,),
     "pt": (_P.TUGAPHONE,),
     "he": (_P.PHONIKUD,),
-    "gl": (_P.COTOVIA, _P.ESPEAK),
+    "gl": (_P.COTOVIA, _P.ORTHOGRAPHY2IPA, _P.ESPEAK),
 }
+
+# Languages whose explicit entry is exhaustive: no generic fallback beyond it.
+_NO_GENERIC_FALLBACK = {"ar"}
+
+
+def _o2i_supports(lang: str) -> bool:
+    """True when orthography2ipa is installed and has a spec for *lang*."""
+    try:
+        from scriptconv.phonemizers.o2ipa import Orthography2IPAPhonemizer
+        Orthography2IPAPhonemizer.get_lang(lang)
+        return True
+    except (ImportError, ValueError):
+        return False
 
 
 def phonemizer_for_lang(lang: str, alphabet: Alphabet = Alphabet.IPA,
@@ -148,15 +162,32 @@ def phonemizer_for_lang(lang: str, alphabet: Alphabet = Alphabet.IPA,
                         model: Optional[str] = None, **kwargs):
     """Construct the default phonemizer for *lang* (or the override).
 
-    Candidates from :data:`LANG_DEFAULTS` are filtered by the alphabet they
-    can emit; espeak is the universal fallback.
+    Resolution order — in-house engines first:
+
+    1. ``override=`` when given;
+    2. the language's explicit :data:`LANG_DEFAULTS` chain, filtered by the
+       alphabet each candidate can emit;
+    3. :data:`~Phonemizer.ORTHOGRAPHY2IPA` when orthography2ipa supports the
+       language (the usual default);
+    4. espeak as the last resort.
+
+    Languages in the no-fallback set (Arabic) never leave their explicit
+    chain — a missing arbtok raises rather than silently degrading.
     """
     if override is not None:
         return get_phonemizer(override, alphabet, model, **kwargs)
     key = lang.replace("_", "-").split("-")[0].lower()
-    for candidate in LANG_DEFAULTS.get(key, ()):
+    explicit = LANG_DEFAULTS.get(key, ())
+    for candidate in explicit:
         if alphabet in _EMITS.get(candidate, (Alphabet.IPA,)):
             return get_phonemizer(candidate, alphabet, model, **kwargs)
+    if key in _NO_GENERIC_FALLBACK:
+        raise ValueError(
+            f"no eligible phonemizer for {lang!r} with alphabet "
+            f"{alphabet.value!r}: the explicit chain "
+            f"{[c.value for c in explicit]} is exhaustive for this language")
+    if alphabet == Alphabet.IPA and _o2i_supports(lang):
+        return get_phonemizer(_P.ORTHOGRAPHY2IPA, alphabet, model, **kwargs)
     return get_phonemizer(_P.ESPEAK, alphabet, model, **kwargs)
 
 
