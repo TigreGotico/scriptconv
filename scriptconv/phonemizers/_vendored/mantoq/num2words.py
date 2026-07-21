@@ -8,8 +8,6 @@ diacritizes them together with the rest of the sentence.
 import re
 from functools import partial
 
-from ovos_number_parser import pronounce_number
-
 NUM_REGEX = re.compile(r"\d+(?:\.\d+)?")
 PERCENT_NO_DIAC = "بالمئة"
 
@@ -27,6 +25,7 @@ def normalize_digits(text: str) -> str:
 
 
 def _convert_num2words(m: re.Match, *, apply_tashkeel):
+    from ovos_number_parser import pronounce_number
     number = m.group(0)
     value = float(number) if "." in number else int(number)
     return pronounce_number(value, lang="ar")
