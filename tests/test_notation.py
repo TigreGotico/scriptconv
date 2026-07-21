@@ -1168,7 +1168,20 @@ def test_mantoq_theta_is_caret_not_shadda():
 
 def test_mantoq_gemination_marker():
     assert mantoq_to_ipa("b_dbl_a") == "bːa"
-    assert mantoq_to_ipa("aa_dbl_") == "aːː"
+
+
+def test_mantoq_dbl_after_vowel_is_inert():
+    # upstream only emits _dbl_ after consonants (tokenization.py splits
+    # doubled consonant phonemes); a vowel+_dbl_ input is left unchanged
+    assert mantoq_to_ipa("aa_dbl_") == "aː"
+
+
+def test_mantoq_special_tokens():
+    # inventory special tokens: _sil_ -> pause (space), _eos_/_pad_ dropped —
+    # and never shredded into letter phonemes
+    assert mantoq_to_ipa("m_sil_n") == "m n"
+    assert mantoq_to_ipa("m a_eos_") == "m a"
+    assert mantoq_to_ipa("_pad_b") == "b"
 
 
 def test_mantoq_word_separator_and_glottal():

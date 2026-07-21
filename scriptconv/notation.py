@@ -1034,7 +1034,8 @@ _MANTOQ_VOWELS: dict[str, str] = {
     "u": "u", "uu": "uː",
 }
 
-_MANTOQ_MULTI = ("_dbl_", "_+_", "aaaa", "aa", "ii", "uu")
+_MANTOQ_MULTI = ("_dbl_", "_+_", "_sil_", "_eos_", "_pad_",
+                 "aaaa", "aa", "ii", "uu")
 
 
 def _tokenize_mantoq(text: str) -> list[str]:
@@ -1065,16 +1066,29 @@ def mantoq_to_ipa(mantoq: str, errors: str = "pass") -> str:
     's a l aː m'
     >>> mantoq_to_ipa("b_dbl_a")
     'bːa'
+
+    The inventory's special tokens are honoured: ``_sil_`` becomes a space,
+    ``_eos_``/``_pad_`` are dropped.
     """
     out: list[str] = []
     last_tok = None
     for pos, tok in enumerate(_tokenize_mantoq(mantoq)):
         if tok == "_dbl_":
-            # vowels lengthen cumulatively (aa + _dbl_ -> aːː); consonants
-            # geminate once
-            if out and last_tok is not None:
-                if last_tok in _MANTOQ_VOWELS or not out[-1].endswith("ː"):
-                    out[-1] += "ː"
+            # upstream emits _dbl_ only by splitting a doubled CONSONANT
+            # (mantoq buck/tokenization.py: `phon not in vowels and
+            # phon[0] == phon[1]`); geminate it with a length mark.  A
+            # vowel+_dbl_ sequence does not occur in genuine mantoq output
+            # and is left unchanged.
+            if out and last_tok in _MANTOQ_CONSONANTS \
+                    and not out[-1].endswith("ː"):
+                out[-1] += "ː"
+            continue
+        if tok == "_sil_":
+            out.append(" ")
+            last_tok = None
+            continue
+        if tok in ("_eos_", "_pad_"):
+            last_tok = None
             continue
         if tok == "_+_":
             out.append(" ")
