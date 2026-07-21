@@ -130,3 +130,32 @@ class TestByT5NoNetwork(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestFacadeAndGraph(unittest.TestCase):
+    def test_phonemize_facade(self):
+        from scriptconv.phonemizers import phonemize
+        out = phonemize("hola", "es", override=Phonemizer.GRAPHEMES)
+        self.assertEqual(out, "hola")
+
+    def test_register_is_opt_in_default_graph_untouched(self):
+        from scriptconv.graph import DEFAULT_GRAPH
+        from scriptconv import phonemizers
+        self.assertNotIn("text", DEFAULT_GRAPH.nodes)
+        g = DEFAULT_GRAPH.extend(phonemizers.register)
+        self.assertIn("text", g.nodes)
+        self.assertNotIn("text", DEFAULT_GRAPH.nodes)
+
+    def test_graph_edge_dispatches_with_override(self):
+        from scriptconv.graph import DEFAULT_GRAPH
+        from scriptconv import phonemizers
+        g = DEFAULT_GRAPH.extend(phonemizers.register)
+        out = g.convert("abc", "text", "ipa", lang="en",
+                        override=Phonemizer.GRAPHEMES)
+        self.assertEqual(out, "abc")
+
+    def test_graph_edge_chains_to_arpa(self):
+        from scriptconv.graph import DEFAULT_GRAPH
+        from scriptconv import phonemizers
+        g = DEFAULT_GRAPH.extend(phonemizers.register)
+        self.assertTrue(g.can_convert("text", "arpa"))

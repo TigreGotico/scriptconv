@@ -158,3 +158,42 @@ def phonemizer_for_lang(lang: str, alphabet: Alphabet = Alphabet.IPA,
         if alphabet in _EMITS.get(candidate, (Alphabet.IPA,)):
             return get_phonemizer(candidate, alphabet, model, **kwargs)
     return get_phonemizer(_P.ESPEAK, alphabet, model, **kwargs)
+
+
+def phonemize(text: str, lang: str, alphabet: Alphabet = Alphabet.IPA,
+              override: Optional[Phonemizer] = None,
+              model: Optional[str] = None, **kwargs) -> str:
+    """One-call facade: phonemize *text* with the language's default backend.
+
+    Equivalent to ``phonemizer_for_lang(...).phonemize_string(text, lang)``.
+    Construct the phonemizer yourself when phonemizing repeatedly — backends
+    cache models/dictionaries per instance.
+    """
+    return phonemizer_for_lang(lang, alphabet, override, model,
+                               **kwargs).phonemize_string(text, lang)
+
+
+def register(graph) -> None:
+    """Opt-in graph integration: add the phonemization edge to *graph*.
+
+    Adds the ``"text"`` representation — meaningful only with ``lang=``
+    routing context, and present only in graphs that opted in (the
+    :data:`scriptconv.graph.DEFAULT_GRAPH` stays orthography-only by
+    design) — and one dispatching ``text -> ipa`` edge that resolves the
+    per-language default (honouring an ``override=`` context key).
+
+    Usage::
+
+        from scriptconv.graph import DEFAULT_GRAPH
+        from scriptconv import phonemizers
+        g = DEFAULT_GRAPH.extend(phonemizers.register)
+        g.convert("bom dia", "text", "ipa", lang="pt")
+    """
+    from scriptconv.graph import Edge
+
+    def _text_to_ipa(text: str, lang: str = "und",
+                     override: Optional[Phonemizer] = None, **_):
+        return phonemizer_for_lang(lang, Alphabet.IPA,
+                                   override).phonemize_string(text, lang)
+
+    graph.register(Edge("text", "ipa", _text_to_ipa, lossless=False))

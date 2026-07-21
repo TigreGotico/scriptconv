@@ -21,6 +21,8 @@ from scriptconv.phonemizers.registry import (
     get_phonemizer,
     get_phonemizer_class,
     phonemizer_for_lang,
+    phonemize,
+    register,
 )
 
 __all__ = [
@@ -37,4 +39,6 @@ __all__ = [
     "get_phonemizer",
     "get_phonemizer_class",
     "phonemizer_for_lang",
+    "phonemize",
+    "register",
 ]
