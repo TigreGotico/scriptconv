@@ -17,8 +17,12 @@ notation:
 translit:
     Script-level decomposition and transliteration (Hangul → jamo,
     Hiragana ↔ Katakana).
+readings:
+    Dictionary-backed respelling (Japanese kanji → kana).  Needs the
+    optional ``pykakasi`` dependency (``pip install scriptconv[ja]``).
 
-Zero runtime dependencies (stdlib only).
+Zero required runtime dependencies (stdlib only); the readings module
+needs the optional ``ja`` extra.
 """
 
 from scriptconv.scripts import (
@@ -61,6 +65,10 @@ from scriptconv.translit import (
     hira_to_kana,
     kana_to_hira,
 )
+from scriptconv.readings import (
+    to_hiragana,
+    to_katakana,
+)
 
 __all__ = [
     # scripts
@@ -100,4 +108,7 @@ __all__ = [
     "decompose_hangul",
     "hira_to_kana",
     "kana_to_hira",
+    # readings (dictionary-backed, needs scriptconv[ja])
+    "to_hiragana",
+    "to_katakana",
 ]
