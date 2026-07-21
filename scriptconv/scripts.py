@@ -652,6 +652,34 @@ _LANG_TO_SCRIPT: dict[str, str] = {
     "rw": "Latn",   # Kinyarwanda
     "tk": "Latn",   # Turkmen (Latin since 1993)
     "eo": "Latn",   # Esperanto
+    # Languages with no ISO 639-1 code (keyed by their 639-3 code directly)
+    "kjh": "Cyrl",  # Khakas
+    "xal": "Cyrl",  # Kalmyk (Cyrillic since 1938)
+    "kbd": "Cyrl",  # Kabardian
+    "erz": "Cyrl",  # Erzya
+    "mdf": "Cyrl",  # Moksha
+}
+
+# ISO 639-2/3 (incl. bibliographic variants) -> the 639-1 key used above.
+# Reference: Library of Congress ISO 639-2 code list.
+_ISO639_ALIASES: dict[str, str] = {
+    "rus": "ru", "ukr": "uk", "bel": "be", "bul": "bg", "srp": "sr",
+    "mkd": "mk", "mac": "mk", "kaz": "kk", "kir": "ky", "tgk": "tg",
+    "mon": "mn", "tat": "tt", "bak": "ba", "chv": "cv", "oss": "os",
+    "che": "ce", "hye": "hy", "arm": "hy", "kat": "ka", "geo": "ka",
+    "aze": "az", "uzb": "uz", "tuk": "tk", "eng": "en", "deu": "de",
+    "ger": "de", "fra": "fr", "fre": "fr", "spa": "es", "por": "pt",
+    "ita": "it", "nld": "nl", "dut": "nl", "ell": "el", "gre": "el",
+    "ara": "ar", "heb": "he", "zho": "zh", "chi": "zh", "jpn": "ja",
+    "kor": "ko", "tur": "tr", "fas": "fa", "per": "fa", "urd": "ur",
+    "hin": "hi", "tha": "th", "vie": "vi", "pol": "pl", "ces": "cs",
+    "cze": "cs", "slk": "sk", "slo": "sk", "ron": "ro", "rum": "ro",
+    "hun": "hu", "fin": "fi", "swe": "sv", "nor": "no", "dan": "da",
+    "isl": "is", "ice": "is", "mya": "my", "bur": "my", "khm": "km",
+    "lao": "lo", "amh": "am", "tam": "ta", "tel": "te", "ben": "bn",
+    "guj": "gu", "kan": "kn", "mal": "ml", "mar": "mr", "pan": "pa",
+    "sin": "si", "nep": "ne", "eus": "eu", "baq": "eu", "cat": "ca",
+    "glg": "gl", "cym": "cy", "wel": "cy", "gle": "ga", "epo": "eo",
 }
 
 
@@ -674,14 +702,21 @@ def lang_to_script(lang: str) -> Optional[str]:
     'Latn'
     """
     subtags = lang.replace("_", "-").split("-")
-    # An explicit script subtag (4 letters, e.g. "Latn") overrides the
-    # language's default script.
+    # An explicit script subtag overrides the language's default script:
+    # 4-letter ISO-15924 codes ("sr-Latn"), and the widespread informal
+    # 3-letter forms "cyr"/"lat" ("uzb_cyr", "aze_lat").
     for sub in subtags[1:]:
+        low = sub.lower()
         if len(sub) == 4 and sub.isalpha():
             resolved = normalize_script_tag(sub)
             if resolved is not None:
                 return resolved
-    return _LANG_TO_SCRIPT.get(subtags[0].lower())
+        elif low in ("cyr", "lat"):
+            return "Cyrl" if low == "cyr" else "Latn"
+    key = subtags[0].lower()
+    if key in _LANG_TO_SCRIPT:
+        return _LANG_TO_SCRIPT[key]
+    return _LANG_TO_SCRIPT.get(_ISO639_ALIASES.get(key, ""))
 
 
 # ---------------------------------------------------------------------------
