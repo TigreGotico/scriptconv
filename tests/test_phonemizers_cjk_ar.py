@@ -39,6 +39,20 @@ class TestShamiFrontend(unittest.TestCase):
         lazy = list(p.phonemize_with_language_ids_lazy(text, "ar"))
         self.assertEqual(eager[0], [ph for ph, _ in lazy])
 
+    def test_frontend_symbols_are_public(self):
+        from scriptconv.phonemizers.shami import (
+            TextFrontend,
+            SYMBOL_TO_ID,
+            ID_TO_SYMBOL,
+            VOCAB_SIZE,
+            get_default_frontend,
+        )
+        self.assertTrue(callable(TextFrontend))
+        self.assertTrue(callable(get_default_frontend))
+        self.assertIsInstance(SYMBOL_TO_ID, dict)
+        self.assertTrue(SYMBOL_TO_ID)
+        self.assertEqual(VOCAB_SIZE, len(ID_TO_SYMBOL))
+
 
 class TestLicensingStubs(unittest.TestCase):
     def test_mantoq_wrapper_constructs_from_vendored_copy(self):

@@ -15,7 +15,22 @@ from quebra_frases import sentence_tokenize
 
 from scriptconv.phonemizers.enums import Alphabet
 from scriptconv.phonemizers.base import BasePhonemizer, PhonemizedChunks
-from scriptconv.phonemizers._thirdparty.shami import TextFrontend
+from scriptconv.phonemizers._thirdparty.shami import (
+    TextFrontend,
+    SYMBOL_TO_ID,
+    ID_TO_SYMBOL,
+    VOCAB_SIZE,
+    get_default_frontend,
+)
+
+__all__ = [
+    "ShamiPhonemizer",
+    "TextFrontend",
+    "SYMBOL_TO_ID",
+    "ID_TO_SYMBOL",
+    "VOCAB_SIZE",
+    "get_default_frontend",
+]
 
 
 class ShamiPhonemizer(BasePhonemizer):
