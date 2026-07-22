@@ -250,6 +250,27 @@ Two design points worth knowing:
   local `model=` path; resolving and caching model files is the caller's
   concern.
 
+**Pre-G2P disambiguation.** `add_diacritics(text, lang, model=None)` restores
+information ordinary orthography omits but a G2P needs, before phonemization:
+Hebrew niqqud (phonikud), Arabic tashkeel (text2tashkeel), word stress across
+26 stressonnx language tags — East Slavic, Bulgarian/Macedonian/Slovene,
+Latvian, Armenian, Georgian, and Turkic/Caucasian languages (`scriptconv[stress]`),
+and European-Portuguese heterophonic-homograph sense diacritics (bifonia —
+`scriptconv[pt]`, never applied to `pt-BR`, whose vowel system differs):
+
+```python
+from scriptconv.phonemizers import GraphemePhonemizer
+
+p = GraphemePhonemizer()
+p.add_diacritics("Tenho muita sede hoje.", "pt")   # 'Tenho muita sêde hoje.' (thirst)
+```
+
+Stress is unwritten or under-marked in all 26 covered languages; East Slavic
+is the clearest case, where unstressed vowels also reduce (e.g. Russian
+о→[ɐ]/[ə]), so a missing mark corrupts more than prosody there. stressonnx is
+optional (not yet on PyPI) and emits the standard combining acute (U+0301)
+after the stressed vowel.
+
 Details: [docs/phonemizers.md](docs/phonemizers.md).
 
 ## Fidelity guarantees
@@ -293,6 +314,8 @@ The core installs with zero dependencies. Capabilities opt in:
 | `espeak`, `gruut`, `goruut`, `epitran`, `transphone`, `misaki`, `byt5` | Multilingual phonemizer backends |
 | `en-phonemizers`, `ja-phonemizers`, `zh-phonemizers`, `ko`, `ar-phonemizers`, `eu`, `pt-phonemizers`, `gl`, `he`, `fa`, `vi`, `mwl`, `shami`, `o2i` | Per-language phonemizer backends |
 | `tashkeel` | Arabic diacritization for the phonemizer pipeline (text2tashkeel) |
+| `stress` | Word-stress restoration for 26 stressonnx language tags — East Slavic, Bulgarian/Macedonian/Slovene, Latvian, Armenian, Georgian, Turkic/Caucasian — for the phonemizer pipeline (stressonnx; not yet on PyPI) |
+| `pt` | European-Portuguese heterophonic-homograph sense diacritics for the phonemizer pipeline (bifonia) |
 
 ## Licensing
 
