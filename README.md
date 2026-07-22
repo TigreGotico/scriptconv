@@ -314,18 +314,12 @@ build on it:
   text-to-speech; consumes scriptconv for scripts, notation, conventions and
   the whole phonemizer layer.
 - [orthography2ipa](https://github.com/TigreGotico/orthography2ipa) —
-  data-driven orthography→IPA engine; the usual per-language phonemizer
-  default.
-- [arbtok](https://github.com/TigreGotico/arbtok) — Arabic diacritization and
-  phonemization; the Arabic default.
-- [euskaphone](https://github.com/TigreGotico/euskaphone) — Basque
-  phonemizer (dialect-aware).
-- [tugaphone](https://github.com/TigreGotico/tugaphone) — European
-  Portuguese phonemizer.
-- [mwl_phonemizer](https://github.com/TigreGotico/mwl_phonemizer) —
-  Mirandese phonemizer.
-- [g2p_barranquenho](https://github.com/TigreGotico/g2p_barranquenho) —
-  Barranquenho phonemizer.
+  data-driven orthography→IPA engine; the usual per-language phonemizer default.
+- [arbtok](https://github.com/TigreGotico/arbtok) — Arabic phonemizer (dialect-aware).
+- [euskaphone](https://github.com/TigreGotico/euskaphone) — Basque phonemizer (dialect-aware).
+- [tugaphone](https://github.com/TigreGotico/tugaphone) — Portuguese phonemizer (dialect-aware).
+- [mwl_phonemizer](https://github.com/TigreGotico/mwl_phonemizer) — Mirandese phonemizer.
+- [g2p_barranquenho](https://github.com/TigreGotico/g2p_barranquenho) — Barranquenho phonemizer.
 - [pycotovia](https://github.com/TigreGotico/pycotovia) — Pure-Python phonemizer port
   of the Cotovía Galician TTS engine, whose notation scriptconv transcodes.
 - [espyak](https://github.com/TigreGotico/espyak) — pure-Python port of
