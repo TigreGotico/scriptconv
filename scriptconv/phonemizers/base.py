@@ -144,9 +144,11 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         """European-Portuguese heterophonic-homograph sense diacritics via bifonia.
 
         Rewrites homographs whose pronunciation depends on meaning (e.g.
-        "sede" thirst/closed vs. seat/open) with a non-canonical open/closed
-        vowel mark that steers a rule-based Portuguese G2P. Install with
-        ``pip install scriptconv[pt]`` (or ``pip install bifonia``)."""
+        "sede" thirst/closed vs. seat/open) with an explicit open/closed
+        vowel diacritic. These are ordinary Portuguese orthographic marks,
+        chosen so any downstream G2P — rule-based, neural, or espeak —
+        reads them correctly. Install with ``pip install scriptconv[pt]``
+        (or ``pip install bifonia``)."""
         try:
             from bifonia import add_extra_diacritics
         except ImportError as e:
@@ -168,7 +170,7 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         """Disambiguate pronunciation before G2P by adding diacritics.
 
         Four backends, each restoring information ordinary orthography
-        omits but a rule-based or dictionary G2P needs:
+        omits but downstream G2P needs:
 
         - Hebrew (``he``) — niqqud via phonikud (``phonikud_model=``).
         - Arabic (``ar``) — tashkeel via text2tashkeel (``[tashkeel]``).
@@ -176,7 +178,9 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
           (``[stress]``); free/mobile stress is unwritten and unstressed
           vowels reduce, so a missing mark corrupts more than prosody.
         - European Portuguese (``pt``/``pt-PT``, never ``pt-BR``) —
-          heterophonic-homograph sense diacritics via bifonia (``[pt]``).
+          heterophonic-homograph sense diacritics via bifonia (``[pt]``);
+          ordinary Portuguese orthographic marks that any downstream G2P
+          reads correctly.
 
         Unrecognized languages are returned unchanged. Each backend raises
         ``ImportError`` naming its extra when the optional dependency is
