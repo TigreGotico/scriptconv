@@ -316,10 +316,8 @@ build on it:
 - [orthography2ipa](https://github.com/TigreGotico/orthography2ipa) —
   data-driven orthography→IPA engine; the usual per-language phonemizer
   default.
-- [arbtok](https://github.com/TigreGotico/arbtok) — Arabic tokenization and
+- [arbtok](https://github.com/TigreGotico/arbtok) — Arabic diacritization and
   phonemization; the Arabic default.
-- [espyak](https://github.com/TigreGotico/espyak) — pure-Python port of
-  espeak-ng's G2P; the espeak fallback when the binary is absent.
 - [euskaphone](https://github.com/TigreGotico/euskaphone) — Basque
   phonemizer (dialect-aware).
 - [tugaphone](https://github.com/TigreGotico/tugaphone) — European
@@ -328,15 +326,11 @@ build on it:
   Mirandese phonemizer.
 - [g2p_barranquenho](https://github.com/TigreGotico/g2p_barranquenho) —
   Barranquenho phonemizer.
-- [pycotovia](https://github.com/TigreGotico/pycotovia) — Python bindings
-  for the Cotovía Galician TTS engine, whose notation scriptconv transcodes.
-- [stressonnx](https://github.com/TigreGotico/stressonnx) — East Slavic
-  stress annotation; shares scriptconv's script tags.
-- [text2tashkeel](https://github.com/TigreGotico/text2tashkeel) — Arabic
-  diacritization models (the prediction side of the `tashkeel` convention).
-- [text2nikkud](https://github.com/TigreGotico/text2nikkud) — Hebrew
-  niqqud restoration (the prediction side of the `niqqud` convention).
-
+- [pycotovia](https://github.com/TigreGotico/pycotovia) — Pure-Python phonemizer port
+  of the Cotovía Galician TTS engine, whose notation scriptconv transcodes.
+- [espyak](https://github.com/TigreGotico/espyak) — pure-Python port of
+  espeak-ng's G2P; the espeak fallback when the binary is absent.
+  
 ## Development
 
 ```bash
