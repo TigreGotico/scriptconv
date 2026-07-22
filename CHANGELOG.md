@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a2](https://github.com/TigreGotico/scriptconv/tree/0.0.4a2) (2026-07-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a1...0.0.4a2)
+
+**Merged pull requests:**
+
+- fix: publicly re-export the shami frontend symbols [\#66](https://github.com/TigreGotico/scriptconv/pull/66) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a1](https://github.com/TigreGotico/scriptconv/tree/0.0.4a1) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3...0.0.4a1)
