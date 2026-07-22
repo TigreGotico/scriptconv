@@ -34,15 +34,23 @@ RawPhonemizedChunks = List[Tuple[str, str, bool]]
 
 PhonemizedChunks = list[list[str]]
 
-# East Slavic languages have free, mobile word stress that is not written in
-# ordinary orthography, and unstressed vowels *reduce* — Russian unstressed
-# "о" surfaces as [ɐ] or [ə] depending on distance from the stress, not [o].
-# A wrong or missing stress mark therefore does not just misplace prosody, it
-# corrupts the vowel quality of the whole word for any G2P that reads stress
-# position to pick allophones. stressonnx restores the mark as a combining
-# acute (U+0301) after the stressed vowel, matching written Russian/Ukrainian/
-# Belarusian pedagogical convention.
-STRESS_LANGS = {"ru", "uk", "be"}
+# Across East Slavic, Bulgarian/Macedonian/Slovene, Latvian, Armenian,
+# Georgian, and several Turkic/Caucasian languages, lexical word stress is
+# free (not fixed to a syllable) and ordinary orthography leaves it unwritten
+# or under-marked. The clearest case is East Slavic: stress is also mobile
+# (it shifts between forms of the same word) and unstressed vowels *reduce*
+# — Russian unstressed "о" surfaces as [ɐ] or [ə] depending on distance from
+# the stress, not [o] — so a wrong or missing mark there corrupts the vowel
+# quality of the whole word, not just its prosody. Other families in this set
+# don't necessarily reduce vowels, but still need the mark for correct stress
+# placement and prosody. stressonnx restores it as a combining acute (U+0301)
+# after the stressed vowel, covering 26 BCP-47 tags across these families
+# (24 primary subtags; Azerbaijani and Uzbek each have Cyrillic/Latin script
+# variants routed by the full tag).
+STRESS_LANGS = {
+    "az", "ba", "be", "bg", "cv", "hy", "ka", "kbd", "kjh", "kk", "ky", "lv",
+    "mdf", "mk", "myv", "ru", "sah", "sl", "tg", "tt", "udm", "uk", "uz", "xal",
+}
 
 
 def _primary_subtag(lang: str) -> str:
@@ -126,7 +134,9 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         return self._tashkeel[model]
 
     def _stress(self, text: str, lang: str, model: Optional[str] = None) -> str:
-        """East-Slavic (ru/uk/be) word-stress restoration via stressonnx.
+        """Word-stress restoration via stressonnx, for the 26 language tags
+        it covers (see ``STRESS_LANGS``) — East Slavic, Bulgarian/Macedonian/
+        Slovene, Latvian, Armenian, Georgian, and Turkic/Caucasian languages.
 
         stressonnx is not on PyPI yet; install straight from source. Install
         with ``pip install scriptconv[stress]`` (or ``pip install
@@ -135,7 +145,7 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
             from stressonnx import stress
         except ImportError as e:
             raise ImportError(
-                "East-Slavic stress restoration requires the stressonnx package: "
+                "stress restoration requires the stressonnx package: "
                 "pip install scriptconv[stress]  (or pip install stressonnx)"
             ) from e
         return stress(text, lang, model=model)
@@ -174,9 +184,12 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
 
         - Hebrew (``he``) — niqqud via phonikud (``phonikud_model=``).
         - Arabic (``ar``) — tashkeel via text2tashkeel (``[tashkeel]``).
-        - East Slavic (``ru``/``uk``/``be``) — word stress via stressonnx
-          (``[stress]``); free/mobile stress is unwritten and unstressed
-          vowels reduce, so a missing mark corrupts more than prosody.
+        - East Slavic, Bulgarian/Macedonian/Slovene, Latvian, Armenian,
+          Georgian, and Turkic/Caucasian languages (``STRESS_LANGS``, 26
+          stressonnx tags) — word stress via stressonnx (``[stress]``);
+          stress is unwritten or under-marked in these languages, and in
+          East Slavic unstressed vowels also reduce, so a missing mark can
+          corrupt more than prosody.
         - European Portuguese (``pt``/``pt-PT``, never ``pt-BR``) —
           heterophonic-homograph sense diacritics via bifonia (``[pt]``);
           ordinary Portuguese orthographic marks that any downstream G2P

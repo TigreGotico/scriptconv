@@ -88,15 +88,21 @@ four such backends, each lazy-imported and each raising a named
 |---|---|---|---|
 | `he` | phonikud (`phonikud_model=`) | `he` | niqqud |
 | `ar` | text2tashkeel | `tashkeel` | tashkeel (+ hamza, dagger alef) |
-| `ru`, `uk`, `be` | stressonnx | `stress` | word stress |
+| 26 stressonnx tags (`STRESS_LANGS`): East Slavic (`ru`, `uk`, `be`), Bulgarian/Macedonian/Slovene (`bg`, `mk`, `sl`), Latvian (`lv`), Armenian (`hy`), Georgian (`ka`), Turkic/Caucasian (`az`, `ba`, `cv`, `kbd`, `kjh`, `kk`, `ky`, `mdf`, `myv`, `sah`, `tg`, `tt`, `udm`, `uz`, `xal`) | stressonnx | `stress` | word stress |
 | `pt` / `pt-PT` (not `pt-BR`) | bifonia | `pt` | heterophonic-homograph sense diacritics |
 
-East-Slavic stress is free and mobile — it is not written — and unstressed
-vowels reduce (Russian о→[ɐ]/[ə] depending on distance from the stress), so a
-wrong or missing mark corrupts the vowel quality of the whole word, not just
-prosody. stressonnx marks the stressed vowel with a combining acute (U+0301);
-it is not yet published to PyPI, so `scriptconv[stress]` installs from
-source. European Portuguese has heterophonic homographs whose pronunciation
+Stress is free and either unwritten or under-marked in all of these
+languages. East Slavic is the clearest case: stress is also mobile (it
+shifts between forms of the same word), and unstressed vowels reduce
+(Russian о→[ɐ]/[ə] depending on distance from the stress), so a wrong or
+missing mark corrupts the vowel quality of the whole word, not just its
+prosody. The other families don't necessarily reduce vowels but still need
+the mark for correct stress placement. stressonnx marks the stressed vowel
+with a combining acute (U+0301); `az` and `uz` have Cyrillic/Latin script
+variants (e.g. `az-Latn`) routed by the full tag, which is passed straight
+through so stressonnx can pick the right one. stressonnx is not yet
+published to PyPI, so `scriptconv[stress]` installs from source. European
+Portuguese has heterophonic homographs whose pronunciation
 depends on meaning (*sede* "thirst" → closed *sêde*, *sede* "seat" → open
 *séde*); bifonia rewrites these with an explicit open/closed-vowel diacritic.
 These are ordinary Portuguese orthographic marks, chosen so any downstream

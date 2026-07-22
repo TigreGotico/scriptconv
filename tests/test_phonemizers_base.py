@@ -278,6 +278,15 @@ class TestEastSlavicStressRouting(unittest.TestCase):
                 GraphemePhonemizer().add_diacritics("текст", lang, model="ruaccent")
             self.assertEqual(calls, [("текст", lang, "ruaccent")], lang)
 
+    def test_additional_stressonnx_languages_route_too(self):
+        import sys
+        from unittest import mock
+        for lang in ("kk", "hy", "az-Latn"):
+            calls = []
+            with mock.patch.dict(sys.modules, {"stressonnx": self._stub(calls)}):
+                GraphemePhonemizer().add_diacritics("text", lang, model="simple")
+            self.assertEqual(calls, [("text", lang, "simple")], lang)
+
     def test_berber_does_not_false_match_belarusian(self):
         import sys
         from unittest import mock
