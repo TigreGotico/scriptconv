@@ -113,6 +113,23 @@ routes `pt-BR` straight through unchanged. Language routing for the two new
 backends matches on the primary subtag exactly (not a prefix check), so e.g.
 Berber (`ber`) never false-matches Belarusian (`be`).
 
+Diacritization is also exposed as a graph transform, via
+`scriptconv.diacritics.register` — parallel to the phonemization edge above,
+it adds a lang-contextual `text-diacritized` node and wraps the same
+`add_diacritics` dispatch:
+
+```python
+from scriptconv import DEFAULT_GRAPH
+from scriptconv import diacritics
+
+g = DEFAULT_GRAPH.extend(diacritics.register)
+g.convert("Tenho muita sede hoje.", "text", "text-diacritized", lang="pt")
+# 'Tenho muita sêde hoje.'
+```
+
+`add_diacritics` remains the single dispatch point — the graph edge is a thin
+wrapper, not a second implementation.
+
 ## Model-backed engines never download
 
 ByT5 and Charsiu run ONNX models. They require explicit local paths —

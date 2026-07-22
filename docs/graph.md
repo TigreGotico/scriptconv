@@ -74,6 +74,22 @@ g.can_convert("text", "arpa")                    # True — phonemize, then tran
 that opted in) and one dispatching phonemization edge. Any external package
 can do the same with its own `register(graph)`.
 
+`diacritics.register` is a second in-house example: it adds a lang-contextual
+`text-diacritized` node and one `text -> text-diacritized` edge (Arabic
+tashkeel, Hebrew niqqud, East-Slavic/Turkic/Caucasian stress, European-
+Portuguese sense marks). Routing `text -> ipa` is unchanged — the direct
+phonemization edge still wins, so stacking this extension is non-invasive:
+
+```python
+from scriptconv import DEFAULT_GRAPH
+from scriptconv import diacritics, phonemizers
+
+g = DEFAULT_GRAPH.extend(diacritics.register).extend(phonemizers.register)
+g.convert("Tenho muita sede hoje.", "text", "text-diacritized", lang="pt")
+# 'Tenho muita sêde hoje.'
+g.route("text", "ipa")   # still the single direct edge — no detour
+```
+
 The same boundary in one sentence: **scriptconv's own edges are orthography
 and notation only; clients may register sound-producing edges into their own
 graph instances, and the engine routes them without knowing the difference.**
