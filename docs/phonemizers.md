@@ -76,6 +76,35 @@ meaningful only with `lang=` — and one dispatching edge that resolves the
 per-language default (or the `override=` context key). `DEFAULT_GRAPH` itself
 stays free of sound-producing edges.
 
+## Pre-G2P diacritics — `add_diacritics`
+
+Some languages need pronunciation disambiguated *before* G2P runs, because
+ordinary orthography drops information a rule-based or dictionary engine
+depends on. `BasePhonemizer.add_diacritics(text, lang, model=None)` wraps
+four such backends, each lazy-imported and each raising a named
+`ImportError` when its extra is missing:
+
+| Language(s) | Backend | Extra | What it restores |
+|---|---|---|---|
+| `he` | phonikud (`phonikud_model=`) | `he` | niqqud |
+| `ar` | text2tashkeel | `tashkeel` | tashkeel (+ hamza, dagger alef) |
+| `ru`, `uk`, `be` | stressonnx | `stress` | word stress |
+| `pt` / `pt-PT` (not `pt-BR`) | bifonia | `pt` | heterophonic-homograph sense diacritics |
+
+East-Slavic stress is free and mobile — it is not written — and unstressed
+vowels reduce (Russian о→[ɐ]/[ə] depending on distance from the stress), so a
+wrong or missing mark corrupts the vowel quality of the whole word, not just
+prosody. stressonnx marks the stressed vowel with a combining acute (U+0301);
+it is not yet published to PyPI, so `scriptconv[stress]` installs from
+source. European Portuguese has heterophonic homographs whose pronunciation
+depends on meaning (*sede* "thirst" → closed *sêde*, *sede* "seat" → open
+*séde*); bifonia rewrites these with a non-canonical open/closed-vowel mark
+that a rule-based Portuguese G2P reads. It is deliberately scoped to European
+Portuguese — Brazilian Portuguese's vowel system differs, and `add_diacritics`
+routes `pt-BR` straight through unchanged. Language routing for the two new
+backends matches on the primary subtag exactly (not a prefix check), so e.g.
+Berber (`ber`) never false-matches Belarusian (`be`).
+
 ## Model-backed engines never download
 
 ByT5 and Charsiu run ONNX models. They require explicit local paths —

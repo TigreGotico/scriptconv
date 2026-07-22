@@ -34,6 +34,37 @@ RawPhonemizedChunks = List[Tuple[str, str, bool]]
 
 PhonemizedChunks = list[list[str]]
 
+# East Slavic languages have free, mobile word stress that is not written in
+# ordinary orthography, and unstressed vowels *reduce* — Russian unstressed
+# "о" surfaces as [ɐ] or [ə] depending on distance from the stress, not [o].
+# A wrong or missing stress mark therefore does not just misplace prosody, it
+# corrupts the vowel quality of the whole word for any G2P that reads stress
+# position to pick allophones. stressonnx restores the mark as a combining
+# acute (U+0301) after the stressed vowel, matching written Russian/Ukrainian/
+# Belarusian pedagogical convention.
+STRESS_LANGS = {"ru", "uk", "be"}
+
+
+def _primary_subtag(lang: str) -> str:
+    """Lowercase, ``_``→``-`` normalized primary language subtag.
+
+    Used for exact-match routing (``STRESS_LANGS`` membership) rather than
+    ``str.startswith``, so e.g. Berber (``ber``) never false-matches
+    Belarusian (``be``).
+    """
+    return lang.lower().replace("_", "-").split("-")[0]
+
+
+def _is_european_portuguese(lang: str) -> bool:
+    """True for European Portuguese (``pt`` or a ``pt-PT`` region tag).
+
+    False for Brazilian Portuguese (``pt-BR``) and everything else — the two
+    varieties' vowel systems differ, and bifonia's open/closed diacritics are
+    only valid for European Portuguese phonology.
+    """
+    norm = lang.lower().replace("_", "-")
+    return norm == "pt" or norm == "pt-pt"
+
 
 class BasePhonemizer(metaclass=abc.ABCMeta):
     def __init__(self, alphabet: Alphabet = Alphabet.UNICODE,
@@ -94,6 +125,37 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
             self._tashkeel[model] = Diacritizer(model)
         return self._tashkeel[model]
 
+    def _stress(self, text: str, lang: str, model: Optional[str] = None) -> str:
+        """East-Slavic (ru/uk/be) word-stress restoration via stressonnx.
+
+        stressonnx is not on PyPI yet; install straight from source. Install
+        with ``pip install scriptconv[stress]`` (or ``pip install
+        stressonnx``)."""
+        try:
+            from stressonnx import stress
+        except ImportError as e:
+            raise ImportError(
+                "East-Slavic stress restoration requires the stressonnx package: "
+                "pip install scriptconv[stress]  (or pip install stressonnx)"
+            ) from e
+        return stress(text, lang, model=model)
+
+    def _sense_diacritics_pt(self, text: str) -> str:
+        """European-Portuguese heterophonic-homograph sense diacritics via bifonia.
+
+        Rewrites homographs whose pronunciation depends on meaning (e.g.
+        "sede" thirst/closed vs. seat/open) with a non-canonical open/closed
+        vowel mark that steers a rule-based Portuguese G2P. Install with
+        ``pip install scriptconv[pt]`` (or ``pip install bifonia``)."""
+        try:
+            from bifonia import add_extra_diacritics
+        except ImportError as e:
+            raise ImportError(
+                "European-Portuguese sense diacritics require the bifonia package: "
+                "pip install scriptconv[pt]  (or pip install bifonia)"
+            ) from e
+        return add_extra_diacritics(text)
+
     @abc.abstractmethod
     def phonemize_string(self, text: str, lang: str) -> str:
         raise NotImplementedError
@@ -103,10 +165,31 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
 
     def add_diacritics(self, text: str, lang: str,
                        model: Optional[str] = None) -> str:
+        """Disambiguate pronunciation before G2P by adding diacritics.
+
+        Four backends, each restoring information ordinary orthography
+        omits but a rule-based or dictionary G2P needs:
+
+        - Hebrew (``he``) — niqqud via phonikud (``phonikud_model=``).
+        - Arabic (``ar``) — tashkeel via text2tashkeel (``[tashkeel]``).
+        - East Slavic (``ru``/``uk``/``be``) — word stress via stressonnx
+          (``[stress]``); free/mobile stress is unwritten and unstressed
+          vowels reduce, so a missing mark corrupts more than prosody.
+        - European Portuguese (``pt``/``pt-PT``, never ``pt-BR``) —
+          heterophonic-homograph sense diacritics via bifonia (``[pt]``).
+
+        Unrecognized languages are returned unchanged. Each backend raises
+        ``ImportError`` naming its extra when the optional dependency is
+        missing — scriptconv never installs anything on the caller's behalf.
+        """
         if lang.startswith("he"):
             return self.phonikud.add_diacritics(text)
         elif lang.startswith("ar"):
             return self.tashkeel(model).diacritize(text)
+        elif _primary_subtag(lang) in STRESS_LANGS:
+            return self._stress(text, lang, model)
+        elif _is_european_portuguese(lang):
+            return self._sense_diacritics_pt(text)
         return text
 
     def phonemize(self, text: str, lang: str) -> PhonemizedChunks:
