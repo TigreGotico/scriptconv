@@ -75,10 +75,19 @@ that opted in) and one dispatching phonemization edge. Any external package
 can do the same with its own `register(graph)`.
 
 `diacritics.register` is a second in-house example: it adds a lang-contextual
-`text-diacritized` node and one `text -> text-diacritized` edge (Arabic
-tashkeel, Hebrew niqqud, East-Slavic/Turkic/Caucasian stress, European-
-Portuguese sense marks). Routing `text -> ipa` is unchanged — the direct
-phonemization edge still wins, so stacking this extension is non-invasive:
+`text-diacritized` node and a pair of edges — `text -> text-diacritized`
+(restore: Arabic tashkeel, Hebrew niqqud, East-Slavic/Turkic/Caucasian stress,
+European-Portuguese sense marks) and `text-diacritized -> text` (strip).
+Restore is model-based and expensive (`lossless=False`); strip is a pure
+Unicode combining-mark removal, lossless and cheap — that cost asymmetry is
+why routing never prefers the round trip over doing nothing. Strip is also
+gated: it is a lossless inverse only for *overlay* diacritics (Arabic/Hebrew
+vocalization, East-Slavic/Turkic stress), whose bare canonical form carries no
+marks; European Portuguese diacritics are native orthography, so stripping
+them would corrupt the spelling (`café` → `cafe`), and the edge raises
+`ValueError` for those languages instead. Routing `text -> ipa` is
+unchanged either way — the direct phonemization edge still wins, so stacking
+this extension is non-invasive:
 
 ```python
 from scriptconv import DEFAULT_GRAPH
@@ -87,6 +96,7 @@ from scriptconv import diacritics, phonemizers
 g = DEFAULT_GRAPH.extend(diacritics.register).extend(phonemizers.register)
 g.convert("Tenho muita sede hoje.", "text", "text-diacritized", lang="pt")
 # 'Tenho muita sêde hoje.'
+g.convert("за́мок", "text-diacritized", "text", lang="ru")   # 'замок' — strip
 g.route("text", "ipa")   # still the single direct edge — no detour
 ```
 

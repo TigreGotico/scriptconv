@@ -115,8 +115,15 @@ Berber (`ber`) never false-matches Belarusian (`be`).
 
 Diacritization is also exposed as a graph transform, via
 `scriptconv.diacritics.register` — parallel to the phonemization edge above,
-it adds a lang-contextual `text-diacritized` node and wraps the same
-`add_diacritics` dispatch:
+it adds a lang-contextual `text-diacritized` node and two edges: `text ->
+text-diacritized` (restore, wrapping `add_diacritics`, model-based and
+expensive) and `text-diacritized -> text` (strip, pure Unicode combining-mark
+removal, lossless and cheap). That cost asymmetry is why routing never takes
+the round trip unless asked. Strip only works for *overlay* diacritics —
+Arabic/Hebrew vocalization and East-Slavic/Turkic/Caucasian stress, whose bare
+form carries no marks — and raises `ValueError` for languages where the marks
+are native orthography (European Portuguese/bifonia), since removing them
+would corrupt the spelling:
 
 ```python
 from scriptconv import DEFAULT_GRAPH
@@ -125,6 +132,8 @@ from scriptconv import diacritics
 g = DEFAULT_GRAPH.extend(diacritics.register)
 g.convert("Tenho muita sede hoje.", "text", "text-diacritized", lang="pt")
 # 'Tenho muita sêde hoje.'
+g.convert("за́мок", "text-diacritized", "text", lang="ru")   # 'замок'
+g.convert("sêde", "text-diacritized", "text", lang="pt")     # raises ValueError
 ```
 
 `add_diacritics` remains the single dispatch point — the graph edge is a thin

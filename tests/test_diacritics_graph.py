@@ -48,6 +48,30 @@ class TestDiacriticsGraphExtension(unittest.TestCase):
         self.assertEqual(out, "STRESSED")
         self.assertEqual(calls, [("замок стоит", "ru", None)])
 
+    def test_strip_recovers_bare_russian(self):
+        out = self.graph.convert("за́мок", "text-diacritized", "text", lang="ru")
+        self.assertEqual(out, "замок")
+
+    def test_strip_recovers_bare_arabic(self):
+        vocalized = "مُحَمَّد"
+        bare = "".join(c for c in vocalized if not (0x064B <= ord(c) <= 0x065F
+                                                     or ord(c) == 0x0670))
+        out = self.graph.convert(vocalized, "text-diacritized", "text", lang="ar")
+        self.assertEqual(out, bare)
+        self.assertEqual(out, "محمد")
+
+    def test_strip_refused_for_portuguese(self):
+        with self.assertRaises(ValueError) as ctx:
+            self.graph.convert("sêde", "text-diacritized", "text", lang="pt")
+        self.assertIn("native orthography", str(ctx.exception))
+
+    def test_strip_edge_does_not_change_text_to_ipa_route(self):
+        route = self.graph.route("text", "ipa")
+        self.assertEqual(len(route), 1)
+        edge = route[0]
+        self.assertEqual(edge.src, "text")
+        self.assertEqual(edge.dst, "ipa")
+
 
 if __name__ == "__main__":
     unittest.main()
