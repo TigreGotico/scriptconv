@@ -102,10 +102,9 @@ def get_phonemizer(phonemizer: Phonemizer,
     """
     phonemizer = Phonemizer(phonemizer)
     cls = get_phonemizer_class(phonemizer)
-    # normalizer/phonikud_model are plain BasePhonemizer attributes; set them
-    # after construction so wrapper __init__ signatures stay untouched
+    # normalizer is a plain BasePhonemizer attribute; set it after
+    # construction so wrapper __init__ signatures stay untouched
     normalizer = kwargs.pop("normalizer", None)
-    phonikud_model = kwargs.pop("phonikud_model", None)
     if phonemizer in (_P.BYT5, _P.CHARSIU, _P.DEEPPHONEMIZER):
         inst = cls(model, **kwargs)
     else:
@@ -124,8 +123,6 @@ def get_phonemizer(phonemizer: Phonemizer,
         inst = cls(**kwargs)
     if normalizer is not None:
         inst.normalizer = normalizer
-    if phonikud_model is not None:
-        inst.phonikud_model = phonikud_model
     return inst
 
 

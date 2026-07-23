@@ -83,11 +83,6 @@ class TestBaseContract(unittest.TestCase):
         u = UnicodeCodepointPhonemizer()
         self.assertEqual(len(u.phonemize_string("ã", "pt")), 2)  # a + combining
 
-    def test_hebrew_diacritizer_requires_local_model(self):
-        with self.assertRaises(ValueError) as ctx:
-            GraphemePhonemizer().add_diacritics("שלום", "he")
-        self.assertIn("phonikud_model", str(ctx.exception))
-
 
 class TestLangDefaults(unittest.TestCase):
     def test_arabic_defaults_to_arbtok(self):
@@ -183,21 +178,6 @@ class TestFacadeAndGraph(unittest.TestCase):
         self.assertTrue(g.can_convert("text", "arpa"))
 
 
-class TestPhonikudModelResolver(unittest.TestCase):
-    def test_callable_resolver_invoked_lazily(self):
-        calls = []
-
-        def resolver():
-            calls.append(1)
-            return ""  # resolves to nothing -> still the explicit ValueError
-
-        g = GraphemePhonemizer(phonikud_model=resolver)
-        self.assertEqual(calls, [])  # not resolved at construction
-        with self.assertRaises(ValueError):
-            g.add_diacritics("שלום", "he")
-        self.assertEqual(calls, [1])
-
-
 class TestModelForwarding(unittest.TestCase):
     def test_model_forwards_to_variant_param(self):
         from unittest import mock
@@ -223,83 +203,3 @@ class TestModelForwarding(unittest.TestCase):
         self.assertIsInstance(g, GraphemePhonemizer)
 
 
-class TestEuropeanPortugueseSenseDiacritics(unittest.TestCase):
-    """Real bifonia — it is on PyPI, so this exercises the actual backend."""
-
-    def test_thirst_sense_gets_closed_vowel(self):
-        out = GraphemePhonemizer().add_diacritics(
-            "Tenho muita sede hoje.", "pt")
-        self.assertEqual(out, "Tenho muita sêde hoje.")
-
-    def test_seat_sense_gets_open_vowel(self):
-        out = GraphemePhonemizer().add_diacritics(
-            "A sede da empresa fica em Lisboa.", "pt")
-        self.assertEqual(out, "A séde da empresa fica em Lisboa.")
-
-    def test_no_homograph_unchanged(self):
-        text = "O cão correu no jardim."
-        self.assertEqual(GraphemePhonemizer().add_diacritics(text, "pt"), text)
-
-    def test_brazilian_portuguese_excluded(self):
-        text = "Tenho muita sede hoje."
-        self.assertEqual(GraphemePhonemizer().add_diacritics(text, "pt-BR"), text)
-
-
-class TestEastSlavicStressRouting(unittest.TestCase):
-    """stressonnx is not yet on PyPI — routing is verified against a stub."""
-
-    def _stub(self, calls):
-        import types
-        mod = types.ModuleType("stressonnx")
-
-        def stress(text, lang, model=None):
-            calls.append((text, lang, model))
-            return "STRESSED"
-
-        mod.stress = stress
-        return mod
-
-    def test_russian_routes_to_stress_backend(self):
-        import sys
-        from unittest import mock
-        calls = []
-        with mock.patch.dict(sys.modules, {"stressonnx": self._stub(calls)}):
-            out = GraphemePhonemizer().add_diacritics(
-                "замок стоит", "ru", model="silero")
-        self.assertEqual(out, "STRESSED")
-        self.assertEqual(calls, [("замок стоит", "ru", "silero")])
-
-    def test_ukrainian_and_belarusian_route_too(self):
-        import sys
-        from unittest import mock
-        for lang in ("uk", "be"):
-            calls = []
-            with mock.patch.dict(sys.modules, {"stressonnx": self._stub(calls)}):
-                GraphemePhonemizer().add_diacritics("текст", lang, model="ruaccent")
-            self.assertEqual(calls, [("текст", lang, "ruaccent")], lang)
-
-    def test_additional_stressonnx_languages_route_too(self):
-        import sys
-        from unittest import mock
-        for lang in ("kk", "hy", "az-Latn"):
-            calls = []
-            with mock.patch.dict(sys.modules, {"stressonnx": self._stub(calls)}):
-                GraphemePhonemizer().add_diacritics("text", lang, model="simple")
-            self.assertEqual(calls, [("text", lang, "simple")], lang)
-
-    def test_berber_does_not_false_match_belarusian(self):
-        import sys
-        from unittest import mock
-        calls = []
-        with mock.patch.dict(sys.modules, {"stressonnx": self._stub(calls)}):
-            out = GraphemePhonemizer().add_diacritics("azul", "ber")
-        self.assertEqual(out, "azul")
-        self.assertEqual(calls, [])
-
-    def test_missing_stressonnx_raises_named_importerror(self):
-        import sys
-        from unittest import mock
-        with mock.patch.dict(sys.modules, {"stressonnx": None}):
-            with self.assertRaises(ImportError) as ctx:
-                GraphemePhonemizer().add_diacritics("замок", "ru")
-        self.assertIn("stressonnx", str(ctx.exception))
