@@ -4,7 +4,7 @@ import math
 import os.path
 from base64 import b64decode
 from pathlib import Path
-from typing import Union, List, Dict
+from typing import Union, List, Dict, Optional
 
 import regex as re
 
@@ -311,7 +311,15 @@ OBSTRUENTS = ()
 SONORANTS = ()
 
 
+_initialized_tables_dir: Optional[Path] = None
+
+
 def initialize_conversion_tables(tables_dir: Path):
+    global _initialized_tables_dir
+    # the CSV tables never change at runtime, so once a given tables_dir has
+    # been parsed there is no need to re-read and re-parse it on every call
+    if _initialized_tables_dir == tables_dir:
+        return
     global CT_double_codas, CT_neutral, CT_tensification, CT_assimilation, CT_aspiration, CT_convention
     CT_double_codas = ConversionTable('double_coda', tables_dir)
     CT_neutral = ConversionTable('neutralization', tables_dir)
@@ -326,6 +334,8 @@ def initialize_conversion_tables(tables_dir: Path):
     VOWELS = tuple(list(CT_convention.V))  # from the V column of the IPA table
     OBSTRUENTS = tuple(set(CONSONANTS) - set(C_SONORANTS))
     SONORANTS = VOWELS + C_SONORANTS
+
+    _initialized_tables_dir = tables_dir
 
 
 def get_substring_ind(string: str, pattern: str) -> List[int]:
