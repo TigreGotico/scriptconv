@@ -38,6 +38,11 @@ from typing import Callable, Dict, List, Optional, Tuple
 __all__ = ["Representation", "Edge", "ConversionGraph", "DEFAULT_GRAPH",
            "REPRESENTATIONS"]
 
+# Chosen so a single lossy hop never wins over a lossless path unless the
+# lossless alternative is at least this many hops longer. A 10-hop lossless
+# chain (cost 10, unit edges) ties a 1-hop lossy edge (cost 10) exactly, and
+# heapq's stable tie-break then decides — a non-issue in practice since real
+# scriptconv graphs are shallow (a handful of hops at most).
 _LOSSY_COST = 10.0
 
 
@@ -56,7 +61,10 @@ class Edge:
     """One registered transform between two representations.
 
     ``fn`` is called as ``fn(text, **context)``; context keys (``lang``,
-    engine-specific options…) pass through the router opaquely.  ``requires``
+    engine-specific options…) pass through the router opaquely.  Every
+    registered ``fn`` MUST accept ``**kwargs`` for this reason — a callable
+    that only takes ``text`` raises :class:`TypeError` the moment routing
+    passes through any context. ``requires``
     names an optional extra the transform needs — metadata only; the
     transform itself raises :class:`ImportError` with an install hint.
     ``cost`` defaults from ``lossless`` so routing prefers lossless paths.

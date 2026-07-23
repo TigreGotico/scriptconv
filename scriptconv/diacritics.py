@@ -55,6 +55,9 @@ _DEFAULT_PHONEMIZER = None
 
 
 def _get_phonemizer(phonikud_model=None):
+    # any concrete BasePhonemizer subclass works here — it's just a vessel
+    # for add_diacritics(); GraphemePhonemizer is picked for having no extra
+    # runtime dependencies of its own
     global _DEFAULT_PHONEMIZER
     if phonikud_model:
         from scriptconv.phonemizers.base import GraphemePhonemizer
@@ -81,6 +84,10 @@ def diacritize(text: str, lang: str = "und", model=None, **context) -> str:
 # which (via NFD) would decompose and destroy precomposed native letters:
 # Cyrillic й/ё, Latvian ī, Azerbaijani ç/ö, and Arabic hamza carriers أ إ آ ؤ ئ.
 _STRESS_MARKS = frozenset({0x0300, 0x0301})            # combining grave / acute
+# U+0300 is included defensively alongside the U+0301 that stressonnx
+# actually emits, in case any backend/locale marks secondary stress with a
+# grave instead of an acute; harmless to strip since native precomposed
+# letters (e.g. Cyrillic й/ё) are unaffected either way.
 _ARABIC_MARKS = frozenset(range(0x064B, 0x0660)) | frozenset({0x0670})  # tashkeel + dagger alef
 _HEBREW_MARKS = (frozenset(range(0x05B0, 0x05BE))
                  | frozenset({0x05BF, 0x05C1, 0x05C2, 0x05C4, 0x05C5, 0x05C7}))  # niqqud
