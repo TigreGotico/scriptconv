@@ -74,6 +74,30 @@ def _is_european_portuguese(lang: str) -> bool:
     return norm == "pt" or norm == "pt-pt"
 
 
+def _diacritizer_family(lang: str) -> Optional[str]:
+    """Which diacritization backend family handles *lang*, or ``None``.
+
+    Single source of truth for lang→backend routing: both the forward
+    dispatch (:meth:`BasePhonemizer.add_diacritics`) and the strip direction
+    (:func:`scriptconv.diacritics._overlay_marks`) resolve through this, so the
+    two can never disagree about which language uses which backend. Returns one
+    of ``"he"`` (niqqud), ``"ar"`` (tashkeel), ``"stress"`` (stressonnx), ``"pt"``
+    (bifonia sense diacritics), or ``None``. Uses exact primary-subtag matching
+    (never ``startswith``), so Aragonese (``arg``), Herero (``her``) and
+    Mapudungun (``arn``) are never misread as Arabic/Hebrew.
+    """
+    p = _primary_subtag(lang)
+    if p == "he":
+        return "he"
+    if p == "ar":
+        return "ar"
+    if p in STRESS_LANGS:
+        return "stress"
+    if _is_european_portuguese(lang):
+        return "pt"
+    return None
+
+
 class BasePhonemizer(metaclass=abc.ABCMeta):
     def __init__(self, alphabet: Alphabet = Alphabet.UNICODE,
                  diacritizer_model: str = "rawi-ensemble",
@@ -199,13 +223,14 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         ``ImportError`` naming its extra when the optional dependency is
         missing — scriptconv never installs anything on the caller's behalf.
         """
-        if _primary_subtag(lang) == "he":
+        family = _diacritizer_family(lang)
+        if family == "he":
             return self.phonikud.add_diacritics(text)
-        elif _primary_subtag(lang) == "ar":
+        if family == "ar":
             return self.tashkeel(model).diacritize(text)
-        elif _primary_subtag(lang) in STRESS_LANGS:
+        if family == "stress":
             return self._stress(text, lang, model)
-        elif _is_european_portuguese(lang):
+        if family == "pt":
             return self._sense_diacritics_pt(text)
         return text
 

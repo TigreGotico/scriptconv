@@ -45,7 +45,7 @@ tashkeel, stressonnx) are strippable; spelling-integral backends (bifonia) are
 not.
 """
 from scriptconv.graph import Edge
-from scriptconv.phonemizers.base import STRESS_LANGS, _primary_subtag
+from scriptconv.phonemizers.base import _diacritizer_family
 
 #: The lang-contextual node produced by diacritization.  Like ``"text"`` it is
 #: meaningful only with ``lang=`` context and exists only in opted-in graphs.
@@ -96,16 +96,18 @@ _HEBREW_MARKS = (frozenset(range(0x05B0, 0x05BE))
 def _overlay_marks(lang: str) -> "frozenset | None":
     """The overlay codepoints for *lang*'s diacritization backend, or None.
 
-    Uses exact primary-subtag matching (never ``startswith``) so Aragonese
-    (``arg``), Herero (``her``), Mapudungun (``arn``) etc. are NOT misread as
-    Arabic/Hebrew and stripped.
+    Resolves the backend family through :func:`_diacritizer_family` (the shared
+    lang→backend routing), so this can never disagree with
+    :meth:`BasePhonemizer.add_diacritics` about which language a backend owns.
+    Only *overlay* families are strippable: ``"pt"`` (bifonia sense marks are
+    native orthography) and ``None`` both return None.
     """
-    p = _primary_subtag(lang)
-    if p in STRESS_LANGS:
+    family = _diacritizer_family(lang)
+    if family == "stress":
         return _STRESS_MARKS
-    if p == "ar":
+    if family == "ar":
         return _ARABIC_MARKS
-    if p == "he":
+    if family == "he":
         return _HEBREW_MARKS
     return None
 
