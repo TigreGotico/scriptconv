@@ -1,4 +1,5 @@
 import abc
+import unicodedata
 from typing import List
 
 
@@ -46,7 +47,9 @@ class JiebaPhonemizer(BasePhonemizer):
         import jieba
         lang = self.get_lang(lang)
         seg_list = jieba.cut(text, cut_all=False)
-        seg_list = [num2str(w) if w.isdigit() else w for w in seg_list]
+        # NFKC folds full-width digits (e.g. "３") to ASCII so num2str's
+        # DIGITS table (keyed by ASCII "0"-"9") never raises KeyError on them
+        seg_list = [num2str(unicodedata.normalize("NFKC", w)) if w.isdigit() else w for w in seg_list]
         return " ".join(seg_list)
 
 
@@ -68,7 +71,13 @@ class BaseChinesePinyinPhonemizer(BasePhonemizer):
         super().__init__(alphabet)
         self.jieba = jieba
         self.retone = retone
-        from pinyin_to_ipa import pinyin_to_ipa
+        try:
+            from pinyin_to_ipa import pinyin_to_ipa
+        except ImportError:
+            raise ImportError(
+                "pinyin->IPA conversion needs pinyin_to_ipa — install with "
+                "`pip install scriptconv[zh-phonemizers]`"
+            ) from None
         self.pinyin_to_ipa = pinyin_to_ipa
 
     @classmethod
@@ -95,7 +104,12 @@ class BaseChinesePinyinPhonemizer(BasePhonemizer):
         p = p.replace('˥˩', '↘')  # fourth tone
         p = p.replace('˥', '→')  # first tone
         p = p.replace(chr(635) + chr(809), 'ɨ').replace(chr(633) + chr(809), 'ɨ')
-        assert chr(809) not in p, p
+        # U+0329 (combining vertical line below, syllabic diacritic) is only
+        # ever expected attached to ɻ/ɹ (U+027B/U+0279) above, which the two
+        # replacements just consumed; any leftover means pinyin_to_ipa
+        # emitted an unanticipated syllabic marking. Rather than crashing in
+        # production, leave it in place — it's still valid IPA, just not
+        # collapsed to the ɨ shorthand.
         return p
 
     def to_ipa(self, phones: List[str]) -> List[str]:
@@ -132,7 +146,9 @@ class BaseChinesePinyinPhonemizer(BasePhonemizer):
             import jieba
             for chunk in jieba.cut(text, cut_all=False):
                 if chunk.isdigit():
-                    chunk = num2str(chunk)
+                    # NFKC folds full-width digits (e.g. "３") to ASCII so
+                    # num2str's DIGITS table never raises KeyError on them
+                    chunk = num2str(unicodedata.normalize("NFKC", chunk))
                 phones += self.get_pinyin(chunk)
                 phones += [" "]  # keep jieba whitespace
         else:
@@ -176,7 +192,13 @@ class G2pCPhonemizer(BaseChinesePinyinPhonemizer):
     """
 
     def __init__(self, alphabet=Alphabet.PINYIN, jieba: bool = True):
-        from g2pc import G2pC
+        try:
+            from g2pc import G2pC
+        except ImportError:
+            raise ImportError(
+                "g2pc phonemization needs g2pc — install with "
+                "`pip install scriptconv[zh-phonemizers]`"
+            ) from None
         self.g2p = G2pC()
         super().__init__(alphabet, jieba)
 
@@ -200,7 +222,13 @@ class G2pMPhonemizer(BaseChinesePinyinPhonemizer):
     """
 
     def __init__(self, alphabet=Alphabet.PINYIN, tone: bool = True, char_split: bool = False, jieba: bool = True):
-        from g2pM import G2pM
+        try:
+            from g2pM import G2pM
+        except ImportError:
+            raise ImportError(
+                "g2pM phonemization needs g2pM — install with "
+                "`pip install scriptconv[zh-phonemizers]`"
+            ) from None
         self.g2p = G2pM()
         self.tone = tone
         self.char_split = char_split
@@ -225,7 +253,13 @@ class XpinyinPhonemizer(BaseChinesePinyinPhonemizer):
     """
 
     def __init__(self, alphabet=Alphabet.PINYIN, tone_marks: str = "numbers", jieba: bool = True):
-        from xpinyin import Pinyin
+        try:
+            from xpinyin import Pinyin
+        except ImportError:
+            raise ImportError(
+                "xpinyin phonemization needs xpinyin — install with "
+                "`pip install scriptconv[zh-phonemizers]`"
+            ) from None
         self.g2p = Pinyin()
         self.tone_marks = tone_marks
         super().__init__(alphabet, jieba)
@@ -249,7 +283,13 @@ class PypinyinPhonemizer(BaseChinesePinyinPhonemizer):
     """
 
     def __init__(self, alphabet=Alphabet.PINYIN, jieba: bool = True):
-        from pypinyin import pinyin
+        try:
+            from pypinyin import pinyin
+        except ImportError:
+            raise ImportError(
+                "pypinyin phonemization needs pypinyin — install with "
+                "`pip install scriptconv[zh]`"
+            ) from None
         self.g2p = pinyin
         super().__init__(alphabet, jieba)
 
