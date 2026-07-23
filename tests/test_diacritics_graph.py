@@ -96,8 +96,7 @@ class TestDiacriticsGraphExtension(unittest.TestCase):
             self.graph.convert("Cristián", "text-diacritized", "text", lang="arg")
 
     def test_add_diacritics_does_not_misroute_herero(self):
-        from scriptconv.phonemizers.base import GraphemePhonemizer
-        self.assertEqual(GraphemePhonemizer().add_diacritics("teste", "her"), "teste")
+        self.assertEqual(diacritics.diacritize("teste", "her"), "teste")
 
 
 if __name__ == "__main__":
