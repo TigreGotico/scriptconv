@@ -223,7 +223,8 @@ phonemize("hello", "en", override=Phonemizer.GRUUT)
 
 Defaults resolve in-house engines first: an explicit per-language chain
 (Arabic → arbtok, Basque → euskaphone, Mirandese, Portuguese → tugaphone,
-Hebrew → phonikud, Galician → Cotovía for its own notation), then
+Hebrew → phonikud, Galician → Cotovía and Russian → vosk for their own
+notations), then
 orthography2ipa wherever it has a language spec, then espeak as the last
 resort. Arabic never falls back past arbtok — a missing engine raises rather
 than silently degrading. Every backend resolves lazily; a missing package

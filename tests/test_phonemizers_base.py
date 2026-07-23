@@ -21,9 +21,11 @@ class TestEnums(unittest.TestCase):
         self.assertEqual(Phonemizer.ARBTOK.value, "arbtok")
         self.assertEqual(Phonemizer.MIRANDESE.value, "mwl_phonemizer")
         self.assertEqual(Phonemizer.KOG2PK.value, "kog2p")
+        self.assertEqual(Phonemizer.VOSK.value, "vosk")
         self.assertEqual(Alphabet.XSAMPA.value, "x-sampa")
-        self.assertEqual(len(list(Phonemizer)), 41)
-        self.assertEqual(len(list(Alphabet)), 21)  # incl. MANTOQ
+        self.assertEqual(Alphabet.VOSK.value, "vosk")
+        self.assertEqual(len(list(Phonemizer)), 42)
+        self.assertEqual(len(list(Alphabet)), 22)  # incl. MANTOQ, VOSK
 
 
 class TestRegistryCompleteness(unittest.TestCase):
