@@ -101,3 +101,49 @@ class TestDiacriticsGraphExtension(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestEdgeModelKeys(unittest.TestCase):
+    """The two model-bearing edges each read their own context key: the
+    diacritizer edge (text -> text-diacritized) reads ``diacritizer_model``,
+    the phonemizer edge (text -> ipa) reads ``phonemizer_model``. Neither picks
+    up the other's key."""
+
+    def setUp(self):
+        self.graph = DEFAULT_GRAPH.extend(diacritics.register).extend(phonemizers.register)
+
+    def test_diacritizer_edge_reads_diacritizer_model(self):
+        seen = {}
+        backend = types.SimpleNamespace(diacritize=lambda t: t)
+
+        def _spy(m=None):
+            seen["m"] = m
+            return backend
+
+        with mock.patch.object(diacritics, "_tashkeel", _spy):
+            self.graph.convert("نص", "text", "text-diacritized", lang="ar",
+                               diacritizer_model="RAWI-X",
+                               phonemizer_model="IGNORED")
+        self.assertEqual(seen["m"], "RAWI-X")
+
+    def test_phonemizer_edge_reads_phonemizer_model(self):
+        from scriptconv.phonemizers import registry
+        cap = {}
+
+        class _P:
+            def phonemize_string(self, t, l):
+                return "IPA"
+
+        def _spy(lang, alphabet, override=None, model=None, **k):
+            cap["model"] = model
+            return _P()
+
+        with mock.patch.object(registry, "phonemizer_for_lang", _spy):
+            self.graph.convert("hello", "text", "ipa", lang="en",
+                               phonemizer_model="BYT5-CKPT",
+                               diacritizer_model="IGNORED")
+        self.assertEqual(cap["model"], "BYT5-CKPT")
+
+
+if __name__ == "__main__":
+    unittest.main()

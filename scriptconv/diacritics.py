@@ -245,24 +245,27 @@ def _sense_diacritics_pt(text: str) -> str:
     return add_extra_diacritics(text)
 
 
-def diacritize(text: str, lang: str = "und", model=None,
-               phonikud_model=None, diacritizer_model=None, **_) -> str:
+def diacritize(text: str, lang: str = "und", diacritizer_model=None,
+               **kwargs) -> str:
     """Add pronunciation-disambiguating diacritics to *text* for *lang*.
 
-    Four backends, each restoring information ordinary orthography omits but
-    downstream G2P needs:
+    ``diacritizer_model=`` is the one model knob for the diacritizer edge — the
+    model for whichever backend the language routes to (there is one such knob,
+    parallel to ``phonemizer_model=`` on the ``text -> ipa`` phonemizer edge):
 
-    - Hebrew (``he``) — niqqud via phonikud. ``phonikud_model=`` is optional:
-      omitted, the small public phonikud ONNX model is auto-downloaded and
-      cached (``$SCRIPTCONV_CACHE``/``$XDG_CACHE_HOME``); pass a path or
-      zero-arg callable to override.
-    - Arabic (``ar``) — tashkeel via text2tashkeel (``[tashkeel]``,
-      ``model=``/``diacritizer_model=``).
+    - Hebrew (``he``) — niqqud via phonikud; ``diacritizer_model`` is the
+      phonikud ONNX path (or a zero-arg callable). Optional: when omitted the
+      small public phonikud model is auto-downloaded and cached
+      (``$SCRIPTCONV_CACHE``/``$XDG_CACHE_HOME``).
+    - Arabic (``ar``) — tashkeel via text2tashkeel (``[tashkeel]``);
+      ``diacritizer_model`` is the text2tashkeel model name (defaults to
+      ``rawi-ensemble``).
     - East Slavic, Bulgarian/Macedonian/Slovene, Latvian, Armenian, Georgian,
       and Turkic/Caucasian languages (``STRESS_LANGS``, 26 stressonnx tags) —
-      word stress via stressonnx (``[stress]``); stress is unwritten or
-      under-marked in these languages, and in East Slavic unstressed vowels
-      also reduce, so a missing mark can corrupt more than prosody.
+      word stress via stressonnx (``[stress]``); ``diacritizer_model`` is the
+      stressonnx model. Stress is unwritten or under-marked in these languages,
+      and in East Slavic unstressed vowels also reduce, so a missing mark can
+      corrupt more than prosody.
     - European Portuguese (``pt``/``pt-PT``, never ``pt-BR``) —
       heterophonic-homograph sense diacritics via bifonia (``[pt]``);
       ordinary Portuguese orthographic marks that any downstream G2P reads
@@ -272,13 +275,17 @@ def diacritize(text: str, lang: str = "und", model=None,
     ``ImportError`` naming its extra when the optional dependency is missing
     — scriptconv never installs anything on the caller's behalf.
     """
+    # one knob for the diacritizer edge; fold the pre-unification kwargs so
+    # older callers keep working (phonikud_model was the Hebrew-only name).
+    diacritizer_model = (diacritizer_model or kwargs.get("phonikud_model")
+                         or kwargs.get("model"))
     family = _diacritizer_family(lang)
     if family == "he":
-        return _phonikud(phonikud_model).add_diacritics(text)
+        return _phonikud(diacritizer_model).add_diacritics(text)
     if family == "ar":
-        return _tashkeel(model or diacritizer_model).diacritize(text)
+        return _tashkeel(diacritizer_model).diacritize(text)
     if family == "stress":
-        return _stress(text, lang, model)
+        return _stress(text, lang, diacritizer_model)
     if family == "pt":
         return _sense_diacritics_pt(text)
     return text
@@ -359,7 +366,8 @@ def register(graph) -> None:
     """
     graph.register(
         Edge("text", DIACRITIZED,
-             lambda text, lang="und", model=None, **c: diacritize(text, lang, model, **c),
+             lambda text, lang="und", diacritizer_model=None, **c:
+                 diacritize(text, lang, diacritizer_model=diacritizer_model, **c),
              lossless=False))
     graph.register(
         Edge(DIACRITIZED, "text",
