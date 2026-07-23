@@ -219,7 +219,9 @@ def register(graph) -> None:
     routing context, and present only in graphs that opted in (the
     :data:`scriptconv.graph.DEFAULT_GRAPH` stays orthography-only by
     design) — and one dispatching ``text -> ipa`` edge that resolves the
-    per-language default (honouring an ``override=`` context key).
+    per-language default (honouring an ``override=`` context key). It also
+    accepts already-diacritized input via a ``"text-diacritized" -> "ipa"``
+    edge (the same phonemization; pair with :func:`scriptconv.diacritics.register`).
 
     Usage::
 
@@ -236,3 +238,4 @@ def register(graph) -> None:
                                    override).phonemize_string(text, lang)
 
     graph.register(Edge("text", "ipa", _text_to_ipa, lossless=False))
+    graph.register(Edge("text-diacritized", "ipa", _text_to_ipa, lossless=False))

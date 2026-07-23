@@ -74,6 +74,35 @@ g.can_convert("text", "arpa")                    # True — phonemize, then tran
 that opted in) and one dispatching phonemization edge. Any external package
 can do the same with its own `register(graph)`.
 
+`diacritics.register` is a second in-house example: it adds a lang-contextual
+`text-diacritized` node and a pair of edges — `text -> text-diacritized`
+(restore: Arabic tashkeel, Hebrew niqqud, East-Slavic/Turkic/Caucasian stress,
+European-Portuguese sense marks) and `text-diacritized -> text` (strip).
+Restore is model-based and expensive (`lossless=False`); strip is cheap and
+removes only the specific overlay codepoints each backend adds (combining
+acute/grave for stress, tashkeel for Arabic, niqqud for Hebrew) — never a
+blanket combining-mark filter, so precomposed native letters (Cyrillic й/ё,
+Latvian macrons, Azerbaijani ç/ö, Arabic hamza carriers) survive intact. That
+cost asymmetry is why routing never prefers the round trip over doing
+nothing. Strip is also gated, by exact primary-subtag match, to *overlay*
+diacritics (Arabic/Hebrew vocalization, East-Slavic/Turkic stress), whose bare
+canonical form carries no marks; European Portuguese diacritics are native
+orthography, so stripping them would corrupt the spelling (`café` → `cafe`),
+and the edge raises `ValueError` for those languages instead. Routing `text -> ipa` is
+unchanged either way — the direct phonemization edge still wins, so stacking
+this extension is non-invasive:
+
+```python
+from scriptconv import DEFAULT_GRAPH
+from scriptconv import diacritics, phonemizers
+
+g = DEFAULT_GRAPH.extend(diacritics.register).extend(phonemizers.register)
+g.convert("Tenho muita sede hoje.", "text", "text-diacritized", lang="pt")
+# 'Tenho muita sêde hoje.'
+g.convert("за́мок", "text-diacritized", "text", lang="ru")   # 'замок' — strip
+g.route("text", "ipa")   # still the single direct edge — no detour
+```
+
 The same boundary in one sentence: **scriptconv's own edges are orthography
 and notation only; clients may register sound-producing edges into their own
 graph instances, and the engine routes them without knowing the difference.**

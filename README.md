@@ -265,6 +265,17 @@ p = GraphemePhonemizer()
 p.add_diacritics("Tenho muita sede hoje.", "pt")   # 'Tenho muita sêde hoje.' (thirst)
 ```
 
+Diacritization also joins the graph, like phonemization, via
+`scriptconv.diacritics.register` — a `text -> text-diacritized` edge, opt-in,
+with `text -> ipa` routing unchanged:
+
+```python
+from scriptconv import diacritics
+g = DEFAULT_GRAPH.extend(diacritics.register).extend(phonemizers.register)
+g.convert("Tenho muita sede hoje.", "text", "text-diacritized", lang="pt")
+# 'Tenho muita sêde hoje.'
+```
+
 Stress is unwritten or under-marked in all 26 covered languages; East Slavic
 is the clearest case, where unstressed vowels also reduce (e.g. Russian
 о→[ɐ]/[ə]), so a missing mark corrupts more than prosody there. stressonnx is

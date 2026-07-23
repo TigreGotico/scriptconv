@@ -113,6 +113,36 @@ routes `pt-BR` straight through unchanged. Language routing for the two new
 backends matches on the primary subtag exactly (not a prefix check), so e.g.
 Berber (`ber`) never false-matches Belarusian (`be`).
 
+Diacritization is also exposed as a graph transform, via
+`scriptconv.diacritics.register` — parallel to the phonemization edge above,
+it adds a lang-contextual `text-diacritized` node and two edges: `text ->
+text-diacritized` (restore, wrapping `add_diacritics`, model-based and
+expensive) and `text-diacritized -> text` (strip, cheap and lossless). Strip
+removes only the specific overlay codepoints each backend adds — combining
+acute/grave for stress, tashkeel for Arabic, niqqud for Hebrew — never a
+blanket combining-mark filter, so precomposed native letters (Cyrillic й/ё,
+Latvian macrons, Azerbaijani ç/ö, Arabic hamza carriers) are left intact.
+That cost asymmetry is why routing never takes the round trip unless asked.
+Strip only works for *overlay* diacritics — Arabic/Hebrew vocalization and
+East-Slavic/Turkic/Caucasian stress, whose bare form carries no marks, gated
+by exact primary-subtag match — and raises `ValueError` for languages where
+the marks are native orthography (European Portuguese/bifonia), since
+removing them would corrupt the spelling:
+
+```python
+from scriptconv import DEFAULT_GRAPH
+from scriptconv import diacritics
+
+g = DEFAULT_GRAPH.extend(diacritics.register)
+g.convert("Tenho muita sede hoje.", "text", "text-diacritized", lang="pt")
+# 'Tenho muita sêde hoje.'
+g.convert("за́мок", "text-diacritized", "text", lang="ru")   # 'замок'
+g.convert("sêde", "text-diacritized", "text", lang="pt")     # raises ValueError
+```
+
+`add_diacritics` remains the single dispatch point — the graph edge is a thin
+wrapper, not a second implementation.
+
 ## Model-backed engines never download
 
 ByT5 and Charsiu run ONNX models. They require explicit local paths —
