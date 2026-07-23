@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a7](https://github.com/TigreGotico/scriptconv/tree/0.0.4a7) (2026-07-23)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a6...0.0.4a7)
+
+**Merged pull requests:**
+
+- feat: auto-provision the Hebrew phonikud model [\#76](https://github.com/TigreGotico/scriptconv/pull/76) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a6](https://github.com/TigreGotico/scriptconv/tree/0.0.4a6) (2026-07-23)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a5...0.0.4a6)
