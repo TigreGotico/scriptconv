@@ -21,6 +21,65 @@ class TestVendoredChinese(unittest.TestCase):
         from scriptconv.phonemizers._thirdparty.zh_num import num2str
         self.assertEqual(num2str("123"), "一百二十三")
 
+    def test_zh_num_fullwidth_digits_normalized(self):
+        # zh_num.DIGITS is keyed by ASCII "0"-"9"; full-width digits (e.g.
+        # "３") must be NFKC-folded before lookup or num2str raises KeyError
+        import unicodedata
+        from scriptconv.phonemizers._thirdparty.zh_num import num2str
+        fullwidth = "１２３"
+        self.assertEqual(
+            num2str(unicodedata.normalize("NFKC", fullwidth)),
+            num2str("123"),
+        )
+
+
+class TestPinyinRetone(unittest.TestCase):
+    def test_retone_tone_marks(self):
+        from scriptconv.phonemizers.zh import BaseChinesePinyinPhonemizer
+        retoned = BaseChinesePinyinPhonemizer._retone("ma˥")
+        self.assertEqual(retoned, "ma→")
+
+    def test_retone_leftover_syllabic_mark_does_not_raise(self):
+        # any pinyin_to_ipa output carrying an unanticipated combining
+        # U+0329 (not attached to ɻ/ɹ) must degrade gracefully, not crash
+        from scriptconv.phonemizers.zh import BaseChinesePinyinPhonemizer
+        leftover = "n" + chr(809)
+        retoned = BaseChinesePinyinPhonemizer._retone(leftover)
+        self.assertEqual(retoned, leftover)
+
+
+class TestZhBackendFriendlyImportErrors(unittest.TestCase):
+    def _assert_friendly(self, module_name, cls, extra):
+        # sys.modules[name] = None makes the `import` statement raise
+        # ImportError regardless of whether the package is actually
+        # installed, so this simulates the missing-dependency case cleanly
+        import sys
+        from unittest.mock import patch
+        with patch.dict(sys.modules, {module_name: None}):
+            with self.assertRaises(ImportError) as ctx:
+                cls()
+        self.assertIn(f"scriptconv[{extra}]", str(ctx.exception))
+
+    def test_pypinyin_missing_dep_message(self):
+        from scriptconv.phonemizers.zh import PypinyinPhonemizer
+        self._assert_friendly("pypinyin", PypinyinPhonemizer, "zh")
+
+    def test_xpinyin_missing_dep_message(self):
+        from scriptconv.phonemizers.zh import XpinyinPhonemizer
+        self._assert_friendly("xpinyin", XpinyinPhonemizer, "zh-phonemizers")
+
+    def test_g2pm_missing_dep_message(self):
+        from scriptconv.phonemizers.zh import G2pMPhonemizer
+        self._assert_friendly("g2pM", G2pMPhonemizer, "zh-phonemizers")
+
+    def test_g2pc_missing_dep_message(self):
+        from scriptconv.phonemizers.zh import G2pCPhonemizer
+        self._assert_friendly("g2pc", G2pCPhonemizer, "zh-phonemizers")
+
+    def test_pinyin_to_ipa_missing_dep_message(self):
+        from scriptconv.phonemizers.zh import PypinyinPhonemizer
+        self._assert_friendly("pinyin_to_ipa", PypinyinPhonemizer, "zh-phonemizers")
+
 
 class TestShamiFrontend(unittest.TestCase):
     def test_codeswitch_language_ids_align(self):

@@ -41,6 +41,7 @@ __all__ = [
     "ipa_to_cotovia",
     "rfe_to_ipa",
     "ipa_to_rfe",
+    "mantoq_to_ipa",
     "looks_like_ipa",
 ]
 
@@ -1053,7 +1054,7 @@ def _tokenize_mantoq(text: str) -> list[str]:
     return tokens
 
 
-def mantoq_to_ipa(mantoq, errors: str = "pass") -> str:
+def mantoq_to_ipa(mantoq: str | list[str], errors: str = "pass") -> str:
     """Convert a Mantoq phoneme string to IPA.
 
     ``_dbl_`` lengthens/geminates the preceding symbol (``ː``), ``_+_``
@@ -1235,15 +1236,19 @@ def can_convert(src: str | Notation, dst: str | Notation) -> bool:
     src = Notation(src)
     dst = Notation(dst)
     if src == dst:
-        # historical contract: identity is not a "conversion"
+        # historical contract: identity is not a "conversion" here, unlike
+        # graph.ConversionGraph.can_convert (which deliberately returns True
+        # for identity — an empty route is a valid, zero-cost conversion there)
         return False
     from scriptconv.graph import DEFAULT_GRAPH
-    if not DEFAULT_GRAPH.can_convert(src.value, dst.value):
+    try:
+        route = DEFAULT_GRAPH.route(src.value, dst.value)
+    except ValueError:
         return False
     # only notation-to-notation reachability counts here; guard against paths
     # that would leave the notation node set (none exist today, cheap to keep)
     return all(e.src in _NOTATION_VALUES and e.dst in _NOTATION_VALUES
-               for e in DEFAULT_GRAPH.route(src.value, dst.value))
+               for e in route)
 
 
 # ---------------------------------------------------------------------------

@@ -45,7 +45,7 @@ tashkeel, stressonnx) are strippable; spelling-integral backends (bifonia) are
 not.
 """
 from scriptconv.graph import Edge
-from scriptconv.phonemizers.base import STRESS_LANGS, _primary_subtag
+from scriptconv.phonemizers.base import _diacritizer_family
 
 #: The lang-contextual node produced by diacritization.  Like ``"text"`` it is
 #: meaningful only with ``lang=`` context and exists only in opted-in graphs.
@@ -55,6 +55,9 @@ _DEFAULT_PHONEMIZER = None
 
 
 def _get_phonemizer(phonikud_model=None):
+    # any concrete BasePhonemizer subclass works here — it's just a vessel
+    # for add_diacritics(); GraphemePhonemizer is picked for having no extra
+    # runtime dependencies of its own
     global _DEFAULT_PHONEMIZER
     if phonikud_model:
         from scriptconv.phonemizers.base import GraphemePhonemizer
@@ -81,6 +84,10 @@ def diacritize(text: str, lang: str = "und", model=None, **context) -> str:
 # which (via NFD) would decompose and destroy precomposed native letters:
 # Cyrillic й/ё, Latvian ī, Azerbaijani ç/ö, and Arabic hamza carriers أ إ آ ؤ ئ.
 _STRESS_MARKS = frozenset({0x0300, 0x0301})            # combining grave / acute
+# U+0300 is included defensively alongside the U+0301 that stressonnx
+# actually emits, in case any backend/locale marks secondary stress with a
+# grave instead of an acute; harmless to strip since native precomposed
+# letters (e.g. Cyrillic й/ё) are unaffected either way.
 _ARABIC_MARKS = frozenset(range(0x064B, 0x0660)) | frozenset({0x0670})  # tashkeel + dagger alef
 _HEBREW_MARKS = (frozenset(range(0x05B0, 0x05BE))
                  | frozenset({0x05BF, 0x05C1, 0x05C2, 0x05C4, 0x05C5, 0x05C7}))  # niqqud
@@ -89,16 +96,18 @@ _HEBREW_MARKS = (frozenset(range(0x05B0, 0x05BE))
 def _overlay_marks(lang: str) -> "frozenset | None":
     """The overlay codepoints for *lang*'s diacritization backend, or None.
 
-    Uses exact primary-subtag matching (never ``startswith``) so Aragonese
-    (``arg``), Herero (``her``), Mapudungun (``arn``) etc. are NOT misread as
-    Arabic/Hebrew and stripped.
+    Resolves the backend family through :func:`_diacritizer_family` (the shared
+    lang→backend routing), so this can never disagree with
+    :meth:`BasePhonemizer.add_diacritics` about which language a backend owns.
+    Only *overlay* families are strippable: ``"pt"`` (bifonia sense marks are
+    native orthography) and ``None`` both return None.
     """
-    p = _primary_subtag(lang)
-    if p in STRESS_LANGS:
+    family = _diacritizer_family(lang)
+    if family == "stress":
         return _STRESS_MARKS
-    if p == "ar":
+    if family == "ar":
         return _ARABIC_MARKS
-    if p == "he":
+    if family == "he":
         return _HEBREW_MARKS
     return None
 

@@ -17,6 +17,7 @@ from __future__ import annotations
 import importlib
 from typing import Dict, Optional, Tuple
 
+from scriptconv.phonemizers.base import _primary_subtag
 from scriptconv.phonemizers.enums import Alphabet, Phonemizer
 
 __all__ = ["PHONEMIZER_REGISTRY", "LANG_DEFAULTS", "get_phonemizer",
@@ -184,7 +185,7 @@ def phonemizer_for_lang(lang: str, alphabet: Alphabet = Alphabet.IPA,
     """
     if override is not None:
         return get_phonemizer(override, alphabet, model, **kwargs)
-    key = lang.replace("_", "-").split("-")[0].lower()
+    key = _primary_subtag(lang)
     explicit = LANG_DEFAULTS.get(key, ())
     for candidate in explicit:
         if alphabet in _EMITS.get(candidate, (Alphabet.IPA,)):
