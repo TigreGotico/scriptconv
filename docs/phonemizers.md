@@ -143,12 +143,23 @@ g.convert("sêde", "text-diacritized", "text", lang="pt")     # raises ValueErro
 `add_diacritics` remains the single dispatch point — the graph edge is a thin
 wrapper, not a second implementation.
 
-## Model-backed engines never download
+## Model-backed engines: download policy
 
-ByT5 and Charsiu run ONNX models. They require explicit local paths —
-`model=` and `tokenizer_config=` — and raise immediately when the files are
-absent. Downloading and caching model files is deliberately the caller's
-concern; the class constants document where the published models live.
+ByT5 and Charsiu run large, licensed ONNX models. They require explicit local
+paths — `model=` and `tokenizer_config=` — and raise immediately when the
+files are absent. Downloading and caching those model files is deliberately
+the caller's concern; the class constants document where the published
+models live.
+
+Small, known-good, unencumbered models are the exception. The Hebrew
+diacritizer (phonikud, see `diacritics.py`) auto-provisions its ONNX model
+using only the stdlib (`urllib.request`) into a cache dir on first use —
+`<base>/scriptconv/phonikud` where `<base>` is `$SCRIPTCONV_CACHE` if set,
+else `$XDG_CACHE_HOME` (default `~/.cache`) — and reuses it afterward. Pass
+`phonikud_model=<path or zero-arg callable>` to override, e.g. on an
+air-gapped host. (`en.py`'s DeepPhonemizer backend similarly fetches its own
+model via the `dp` package; that fetch is DeepPhonemizer's, not scriptconv's,
+but the net effect for a caller is the same — no local path required.)
 
 ## Licensing quarantine — `_vendored`
 

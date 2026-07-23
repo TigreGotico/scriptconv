@@ -3,6 +3,8 @@
 No optional backend is required — strip_diacritics/_overlay_marks/_supports_strip
 never load a phonemizer model.
 """
+import os
+
 import pytest
 
 from scriptconv.diacritics import (
@@ -90,27 +92,120 @@ def test_overlay_marks_none_for_native_orthography():
     assert _overlay_marks("en") is None
 
 
-class TestHebrewDiacritizerRequiresLocalModel:
-    def test_hebrew_diacritizer_requires_local_model(self):
-        from scriptconv.diacritics import diacritize
-        with pytest.raises(ValueError) as ctx:
-            diacritize("שלום", "he")
-        assert "phonikud_model" in str(ctx.value)
+class TestHebrewDiacritizerAutoProvisions:
+    def test_no_model_given_auto_provisions(self, monkeypatch):
+        from scriptconv import diacritics
+
+        monkeypatch.setitem(diacritics._PHONIKUD_CACHE, "/sentinel/path.onnx", object())
+        monkeypatch.setattr(diacritics, "_default_phonikud_model",
+                             lambda: "/sentinel/path.onnx")
+        result = diacritics._phonikud(None)
+        assert result is diacritics._PHONIKUD_CACHE["/sentinel/path.onnx"]
+
+    def test_explicit_path_bypasses_provisioner(self, monkeypatch):
+        from scriptconv import diacritics
+
+        calls = []
+        monkeypatch.setattr(diacritics, "_default_phonikud_model",
+                             lambda: calls.append(1) or "/should/not/be/used.onnx")
+
+        class FakePhonikud:
+            def __init__(self, model):
+                self.model = model
+
+        monkeypatch.setattr(diacritics, "_PHONIKUD_CACHE", {})
+        import sys
+        import types
+        fake_mod = types.ModuleType("phonikud_onnx")
+        fake_mod.Phonikud = FakePhonikud
+        monkeypatch.setitem(sys.modules, "phonikud_onnx", fake_mod)
+
+        result = diacritics._phonikud("/explicit/path.onnx")
+        assert result.model == "/explicit/path.onnx"
+        assert calls == []  # provisioner never invoked
 
 
 class TestPhonikudModelResolver:
-    def test_callable_resolver_invoked_lazily(self):
-        from scriptconv.diacritics import diacritize
+    def test_callable_resolver_invoked_lazily(self, monkeypatch):
+        from scriptconv import diacritics
+
         calls = []
 
         def resolver():
             calls.append(1)
-            return ""  # resolves to nothing -> still the explicit ValueError
+            return "/from/callable.onnx"
+
+        class FakePhonikud:
+            def __init__(self, model):
+                self.model = model
+
+        monkeypatch.setattr(diacritics, "_PHONIKUD_CACHE", {})
+        import sys
+        import types
+        fake_mod = types.ModuleType("phonikud_onnx")
+        fake_mod.Phonikud = FakePhonikud
+        monkeypatch.setitem(sys.modules, "phonikud_onnx", fake_mod)
 
         assert calls == []  # not resolved at construction
-        with pytest.raises(ValueError):
-            diacritize("שלום", "he", phonikud_model=resolver)
+        result = diacritics._phonikud(resolver)
         assert calls == [1]
+        assert result.model == "/from/callable.onnx"
+
+
+class TestDefaultPhonikudModelProvisioning:
+    def test_downloads_to_cache_dir_and_returns_path(self, monkeypatch, tmp_path):
+        from scriptconv import diacritics
+
+        monkeypatch.setenv("SCRIPTCONV_CACHE", str(tmp_path))
+        calls = []
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+            def read(self, n):
+                if calls and calls[-1] == "read-done":
+                    return b""
+                calls.append("read-done")
+                return b"dummy-onnx-bytes"
+
+        def fake_urlopen(url):
+            calls.append(("urlopen", url))
+            return FakeResponse()
+
+        monkeypatch.setattr(diacritics.urllib.request, "urlopen", fake_urlopen)
+
+        path = diacritics._default_phonikud_model()
+        assert path == str(tmp_path / "scriptconv" / "phonikud" / "phonikud-1.0.int8.onnx")
+        assert os.path.isfile(path)
+
+        # idempotent: second call must not re-download
+        urlopen_calls_before = sum(1 for c in calls if isinstance(c, tuple))
+        diacritics._default_phonikud_model()
+        urlopen_calls_after = sum(1 for c in calls if isinstance(c, tuple))
+        assert urlopen_calls_before == urlopen_calls_after == 1
+
+    def test_failed_download_leaves_no_partial_file(self, monkeypatch, tmp_path):
+        from scriptconv import diacritics
+
+        monkeypatch.setenv("SCRIPTCONV_CACHE", str(tmp_path))
+
+        def failing_urlopen(url):
+            raise OSError("network unavailable")
+
+        monkeypatch.setattr(diacritics.urllib.request, "urlopen", failing_urlopen)
+
+        with pytest.raises(OSError):
+            diacritics._default_phonikud_model()
+
+        dest = tmp_path / "scriptconv" / "phonikud" / "phonikud-1.0.int8.onnx"
+        assert not dest.exists()
+        cache_dir = tmp_path / "scriptconv" / "phonikud"
+        if cache_dir.exists():
+            assert list(cache_dir.iterdir()) == []
 
 
 class TestEuropeanPortugueseSenseDiacritics:

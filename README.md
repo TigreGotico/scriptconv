@@ -246,9 +246,13 @@ Two design points worth knowing:
   phonemizing; that needs language resources scriptconv doesn't ship. Pass
   `normalizer=` (a `(text, lang) -> str` callable) to run yours inside the
   pipeline; without it, text is phonemized as-is.
-- **Model-backed engines never download.** ByT5/Charsiu require an explicit
-  local `model=` path; resolving and caching model files is the caller's
-  concern.
+- **Large/licensed model-backed engines never download.** ByT5/Charsiu
+  require an explicit local `model=` path; resolving and caching those model
+  files is the caller's concern. Small, known-good, unencumbered models are
+  the exception: the Hebrew phonikud diacritizer auto-provisions its ONNX
+  model to a cache dir on first use (`phonikud_model=` still overrides it
+  with a path or callable; cache location via `SCRIPTCONV_CACHE`/
+  `XDG_CACHE_HOME`).
 
 **Pre-G2P disambiguation.** `add_diacritics(text, lang, model=None)` restores
 information ordinary orthography omits but a G2P needs, before phonemization:

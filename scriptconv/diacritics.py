@@ -51,6 +51,10 @@ tracks which backend/model produced the marks: overlay backends (phonikud,
 tashkeel, stressonnx) are strippable; spelling-integral backends (bifonia) are
 not.
 """
+import os
+import tempfile
+import urllib.request
+from pathlib import Path
 from typing import Optional
 
 from scriptconv.graph import Edge
@@ -119,20 +123,61 @@ _DEFAULT_DIACRITIZER_MODEL = "rawi-ensemble"
 _PHONIKUD_CACHE: dict = {}   # resolved model path/string -> Phonikud instance
 _TASHKEEL_CACHE: dict = {}  # model name -> text2tashkeel Diacritizer
 
+# phonikud is a small (~100MB), public, unlicensed-restriction ONNX model, so
+# — unlike the large/licensed models behind mul.py's ByT5/Charsiu backends —
+# scriptconv auto-provisions it: no local path is required unless the caller
+# wants to override the cache (e.g. an air-gapped host).
+_PHONIKUD_URL = "https://huggingface.co/thewh1teagle/phonikud-onnx/resolve/main/phonikud-1.0.int8.onnx"
 
-def _phonikud(phonikud_model):
+
+def _default_phonikud_model() -> str:
+    """Resolve (downloading and caching on first use if needed) the path to
+    the default phonikud ONNX model.
+
+    Cache directory: ``<base>/scriptconv/phonikud`` where ``<base>`` is
+    ``$SCRIPTCONV_CACHE`` if set, else ``$XDG_CACHE_HOME`` (default
+    ``~/.cache``) — i.e. ``~/.cache/scriptconv/phonikud`` by default. The
+    download is written to a temp file
+    in the same directory and atomically moved into place via
+    :func:`os.replace`, so a failed or interrupted download never leaves a
+    partial file at the destination path.
+    """
+    base = os.environ.get("SCRIPTCONV_CACHE") or os.environ.get(
+        "XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
+    cache_dir = Path(base) / "scriptconv" / "phonikud"
+    dest = cache_dir / "phonikud-1.0.int8.onnx"
+    if not dest.is_file():
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        fd, tmp_path = tempfile.mkstemp(dir=str(cache_dir), prefix=".phonikud-", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "wb") as tmp_f, urllib.request.urlopen(_PHONIKUD_URL) as resp:
+                while True:
+                    chunk = resp.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    tmp_f.write(chunk)
+            os.replace(tmp_path, dest)
+        except BaseException:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+            raise
+    return str(dest)
+
+
+def _phonikud(phonikud_model=None):
     """Lazily build (and cache) the phonikud Phonikud instance used for Hebrew.
 
-    ``phonikud_model`` is a local path to a phonikud ONNX model, or a
-    zero-arg callable resolving one lazily; scriptconv never downloads —
-    the consumer resolves the file. Install with ``pip install
-    scriptconv[he]`` (or ``pip install phonikud-onnx``)."""
+    ``phonikud_model`` is optional: a local path to a phonikud ONNX model, or
+    a zero-arg callable resolving one lazily. When omitted, scriptconv
+    auto-provisions the small public phonikud model, downloading it once into
+    a cache dir (see :func:`_default_phonikud_model`) and reusing it on
+    subsequent calls. Pass an explicit path/callable to override — e.g. to
+    point at a model already on disk, or on an air-gapped host. Install
+    phonikud-onnx with ``pip install scriptconv[he]`` (or ``pip install
+    phonikud-onnx``)."""
     model = phonikud_model() if callable(phonikud_model) else phonikud_model
     if not model:
-        raise ValueError(
-            "Hebrew diacritization needs a local phonikud ONNX model: "
-            "pass phonikud_model=<path> (scriptconv never downloads "
-            "models; obtain one from the phonikud-onnx release)")
+        model = _default_phonikud_model()
     if model not in _PHONIKUD_CACHE:
         try:
             from phonikud_onnx import Phonikud
@@ -207,7 +252,10 @@ def diacritize(text: str, lang: str = "und", model=None,
     Four backends, each restoring information ordinary orthography omits but
     downstream G2P needs:
 
-    - Hebrew (``he``) — niqqud via phonikud (``phonikud_model=``).
+    - Hebrew (``he``) — niqqud via phonikud. ``phonikud_model=`` is optional:
+      omitted, the small public phonikud ONNX model is auto-downloaded and
+      cached (``$SCRIPTCONV_CACHE``/``$XDG_CACHE_HOME``); pass a path or
+      zero-arg callable to override.
     - Arabic (``ar``) — tashkeel via text2tashkeel (``[tashkeel]``,
       ``model=``/``diacritizer_model=``).
     - East Slavic, Bulgarian/Macedonian/Slovene, Latvian, Armenian, Georgian,
