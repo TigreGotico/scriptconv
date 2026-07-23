@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a4](https://github.com/TigreGotico/scriptconv/tree/0.0.4a4) (2026-07-23)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a3...0.0.4a4)
+
+**Merged pull requests:**
+
+- feat: model diacritization as a graph extension parallel to phonemizers [\#70](https://github.com/TigreGotico/scriptconv/pull/70) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a3](https://github.com/TigreGotico/scriptconv/tree/0.0.4a3) (2026-07-22)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a2...0.0.4a3)
