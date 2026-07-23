@@ -231,9 +231,13 @@ def register(graph) -> None:
     from scriptconv.graph import Edge
 
     def _text_to_ipa(text: str, lang: str = "und",
-                     override: Optional[Phonemizer] = None, **_):
-        return phonemizer_for_lang(lang, Alphabet.IPA,
-                                   override).phonemize_string(text, lang)
+                     override: Optional[Phonemizer] = None,
+                     phonemizer_model: Optional[str] = None, **_):
+        # phonemizer_model is the model knob for this (phonemizer) edge —
+        # forwarded to model-backed phonemizers (ByT5/Charsiu/…); parallel to
+        # diacritizer_model on the text -> text-diacritized edge.
+        return phonemizer_for_lang(lang, Alphabet.IPA, override,
+                                   phonemizer_model).phonemize_string(text, lang)
 
     graph.register(Edge("text", "ipa", _text_to_ipa, lossless=False))
     graph.register(Edge("text-diacritized", "ipa", _text_to_ipa, lossless=False))
