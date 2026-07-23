@@ -44,7 +44,14 @@ class JiebaPhonemizer(BasePhonemizer):
         Returns:
             str: Tokenized text with words separated by spaces.
         """
-        import jieba
+        try:
+            import jieba
+        except ImportError as e:
+            raise ImportError(
+                "jieba is required for the Jieba phonemizer. "
+                "Install it with 'pip install jieba' "
+                "(or 'pip install scriptconv[zh-phonemizers]')."
+            ) from e
         lang = self.get_lang(lang)
         seg_list = jieba.cut(text, cut_all=False)
         # NFKC folds full-width digits (e.g. "３") to ASCII so num2str's
