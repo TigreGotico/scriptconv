@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a9](https://github.com/TigreGotico/scriptconv/tree/0.0.4a9) (2026-07-23)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a8...0.0.4a9)
+
+**Merged pull requests:**
+
+- fix: name the install extra when an optional phonemizer backend is missing [\#80](https://github.com/TigreGotico/scriptconv/pull/80) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a8](https://github.com/TigreGotico/scriptconv/tree/0.0.4a8) (2026-07-23)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a7...0.0.4a8)
