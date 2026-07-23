@@ -2,6 +2,7 @@
 import csv
 import math
 import os.path
+import threading
 from base64 import b64decode
 from pathlib import Path
 from typing import Union, List, Dict, Optional
@@ -312,30 +313,45 @@ SONORANTS = ()
 
 
 _initialized_tables_dir: Optional[Path] = None
+# guards the one-time table population below. The rule functions read the
+# module globals (CT_*, CONSONANTS, VOWELS, ...) without locking, which is safe
+# only because those globals are written exactly once and never mutated
+# afterwards; this lock serialises concurrent first-time initialisation so no
+# thread can observe a half-populated set of tables.
+_init_lock = threading.Lock()
 
 
 def initialize_conversion_tables(tables_dir: Path):
     global _initialized_tables_dir
     # the CSV tables never change at runtime, so once a given tables_dir has
-    # been parsed there is no need to re-read and re-parse it on every call
+    # been parsed there is no need to re-read and re-parse it on every call.
+    # Fast path is lock-free: _initialized_tables_dir is published (assigned)
+    # last, after every table global is fully populated, so any thread that
+    # sees it set also sees the complete tables.
     if _initialized_tables_dir == tables_dir:
         return
-    global CT_double_codas, CT_neutral, CT_tensification, CT_assimilation, CT_aspiration, CT_convention
-    CT_double_codas = ConversionTable('double_coda', tables_dir)
-    CT_neutral = ConversionTable('neutralization', tables_dir)
-    CT_tensification = ConversionTable('tensification', tables_dir)
-    CT_assimilation = ConversionTable('assimilation', tables_dir)
-    CT_aspiration = ConversionTable('aspiration', tables_dir)
-    CT_convention = ConversionTable('ipa', tables_dir)
+    with _init_lock:
+        # re-check under the lock: another thread may have initialised while we
+        # waited (double-checked locking)
+        if _initialized_tables_dir == tables_dir:
+            return
+        global CT_double_codas, CT_neutral, CT_tensification, CT_assimilation, CT_aspiration, CT_convention
+        CT_double_codas = ConversionTable('double_coda', tables_dir)
+        CT_neutral = ConversionTable('neutralization', tables_dir)
+        CT_tensification = ConversionTable('tensification', tables_dir)
+        CT_assimilation = ConversionTable('assimilation', tables_dir)
+        CT_aspiration = ConversionTable('aspiration', tables_dir)
+        CT_convention = ConversionTable('ipa', tables_dir)
 
-    global CONSONANTS, VOWELS, OBSTRUENTS, SONORANTS
-    CONSONANTS = tuple(
-        list(CT_convention.C)[:-2])  # from the C column of the IPA table, remove special characters # and $
-    VOWELS = tuple(list(CT_convention.V))  # from the V column of the IPA table
-    OBSTRUENTS = tuple(set(CONSONANTS) - set(C_SONORANTS))
-    SONORANTS = VOWELS + C_SONORANTS
+        global CONSONANTS, VOWELS, OBSTRUENTS, SONORANTS
+        CONSONANTS = tuple(
+            list(CT_convention.C)[:-2])  # from the C column of the IPA table, remove special characters # and $
+        VOWELS = tuple(list(CT_convention.V))  # from the V column of the IPA table
+        OBSTRUENTS = tuple(set(CONSONANTS) - set(C_SONORANTS))
+        SONORANTS = VOWELS + C_SONORANTS
 
-    _initialized_tables_dir = tables_dir
+        # published last: any thread seeing this set also sees all tables above
+        _initialized_tables_dir = tables_dir
 
 
 def get_substring_ind(string: str, pattern: str) -> List[int]:
