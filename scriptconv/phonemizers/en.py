@@ -1,7 +1,3 @@
-import os
-
-import requests
-
 from scriptconv.notation import _ARPA_TO_IPA as arpa_to_ipa_lookup
 from scriptconv.phonemizers.base import BasePhonemizer
 from scriptconv.phonemizers.enums import Alphabet
@@ -18,6 +14,8 @@ class DeepPhonemizer(BasePhonemizer):
     }
 
     def __init__(self, model="latin_ipa_forward.pt"):
+        import os
+
         import dp
         from dp.phonemizer import Phonemizer
         import torch
@@ -38,6 +36,7 @@ class DeepPhonemizer(BasePhonemizer):
                 os.makedirs(cache_dir, exist_ok=True)
                 model_path = os.path.join(cache_dir, model)
                 if not os.path.isfile(model_path):
+                    import requests
                     print(f"Downloading {model} from {url}...")
                     with requests.get(url, stream=True) as r:
                         r.raise_for_status()
