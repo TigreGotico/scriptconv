@@ -7,7 +7,14 @@ from scriptconv.phonemizers.enums import Alphabet
 class TugaphonePhonemizer(BasePhonemizer):
 
     def __init__(self):
-        from tugaphone import TugaPhonemizer
+        try:
+            from tugaphone import TugaPhonemizer
+        except ImportError as e:
+            raise ImportError(
+                "tugaphone is required for the Tugaphone phonemizer. "
+                "Install it with 'pip install tugaphone' "
+                "(or 'pip install scriptconv[pt-phonemizers]')."
+            ) from e
         self.tuga = TugaPhonemizer()
         super().__init__(Alphabet.IPA)
 

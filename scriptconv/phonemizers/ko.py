@@ -10,7 +10,14 @@ class G2PKPhonemizer(BasePhonemizer):
     def __init__(self, descriptive=True, group_vowels=True, to_syl=True,
                  alphabet=Alphabet.IPA):
         assert alphabet in [Alphabet.IPA, Alphabet.HANGUL]
-        from g2pk import G2p
+        try:
+            from g2pk import G2p
+        except ImportError as e:
+            raise ImportError(
+                "g2pk is required for the G2PK phonemizer. "
+                "Install it with 'pip install g2pk' "
+                "(or 'pip install scriptconv[ko]')."
+            ) from e
         self.g2p = G2p()
         self.descriptive = descriptive
         self.group_vowels = group_vowels

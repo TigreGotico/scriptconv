@@ -40,7 +40,14 @@ class CutletPhonemizer(BasePhonemizer):
         # If `use_foreign_spelling` is true, output will use the foreign spelling
         #         provided in a UniDic lemma when available. For example, "カツ" will
         #         become "cutlet" instead of "katsu".
-        import cutlet
+        try:
+            import cutlet
+        except ImportError as e:
+            raise ImportError(
+                "cutlet is required for the Cutlet phonemizer. "
+                "Install it with 'pip install cutlet' "
+                "(or 'pip install scriptconv[ja-phonemizers]')."
+            ) from e
         self.g2p = cutlet.Cutlet(alphabet)
         self.g2p.use_foreign_spelling = use_foreign_spelling
         super().__init__(alphabet)
@@ -73,7 +80,14 @@ class PyKakasiPhonemizer(BasePhonemizer):
     def __init__(self, alphabet=Alphabet.HEPBURN):
         assert alphabet in [Alphabet.HEPBURN, Alphabet.KANA, Alphabet.HIRA]
         # kana, hira, hepburn
-        import pykakasi
+        try:
+            import pykakasi
+        except ImportError as e:
+            raise ImportError(
+                "pykakasi is required for the PyKakasi phonemizer. "
+                "Install it with 'pip install pykakasi' "
+                "(or 'pip install scriptconv[ja-phonemizers]')."
+            ) from e
         self.g2p = pykakasi.kakasi()
         super().__init__(alphabet)
 

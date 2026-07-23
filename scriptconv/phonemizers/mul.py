@@ -435,7 +435,14 @@ class GruutPhonemizer(BasePhonemizer):
         Yields lists of word phonemes for each sentence.
         """
         lang = self.get_lang(lang)
-        import gruut
+        try:
+            import gruut
+        except ImportError as e:
+            raise ImportError(
+                "gruut is required for the Gruut phonemizer. "
+                "Install it with 'pip install gruut' "
+                "(or 'pip install scriptconv[gruut]')."
+            ) from e
         for sentence in gruut.sentences(text, lang=lang):
             sent_phonemes = [w.phonemes for w in sentence if w.phonemes]
             if sentence and not sent_phonemes:
@@ -601,8 +608,15 @@ class GoruutPhonemizer(BasePhonemizer):
 
     def __init__(self, remote_url=None):
         super().__init__(Alphabet.IPA)
-        from pygoruut.pygoruut import Pygoruut
-        from pygoruut.pygoruut_languages import PygoruutLanguages
+        try:
+            from pygoruut.pygoruut import Pygoruut
+            from pygoruut.pygoruut_languages import PygoruutLanguages
+        except ImportError as e:
+            raise ImportError(
+                "pygoruut is required for the Goruut phonemizer. "
+                "Install it with 'pip install pygoruut' "
+                "(or 'pip install scriptconv[goruut]')."
+            ) from e
 
         self.pygoruut_langs = PygoruutLanguages()
         if remote_url is not None:
@@ -665,7 +679,14 @@ class EpitranPhonemizer(BasePhonemizer):
 
     def __init__(self):
         super().__init__(Alphabet.IPA)
-        import epitran
+        try:
+            import epitran
+        except ImportError as e:
+            raise ImportError(
+                "epitran is required for the Epitran phonemizer. "
+                "Install it with 'pip install epitran' "
+                "(or 'pip install scriptconv[epitran]')."
+            ) from e
         self.epitran = epitran
         self._epis: Dict[str, epitran.Epitran] = {}
 
@@ -735,35 +756,42 @@ class MisakiPhonemizer(BasePhonemizer):
         """
         lang = self.get_lang(lang)
 
-        if lang == "zh":
-            if self.g2p_zh is None:
-                from misaki.zh import ZHG2P
-                self.g2p_zh = ZHG2P(version=self.zh_version)
-            return self.g2p_zh
-        elif lang == "ko":
-            if self.g2p_ko is None:
-                from misaki.ko import KOG2P
-                self.g2p_ko = KOG2P()
-            return self.g2p_ko
-        elif lang == "vi":
-            if self.g2p_vi is None:
-                from misaki.vi import VIG2P
-                self.g2p_vi = VIG2P()
-            return self.g2p_vi
-        elif lang == "ja":
-            if self.g2p_ja is None:
-                from misaki.ja import JAG2P
-                self.g2p_ja = JAG2P()
-            return self.g2p_ja
-        else:
-            if self.g2p_en is None:
-                from misaki import en
-                self.g2p_en = en.G2P()
-            if lang == "en-GB":
-                self.g2p_en.british = True
-            elif lang == "en-US":
-                self.g2p_en.british = False
-            return self.g2p_en
+        try:
+            if lang == "zh":
+                if self.g2p_zh is None:
+                    from misaki.zh import ZHG2P
+                    self.g2p_zh = ZHG2P(version=self.zh_version)
+                return self.g2p_zh
+            elif lang == "ko":
+                if self.g2p_ko is None:
+                    from misaki.ko import KOG2P
+                    self.g2p_ko = KOG2P()
+                return self.g2p_ko
+            elif lang == "vi":
+                if self.g2p_vi is None:
+                    from misaki.vi import VIG2P
+                    self.g2p_vi = VIG2P()
+                return self.g2p_vi
+            elif lang == "ja":
+                if self.g2p_ja is None:
+                    from misaki.ja import JAG2P
+                    self.g2p_ja = JAG2P()
+                return self.g2p_ja
+            else:
+                if self.g2p_en is None:
+                    from misaki import en
+                    self.g2p_en = en.G2P()
+                if lang == "en-GB":
+                    self.g2p_en.british = True
+                elif lang == "en-US":
+                    self.g2p_en.british = False
+                return self.g2p_en
+        except ImportError as e:
+            raise ImportError(
+                "misaki is required for the Misaki phonemizer. "
+                "Install it with 'pip install misaki' "
+                "(or 'pip install scriptconv[misaki]')."
+            ) from e
 
     def phonemize_string(self, text: str, lang: str) -> str:
         pho = self._get_phonemizer(lang)
@@ -1386,7 +1414,14 @@ class TransphonePhonemizer(BasePhonemizer):
 
     def __init__(self):
         super().__init__(Alphabet.IPA)
-        from transphone import read_tokenizer
+        try:
+            from transphone import read_tokenizer
+        except ImportError as e:
+            raise ImportError(
+                "transphone is required for the Transphone phonemizer. "
+                "Install it with 'pip install transphone' "
+                "(or 'pip install scriptconv[transphone]')."
+            ) from e
         self.read_tokenizer = read_tokenizer
         self._models = {}
 
