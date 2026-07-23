@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a8](https://github.com/TigreGotico/scriptconv/tree/0.0.4a8) (2026-07-23)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a7...0.0.4a8)
+
+**Merged pull requests:**
+
+- refactor: one model knob per graph edge \(phonemizer\_model / diacritizer\_model\) [\#78](https://github.com/TigreGotico/scriptconv/pull/78) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a7](https://github.com/TigreGotico/scriptconv/tree/0.0.4a7) (2026-07-23)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a6...0.0.4a7)
