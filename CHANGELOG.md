@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a6](https://github.com/TigreGotico/scriptconv/tree/0.0.4a6) (2026-07-23)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a5...0.0.4a6)
+
+**Merged pull requests:**
+
+- refactor: move diacritization mechanism out of BasePhonemizer into diacritics [\#74](https://github.com/TigreGotico/scriptconv/pull/74) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a5](https://github.com/TigreGotico/scriptconv/tree/0.0.4a5) (2026-07-23)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a4...0.0.4a5)
