@@ -199,9 +199,9 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         ``ImportError`` naming its extra when the optional dependency is
         missing — scriptconv never installs anything on the caller's behalf.
         """
-        if lang.startswith("he"):
+        if _primary_subtag(lang) == "he":
             return self.phonikud.add_diacritics(text)
-        elif lang.startswith("ar"):
+        elif _primary_subtag(lang) == "ar":
             return self.tashkeel(model).diacritize(text)
         elif _primary_subtag(lang) in STRESS_LANGS:
             return self._stress(text, lang, model)

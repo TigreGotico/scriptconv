@@ -117,13 +117,17 @@ Diacritization is also exposed as a graph transform, via
 `scriptconv.diacritics.register` — parallel to the phonemization edge above,
 it adds a lang-contextual `text-diacritized` node and two edges: `text ->
 text-diacritized` (restore, wrapping `add_diacritics`, model-based and
-expensive) and `text-diacritized -> text` (strip, pure Unicode combining-mark
-removal, lossless and cheap). That cost asymmetry is why routing never takes
-the round trip unless asked. Strip only works for *overlay* diacritics —
-Arabic/Hebrew vocalization and East-Slavic/Turkic/Caucasian stress, whose bare
-form carries no marks — and raises `ValueError` for languages where the marks
-are native orthography (European Portuguese/bifonia), since removing them
-would corrupt the spelling:
+expensive) and `text-diacritized -> text` (strip, cheap and lossless). Strip
+removes only the specific overlay codepoints each backend adds — combining
+acute/grave for stress, tashkeel for Arabic, niqqud for Hebrew — never a
+blanket combining-mark filter, so precomposed native letters (Cyrillic й/ё,
+Latvian macrons, Azerbaijani ç/ö, Arabic hamza carriers) are left intact.
+That cost asymmetry is why routing never takes the round trip unless asked.
+Strip only works for *overlay* diacritics — Arabic/Hebrew vocalization and
+East-Slavic/Turkic/Caucasian stress, whose bare form carries no marks, gated
+by exact primary-subtag match — and raises `ValueError` for languages where
+the marks are native orthography (European Portuguese/bifonia), since
+removing them would corrupt the spelling:
 
 ```python
 from scriptconv import DEFAULT_GRAPH

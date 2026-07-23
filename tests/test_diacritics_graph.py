@@ -72,6 +72,33 @@ class TestDiacriticsGraphExtension(unittest.TestCase):
         self.assertEqual(edge.src, "text")
         self.assertEqual(edge.dst, "ipa")
 
+    def test_strip_preserves_cyrillic_native_letters(self):
+        out = self.graph.convert("мой родно́й край", "text-diacritized",
+                                  "text", lang="ru")
+        self.assertEqual(out, "мой родной край")
+        out2 = self.graph.convert("ёлка", "text-diacritized", "text", lang="ru")
+        self.assertEqual(out2, "ёлка")
+
+    def test_strip_preserves_latin_stress_lang_diacritics(self):
+        # native macron (ī) plus an added combining acute overlay
+        out = self.graph.convert("Rī́ga", "text-diacritized", "text",
+                                  lang="lv")
+        self.assertEqual(out, "Rīga")
+        out2 = self.graph.convert("Rīga", "text-diacritized", "text", lang="lv")
+        self.assertEqual(out2, "Rīga")
+
+    def test_strip_preserves_arabic_hamza(self):
+        out = self.graph.convert("أَحْمَد", "text-diacritized", "text", lang="ar")
+        self.assertEqual(out, "أحمد")
+
+    def test_strip_refuses_aragonese(self):
+        with self.assertRaises(ValueError):
+            self.graph.convert("Cristián", "text-diacritized", "text", lang="arg")
+
+    def test_add_diacritics_does_not_misroute_herero(self):
+        from scriptconv.phonemizers.base import GraphemePhonemizer
+        self.assertEqual(GraphemePhonemizer().add_diacritics("teste", "her"), "teste")
+
 
 if __name__ == "__main__":
     unittest.main()
