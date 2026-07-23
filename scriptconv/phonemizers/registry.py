@@ -71,6 +71,7 @@ PHONEMIZER_REGISTRY: Dict[Phonemizer, Tuple[str, str, Optional[str]]] = {
     _P.MANTOQ: (f"{_BASE}.ar", "MantoqPhonemizer", "ar-phonemizers"),
     _P.ARBTOK: (f"{_BASE}.ar", "ArbtokPhonemizer", "ar-phonemizers"),
     _P.SHAMI: (f"{_BASE}.shami", "ShamiPhonemizer", "shami"),
+    _P.VOSK: (f"{_BASE}.ru", "VoskPhonemizer", "phonemizers"),
 }
 
 
@@ -135,6 +136,7 @@ _EMITS: Dict[Phonemizer, Tuple[Alphabet, ...]] = {
     _P.TUGAPHONE: (Alphabet.IPA,),
     _P.PHONIKUD: (Alphabet.IPA,),
     _P.COTOVIA: (Alphabet.COTOVIA,),
+    _P.VOSK: (Alphabet.VOSK,),
     _P.ESPEAK: (Alphabet.IPA,),
 }
 
@@ -147,6 +149,9 @@ LANG_DEFAULTS: Dict[str, Tuple[Phonemizer, ...]] = {
     "pt": (_P.TUGAPHONE,),
     "he": (_P.PHONIKUD,),
     "gl": (_P.COTOVIA, _P.ORTHOGRAPHY2IPA, _P.ESPEAK),
+    # vosk emits its own inventory, so it is the Russian default only
+    # when that notation is requested (same shape as Cotovía above)
+    "ru": (_P.VOSK, _P.ORTHOGRAPHY2IPA, _P.ESPEAK),
 }
 
 # Languages whose explicit entry is exhaustive: no generic fallback beyond it.

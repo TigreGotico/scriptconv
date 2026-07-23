@@ -30,6 +30,7 @@ class Alphabet(str, Enum):
     BUCKWALTER = "buckwalter"
     MANTOQ = "mantoq"  # ar — Halabi Arabic-Phonetiser inventory # ar
     CANGJIE = "cangjie" # zh (Cangjie input method)
+    VOSK = "vosk" # ru — vosk-tts phoneme inventory (a0, bj, sch ...)
     GRAPHEMES = "graphemes"  # plain text / grapheme input (user-side)
 
 
@@ -73,6 +74,7 @@ class Phonemizer(str, Enum):
     PYPINYIN = "pypinyin" # chinese
     XPINYIN = "xpinyin" # chinese
     JIEBA = "jieba" # chinese  (not a real phonemizer!)
+    VOSK = "vosk"  # russian  (no ipa!)
     SHAMI = "shami"  # Levantine Arabic / English code-switching (ShamiVITS)
     ARBTOK = "arbtok"  # arabic (dialect-aware, undiacritized text; o2i lattice)
     EUSKAPHONE = "euskaphone"  # basque (dialect-aware; o2i lattice)

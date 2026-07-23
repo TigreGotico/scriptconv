@@ -48,8 +48,9 @@ default, resolving in-house engines first:
 
 1. the explicit per-language chain — Arabic → arbtok, Basque → euskaphone,
    Mirandese → mwl_phonemizer, Portuguese → tugaphone, Hebrew → phonikud,
-   Galician → Cotovía (only when Cotovía's own notation is requested: a
-   candidate must be able to *emit* the requested alphabet);
+   Galician → Cotovía and Russian → vosk (both only when their own
+   notation is requested: a candidate must be able to *emit* the requested
+   alphabet);
 2. orthography2ipa, wherever it has a spec for the language;
 3. espeak as the universal fallback (the espeak-ng subprocess, or the
    pure-Python espyak port when the binary is absent).
@@ -196,7 +197,9 @@ Per-language: English (DeepPhonemizer, OpenPhonemizer, g2p_en), Japanese
 (OpenJTalk, cutlet, pykakasi), Korean (g2pk, KoG2P), Chinese (jieba, g2pM,
 xpinyin, pypinyin), Arabic (arbtok, mantoq), Hebrew (phonikud), Persian,
 Vietnamese (viphoneme), Portuguese (tugaphone, barranquenho), Galician
-(Cotovía), Basque (AhoTTS, euskaphone), Mirandese, Levantine Arabic/English
+(Cotovía), Russian (vosk — the vosk-tts inventory, `Alphabet.VOSK`, with the
+voice's pronunciation dictionary passed as `phonemizer_model`), Basque
+(AhoTTS, euskaphone), Mirandese, Levantine Arabic/English
 code-switching (shami — whose `phonemize_with_language_ids` also returns the
 parallel per-phoneme language-ID stream), and orthography2ipa for its
 data-driven language specs. Trivial built-ins that need no extra:
