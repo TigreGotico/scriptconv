@@ -5,7 +5,7 @@ Currently one backend: the Vosk-TTS front-end, wrapping the vendored
 Russian voices can be driven from text without the ``vosk-tts`` package.
 """
 import re
-from typing import List, Optional
+from typing import Iterator, List, Optional
 
 from quebra_frases import sentence_tokenize
 
@@ -86,25 +86,28 @@ class VoskPhonemizer(BasePhonemizer):
                 tokens.extend(convert(word).split())
         return tokens
 
-    def phonemize(self, text: str, lang: str) -> PhonemizedChunks:
-        """Sentence-level lists of Vosk phoneme tokens.
+    def phonemize_lazy(self, text: str, lang: str) -> Iterator[List[str]]:
+        """Sentence-level lists of Vosk phoneme tokens, one sentence at a time.
 
         Punctuation is preserved (it drives pausing); each sentence becomes one
         synthesis chunk.  Multi-character tokens (``sch``, ``bj``, ``a1``) stay
-        whole, so :meth:`BasePhonemizer.phonemize`'s per-character split is
-        deliberately bypassed.
+        whole, so :meth:`BasePhonemizer.phonemize_lazy`'s per-character split of
+        the phoneme *string* is deliberately bypassed — splitting ``s h`` into
+        characters would later fold back into ``sh`` (ш), a different phoneme.
         """
         self.get_lang(lang)
         if not text:
-            return []
+            return
         if self.normalizer is not None:
             text = self.normalizer(text, lang)
-        results: PhonemizedChunks = []
         for sentence in sentence_tokenize(text):
             tokens = self._g2p_tokens(sentence)
             if tokens:
-                results.append(tokens)
-        return results
+                yield tokens
+
+    def phonemize(self, text: str, lang: str) -> PhonemizedChunks:
+        """Sentence-level lists of Vosk phoneme tokens."""
+        return list(self.phonemize_lazy(text, lang))
 
     def phonemize_to_list(self, text: str, lang: str) -> List[str]:
         self.get_lang(lang)

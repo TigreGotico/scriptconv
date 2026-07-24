@@ -209,6 +209,21 @@ class TestVoskRegistration(unittest.TestCase):
         p = phonemizer_for_lang("ru", alphabet=Alphabet.IPA)
         self.assertNotIsInstance(p, VoskPhonemizer)
 
+    def test_phonemize_lazy_keeps_tokens_whole(self):
+        # the lazy path is what consumers stream through: it must yield the same
+        # whole phoneme tokens as phonemize(), never a per-character split
+        # ("s", "h" would otherwise fold back into "sh" — a different phoneme)
+        p = VoskPhonemizer()
+        text = "Сходить в кино. Счастье рядом!"
+        self.assertEqual(list(p.phonemize_lazy(text, "ru")), p.phonemize(text, "ru"))
+        flat = [t for chunk in p.phonemize_lazy(text, "ru") for t in chunk]
+        self.assertIn("s", flat)
+        self.assertIn("h", flat)
+        self.assertTrue(all(len(t) <= 3 for t in flat))
+        # every emitted token is a real phoneme/pause, not a bare character of one
+        self.assertNotIn("0", flat)
+        self.assertNotIn("1", flat)
+
     def test_module_level_phonemize_facade(self):
         self.assertEqual(phonemize("Привет", "ru", alphabet=Alphabet.VOSK),
                          "p rj i0 vj e0 t")
