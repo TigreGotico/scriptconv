@@ -1,6 +1,7 @@
 import unittest
 
 from scriptconv.phonemizers import Phonemizer, get_phonemizer_class
+from scriptconv.phonemizers.registry import get_phonemizer
 
 
 class TestVendoredKorean(unittest.TestCase):
@@ -174,3 +175,35 @@ class TestMantoqTokensToIpa(unittest.TestCase):
     def test_pretokenized_dbl_geminate(self):
         from scriptconv.notation import mantoq_to_ipa
         self.assertEqual(mantoq_to_ipa(["b", "_dbl_", "a"]), "bːa")
+
+
+class TestUnsupportedAlphabetIsAClearError(unittest.TestCase):
+    """A wrapper asked for an alphabet it cannot emit must say so.
+
+    ``get_phonemizer`` injects its own ``alphabet=`` default (IPA) into every
+    constructor declaring the parameter, so the Japanese wrappers — which emit
+    romanizations, never IPA — were hit by ordinary registry use and raised a
+    bare ``AssertionError`` with an empty message.
+    """
+
+    def test_registry_default_raises_valueerror_naming_the_alphabets(self):
+        from scriptconv.phonemizers.enums import Alphabet
+        for member in (Phonemizer.OPENJTALK, Phonemizer.CUTLET,
+                       Phonemizer.PYKAKASI):
+            with self.subTest(phonemizer=member.value):
+                try:
+                    get_phonemizer(member)
+                except ImportError:
+                    self.skipTest(f"{member.value} backend not installed")
+                except ValueError as e:
+                    self.assertIn("ipa", str(e))
+                    self.assertIn(Alphabet.HEPBURN.value, str(e))
+                else:
+                    self.fail("expected ValueError for an unemittable alphabet")
+
+    def test_openjtalk_default_alphabet_is_one_it_can_emit(self):
+        cls = get_phonemizer_class(Phonemizer.OPENJTALK)
+        import inspect
+        from scriptconv.phonemizers.enums import Alphabet
+        default = inspect.signature(cls.__init__).parameters["alphabet"].default
+        self.assertIn(default, (Alphabet.HEPBURN, Alphabet.KANA))

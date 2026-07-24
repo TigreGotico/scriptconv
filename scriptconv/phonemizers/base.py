@@ -45,6 +45,25 @@ def _primary_subtag(lang: str) -> str:
     return lang.lower().replace("_", "-").split("-")[0]
 
 
+def _check_alphabet(phonemizer, alphabet: Alphabet,
+                    supported: List[Alphabet]) -> None:
+    """Reject an output alphabet a wrapper cannot emit, with a usable message.
+
+    Wrappers used to guard this with a bare ``assert``, which surfaced as an
+    ``AssertionError`` carrying an empty message — the caller learned nothing
+    about which alphabet it asked for or which ones exist. That matters because
+    :func:`~scriptconv.phonemizers.registry.get_phonemizer` injects its own
+    ``alphabet=`` default into every constructor that declares the parameter,
+    so an unsupported default is hit by ordinary registry use, not just by
+    callers passing an odd value.
+    """
+    if alphabet not in supported:
+        raise ValueError(
+            f"{type(phonemizer).__name__} cannot emit "
+            f"{Alphabet(alphabet).value!r}; supported alphabets are "
+            f"{[Alphabet(a).value for a in supported]}")
+
+
 class BasePhonemizer(metaclass=abc.ABCMeta):
     def __init__(self, alphabet: Alphabet = Alphabet.UNICODE,
                  normalizer: Optional[Callable[[str, str], str]] = None):

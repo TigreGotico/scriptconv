@@ -3,7 +3,7 @@ import unicodedata
 from typing import List
 
 
-from scriptconv.phonemizers.base import BasePhonemizer
+from scriptconv.phonemizers.base import BasePhonemizer, _check_alphabet
 from scriptconv.phonemizers._thirdparty.zh_num import num2str
 from scriptconv.phonemizers.enums import Alphabet
 
@@ -74,7 +74,7 @@ class BaseChinesePinyinPhonemizer(BasePhonemizer):
             ipa (bool): Whether to convert pinyin to IPA.
             jieba (bool): Whether to segment text using Jieba before phonemization.
         """
-        assert alphabet in [Alphabet.PINYIN, Alphabet.IPA]
+        _check_alphabet(self, alphabet, [Alphabet.PINYIN, Alphabet.IPA])
         super().__init__(alphabet)
         self.jieba = jieba
         self.retone = retone
