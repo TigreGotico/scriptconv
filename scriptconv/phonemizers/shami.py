@@ -58,8 +58,21 @@ class ShamiPhonemizer(BasePhonemizer):
 
     def phonemize(self, text: str, lang: str) -> PhonemizedChunks:
         """Return sentence-level phoneme lists."""
-        phonemes, _ = self.phonemize_with_language_ids(text, lang)
-        return phonemes
+        return list(self.phonemize_lazy(text, lang))
+
+    def phonemize_lazy(self, text: str, lang: str) -> Iterator[List[str]]:
+        """Sentence-level lists of ShamiVITS symbols, one sentence at a time.
+
+        The front-end emits the model's own 88-symbol inventory, 24 of which are
+        multi-character (``d\u0361\u0292``, ``t\u0361\u0283``, ``s\u02e4``, the long vowels ``a\u02d0``/``i\u02d0``/``u\u02d0``,
+        the diphthongs ``a\u0361\u026a``/``o\u0361\u028a`` \u2026) plus the ``<bos>``/``<eos>`` sentinels.
+        :meth:`BasePhonemizer.phonemize_lazy` splits the phoneme *string* per
+        character, which would shred ``i\u02d0`` into ``i`` + ``\u02d0`` \u2014 and a bare ``\u02d0`` is
+        not in the inventory, so the tokenizer drops it as OOV and the model is
+        fed a shorter, wrong sequence. Yield the front-end's own tokens instead.
+        """
+        for phonemes, _ in self.phonemize_with_language_ids_lazy(text, lang):
+            yield phonemes
 
     def phonemize_with_language_ids(
         self, text: str, lang: str
