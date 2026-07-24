@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a11](https://github.com/TigreGotico/scriptconv/tree/0.0.4a11) (2026-07-24)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a10...0.0.4a11)
+
+**Merged pull requests:**
+
+- fix\(ru\): keep vosk phoneme tokens whole on the lazy path [\#84](https://github.com/TigreGotico/scriptconv/pull/84) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a10](https://github.com/TigreGotico/scriptconv/tree/0.0.4a10) (2026-07-23)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a9...0.0.4a10)
