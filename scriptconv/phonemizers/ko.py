@@ -1,6 +1,6 @@
 
 
-from scriptconv.phonemizers.base import BasePhonemizer
+from scriptconv.phonemizers.base import BasePhonemizer, _check_alphabet
 from scriptconv.phonemizers._thirdparty.hangul2ipa import hangul2ipa
 from scriptconv.phonemizers.enums import Alphabet
 
@@ -9,7 +9,7 @@ class G2PKPhonemizer(BasePhonemizer):
 
     def __init__(self, descriptive=True, group_vowels=True, to_syl=True,
                  alphabet=Alphabet.IPA):
-        assert alphabet in [Alphabet.IPA, Alphabet.HANGUL]
+        _check_alphabet(self, alphabet, [Alphabet.IPA, Alphabet.HANGUL])
         try:
             from g2pk import G2p
         except ImportError as e:
