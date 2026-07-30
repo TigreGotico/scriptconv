@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a13](https://github.com/TigreGotico/scriptconv/tree/0.0.4a13) (2026-07-30)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a12...0.0.4a13)
+
+**Merged pull requests:**
+
+- docs: rewrite README in Simplified Technical English [\#89](https://github.com/TigreGotico/scriptconv/pull/89) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a12](https://github.com/TigreGotico/scriptconv/tree/0.0.4a12) (2026-07-24)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a11...0.0.4a12)
