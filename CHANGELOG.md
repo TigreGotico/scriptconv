@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a17](https://github.com/TigreGotico/scriptconv/tree/0.0.4a17) (2026-08-02)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a16...0.0.4a17)
+
+**Merged pull requests:**
+
+- fix: plain h missing from the X-SAMPA table [\#97](https://github.com/TigreGotico/scriptconv/pull/97) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a16](https://github.com/TigreGotico/scriptconv/tree/0.0.4a16) (2026-08-02)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a15...0.0.4a16)
