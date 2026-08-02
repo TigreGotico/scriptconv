@@ -1,10 +1,7 @@
 """Tests for the africa-g2p-backed phonemizer.
 
-africa-g2p is not part of the ``test`` extra (it is not yet published to
-PyPI at time of writing — see the PR body), so the functional tests here
-skip gracefully when the package is unavailable, following the same shape
-as the CJK/Arabic backend tests in ``test_phonemizers_cjk_ar.py``. The
-registry-wiring and friendly-import-error tests run unconditionally.
+africa-g2p is vendored (``scriptconv.phonemizers._vendored.africa_g2p``),
+not an optional extra, so it is always present -- these tests never skip.
 """
 import unittest
 
@@ -17,14 +14,7 @@ from scriptconv.phonemizers import (
 )
 from scriptconv.phonemizers.africa import AfricaG2PPhonemizer
 
-try:
-    import africa_g2p  # noqa: F401
-    _HAS_AFRICA_G2P = True
-except ImportError:
-    _HAS_AFRICA_G2P = False
 
-
-@unittest.skipUnless(_HAS_AFRICA_G2P, "africa-g2p not installed")
 class TestAfricaG2PPhonemizer(unittest.TestCase):
     def test_ipa_output(self):
         p = AfricaG2PPhonemizer(alphabet=Alphabet.IPA)
@@ -72,15 +62,11 @@ class TestAfricaG2PRegistration(unittest.TestCase):
     def test_registered(self):
         self.assertIn(Phonemizer.AFRICA_G2P, PHONEMIZER_REGISTRY)
 
-    def test_class_resolves_or_raises_named_importerror(self):
-        try:
-            cls = get_phonemizer_class(Phonemizer.AFRICA_G2P)
-        except ImportError as e:
-            self.assertIn("scriptconv[", str(e))
-        else:
-            self.assertIs(cls, AfricaG2PPhonemizer)
+    def test_class_resolves_without_any_extra(self):
+        # vendored -- always resolves, never an ImportError naming an extra
+        cls = get_phonemizer_class(Phonemizer.AFRICA_G2P)
+        self.assertIs(cls, AfricaG2PPhonemizer)
 
-    @unittest.skipUnless(_HAS_AFRICA_G2P, "africa-g2p not installed")
     def test_get_phonemizer_builds_it(self):
         p = get_phonemizer(Phonemizer.AFRICA_G2P, Alphabet.IPA)
         self.assertIsInstance(p, AfricaG2PPhonemizer)
