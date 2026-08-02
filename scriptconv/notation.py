@@ -330,6 +330,7 @@ _XSAMPA_TO_IPA: dict[str, str] = {
     "R": "ʁ",
     "H\\": "ʜ",
     "?\\": "ʕ",
+    "h": "h",     # plain h = voiceless glottal fricative in canonical X-SAMPA
     "h\\": "ɦ",
     "?": "ʔ",
     "H": "ɥ",
