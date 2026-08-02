@@ -10,7 +10,7 @@ this once. Every representation is a **node**, every converter is an
 from scriptconv import DEFAULT_GRAPH
 
 DEFAULT_GRAPH.convert("こんにちは", "hira", "kana")     # 'コンニチハ'
-DEFAULT_GRAPH.convert("mrHbaa", "mantoq", "x-sampa")   # via IPA, two hops
+DEFAULT_GRAPH.convert("mrHbaa", "halabi", "x-sampa")   # via IPA, two hops
 
 [f"{e.src}->{e.dst}" for e in DEFAULT_GRAPH.route("arpa", "x-sampa")]
 # ['arpa->ipa', 'ipa->x-sampa']
@@ -19,7 +19,7 @@ DEFAULT_GRAPH.convert("mrHbaa", "mantoq", "x-sampa")   # via IPA, two hops
 ## Nodes: representations
 
 A node is a `Representation(id, kind, script, system, reference)`, notations
-(`ipa`, `arpa`, `mantoq`, …) and orthographies (`hira`, `hanzi`, `cangjie`,
+(`ipa`, `arpa`, `halabi`, …) and orthographies (`hira`, `hanzi`, `cangjie`,
 `hangul`, `jamo`, …) are peers in one flat id namespace. The `system` field
 qualifies sub-script systems (`pinyin` is written in Latin script but is not
 "Latin text"), so metadata never overclaims.
@@ -111,8 +111,8 @@ graph instances, and the engine routes them without knowing the difference.**
 
 ```bash
 python -m scriptconv convert hira kana "こんにちは"     # any representation pair
-python -m scriptconv route mantoq x-sampa              # show the chosen path
-#   mantoq -> ipa  (lossy, cost 10)
+python -m scriptconv route halabi x-sampa              # show the chosen path
+#   halabi -> ipa  (lossy, cost 10)
 #   ipa -> x-sampa  (lossless, cost 1)
 ```
 

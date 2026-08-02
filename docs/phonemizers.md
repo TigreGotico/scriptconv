@@ -182,11 +182,11 @@ defaults exist for both languages (arbtok, g2pk) and are what the
 per-language resolution selects.
 
 `MantoqPhonemizer` preserves its long-standing contract, because published
-models trained on mantoq phoneme sequences depend on it: the default
+models trained on Halabi-notation phoneme sequences depend on it: the default
 `alphabet=Alphabet.BUCKWALTER` returns the raw mantoq inventory (that
 historical label persists, `Alphabet.MANTOQ` is the accurate alias), and
 `Alphabet.IPA` converts through
-[`mantoq_to_ipa`](notation.md), the mantoq inventory is itself a full
+[`halabi_to_ipa`](notation.md), the Halabi inventory is itself a full
 notation, so its output participates in graph routing like any other.
 
 ## The backend catalog

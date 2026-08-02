@@ -13,7 +13,7 @@ zero-to-hero arc, or jump straight to the module you need.
    tags are stable API.
 2. **[notation.md](notation.md)**, phoneme-notation transcoding through the
    IPA hub: ARPABET (with reversible stress preservation), X-SAMPA,
-   Kirshenbaum, Lexique, Cotovía, RFE, Buckwalter ↔ Arabic, and the mantoq
+   Kirshenbaum, Lexique, Cotovía, RFE, Buckwalter ↔ Arabic, and the Halabi
    phonetic alphabet. The codecs-style `errors=` policy and the queryable
    `NOTATION_INFO` fidelity registry.
 3. **[translit.md](translit.md)**, deterministic script-level rewriting:

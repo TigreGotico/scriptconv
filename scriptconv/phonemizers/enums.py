@@ -28,7 +28,7 @@ class Alphabet(str, Enum):
     COTOVIA = "cotovia" # gl
     HANZI = "hanzi" # zh
     BUCKWALTER = "buckwalter"
-    MANTOQ = "mantoq"  # ar — Halabi Arabic-Phonetiser inventory # ar
+    HALABI = "halabi"  # ar — Halabi Arabic-Phonetiser phoneme notation
     CANGJIE = "cangjie" # zh (Cangjie input method)
     VOSK = "vosk" # ru — vosk-tts phoneme inventory (a0, bj, sch ...)
     GRAPHEMES = "graphemes"  # plain text / grapheme input (user-side)
@@ -66,7 +66,7 @@ class Phonemizer(str, Enum):
     COTOVIA = "cotovia"  # galician  (no ipa!)
     AHOTTS = "ahotts"  # basque
     PHONIKUD = "phonikud"  # hebrew
-    MANTOQ = "mantoq"  # arabic
+    MANTOQ = "mantoq"  # arabic — the mantoq wrapper around Halabi's Arabic-Phonetiser
     VIPHONEME = "viphoneme" # vietnamese
     G2PK = "g2pk" # korean
     KOG2PK = "kog2p" # korean

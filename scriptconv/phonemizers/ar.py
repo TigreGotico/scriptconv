@@ -7,7 +7,7 @@ from scriptconv.phonemizers.base import BasePhonemizer
 # Module-level indirection for the mantoq backend: resolved lazily on first
 # construction, kept as module globals so tests and callers can patch them.
 mantoq = None  # the g2p callable
-from scriptconv.notation import mantoq_to_ipa  # noqa: E402  (patchable name)
+from scriptconv.notation import halabi_to_ipa  # noqa: E402  (patchable name)
 
 
 def _load_mantoq_g2p():
@@ -33,13 +33,13 @@ class MantoqPhonemizer(BasePhonemizer):
 
     Historical contract, preserved for models in the wild: the default
     ``alphabet=Alphabet.BUCKWALTER`` returns the raw mantoq inventory (its
-    long-standing, if imprecise, label — ``Alphabet.MANTOQ`` is the accurate
+    long-standing, if imprecise, label — ``Alphabet.HALABI`` is the accurate
     alias); ``Alphabet.IPA`` converts via
-    :func:`scriptconv.notation.mantoq_to_ipa`.
+    :func:`scriptconv.notation.halabi_to_ipa`.
     """
 
     def __init__(self, alphabet: Alphabet = Alphabet.BUCKWALTER):
-        if alphabet not in (Alphabet.IPA, Alphabet.BUCKWALTER, Alphabet.MANTOQ):
+        if alphabet not in (Alphabet.IPA, Alphabet.BUCKWALTER, Alphabet.HALABI):
             raise ValueError("unsupported alphabet")
         super().__init__(alphabet)
         global mantoq
@@ -55,13 +55,13 @@ class MantoqPhonemizer(BasePhonemizer):
 
         Tokens are joined and the ``_+_`` word separator becomes a space —
         the byte-exact historical behavior; IPA output converts the joined
-        string with :func:`mantoq_to_ipa`.
+        string with :func:`halabi_to_ipa`.
         """
         lang = self.get_lang(lang)
         normalized_text, phonemes = mantoq(text)
         phonemes = "".join(phonemes).replace("_+_", " ")
         if self.alphabet == Alphabet.IPA:
-            return mantoq_to_ipa(phonemes)
+            return halabi_to_ipa(phonemes)
         return phonemes
 
 
