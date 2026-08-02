@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a15](https://github.com/TigreGotico/scriptconv/tree/0.0.4a15) (2026-08-02)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a14...0.0.4a15)
+
+**Merged pull requests:**
+
+- fix: ShamiPhonemizer.phonemize\_lazy shredded multi-character symbols [\#86](https://github.com/TigreGotico/scriptconv/pull/86) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a14](https://github.com/TigreGotico/scriptconv/tree/0.0.4a14) (2026-08-02)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a13...0.0.4a14)
