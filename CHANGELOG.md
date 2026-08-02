@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a14](https://github.com/TigreGotico/scriptconv/tree/0.0.4a14) (2026-08-02)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a13...0.0.4a14)
+
+**Merged pull requests:**
+
+- feat: africa-g2p phonemizer backend [\#91](https://github.com/TigreGotico/scriptconv/pull/91) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a13](https://github.com/TigreGotico/scriptconv/tree/0.0.4a13) (2026-07-30)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a12...0.0.4a13)
