@@ -311,6 +311,7 @@ _XSAMPA_TO_IPA: dict[str, str] = {
     "p\\": "ɸ",
     "B\\": "ʙ",
     "r\\": "ɹ",
+    "r": "r",     # plain r = alveolar TRILL in canonical X-SAMPA (tap is "4")
     "r`": "ɽ",    # retroflex FLAP (not approximant)
     "R\\": "ʀ",
     "l`": "ɭ",
