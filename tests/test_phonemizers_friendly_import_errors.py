@@ -43,6 +43,11 @@ def _trigger_jieba(cls):
     p.phonemize_string("你好", "zh")
 
 
+def _trigger_africa_g2p(cls):
+    p = cls()
+    p.phonemize_string("Akwaaba", "twi")
+
+
 # member -> (module name to blank out in sys.modules, how to trigger the
 # lazy import that consumes it)
 CASES = {
@@ -61,6 +66,7 @@ CASES = {
     Phonemizer.VIPHONEME: ("viphoneme", _trigger_construct),
     Phonemizer.G2PK: ("g2pk", _trigger_construct),
     Phonemizer.JIEBA: ("jieba", _trigger_jieba),
+    Phonemizer.AFRICA_G2P: ("africa_g2p", _trigger_africa_g2p),
 }
 
 
@@ -68,7 +74,7 @@ class TestLazyBackendImportsAreFriendly(unittest.TestCase):
     def test_all_documented_backends_covered(self):
         # keeps this test list honest if a new Phonemizer member is added
         # backed by one of the wrapper modules touched by this convention
-        self.assertEqual(len(CASES), 15)
+        self.assertEqual(len(CASES), 16)
 
     def _assert_friendly(self, member):
         module_name, trigger = CASES[member]
@@ -123,6 +129,9 @@ class TestLazyBackendImportsAreFriendly(unittest.TestCase):
 
     def test_jieba(self):
         self._assert_friendly(Phonemizer.JIEBA)
+
+    def test_africa_g2p(self):
+        self._assert_friendly(Phonemizer.AFRICA_G2P)
 
 
 if __name__ == "__main__":
