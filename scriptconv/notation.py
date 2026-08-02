@@ -154,6 +154,10 @@ for _arpa, _ipa in _ARPA_BASE.items():
         _IPA_TO_ARPA[_ipa] = _arpa
 # Accept ASCII "g" (U+0067) as well as canonical script "ɡ" (U+0261) on input.
 _IPA_TO_ARPA.setdefault("g", "G")
+# Bare/long NURSE vowel (non-rhotic British ɜ, ɜː) has no dedicated ARPA symbol —
+# ARPABET is rhotic-only, so it collapses onto the same "ER" as the r-colored ɜr.
+_IPA_TO_ARPA.setdefault("ɜː", "ER")
+_IPA_TO_ARPA.setdefault("ɜ", "ER")
 
 # Precompiled regex for IPA → ARPA (longest-first)
 _IPA_ARPA_KEYS_SORTED = sorted(_IPA_TO_ARPA.keys(), key=len, reverse=True)
