@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a18](https://github.com/TigreGotico/scriptconv/tree/0.0.4a18) (2026-08-02)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a17...0.0.4a18)
+
+**Merged pull requests:**
+
+- fix: rename the mantoq notation to halabi [\#99](https://github.com/TigreGotico/scriptconv/pull/99) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a17](https://github.com/TigreGotico/scriptconv/tree/0.0.4a17) (2026-08-02)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a16...0.0.4a17)
