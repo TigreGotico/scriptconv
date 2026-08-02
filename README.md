@@ -45,7 +45,7 @@ Everything is also a command:
 python -m scriptconv detect "안녕하세요"           # Hang
 python -m scriptconv convert arpa ipa "K AE1 T"   # kæt
 python -m scriptconv strip tashkeel "مُحَمَّد"       # محمد
-python -m scriptconv route mantoq x-sampa         # the conversion path, hop by hop
+python -m scriptconv route halabi x-sampa         # the conversion path, hop by hop
 ```
 
 ## The mental model
@@ -58,8 +58,8 @@ scriptconv is organized around four ideas, layered from identity to sound.
 
 2. **Representations are nodes. Conversions are edges.** IPA, ARPABET,
    hiragana, pinyin, and Cangjie codes are each a node in one conversion
-   graph, and asking for `mantoq → x-sampa` finds the cheapest path
-   (`mantoq → ipa → x-sampa`), preferring lossless edges by construction.
+   graph, and asking for `halabi → x-sampa` finds the cheapest path
+   (`halabi → ipa → x-sampa`), preferring lossless edges by construction.
 
 3. **Conventions are decorations, not identities.** Arabic vowel marks,
    Hebrew points, Japanese word spacing, and pinyin tone spelling are
@@ -97,7 +97,7 @@ Cyrillic never splits. Details: [docs/scripts.md](docs/scripts.md).
 ### Same sounds, different symbols: the `notation` module
 
 Nine phoneme notations transcode through an IPA hub: ARPABET, X-SAMPA,
-Kirshenbaum, Lexique, Cotovía, RFE, Buckwalter to Arabic, and mantoq.
+Kirshenbaum, Lexique, Cotovía, RFE, Buckwalter to Arabic, and Halabi (the Nawar Halabi Arabic-Phonetiser notation, popularized by the mantoq package).
 
 ```python
 from scriptconv import convert, arpa_to_ipa, ipa_to_arpa
@@ -123,9 +123,9 @@ Two contracts make this trustworthy:
 
 Buckwalter is an independent implementation of the published transliteration
 scheme, including alef wasla and the dagger alef (رحمٰن transliterates as
-*rHm`n*). Mantoq
+*rHm`n*). The Halabi notation
 is the phonetic alphabet of the Halabi Arabic-Phonetiser. Text in it
-converts one way to IPA (`mantoq_to_ipa("mrHbaa")` → `'mrħbaː'`) and onward
+converts one way to IPA (`halabi_to_ipa("mrHbaa")` → `'mrħbaː'`) and onward
 through the graph. Details: [docs/notation.md](docs/notation.md).
 
 ### Rewriting the writing: `translit`, `readings`, `cangjie`
@@ -322,7 +322,7 @@ placeholder (`?`, the historical `ipa_to_arpa` default, tunable via
 | **ARPABET** | **Lossless with `stress=True`** (digits map to IPA `ˈ`/`ˌ` before the stressed vowel; residues: extended-ARPABET `AX` normalises to CMUdict's `AH0` spelling, and `AH0 R` fuses to the r-colored `AXR0`, stable from the IPA side). Default `stress=False` drops digits and merges `AH0` with `AX` | **Lossy** (ARPABET is an English-only inventory, so any IPA symbol outside it becomes the *unknown* placeholder) | `arpa_to_ipa`: passed through unchanged. `ipa_to_arpa`: diacritics and suprasegmentals are dropped. Other out-of-inventory symbols follow `errors=` (default `"replace"` → `?`) |
 | **X-SAMPA** | Exact for all canonical symbols | Exact except aliases (`f\`→ɸ, `&`→æ) normalise to their canonical spelling | Passed through unchanged |
 | **Buckwalter ↔ Arabic** | Exact (precomposed lam-alef ligatures decompose to two characters, visually identical) | Exact | Follows `errors=` (default: passed through) |
-| **Mantoq → IPA** | One-directional (gemination and word markers are consumed; there is no IPA to Mantoq) | Not applicable | Follows `errors=` (default: passed through) |
+| **Halabi → IPA** | One-directional (gemination and word markers are consumed; there is no IPA to Halabi) | Not applicable | Follows `errors=` (default: passed through) |
 | **Lexique ↔ IPA** | Exact except the `°`/`3` schwa pair (both map to `ə`; the reverse always produces `°`) | Exact | Passed through unchanged |
 | **Kirshenbaum ↔ IPA** | Exact | **Lossy** (restricted ASCII inventory; IPA outside it passes through) | Passed through unchanged |
 | **Cotovía ↔ IPA** | Exact except the three `L`/`Z`/`jj` symbols for `ʎ` normalise to `L` | **Lossy** (Galician/Spanish inventory; IPA outside it passes through) | Passed through unchanged |

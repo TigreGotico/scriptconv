@@ -190,18 +190,18 @@ if __name__ == "__main__":
 class TestMantoqTokensToIpa(unittest.TestCase):
     def test_pretokenized_sequence_accepted(self):
         # the mantoq package's g2p returns a token LIST; joining is ambiguous
-        # so mantoq_to_ipa consumes sequences directly
-        from scriptconv.notation import mantoq_to_ipa
+        # so halabi_to_ipa consumes sequences directly
+        from scriptconv.notation import halabi_to_ipa
         tokens = ["m", "a", "r", "H", "a", "b", "a", "n", "aa",
                   "_+_", "b", "i", "l", "E", "aa", "l", "a", "m", "i"]
-        out = mantoq_to_ipa(tokens)
+        out = halabi_to_ipa(tokens)
         self.assertIn("ħ", out)
         self.assertIn(" ", out)
         self.assertNotIn("_", out)
 
     def test_pretokenized_dbl_geminate(self):
-        from scriptconv.notation import mantoq_to_ipa
-        self.assertEqual(mantoq_to_ipa(["b", "_dbl_", "a"]), "bːa")
+        from scriptconv.notation import halabi_to_ipa
+        self.assertEqual(halabi_to_ipa(["b", "_dbl_", "a"]), "bːa")
 
 
 class TestUnsupportedAlphabetIsAClearError(unittest.TestCase):
