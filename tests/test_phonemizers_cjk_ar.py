@@ -99,6 +99,33 @@ class TestShamiFrontend(unittest.TestCase):
         lazy = list(p.phonemize_with_language_ids_lazy(text, "ar"))
         self.assertEqual(eager[0], [ph for ph, _ in lazy])
 
+    def test_phonemize_lazy_matches_phonemize(self):
+        """phoonnx (and any streaming caller) consumes phonemize_lazy only."""
+        from scriptconv.phonemizers.shami import ShamiPhonemizer
+        p = ShamiPhonemizer()
+        text = "\u0627\u0644\u062c\u0648 \u062d\u0644\u0648 \u0627\u0644\u064a\u0648\u0645. \u0627\u0644\u0634\u062c\u0631\u0629 \u0643\u0628\u064a\u0631\u0629."
+        self.assertEqual(p.phonemize(text, "ar"),
+                         list(p.phonemize_lazy(text, "ar")))
+
+    def test_phonemize_lazy_keeps_multichar_symbols_whole(self):
+        """Every yielded token is a whole inventory symbol, never a shredded
+        fragment. The exact phoneme sequence depends on which optional Arabic
+        diacritizer backend is installed, so the assertions are invariants over
+        the inventory, not a hardcoded transcription: a bare length mark can
+        only appear if a long-vowel symbol was split, and every token must be
+        a real ShamiVITS symbol."""
+        from scriptconv.phonemizers.shami import ShamiPhonemizer, SYMBOL_TO_ID
+        p = ShamiPhonemizer()
+        tokens = [t for sent in p.phonemize_lazy("\u0627\u0644\u0634\u062c\u0631\u0629 \u0643\u0628\u064a\u0631\u0629.", "ar")
+                  for t in sent]
+        self.assertNotIn("\u02d0", tokens)
+        for t in tokens:
+            self.assertIn(t, SYMBOL_TO_ID, f"{t!r} is not a ShamiVITS symbol")
+        # If any multi-character symbol was produced, it survived whole.
+        multi = [t for t in tokens if len(t) > 1 and not t.startswith("<")]
+        for t in multi:
+            self.assertIn(t, SYMBOL_TO_ID)
+
     def test_frontend_symbols_are_public(self):
         from scriptconv.phonemizers.shami import (
             TextFrontend,
