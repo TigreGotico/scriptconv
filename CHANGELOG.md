@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.0.4a16](https://github.com/TigreGotico/scriptconv/tree/0.0.4a16) (2026-08-02)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a15...0.0.4a16)
+
+**Merged pull requests:**
+
+- fix: plain r \(alveolar trill\) missing from the X-SAMPA table [\#95](https://github.com/TigreGotico/scriptconv/pull/95) ([JarbasAl](https://github.com/JarbasAl))
+- fix: map bare/long NURSE vowel to ARPA ER [\#93](https://github.com/TigreGotico/scriptconv/pull/93) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a15](https://github.com/TigreGotico/scriptconv/tree/0.0.4a15) (2026-08-02)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a14...0.0.4a15)
