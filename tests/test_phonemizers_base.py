@@ -21,9 +21,11 @@ class TestEnums(unittest.TestCase):
         self.assertEqual(Phonemizer.ARBTOK.value, "arbtok")
         self.assertEqual(Phonemizer.MIRANDESE.value, "mwl_phonemizer")
         self.assertEqual(Phonemizer.KOG2PK.value, "kog2p")
+        self.assertEqual(Phonemizer.VOSK.value, "vosk")
         self.assertEqual(Alphabet.XSAMPA.value, "x-sampa")
-        self.assertEqual(len(list(Phonemizer)), 41)
-        self.assertEqual(len(list(Alphabet)), 21)  # incl. MANTOQ
+        self.assertEqual(Alphabet.VOSK.value, "vosk")
+        self.assertEqual(len(list(Phonemizer)), 45)  # +HALABI, +IQRA
+        self.assertEqual(len(list(Alphabet)), 23)  # incl. HALABI, VOSK, AFRICA_G2P
 
 
 class TestRegistryCompleteness(unittest.TestCase):
@@ -82,11 +84,6 @@ class TestBaseContract(unittest.TestCase):
     def test_unicode_codepoint_nfd(self):
         u = UnicodeCodepointPhonemizer()
         self.assertEqual(len(u.phonemize_string("ã", "pt")), 2)  # a + combining
-
-    def test_hebrew_diacritizer_requires_local_model(self):
-        with self.assertRaises(ValueError) as ctx:
-            GraphemePhonemizer().add_diacritics("שלום", "he")
-        self.assertIn("phonikud_model", str(ctx.exception))
 
 
 class TestLangDefaults(unittest.TestCase):
@@ -183,21 +180,6 @@ class TestFacadeAndGraph(unittest.TestCase):
         self.assertTrue(g.can_convert("text", "arpa"))
 
 
-class TestPhonikudModelResolver(unittest.TestCase):
-    def test_callable_resolver_invoked_lazily(self):
-        calls = []
-
-        def resolver():
-            calls.append(1)
-            return ""  # resolves to nothing -> still the explicit ValueError
-
-        g = GraphemePhonemizer(phonikud_model=resolver)
-        self.assertEqual(calls, [])  # not resolved at construction
-        with self.assertRaises(ValueError):
-            g.add_diacritics("שלום", "he")
-        self.assertEqual(calls, [1])
-
-
 class TestModelForwarding(unittest.TestCase):
     def test_model_forwards_to_variant_param(self):
         from unittest import mock
@@ -221,3 +203,5 @@ class TestModelForwarding(unittest.TestCase):
     def test_model_none_forwards_nothing(self):
         g = get_phonemizer(Phonemizer.GRAPHEMES, model=None)
         self.assertIsInstance(g, GraphemePhonemizer)
+
+

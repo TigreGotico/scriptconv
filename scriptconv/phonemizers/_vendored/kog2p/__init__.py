@@ -33,6 +33,7 @@ import re
 import math
 import sys
 import optparse
+from functools import lru_cache
 
 # Option
 # Import-time CLI parsing removed for library use (the upstream script
@@ -366,10 +367,19 @@ kog2p_to_hangul = {
 }
 
 
+@lru_cache(maxsize=None)
+def _cachedReadRules(pver, rule_book):
+    # rulebook.txt never changes at runtime, so parse it once per path
+    # instead of re-opening and re-parsing it on every runKoG2P call
+    rule_in, rule_out = readRules(pver, rule_book)
+    return tuple(rule_in), tuple(rule_out)
+
+
 def runKoG2P(graph, rulebook=None):
     if not rulebook:
         rulebook = f"{os.path.dirname(__file__)}/rulebook.txt"
-    [rule_in, rule_out] = readRules(ver_info[0], rulebook)
+    rule_in, rule_out = _cachedReadRules(ver_info[0], rulebook)
+    rule_in, rule_out = list(rule_in), list(rule_out)
     words = graph.split()
     phonemized = []
     for w in words:
