@@ -113,9 +113,8 @@ class TestIqraPhonemizer(unittest.TestCase):
 class TestIqraPreprocessRules(unittest.TestCase):
     """The three text-level transforms in isolation — each independently
     verified against a 2,588-row held-out sample of IqraEval/Iqra_train's dev
-    split (see scripts/benchmark_iqraeval.py; 77.6% exact token-match with
-    these three rules, residual classes documented in IqraPhonemizer's
-    docstring, mostly bugs in the vendored phonetiser itself)."""
+    split (see scripts/benchmark_iqraeval.py for the current exact-match rate
+    and any residual mismatch classes)."""
 
     def test_tanwin_stripped_mid_utterance_not_just_at_pause(self):
         from scriptconv.phonemizers.ar import _iqra_preprocess
@@ -141,6 +140,56 @@ class TestIqraPreprocessRules(unittest.TestCase):
         # a long vowel, untouched; the point is nothing crashes and the
         # rule only ever touches the true last word)
         self.assertTrue(out)
+
+
+class TestIqraPhonetiserBackend(unittest.TestCase):
+    """Regression tests for the ``_vendored/iqra_phonetiser`` backend fixes
+    that took the IqraEval dev-split exact-match rate from an initial,
+    badly-regressed port (33.6%, missing the utterance-level normalization
+    pass entirely) to 98.3% — see the introducing PR for the full history
+    and ``scripts/benchmark_iqraeval.py`` for the current rate and the
+    residual mismatch classes (predominantly a proven dataset-generation
+    bug, not a phonetiser fidelity gap)."""
+
+    def test_mid_utterance_connecting_alif_is_silent(self):
+        # hamzat al-waṣl: a definite article mid-utterance connects directly
+        # to the previous word's final vowel — its own alif is never
+        # pronounced as a long "aa" (only utterance-INITIAL "ال" gets the
+        # explicit hamza treatment; see _iqra_preprocess). Regression test
+        # for the missing ``_preprocess_utterance`` normalization pass (the
+        # ``([^-]) A`` -> `` `` rule) that, when absent, phonetised every
+        # mid-utterance "ال" alif as a spurious "aa".
+        #
+        # Built with explicit codepoints (shadda U+0651 before the fatha
+        # U+064E on the shadda-doubled seen) — the dataset's own diacritic
+        # ordering convention; some keyboard input methods produce the
+        # opposite order, which the raw phonetiser (upstream's own
+        # ambiguity, not this port's) reads differently.
+        seen_al_samawati = (
+            "ا" + "ل" + "س" + "ّ" + "َ" + "م" + "َ" + "ا"
+            + "و" + "َ" + "ا" + "ت" + "ِ"
+        )
+        p = get_phonemizer(Phonemizer.IQRA, alphabet=Alphabet.HALABI)
+        out = p.phonemize_string(f"فِي {seen_al_samawati} وَالْأَرْضِ", "ar").split()
+        # "في" + "السماوات": the alif of "ال" must not surface as "aa"
+        # between "ii" (fii) and "ss" (the sun-letter-elided lam + shadda-
+        # doubled seen).
+        self.assertEqual(out[:9], ["f", "ii", "ss", "a", "m", "aa", "w", "aa", "t"])
+
+    def test_emphatic_context_does_not_leak_across_ra(self):
+        # Upstream's (and mantoq's) actual, executed condition for resetting
+        # emphaticContext is an adjacent-string-literal typo that never
+        # matches "r"/"l" despite the "(except for Lam and Ra)" comment —
+        # i.e. an emphatic consonant's context does NOT survive past a
+        # following "r" the way the comment claims. phoneme_ref was
+        # generated against that actual (buggy) behavior, so this backend
+        # reproduces it verbatim rather than the comment's intent.
+        p = get_phonemizer(Phonemizer.IQRA, alphabet=Alphabet.HALABI)
+        out = p.phonemize_string("يُبْصِرُونَ", "ar").split()
+        # final "uu" is after a non-resetting-per-the-comment "r", but the
+        # actual upstream behavior resets emphaticContext there anyway.
+        self.assertIn("uu", out)
+        self.assertNotIn("UU", out)
 
 
 class TestMantoqHalabiLabelingIsAccurate(unittest.TestCase):

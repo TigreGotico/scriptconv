@@ -9,6 +9,7 @@ from scriptconv.phonemizers.base import BasePhonemizer, _check_alphabet
 # construction, kept as module globals so tests and callers can patch them.
 mantoq = None  # the g2p callable
 _halabi_backend = None  # (arabic_to_buckwalter, process_utterance) tuple
+_iqra_backend = None  # (arabic_to_buckwalter, process_utterance) tuple, IqraEval fork
 from scriptconv.notation import halabi_to_ipa, iqra_halabi_to_ipa  # noqa: E402  (patchable names)
 
 
@@ -40,6 +41,22 @@ def _load_halabi_backend():
         from scriptconv.phonemizers import _vendored
         from scriptconv.phonemizers._vendored.mantoq.buck.phonetise_buckwalter import (
             arabic_to_buckwalter, process_utterance)
+    return arabic_to_buckwalter, process_utterance
+
+
+def _load_iqra_backend():
+    """Resolve ``(arabic_to_buckwalter, process_utterance)`` from the
+    IqraEval shared task's OWN published data-prep code
+    (Iqra-Eval/MSA_phonetiser's ``phonetiser/phonetise_Arabic.py``), vendored
+    separately from :func:`_load_halabi_backend`'s mantoq copy — see
+    ``_vendored/iqra_phonetiser/LICENSE.md`` and ``phonetiser.py``'s module
+    docstring for why the two diverge and what each patch fixes.  Only
+    :class:`IqraPhonemizer` uses this; :class:`HalabiPhonemizer` and
+    :class:`MantoqPhonemizer` keep the long-standing mantoq-derived backend.
+    """
+    from scriptconv.phonemizers import _vendored
+    from scriptconv.phonemizers._vendored.iqra_phonetiser.phonetiser import (
+        arabic_to_buckwalter, process_utterance)
     return arabic_to_buckwalter, process_utterance
 
 
@@ -305,49 +322,35 @@ class HalabiPhonemizer(BasePhonemizer):
 class IqraPhonemizer(BasePhonemizer):
     """The IqraEval shared task's flavor of the Halabi phonetiser.
 
-    Nawar Halabi's phonetiser called directly (same input contract as
-    :class:`HalabiPhonemizer`: already-vowelized text), with its raw output
-    post-processed to match the IqraEval shared task's ``phoneme_ref``
-    convention (Interspeech 2025, doi:10.21437/Interspeech.2025-2411 — "we
-    employed the phonetizer introduced by Nawar Halabi"; TigreGotico/arbtok's
-    ``scripts/benchmark_iqraeval.py`` independently verified the base
-    notation symbol-by-symbol against a 5,050-row sample).
+    Backed by ``_vendored/iqra_phonetiser/phonetiser.py`` — a port of
+    Iqra-Eval/MSA_phonetiser's own ``phonetiser/phonetise_Arabic.py``, the
+    IqraEval shared task's OWN published data-prep code (confirmed, per its
+    ``run_phonetiser.py``, to be what generates ``phoneme_ref`` itself), NOT
+    mantoq's vendored copy of Nawar Halabi's pristine original (that copy
+    backs :class:`HalabiPhonemizer`/:class:`MantoqPhonemizer` instead — see
+    ``_vendored/iqra_phonetiser/LICENSE.md`` and that module's docstring for
+    the full diff against both the pristine upstream and mantoq's copy, and
+    why the two vendored copies must stay independent).
 
     Three deterministic text-level transforms are applied to the input
     *before* the phonetiser runs (see :func:`_iqra_preprocess`, each cited
-    to its tajwīd/grammar name, each verified against a 2,588-row held-out
-    sample of IqraEval/Iqra_train's dev split — 76.6% exact token-match; see
-    the introducing PR for the full methodology and the residual classes
-    below), plus the stress-digit strip every raw edge needs:
+    to its tajwīd/grammar name), plus the stress-digit strip every raw edge
+    needs:
 
       1. tanwīn (nunation) dropped everywhere, not just at a pause;
       2. wāw al-jamāʿah's silent alif (``-ūا`` → ``-ū``) collapsed;
       3. utterance-initial hamzat al-waṣl on the definite article "ال"
          realized as hamza + fatḥa (``أَ``) rather than elided.
 
-    Known, *proven* residual divergence (counterexamples in the introducing
-    PR) — not implemented here because it needs a patch inside the
-    CC BY-NC-quarantined vendored phonetiser itself, not a text-level
-    transform, so is out of scope for this edge:
-
-      - the definite article's lam is never assimilated into a following
-        sun letter in this dataset (``ال`` + sun letter stays literal
-        ``a l`` + the doubled letter, it never elides to just the doubled
-        letter); the vendored phonetiser's lam-omission rule fires
-        regardless and a text-level workaround (inserting a sukūn to block
-        it) is undone by the phonetiser's own input normalization.
-      - a handful of specific diacritic-ordering sequences (shadda written
-        before vs. after the vowel mark on certain letters) make the
-        vendored phonetiser silently drop a word-medial consonant; and a
-        narrow class of word-initial "kaf/wāw + alif" words (e.g. ``كَانَ``)
-        hit an internal pronunciation-ambiguity branch whose first
-        (default) candidate is the short-vowel reading — both are bugs in
-        the vendored engine itself, not this edge's post-processing.
+    See the introducing PR for the full methodology, the match-rate history,
+    and any residual mismatch classes against ``IqraEval/Iqra_train``'s
+    ``phoneme_ref`` (``scripts/benchmark_iqraeval.py``).
 
     ``Alphabet.HALABI`` (default) returns the cleaned native tokens
     (space-separated, digits stripped, no ``+``/``sil``, gemination as a
     literal doubled consonant letter — the ``phoneme_ref`` convention
-    itself). ``Alphabet.IPA`` converts through
+    itself, emphatic-context uppercase vowels included: the reference keeps
+    that distinction). ``Alphabet.IPA`` converts through
     :func:`scriptconv.notation.iqra_halabi_to_ipa`, which — unlike
     :func:`~scriptconv.notation.halabi_to_ipa` — keeps the emphatic-context
     vowels distinct.
@@ -356,9 +359,9 @@ class IqraPhonemizer(BasePhonemizer):
     def __init__(self, alphabet: Alphabet = Alphabet.HALABI):
         _check_alphabet(self, alphabet, [Alphabet.IPA, Alphabet.HALABI])
         super().__init__(alphabet)
-        global _halabi_backend
-        if _halabi_backend is None:
-            _halabi_backend = _load_halabi_backend()
+        global _iqra_backend
+        if _iqra_backend is None:
+            _iqra_backend = _load_iqra_backend()
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
@@ -366,7 +369,7 @@ class IqraPhonemizer(BasePhonemizer):
 
     def phonemize_string(self, text: str, lang: str = "ar") -> str:
         self.get_lang(lang)
-        arabic_to_buckwalter, process_utterance = _halabi_backend
+        arabic_to_buckwalter, process_utterance = _iqra_backend
         text = _iqra_preprocess(text)
         raw = process_utterance(arabic_to_buckwalter(text))
         cleaned = _strip_halabi_digits(raw)

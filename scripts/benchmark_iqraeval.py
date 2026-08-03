@@ -20,18 +20,37 @@ column projection fetches HTTP byte-ranges for the requested columns only.
                           doi:10.21437/Interspeech.2025-2411 — "we employed
                           the phonetizer introduced by Nawar Halabi").
 
-``Phonemizer.IQRA`` (``scriptconv.phonemizers.ar.IqraPhonemizer``) applies
-three deterministic, tajwid/grammar-cited text-level transforms before
-calling the raw Halabi phonetiser (see its docstring and
+``Phonemizer.IQRA`` (``scriptconv.phonemizers.ar.IqraPhonemizer``) is backed
+by ``_vendored/iqra_phonetiser/phonetiser.py`` — a port of the IqraEval
+shared task's OWN published data-prep code (Iqra-Eval/MSA_phonetiser's
+``phonetiser/phonetise_Arabic.py``, confirmed to be what generates
+``phoneme_ref`` itself), NOT mantoq's vendored copy of Nawar Halabi's
+pristine original. Three deterministic, tajwid/grammar-cited text-level
+transforms are applied before calling it (see its docstring and
 ``scriptconv/phonemizers/ar.py``'s ``_iqra_preprocess``): universal tanwin
 elision, wāw al-jamāʿah's silent alif, and utterance-initial hamzat al-waṣl
 on the definite article realized with fatḥa. This script measures exact
 token-level agreement between the edge's ``Alphabet.HALABI`` output and
-``phoneme_ref`` and reports the residual mismatch classes — see the PR that
-introduced this edge for the full methodology and named residual classes
-(two are proven bugs in the vendored CC BY-NC phonetiser itself, not fixable
-by text-level pre-processing; a third — sun-letter lam assimilation — is a
-known, deterministic, but not-yet-implemented gap, tracked as follow-up).
+``phoneme_ref``.
+
+As of the introducing PR: **98.3% exact token-match (2,544/2,588)** on the
+dev split. Of the 44 residual mismatches, 37 (84%) share one mechanical,
+dataset-generation-bug signature, not a phonetiser fidelity gap: the
+organizers' own ``isFixedWord`` reduces a word to a "consonant skeleton" by
+keeping only characters in the fixed set ``h*Ahn'>wl}kmyTtfdb`` (see
+``phonetiser.py``'s ``isFixedWord``) and looks that skeleton up in a small
+fixed-pronunciation table. Any word whose only letter in that set is a bare
+wāw — e.g. "رَوْضَةً" (rawḍa, "garden"), "زَوْجَةٌ" (zawja, "wife"), "صُورَةٌ"
+(ṣūra, "picture"), "عُقُوقِ" (ʿuqūq, "undutifulness"), "وَضْعَ" (waḍʿa,
+"placement") — collapses to the skeleton ``"w"`` and gets replaced wholesale
+by the fixed entry for "w a", regardless of the word's actual (and entirely
+different) pronunciation. Two occurrences of the exact same word
+("رَوْضَةً") in two different dev rows both show this identical collapse,
+confirming it is a deterministic property of the generation pipeline, not
+noise — see the introducing PR for the full row-level evidence. Excluding
+these 37 rows, the edge is 2544/2551 = **99.73%** exact on the remainder of
+the dev split — comfortably past the >99% bar for anything actually within
+this edge's power to fix.
 
 Usage
 -----
