@@ -71,6 +71,8 @@ PHONEMIZER_REGISTRY: Dict[Phonemizer, Tuple[str, str, Optional[str]]] = {
     _P.PYPINYIN: (f"{_BASE}.zh", "PypinyinPhonemizer", "zh-phonemizers"),
     _P.XPINYIN: (f"{_BASE}.zh", "XpinyinPhonemizer", "zh-phonemizers"),
     _P.MANTOQ: (f"{_BASE}.ar", "MantoqPhonemizer", "ar-phonemizers"),
+    _P.HALABI: (f"{_BASE}.ar", "HalabiPhonemizer", "ar-phonemizers"),
+    _P.IQRA: (f"{_BASE}.ar", "IqraPhonemizer", "ar-phonemizers"),
     _P.ARBTOK: (f"{_BASE}.ar", "ArbtokPhonemizer", "ar-phonemizers"),
     _P.SHAMI: (f"{_BASE}.shami", "ShamiPhonemizer", "shami"),
     _P.VOSK: (f"{_BASE}.ru", "VoskPhonemizer", "phonemizers"),

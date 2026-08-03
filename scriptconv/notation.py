@@ -42,6 +42,7 @@ __all__ = [
     "rfe_to_ipa",
     "ipa_to_rfe",
     "halabi_to_ipa",
+    "iqra_halabi_to_ipa",
     "looks_like_ipa",
 ]
 
@@ -1048,10 +1049,20 @@ _HALABI_VOWELS: dict[str, str] = {
     "a": "a", "aa": "aː", "aaaa": "aːː",
     "i": "i", "ii": "iː",
     "u": "u", "uu": "uː",
+    # emphatic-context allophones from the RAW (pre-mantoq-simplification)
+    # Halabi phonetiser layer — mantoq's own g2p folds these to the plain
+    # forms above via ``simplify_phonemes``, but scriptconv's raw
+    # ``Phonemizer.HALABI``/``Phonemizer.IQRA`` edges call the phonetiser
+    # directly and preserve the distinction (see arbtok's
+    # scripts/benchmark_iqraeval.py, verified symbol-by-symbol against the
+    # IqraEval/Iqra_train corpus).
+    "A": "ɑ", "AA": "ɑː",
+    "I": "ɪ", "II": "ɪː",
+    "U": "ʊ", "UU": "ʊː",
 }
 
 _HALABI_MULTI = ("_dbl_", "_+_", "_sil_", "_eos_", "_pad_",
-                 "aaaa", "aa", "ii", "uu")
+                 "aaaa", "aa", "ii", "uu", "AA", "II", "UU")
 
 
 def _tokenize_halabi(text: str) -> list[str]:
@@ -1133,6 +1144,67 @@ def halabi_to_ipa(halabi: str | list[str], errors: str = "pass") -> str:
             last_tok = None
             continue
         last_tok = tok
+    return "".join(out)
+
+
+# ---------------------------------------------------------------------------
+# IqraEval phoneme_ref -> IPA
+#
+# The IqraEval shared task (Interspeech 2025, doi:10.21437/Interspeech.2025-2411
+# — "we employed the phonetizer introduced by Nawar Halabi") scores against a
+# space-separated ``phoneme_ref`` column that is the raw Halabi phonetiser
+# output with the stress/vowel-realization digits, the ``+`` word separator
+# and the ``sil`` pause token stripped — but, unlike mantoq's own
+# ``simplify_phonemes``, keeping the emphatic-allophone uppercase vowels
+# (``A``/``AA``/``I``/``II``/``U``/``UU``) and gemination as a literal doubled
+# consonant letter (``bb``, ``nn``, …) rather than a ``_dbl_`` marker. Table
+# verified symbol-by-symbol against a 5,050-row IqraEval/Iqra_train sample by
+# TigreGotico/arbtok's ``scripts/benchmark_iqraeval.py``; reproduced here
+# (same license posture as ``halabi_to_ipa`` above: a factual symbol table,
+# not the CC BY-NC phonetiser code).
+# ---------------------------------------------------------------------------
+
+_IQRA_CONSONANTS: dict[str, str] = {
+    "b": "b", "t": "t", "^": "θ", "j": "dʒ", "H": "ħ", "x": "x", "d": "d",
+    "*": "ð", "r": "r", "z": "z", "s": "s", "$": "ʃ", "S": "sˤ", "D": "dˤ",
+    "T": "tˤ", "Z": "ðˤ", "E": "ʕ", "g": "ɣ", "f": "f", "q": "q", "k": "k",
+    "l": "l", "m": "m", "n": "n", "h": "h", "w": "w", "y": "j", "<": "ʔ",
+}
+_IQRA_VOWELS: dict[str, str] = {
+    "a": "a", "aa": "aː", "A": "ɑ", "AA": "ɑː",
+    "i": "i", "ii": "iː", "I": "ɪ", "II": "ɪː",
+    "u": "u", "uu": "uː", "U": "ʊ", "UU": "ʊː",
+}
+_IQRA_NOTATION: dict[str, str] = dict(_IQRA_VOWELS)
+for _sym, _ipa in _IQRA_CONSONANTS.items():
+    _IQRA_NOTATION[_sym] = _ipa
+    _IQRA_NOTATION[_sym * 2] = _ipa + "ː"  # gemination: doubled token, shadda
+
+
+def iqra_halabi_to_ipa(tokens: str, errors: str = "pass") -> str:
+    """Convert IqraEval-flavored (already digit/separator/sil-stripped)
+    space-separated Halabi tokens to IPA.
+
+    Unlike :func:`halabi_to_ipa` (which targets mantoq's own simplified,
+    lowercase-only inventory), this keeps the emphatic-allophone uppercase
+    vowels distinct and reads gemination off a literal doubled consonant
+    letter — the ``phoneme_ref`` convention.  Unknown tokens follow the
+    ``errors`` policy (``"pass"`` by default: passed through verbatim).
+
+    Examples
+    --------
+    >>> iqra_halabi_to_ipa("f ii h i x A y r aa t u n")
+    'fiːhixɑjraːtun'
+    """
+    out = []
+    for pos, tok in enumerate(tokens.split()):
+        ipa = _IQRA_NOTATION.get(tok)
+        if ipa is not None:
+            out.append(ipa)
+        else:
+            res = _unknown(tok, pos, "halabi", errors, replacement=f"{{{{{tok}}}}}")
+            if res:
+                out.append(res)
     return "".join(out)
 
 
