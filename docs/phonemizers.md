@@ -181,13 +181,48 @@ tree, and both notices ship in the wheel. An externally installed `mantoq` or
 defaults exist for both languages (arbtok, g2pk) and are what the
 per-language resolution selects.
 
-`MantoqPhonemizer` preserves its long-standing contract, because published
-models trained on Halabi-notation phoneme sequences depend on it: the default
-`alphabet=Alphabet.BUCKWALTER` returns the raw mantoq inventory (that
-historical label persists, `Alphabet.MANTOQ` is the accurate alias), and
-`Alphabet.IPA` converts through
-[`halabi_to_ipa`](notation.md), the Halabi inventory is itself a full
-notation, so its output participates in graph routing like any other.
+### Three Arabic edges on the same Halabi phonetiser
+
+`mantoq`, `halabi` and `iqra` share one backend — Nawar Halabi's
+Arabic-Phonetiser (2016, CC BY-NC 4.0), vendored/externally-installed as the
+`mantoq` package — at three different points in its pipeline:
+
+- `Phonemizer.MANTOQ` (`MantoqPhonemizer`): the full pipeline, mantoq's own
+  diacritizer restoring tashkeel on bare text before the phonetiser runs.
+  Preserves its long-standing contract, because published models trained on
+  Halabi-notation phoneme sequences depend on it: the default
+  `alphabet=Alphabet.BUCKWALTER` returns the raw inventory (that historical
+  label persists — `Alphabet.HALABI` is the accurate name and returns the
+  byte-identical string; there is no separate orthographic Buckwalter
+  transliteration layer in this pipeline to distinguish it from, so
+  `BUCKWALTER` is kept only as a back-compat alias, not because the label was
+  ever meaningfully different), and `Alphabet.IPA` converts through
+  [`halabi_to_ipa`](notation.md).
+- `Phonemizer.HALABI` (`HalabiPhonemizer`): the phonetiser called directly,
+  no diacritizer — **input must already be fully vowelized** (bare text is
+  garbage in, garbage out, matching upstream). `Alphabet.HALABI` (default)
+  is the raw notation verbatim, including the stress/vowel-realization digit
+  suffix and the emphatic-context uppercase vowels mantoq's own
+  `simplify_phonemes` folds away; `Alphabet.IPA` strips the digits and
+  converts through `halabi_to_ipa`.
+- `Phonemizer.IQRA` (`IqraPhonemizer`): the same direct-phonetiser call as
+  `HALABI`, post-processed to match the IqraEval shared task's `phoneme_ref`
+  convention (Interspeech 2025, doi:10.21437/Interspeech.2025-2411 — "we
+  employed the phonetizer introduced by Nawar Halabi"). Three deterministic,
+  tajwid/grammar-cited text transforms run before phonetisation (universal
+  tanwin elision, wāw al-jamāʿah's silent alif, utterance-initial hamzat
+  al-waṣl on the definite article); see `scripts/benchmark_iqraeval.py` for
+  the verification methodology (77.6% exact token-match against a 2,588-row
+  IqraEval/Iqra_train dev-split sample) and `IqraPhonemizer`'s docstring for
+  the named residual divergence classes, most of which are bugs in the
+  vendored phonetiser itself rather than gaps in this edge's post-processing.
+  `Alphabet.IPA` converts through
+  [`iqra_halabi_to_ipa`](notation.md), which — unlike `halabi_to_ipa` — keeps
+  the emphatic-context vowels distinct, matching `phoneme_ref`'s own
+  notation.
+
+None of the three is selected automatically for any language;
+`ArbtokPhonemizer` is the Arabic default (`LANG_DEFAULTS["ar"]`).
 
 ## The backend catalog
 

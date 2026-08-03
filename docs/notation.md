@@ -559,23 +559,24 @@ single IPA symbol fuse to it, `AH0 R` → `AXR0` (r-colored schwa),
 applies in default mode too. The general contract: round-trips are exact up
 to IPA-equivalence, a fused spelling always produces the identical IPA.
 
-## Mantoq → IPA (Halabi Arabic-Phonetiser inventory)
+## Halabi → IPA (Nawar Halabi's Arabic-Phonetiser inventory)
 
-Mantoq is the phonetic alphabet emitted by the mantoq Arabic G2P pipeline:
-ASCII consonant letters with the inventory's own conventions (`^` is θ, `v` a
-loan phoneme), plain short/long vowels (`a`/`aa`/`aaaa`), a gemination marker
-`_dbl_`, a word separator `_+_`, and `<` for the glottal stop. Published
-models trained on mantoq sequences make the notation worth transcoding, so it
-is a full `Notation` member with a one-directional converter:
+Halabi is the phonetic notation emitted by Nawar Halabi's Arabic-Phonetiser
+(the rule engine the `mantoq` package wraps): ASCII consonant letters with
+the inventory's own conventions (`^` is θ, `v` a loan phoneme), plain
+short/long vowels (`a`/`aa`/`aaaa`), a gemination marker `_dbl_`, a word
+separator `_+_`, and `<` for the glottal stop. Published models trained on
+this notation make it worth transcoding, so it is a full `Notation` member
+with a one-directional converter:
 
 ```python
-from scriptconv.notation import mantoq_to_ipa
+from scriptconv.notation import halabi_to_ipa
 from scriptconv import convert, can_convert
 
-mantoq_to_ipa("s a l aa m")        # 's a l aː m'
-mantoq_to_ipa("b_dbl_a")           # 'bːa'      (consonant gemination)
-convert("mrHbaa", "mantoq", "x-sampa")   # routes mantoq → ipa → x-sampa
-can_convert("ipa", "mantoq")       # False, one-directional by design
+halabi_to_ipa("s a l aa m")        # 's a l aː m'
+halabi_to_ipa("b_dbl_a")           # 'bːa'      (consonant gemination)
+convert("mrHbaa", "halabi", "x-sampa")   # routes halabi → ipa → x-sampa
+can_convert("ipa", "halabi")       # False, one-directional by design
 ```
 
 The inventory's semantics are honoured precisely: `_dbl_` geminates only
@@ -583,8 +584,28 @@ consonants (the pipeline never emits it after a vowel), `_sil_` becomes a
 pause, `_eos_`/`_pad_` are dropped, and a pre-tokenized sequence (as returned
 by the mantoq package's `g2p`) is accepted directly, since joining tokens
 into a string is ambiguous. The token → IPA table maps the inventory's
-phonetic values, the phonetiser *engine* itself lives in
+phonetic values; the phonetiser *engine* itself lives in
 [phonemizers](phonemizers.md) under its own license.
+
+`halabi_to_ipa` also accepts the RAW (pre-`simplify_phonemes`) phonetiser
+output — the emphatic-context uppercase vowels (`A`/`AA`/`I`/`II`/`U`/`UU`)
+that `Phonemizer.HALABI` returns natively, since mantoq's own g2p folds them
+to the plain forms above before a caller ever sees them.
+
+### `iqra_halabi_to_ipa` — the IqraEval `phoneme_ref` flavor
+
+`Phonemizer.IQRA`'s output uses a related but distinct table: gemination is a
+literal doubled consonant letter (`bb`, `nn`, …) rather than a `_dbl_`
+marker, and the emphatic-context vowels stay distinct rather than folding to
+the plain forms. `scriptconv.notation.iqra_halabi_to_ipa` implements this
+table (verified symbol-by-symbol against IqraEval/Iqra_train by
+TigreGotico/arbtok's `scripts/benchmark_iqraeval.py`):
+
+```python
+from scriptconv.notation import iqra_halabi_to_ipa
+
+iqra_halabi_to_ipa("f ii h i x A y r aa t")   # 'fiːhixɑjraːt'
+```
 
 ---
 [← scripts](scripts.md) · [Home](../README.md) · [translit →](translit.md)

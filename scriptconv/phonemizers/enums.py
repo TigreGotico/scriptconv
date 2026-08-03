@@ -67,6 +67,8 @@ class Phonemizer(str, Enum):
     AHOTTS = "ahotts"  # basque
     PHONIKUD = "phonikud"  # hebrew
     MANTOQ = "mantoq"  # arabic — the mantoq wrapper around Halabi's Arabic-Phonetiser
+    HALABI = "halabi"  # arabic — raw Halabi Arabic-Phonetiser, no diacritizer (vowelized input only)
+    IQRA = "iqra"  # arabic — Halabi phonetiser output post-processed to the IqraEval phoneme_ref convention
     VIPHONEME = "viphoneme" # vietnamese
     G2PK = "g2pk" # korean
     KOG2PK = "kog2p" # korean
