@@ -47,6 +47,15 @@ def test_strip_hebrew_removes_niqqud_preserves_consonants():
     assert stripped == "שלום"
 
 
+def test_strip_bare_az_uses_broad_stress_lang_membership():
+    # Bare "az"/"uz" are script-ambiguous for *generation* (stressonnx needs
+    # az-Cyrl/az-Latn to actually run), but stripping is a pure codepoint
+    # filter that needs no model — it must still work for the bare tag
+    # rather than raising the native-orthography ValueError.
+    text = "za" + "\u0301" + "mok"  # combining acute (U+0301), not precomposed á
+    assert strip_diacritics(text, "az") == "zamok"
+
+
 @pytest.mark.parametrize("text,lang", [
     ("café", "pt"),
     ("café", "en"),
@@ -75,7 +84,9 @@ def test_supports_strip_false(lang):
 
 
 def test_overlay_marks_stress_lang():
-    lang = next(iter(STRESS_LANGS))
+    # "az"/"uz" are script-ambiguous bare tags (stressonnx only serves the
+    # az-Cyrl/az-Latn/uz-Cyrl/uz-Latn variants) — pick an unambiguous member.
+    lang = next(t for t in STRESS_LANGS if t not in ("az", "uz"))
     assert _overlay_marks(lang) == _STRESS_MARKS
 
 
@@ -294,3 +305,108 @@ class TestEastSlavicStressRouting:
             with pytest.raises(ImportError) as ctx:
                 diacritize("замок", "ru")
         assert "stressonnx" in str(ctx.value)
+
+
+class TestFamilyAgreesWithStressonnxResolution:
+    """``_diacritizer_family`` must never claim a lang stressonnx rejects,
+    and must never reject a lang stressonnx actually resolves — the two
+    have to agree by construction (real installed stressonnx 0.0.3a2, no
+    model inference: ``_stress`` itself is monkeypatched)."""
+
+    def test_regional_tag_routes_to_stress_and_calls_through_with_raw_tag(self, monkeypatch):
+        from scriptconv import diacritics
+        calls = []
+        monkeypatch.setattr(diacritics, "_stress",
+                             lambda text, lang, model=None: calls.append((text, lang)) or "STRESSED")
+        out = diacritics.diacritize("замок", "ru-RU")
+        assert out == "STRESSED"
+        assert calls == [("замок", "ru-RU")]
+
+    def test_bare_az_does_not_route_to_stress(self, monkeypatch):
+        from scriptconv import diacritics
+        monkeypatch.setattr(diacritics, "_stress",
+                             lambda text, lang, model=None: (_ for _ in ()).throw(
+                                 AssertionError("stress backend must not be called for bare 'az'")))
+        # bare "az" is script-ambiguous for stressonnx (only az-Cyrl/az-Latn
+        # exist) — no UnsupportedLanguageError should escape scriptconv, and
+        # the stress backend must never be invoked for it.
+        out = diacritics.diacritize("salam", "az")
+        assert out == "salam"
+
+    def test_bare_uz_does_not_route_to_stress(self, monkeypatch):
+        from scriptconv import diacritics
+        monkeypatch.setattr(diacritics, "_stress",
+                             lambda text, lang, model=None: (_ for _ in ()).throw(
+                                 AssertionError("stress backend must not be called for bare 'uz'")))
+        out = diacritics.diacritize("salom", "uz")
+        assert out == "salom"
+
+    def test_script_qualified_az_routes_to_stress(self, monkeypatch):
+        from scriptconv import diacritics
+        calls = []
+        monkeypatch.setattr(diacritics, "_stress",
+                             lambda text, lang, model=None: calls.append((text, lang)) or "STRESSED")
+        out = diacritics.diacritize("salam", "az-Latn")
+        assert out == "STRESSED"
+        assert calls == [("salam", "az-Latn")]
+
+    def test_ru_latn_does_not_crash_and_is_not_claimed_by_stress(self, monkeypatch):
+        from scriptconv import diacritics
+        monkeypatch.setattr(diacritics, "_stress",
+                             lambda text, lang, model=None: (_ for _ in ()).throw(
+                                 AssertionError("stress backend must not be called for 'ru-Latn'")))
+        # "ru-Latn" names a script Russian isn't written in — stressonnx
+        # raises UnsupportedLanguageError for it, so the family test must
+        # not claim it either; scriptconv falls through to unchanged text.
+        text = "zamok"
+        assert diacritics.diacritize(text, "ru-Latn") == text
+
+    def test_fallback_matches_real_stressonnx_on_every_probe(self):
+        # ``pip install scriptconv[stress]`` must change only whether
+        # generation *works*, never which tags are claimed as stress-family
+        # — so the no-extra-installed fallback and the real, installed
+        # stressonnx must agree on every probe tag.
+        from scriptconv.diacritics import _is_stress_lang, _is_stress_lang_fallback
+
+        probes = ["ru", "ru-RU", "ru-Latn", "az", "uz", "az-Latn", "az-Cyrl",
+                  "uz-Latn", "uz-Cyrl", "uk", "be", "ka", "hy", "ber", "en"]
+        for tag in probes:
+            assert _is_stress_lang_fallback(tag) == _is_stress_lang(tag), tag
+
+
+class TestStressFamilyRoutingWithoutStressonnxInstalled:
+    """``_is_stress_lang`` must apply the same script-ambiguity rule whether
+    or not stressonnx is importable, so routing never depends on the
+    optional extra being installed."""
+
+    def _hide_stressonnx(self, monkeypatch):
+        import sys
+        monkeypatch.setitem(sys.modules, "stressonnx", None)
+        monkeypatch.setitem(sys.modules, "stressonnx.langs", None)
+        monkeypatch.setitem(sys.modules, "stressonnx.errors", None)
+
+    def test_bare_az_not_claimed_without_extra(self, monkeypatch):
+        from scriptconv import diacritics
+        self._hide_stressonnx(monkeypatch)
+        assert diacritics._is_stress_lang("az") is False
+        assert diacritics.diacritize("salam", "az") == "salam"
+
+    def test_bare_uz_not_claimed_without_extra(self, monkeypatch):
+        from scriptconv import diacritics
+        self._hide_stressonnx(monkeypatch)
+        assert diacritics._is_stress_lang("uz") is False
+
+    def test_script_qualified_az_claimed_without_extra(self, monkeypatch):
+        from scriptconv import diacritics
+        self._hide_stressonnx(monkeypatch)
+        assert diacritics._is_stress_lang("az-Latn") is True
+
+    def test_ru_latn_not_claimed_without_extra(self, monkeypatch):
+        from scriptconv import diacritics
+        self._hide_stressonnx(monkeypatch)
+        assert diacritics._is_stress_lang("ru-Latn") is False
+
+    def test_regional_ru_claimed_without_extra(self, monkeypatch):
+        from scriptconv import diacritics
+        self._hide_stressonnx(monkeypatch)
+        assert diacritics._is_stress_lang("ru-RU") is True

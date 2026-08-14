@@ -94,17 +94,86 @@ def _is_european_portuguese(lang: str) -> bool:
     return norm == "pt" or norm == "pt-pt"
 
 
+#: Primary subtags whose STRESS_LANGS membership does not by itself mean the
+#: bare tag is servable — stressonnx only ships script-qualified variants
+#: (az-Cyrl/az-Latn, uz-Cyrl/uz-Latn) for these, so the bare tag is script-
+#: ambiguous. Used both by the real stressonnx-backed check and by the
+#: no-extra-installed fallback, so the two never disagree.
+_SCRIPT_AMBIGUOUS_STRESS_LANGS = frozenset({"az", "uz"})
+
+
+def _is_stress_lang_fallback(lang: str) -> bool:
+    """``_is_stress_lang`` semantics without importing stressonnx.
+
+    Mirrors stressonnx's own resolution rules closely enough to agree with
+    it on every tag ``STRESS_LANGS`` can produce: an exact/regional match on
+    a member whose primary subtag isn't script-ambiguous is accepted; a
+    4-letter script subtag is only meaningful for the script-ambiguous pair
+    (az/uz) and must be Cyrl/Latn; every other script-qualified tag, and
+    every bare az/uz, is rejected rather than guessed at.
+    """
+    if not isinstance(lang, str):
+        return False
+    normalized = lang.replace("_", "-")
+    parts = normalized.split("-")
+    p = parts[0].lower()
+    if p not in STRESS_LANGS:
+        return False
+    has_script = len(parts) >= 2 and len(parts[1]) == 4 and parts[1].isalpha()
+    if p in _SCRIPT_AMBIGUOUS_STRESS_LANGS:
+        return has_script and parts[1].title() in ("Cyrl", "Latn")
+    return not has_script
+
+
+def _is_stress_lang(lang: str) -> bool:
+    """True if stressonnx actually resolves *lang* to a supported model.
+
+    Delegates to stressonnx's own ``resolve_lang`` (the same resolver
+    :func:`_stress` triggers indirectly through ``stress()``) instead of
+    re-deriving the resolution rules here, so this and the real call can
+    never disagree — e.g. a bare ``"az"``/``"uz"`` is script-ambiguous and
+    stressonnx rejects it even though ``"az"``/``"uz"`` are primary subtags
+    of a ``STRESS_LANGS`` member, while a regional tag like ``"ru-RU"``
+    resolves fine to ``"ru"``. Only reached once :func:`_diacritizer_family`
+    has already matched the primary subtag against ``STRESS_LANGS``, so
+    non-stress tags (``en``, ``pt`` …) never pay for the stressonnx import
+    or the exception-based resolution.
+
+    Falls back to :func:`_is_stress_lang_fallback` — the same script-
+    ambiguity rule, evaluated without importing stressonnx — when the
+    optional ``[stress]`` extra isn't installed, so ``pip install
+    scriptconv[stress]`` changes only whether generation *works*, never
+    which tags are claimed as stress-family.
+    """
+    try:
+        from stressonnx import ALL_LANGS
+        from stressonnx.langs import resolve_lang
+        from stressonnx.errors import UnsupportedLanguageError
+    except ImportError:
+        return _is_stress_lang_fallback(lang)
+    try:
+        resolve_lang(lang, ALL_LANGS)
+    except UnsupportedLanguageError:
+        return False
+    return True
+
+
 def _diacritizer_family(lang: str) -> Optional[str]:
     """Which diacritization backend family handles *lang*, or ``None``.
 
-    Single source of truth for lang→backend routing: both the forward
-    dispatch (:func:`diacritize`) and the strip direction (:func:`_overlay_marks`)
-    resolve through this, so the two can never disagree about which language
-    uses which backend. Returns one of ``"he"`` (niqqud), ``"ar"`` (tashkeel),
-    ``"stress"`` (stressonnx), ``"pt"`` (bifonia sense diacritics), or
-    ``None``. Uses exact primary-subtag matching (never ``startswith``), so
-    Aragonese (``arg``), Herero (``her``) and Mapudungun (``arn``) are never
-    misread as Arabic/Hebrew.
+    Single source of truth for lang→backend routing for the *strip*
+    direction (:func:`_overlay_marks`) and for which languages carry
+    overlay marks at all: it uses the broad ``STRESS_LANGS`` primary-subtag
+    membership, not stressonnx's stricter script-resolution rules, because
+    stripping needs no model and every ``STRESS_LANGS`` member (bare az/uz
+    included) writes its overlay marks the same way regardless of script
+    ambiguity. :func:`diacritize`'s *generation* path narrows the "stress"
+    result further through :func:`_is_stress_lang` before actually calling
+    stressonnx, since only that path needs the real resolution. Returns one
+    of ``"he"`` (niqqud), ``"ar"`` (tashkeel), ``"stress"`` (stressonnx),
+    ``"pt"`` (bifonia sense diacritics), or ``None``. Uses exact primary-
+    subtag matching (never ``startswith``), so Aragonese (``arg``), Herero
+    (``her``) and Mapudungun (``arn``) are never misread as Arabic/Hebrew.
     """
     p = _primary_subtag(lang)
     if p == "he":
@@ -285,7 +354,14 @@ def diacritize(text: str, lang: str = "und", diacritizer_model=None,
     if family == "ar":
         return _tashkeel(diacritizer_model).diacritize(text)
     if family == "stress":
-        return _stress(text, lang, diacritizer_model)
+        # _diacritizer_family's "stress" match is the broad STRESS_LANGS
+        # primary-subtag test (also used for stripping); generation needs
+        # stressonnx's stricter, script-aware resolution — a bare az/uz or
+        # a script-mismatched regional tag (e.g. "ru-Latn") is script-
+        # ambiguous/unsupported and must not reach the backend at all.
+        if _is_stress_lang(lang):
+            return _stress(text, lang, diacritizer_model)
+        return text
     if family == "pt":
         return _sense_diacritics_pt(text)
     return text
