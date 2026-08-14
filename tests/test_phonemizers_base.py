@@ -5,6 +5,7 @@ from scriptconv.phonemizers import (
     BasePhonemizer,
     GraphemePhonemizer,
     LANG_DEFAULTS,
+    MissingLanguageError,
     PHONEMIZER_REGISTRY,
     Phonemizer,
     UnicodeCodepointPhonemizer,
@@ -80,6 +81,22 @@ class TestBaseContract(unittest.TestCase):
         with self.assertRaises(ValueError):
             BasePhonemizer.match_lang("zz-XX", ["en", "pt"])
         self.assertEqual(BasePhonemizer.match_lang("en-US", ["en", "pt"]), "en")
+
+    def test_match_lang_unsupported_tag_keeps_plain_valueerror(self):
+        # a real, present-but-unsupported tag (e.g. Tetun) is a phonemizer
+        # capability gap, not a missing-language config defect
+        with self.assertRaises(ValueError) as cm:
+            BasePhonemizer.match_lang("tet", ["en", "pt"])
+        self.assertNotIsInstance(cm.exception, MissingLanguageError)
+        self.assertIn("unsupported language code", str(cm.exception))
+
+    def test_match_lang_missing_language_raises_distinct_error(self):
+        for missing in (None, "", "und"):
+            with self.assertRaises(MissingLanguageError) as cm:
+                BasePhonemizer.match_lang(missing, ["eu"])
+            # still a ValueError so existing `except ValueError` callers work
+            self.assertIsInstance(cm.exception, ValueError)
+            self.assertNotIn("unsupported language code", str(cm.exception))
 
     def test_unicode_codepoint_nfd(self):
         u = UnicodeCodepointPhonemizer()
