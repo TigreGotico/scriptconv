@@ -205,3 +205,29 @@ class TestModelForwarding(unittest.TestCase):
         self.assertIsInstance(g, GraphemePhonemizer)
 
 
+class TestEspeakGetLangChinese(unittest.TestCase):
+    """espeak-ng ships no bare "zh"/region-tagged Chinese voice, only "cmn"
+    and "yue" — get_lang must map BCP-47 Chinese tags onto those directly."""
+
+    def _get_lang(self):
+        from scriptconv.phonemizers.mul import EspeakPhonemizer
+        return EspeakPhonemizer.get_lang
+
+    def test_zh_region_tags_resolve_to_supported_voice(self):
+        from scriptconv.phonemizers.mul import EspeakPhonemizer
+        get_lang = self._get_lang()
+        for code in ("zh", "zh-CN", "zh-TW", "zh-HK", "zh-Hant-TW"):
+            resolved = get_lang(code)
+            self.assertIn(resolved, EspeakPhonemizer.ESPEAK_LANGS,
+                           f"{code} -> {resolved}")
+
+    def test_en_gb_special_case_unchanged(self):
+        get_lang = self._get_lang()
+        self.assertEqual(get_lang("en-gb"), "en-gb-x-rp")
+
+    def test_unsupported_code_still_raises(self):
+        get_lang = self._get_lang()
+        with self.assertRaises(ValueError):
+            get_lang("xx-not-a-real-lang")
+
+
