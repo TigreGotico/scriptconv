@@ -5,7 +5,14 @@ from scriptconv.phonemizers.base import BasePhonemizer
 class PhonikudPhonemizer(BasePhonemizer):
 
     def __init__(self):
-        from phonikud import phonemize
+        try:
+            from phonikud import phonemize
+        except ImportError as e:
+            raise ImportError(
+                "phonikud is required for the Hebrew phonemizer. "
+                "Install it with 'pip install phonikud-onnx' "
+                "(or 'pip install scriptconv[he]')."
+            ) from e
         self.g2p = phonemize
         super().__init__(Alphabet.IPA)
 
