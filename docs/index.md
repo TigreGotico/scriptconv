@@ -33,6 +33,8 @@ zero-to-hero arc, or jump straight to the module you need.
    wrapper layer over G2P engines, per-language defaults with override, the
    injectable normalizer, and the licensing quarantine for vendored
    third-party engines.
+8. **[ovos.md](ovos.md)**, using scriptconv's phonemizers from OVOS through
+   `ovos-scriptconv-g2p-plugin`, an OPM `opm.g2p` plugin.
 
 Every command shown in these pages is also available from the CLI:
 `python -m scriptconv --help`.

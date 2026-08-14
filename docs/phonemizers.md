@@ -241,5 +241,8 @@ data-driven language specs. Trivial built-ins that need no extra:
 `GraphemePhonemizer` (normalized characters) and `UnicodeCodepointPhonemizer`
 (codepoints as phonemes).
 
+See [ovos.md](ovos.md) for using this layer from OVOS through
+`ovos-scriptconv-g2p-plugin`.
+
 ---
-[← graph](graph.md) · [Home](../README.md)
+[← graph](graph.md) · [ovos →](ovos.md) · [Home](../README.md)
