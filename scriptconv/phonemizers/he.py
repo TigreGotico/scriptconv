@@ -10,7 +10,7 @@ class PhonikudPhonemizer(BasePhonemizer):
         except ImportError as e:
             raise ImportError(
                 "phonikud is required for the Hebrew phonemizer. "
-                "Install it with 'pip install phonikud-onnx' "
+                "Install it with 'pip install phonikud' "
                 "(or 'pip install scriptconv[he]')."
             ) from e
         self.g2p = phonemize
