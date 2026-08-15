@@ -325,6 +325,19 @@ class EspeakPhonemizer(BasePhonemizer):
         """
         if target_lang.lower() == "en-gb":
             return "en-gb-x-rp"
+        # espeak-ng has no bare "zh"/region-tagged Chinese codes, only "cmn" (Mandarin,
+        # any script) and "yue" (Cantonese); map BCP-47 Chinese tags onto those voices
+        # directly instead of falling through to tag_distance, which scores them below
+        # the match threshold and raises. Hong Kong/Macau are the only regions where
+        # Cantonese, not Mandarin, is the spoken vernacular.
+        ZH_ALIASES = {
+            "zh": "cmn", "zh-cn": "cmn", "zh-sg": "cmn",
+            "zh-hans": "cmn", "zh-hans-cn": "cmn", "zh-hans-sg": "cmn",
+            "zh-tw": "cmn", "zh-hant": "cmn", "zh-hant-tw": "cmn",
+            "zh-hk": "yue", "zh-mo": "yue",
+        }
+        if target_lang.lower() in ZH_ALIASES:
+            return ZH_ALIASES[target_lang.lower()]
         if target_lang in cls.ESPEAK_LANGS:
             return target_lang
         if target_lang.lower().split("-")[0] in cls.ESPEAK_LANGS:
