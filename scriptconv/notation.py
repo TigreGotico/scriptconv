@@ -159,6 +159,14 @@ _IPA_TO_ARPA.setdefault("g", "G")
 # ARPABET is rhotic-only, so it collapses onto the same "ER" as the r-colored ɜr.
 _IPA_TO_ARPA.setdefault("ɜː", "ER")
 _IPA_TO_ARPA.setdefault("ɜ", "ER")
+# English rhotic approximant: ARPABET "R" canonically maps back to plain "r",
+# but real transcriptions overwhelmingly write ɹ — accept it on input.
+_IPA_TO_ARPA.setdefault("ɹ", "R")
+# British (SSB) GOAT diphthong: ARPABET is GA-based so OW round-trips as oʊ,
+# but əʊ is the same phoneme in RP/SSB transcriptions.
+_IPA_TO_ARPA.setdefault("əʊ", "OW")
+# British LOT vowel: GA merges it into ɑ (AA); ɒ has no ARPA symbol of its own.
+_IPA_TO_ARPA.setdefault("ɒ", "AA")
 
 # Precompiled regex for IPA → ARPA (longest-first)
 _IPA_ARPA_KEYS_SORTED = sorted(_IPA_TO_ARPA.keys(), key=len, reverse=True)
