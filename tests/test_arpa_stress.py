@@ -86,3 +86,25 @@ class TestRoundTrip(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestEnglishInputAliases(unittest.TestCase):
+    """British/phonetic-detail IPA symbols accepted on ARPA input."""
+
+    def test_rhotic_approximant(self):
+        from scriptconv import ipa_to_arpa
+        self.assertEqual(ipa_to_arpa("ɹ"), "R")
+        self.assertEqual(ipa_to_arpa("maɪkɹɑft"), "M AY K R AA F T")
+
+    def test_british_goat_diphthong(self):
+        from scriptconv import ipa_to_arpa
+        self.assertEqual(ipa_to_arpa("əʊ"), "OW")
+
+    def test_british_lot_vowel(self):
+        from scriptconv import ipa_to_arpa
+        self.assertEqual(ipa_to_arpa("ɒ"), "AA")
+
+    def test_canonical_round_trip_unchanged(self):
+        from scriptconv import arpa_to_ipa, ipa_to_arpa
+        self.assertEqual(ipa_to_arpa(arpa_to_ipa("OW")), "OW")
+        self.assertEqual(ipa_to_arpa(arpa_to_ipa("R")), "R")
