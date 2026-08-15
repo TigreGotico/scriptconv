@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.0.4a21](https://github.com/TigreGotico/scriptconv/tree/0.0.4a21) (2026-08-15)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a20...0.0.4a21)
+
+**Merged pull requests:**
+
+- fix: raise MissingLanguageError for None/empty/und in match\_lang [\#108](https://github.com/TigreGotico/scriptconv/pull/108) ([JarbasAl](https://github.com/JarbasAl))
+- fix: resolve BCP-47 zh region tags in EspeakPhonemizer.get\_lang [\#105](https://github.com/TigreGotico/scriptconv/pull/105) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a20](https://github.com/TigreGotico/scriptconv/tree/0.0.4a20) (2026-08-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a19...0.0.4a20)
