@@ -35,6 +35,16 @@ RawPhonemizedChunks = List[Tuple[str, str, bool]]
 PhonemizedChunks = list[list[str]]
 
 
+class MissingLanguageError(ValueError):
+    """No language reached :meth:`BasePhonemizer.match_lang` at all.
+
+    Raised for ``None``/``""``/``"und"`` targets, which is a distinct failure
+    from an unsupported-but-present tag: it means whatever called into the
+    phonemizer never determined a language for the text, an upstream
+    config/data defect rather than a phonemizer capability gap.
+    """
+
+
 def _primary_subtag(lang: str) -> str:
     """Lowercase, ``_``→``-`` normalized primary language subtag.
 
@@ -165,8 +175,13 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
             str: The validated language code.
 
         Raises:
+            MissingLanguageError: If no language reached the matcher at all
+                (``None``/``""``/``"und"``).
             ValueError: If the language code is unsupported.
         """
+        if target_lang in (None, "", "und"):
+            raise MissingLanguageError(
+                f"no language provided to phonemize: {target_lang!r}")
         lang, score = BasePhonemizer._match_lang(target_lang, valid_langs)
         if score > 10:
             # raise an error for unsupported language
