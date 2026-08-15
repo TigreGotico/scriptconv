@@ -32,45 +32,45 @@ class Script:
 
 ## SCRIPT_REGISTRY
 
-`SCRIPT_REGISTRY: dict[str, Script]` — maps ISO-15924 codes to `Script` objects.
+`SCRIPT_REGISTRY: dict[str, Script]`, maps ISO-15924 codes to `Script` objects.
 The registry covers 34 scripts:
 
 | ISO-15924 | Name | Direction | Unicode ranges (hex, inclusive) |
 |-----------|------|-----------|--------------------------------|
-| `Arab` | Arabic | rtl | 0600–06FF, 0750–077F, 0870–089F, 08A0–08FF, FB50–FDFF, FE70–FEFC |
-| `Armn` | Armenian | ltr | 0530–058F |
-| `Beng` | Bengali | ltr | 0980–09FF |
-| `Cans` | Unified Canadian Aboriginal Syllabics | ltr | 1400–167F, 18B0–18FF |
-| `Cprt` | Cypriot | rtl | 10800–1083F |
-| `Cyrl` | Cyrillic | ltr | 0400–04FF, 0500–052F, 1C80–1C8F, 2DE0–2DFF, A640–A69F, 1E030–1E08F |
-| `Deva` | Devanagari | ltr | 0900–097F, A8E0–A8FF |
-| `Ethi` | Ethiopic | ltr | 1200–137F, 1380–139F, 2D80–2DDF, AB00–AB2F, 1E7E0–1E7FF |
-| `Geor` | Georgian | ltr | 10A0–10FF, 2D00–2D2F, 1C90–1CBF |
-| `Glag` | Glagolitic | ltr | 2C00–2C5F |
-| `Grek` | Greek | ltr | 0370–03FF, 1F00–1FFF |
-| `Gujr` | Gujarati | ltr | 0A80–0AFF |
-| `Guru` | Gurmukhi | ltr | 0A00–0A7F |
-| `Hang` | Hangul | ltr | AC00–D7AF, D7B0–D7FF, 1100–11FF, 3130–318F, A960–A97C |
-| `Hani` | Han | ltr | 4E00–9FFF, 3400–4DBF, F900–FAFF, 20000–2A6DF, 2A700–2B81F, 2B820–2CEAF, 2CEB0–2EBEF, 2F800–2FA1F, 30000–3134F, 31350–323AF, 323B0–3347F |
-| `Hebr` | Hebrew | rtl | 0590–05FF, FB1D–FB4F |
-| `Hira` | Hiragana | ltr | 3040–309F |
-| `Kana` | Katakana | ltr | 30A0–30FF, 31F0–31FF |
-| `Knda` | Kannada | ltr | 0C80–0CFF |
-| `Khmr` | Khmer | ltr | 1780–17FF, 19E0–19FF |
-| `Laoo` | Lao | ltr | 0E80–0EFF |
-| `Latn` | Latin | ltr | 0041–005A, 0061–007A, 00C0–024F, 0250–02AF, 1E00–1EFF, 2C60–2C7F, A720–A7FF, AB30–AB6F, 10780–107BF, 1DF00–1DFFF |
-| `Mlym` | Malayalam | ltr | 0D00–0D7F |
-| `Mymr` | Myanmar | ltr | 1000–109F, A9E0–A9FF, AA60–AA7F, 116D0–116FF |
-| `Ogam` | Ogham | ltr | 1681–169C |
-| `Orya` | Odia | ltr | 0B00–0B7F |
-| `Phnx` | Phoenician | rtl | 10900–1091F |
-| `Runr` | Runic | ltr | 16A0–16FF |
-| `Sinh` | Sinhala | ltr | 0D80–0DFF, 111E0–111FF |
-| `Taml` | Tamil | ltr | 0B80–0BFF, 11FC0–11FFF |
-| `Telu` | Telugu | ltr | 0C00–0C7F |
-| `Tfng` | Tifinagh | ltr | 2D30–2D7F |
-| `Thai` | Thai | ltr | 0E00–0E7F |
-| `Tibt` | Tibetan | ltr | 0F00–0FFF |
+| `Arab` | Arabic | rtl | 0600-06FF, 0750-077F, 0870-089F, 08A0-08FF, FB50-FDFF, FE70-FEFC |
+| `Armn` | Armenian | ltr | 0530-058F |
+| `Beng` | Bengali | ltr | 0980-09FF |
+| `Cans` | Unified Canadian Aboriginal Syllabics | ltr | 1400-167F, 18B0-18FF |
+| `Cprt` | Cypriot | rtl | 10800-1083F |
+| `Cyrl` | Cyrillic | ltr | 0400-04FF, 0500-052F, 1C80-1C8F, 2DE0-2DFF, A640-A69F, 1E030-1E08F |
+| `Deva` | Devanagari | ltr | 0900-097F, A8E0-A8FF |
+| `Ethi` | Ethiopic | ltr | 1200-137F, 1380-139F, 2D80-2DDF, AB00-AB2F, 1E7E0-1E7FF |
+| `Geor` | Georgian | ltr | 10A0-10FF, 2D00-2D2F, 1C90-1CBF |
+| `Glag` | Glagolitic | ltr | 2C00-2C5F |
+| `Grek` | Greek | ltr | 0370-03FF, 1F00-1FFF |
+| `Gujr` | Gujarati | ltr | 0A80-0AFF |
+| `Guru` | Gurmukhi | ltr | 0A00-0A7F |
+| `Hang` | Hangul | ltr | AC00-D7AF, D7B0-D7FF, 1100-11FF, 3130-318F, A960-A97C |
+| `Hani` | Han | ltr | 4E00-9FFF, 3400-4DBF, F900-FAFF, 20000-2A6DF, 2A700-2B81F, 2B820-2CEAF, 2CEB0-2EBEF, 2F800-2FA1F, 30000-3134F, 31350-323AF, 323B0-3347F |
+| `Hebr` | Hebrew | rtl | 0590-05FF, FB1D-FB4F |
+| `Hira` | Hiragana | ltr | 3040-309F |
+| `Kana` | Katakana | ltr | 30A0-30FF, 31F0-31FF |
+| `Knda` | Kannada | ltr | 0C80-0CFF |
+| `Khmr` | Khmer | ltr | 1780-17FF, 19E0-19FF |
+| `Laoo` | Lao | ltr | 0E80-0EFF |
+| `Latn` | Latin | ltr | 0041-005A, 0061-007A, 00C0-024F, 0250-02AF, 1E00-1EFF, 2C60-2C7F, A720-A7FF, AB30-AB6F, 10780-107BF, 1DF00-1DFFF |
+| `Mlym` | Malayalam | ltr | 0D00-0D7F |
+| `Mymr` | Myanmar | ltr | 1000-109F, A9E0-A9FF, AA60-AA7F, 116D0-116FF |
+| `Ogam` | Ogham | ltr | 1681-169C |
+| `Orya` | Odia | ltr | 0B00-0B7F |
+| `Phnx` | Phoenician | rtl | 10900-1091F |
+| `Runr` | Runic | ltr | 16A0-16FF |
+| `Sinh` | Sinhala | ltr | 0D80-0DFF, 111E0-111FF |
+| `Taml` | Tamil | ltr | 0B80-0BFF, 11FC0-11FFF |
+| `Telu` | Telugu | ltr | 0C00-0C7F |
+| `Tfng` | Tifinagh | ltr | 2D30-2D7F |
+| `Thai` | Thai | ltr | 0E00-0E7F |
+| `Tibt` | Tibetan | ltr | 0F00-0FFF |
 
 ---
 
@@ -81,7 +81,7 @@ def char_script(ch: str) -> Optional[str]
 ```
 
 Returns the ISO-15924 code for a single character, or `None` if the character is not in
-any registered script's codepoint ranges. ASCII digits (0–9), spaces, and most punctuation
+any registered script's codepoint ranges. ASCII digits (0-9), spaces, and most punctuation
 return `None`.
 
 ```python
@@ -93,8 +93,8 @@ char_script("1")   # None
 ```
 
 **Implementation**: uses O(log n) binary search over a precomputed sorted interval list.
-Characters in the IPA Extensions block (U+0250–U+02AF) and Latin Extended Additional
-(U+1E00–U+1EFF) are classified as `"Latn"`.
+Characters in the IPA Extensions block (U+0250-U+02AF) and Latin Extended Additional
+(U+1E00-U+1EFF) are classified as `"Latn"`.
 
 **Gotcha**: characters in overlapping Unicode ranges (very rare in this registry) will
 match whichever script appears first in `SCRIPT_REGISTRY`. There are no overlaps in the
@@ -165,11 +165,11 @@ detect_script("123 !!!")             # None
 ```
 
 **Mixed-script behaviour**: returns whichever script has more characters. Ties are broken
-by lexicographic order on the ISO-15924 code — the alphabetically **last** code wins
+by lexicographic order on the ISO-15924 code, the alphabetically **last** code wins
 (e.g. `"Latn"` beats `"Cyrl"` because `L` > `C`).
 
-**Gotcha — Japanese**: Japanese text typically mixes Hiragana (`Hira`), Katakana (`Kana`),
-and Han (`Hani`). `detect_script` returns the single dominant code; for Japanese NLP,
+**Gotcha, Japanese**: Japanese text typically mixes Hiragana (`Hira`), Katakana (`Kana`),
+and Han (`Hani`). `detect_script` returns the single dominant code, for Japanese NLP,
 inspect the full character distribution rather than the single dominant result.
 
 ---
@@ -252,13 +252,14 @@ Returns `None` for unknown languages.
 
 **Notes**:
 - Japanese (`ja`) maps to `Hira` (Hiragana) because Hiragana is the base syllabary.
-  Real Japanese text is mixed; use `detect_script` on actual text when the script
+  Real Japanese text is mixed, use `detect_script` on actual text when the script
   distribution matters.
 - Plains Cree (`crk`) maps to `Cans` (Canadian Aboriginal Syllabics), the default
   orthography used in MMS-style labelling (`"syllabics"`).
-- Several languages have multiple recognised orthographies; the table records the
-  modern standard. Serbian (`sr`) maps to `Cyrl`; Latin-script Serbian is `sr-Latn` —
-  `lang_to_script` uses only the primary subtag and will return `Cyrl` for both.
+- Several languages have multiple recognised orthographies. The table records
+  the modern standard: Serbian (`sr`) maps to `Cyrl`. Latin-script Serbian is
+  `sr-Latn`. `lang_to_script` uses only the primary subtag and returns
+  `Cyrl` for both.
 
 ---
 
@@ -314,18 +315,18 @@ normalize_script_tag("lao")        # "Laoo"   ← label "lao" maps to code "Laoo
 normalize_script_tag("unknown")    # None
 ```
 
-**Gotcha — "lao" vs "Laoo"**: the English name `"lao"` maps to ISO-15924 `"Laoo"`.
+**Gotcha, "lao" vs "Laoo"**: the English name `"lao"` maps to ISO-15924 `"Laoo"`.
 Passing the ISO code `"laoo"` (lowercase) also works via the code-normalisation path.
 
-**Gotcha — case**: lookup is case-insensitive for both the label map and the ISO code
+**Gotcha, case**: lookup is case-insensitive for both the label map and the ISO code
 map. `"LATIN"` → lowercased to `"latin"` → found in label map → `"Latn"`.
 
-## Typological metadata — `script_type`
+## Typological metadata, `script_type`
 
 Each `Script` in `SCRIPT_REGISTRY` carries a `script_type`: one of `alphabet`,
 `abjad`, `abugida`, `syllabary`, `logographic`, `featural`, or `other`
 (classification per Daniels & Bright, *The World's Writing Systems*, 1996). It
-describes how the script encodes sounds structurally — not how any language is
+describes how the script encodes sounds structurally, not how any language is
 pronounced.
 
 ```python
@@ -334,9 +335,9 @@ SCRIPT_REGISTRY["Deva"].script_type   # "abugida"
 SCRIPT_REGISTRY["Hani"].script_type   # "logographic"
 ```
 
-## Mixed-script segmentation — `script_runs`
+## Mixed-script segmentation, `script_runs`
 
-`detect_script` flattens text to one dominant script; `script_runs` preserves
+`detect_script` flattens text to one dominant script, `script_runs` preserves
 structure by returning contiguous `(script, substring)` runs. Script-neutral
 characters (spaces, punctuation, combining marks) attach to the preceding run,
 following the resolution model of Unicode UAX #24.
@@ -360,3 +361,6 @@ major version. `lang_to_script` accepts ISO 639-1 codes, ISO 639-2/3 codes
 including bibliographic variants (`ger`, `gre`, `arm`), BCP-47 tags with an
 authoritative script subtag (`sr-Latn`), and the widespread informal
 `_cyr`/`_lat` variant suffixes (`uzb_cyr`).
+
+---
+[Home](../README.md) · [notation →](notation.md)
