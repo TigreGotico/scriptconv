@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a22](https://github.com/TigreGotico/scriptconv/tree/0.0.4a22) (2026-08-15)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a21...0.0.4a22)
+
+**Merged pull requests:**
+
+- fix: he extra installs phonikud, not just phonikud-onnx [\#107](https://github.com/TigreGotico/scriptconv/pull/107) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a21](https://github.com/TigreGotico/scriptconv/tree/0.0.4a21) (2026-08-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a20...0.0.4a21)
