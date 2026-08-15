@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a23](https://github.com/TigreGotico/scriptconv/tree/0.0.4a23) (2026-08-15)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a22...0.0.4a23)
+
+**Merged pull requests:**
+
+- fix: accept English phonetic-detail IPA on ARPABET input [\#111](https://github.com/TigreGotico/scriptconv/pull/111) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a22](https://github.com/TigreGotico/scriptconv/tree/0.0.4a22) (2026-08-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a21...0.0.4a22)
