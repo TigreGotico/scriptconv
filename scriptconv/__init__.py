@@ -22,6 +22,10 @@ readings:
     extra; Chinese hanzi → pinyin/bopomofo via the ``zh`` extra).
 cangjie:
     Hanzi → Cangjie5 input codes (shape decomposition, vendored table).
+cuneiform:
+    Cuneiform signs ↔ the sign names Unicode gives them (sign values, read
+    from ``unicodedata``, not shipped), and Assyriological readings →
+    signs from the optional ``cuneiscribe`` reading list.
 graph:
     Conversion-graph engine: representations (notations and orthographies)
     as nodes, registered transforms as edges, lossless-preferring routing.
@@ -106,6 +110,15 @@ from scriptconv.cangjie import (
     cangjie_code,
     to_cangjie,
 )
+from scriptconv.cuneiform import (
+    cuneiform_to_sign_names,
+    readings_to_cuneiform,
+    sign_readings_table,
+    is_cuneiform,
+    sign_for_name,
+    sign_name,
+    sign_names_to_cuneiform,
+)
 
 __all__ = [
     # scripts
@@ -170,6 +183,14 @@ __all__ = [
     # cangjie (vendored Cangjie5 table)
     "cangjie_code",
     "to_cangjie",
+    # cuneiform (Unicode sign names, read from unicodedata)
+    "cuneiform_to_sign_names",
+    "sign_names_to_cuneiform",
+    "readings_to_cuneiform",
+    "sign_readings_table",
+    "sign_name",
+    "sign_for_name",
+    "is_cuneiform",
     "to_pinyin",
     "to_bopomofo",
 ]

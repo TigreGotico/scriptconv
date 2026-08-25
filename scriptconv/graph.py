@@ -200,6 +200,16 @@ REPRESENTATIONS: Dict[str, Representation] = {r.id: r for r in (
                    reference="Hanyu Pinyin romanization"),
     Representation("bopomofo", "orthography", script="Bopo",
                    reference="Zhuyin fuhao"),
+    Representation("cuneiform", "orthography", script="Xsux",
+                   reference="Sumero-Akkadian cuneiform signs"),
+    Representation("sign-readings", "orthography", script="Latn",
+                   system="transliteration",
+                   reference="Assyriological transliteration (readings); "
+                             "table from the optional cuneiscribe package"),
+    Representation("sign-names", "orthography", script="Latn",
+                   system="unicode-sign-names",
+                   reference="Unicode cuneiform sign names (CUNEIFORM SIGN AN "
+                             "-> AN); sign values, not readings"),
 )}
 
 
@@ -260,10 +270,33 @@ def _orthography_edges() -> List[Edge]:
         from scriptconv.cangjie import to_cangjie
         return to_cangjie(text)
 
+    def cuneiform_to_sign_names(text, **_):
+        from scriptconv.cuneiform import cuneiform_to_sign_names as f
+        return f(text)
+
+    def readings_to_cuneiform(text, **_):
+        from scriptconv.cuneiform import readings_to_cuneiform as f
+        return f(text)
+
+    def sign_names_to_cuneiform(text, **_):
+        from scriptconv.cuneiform import sign_names_to_cuneiform as f
+        return f(text)
+
     return [
         Edge("hira", "kana", hira_to_kana, lossless=True),
         Edge("kana", "hira", kana_to_hira, lossless=True),
         Edge("hangul", "jamo", hangul_to_jamo, lossless=False),
+        # Every encoded sign has exactly one Unicode name and no two share
+        # one, so signs survive the round trip. The reverse is not lossless:
+        # a name Unicode never assigned has no sign to become.
+        Edge("cuneiform", "sign-names", cuneiform_to_sign_names, lossless=True),
+        Edge("sign-names", "cuneiform", sign_names_to_cuneiform, lossless=False),
+        # Readings, not sign values. One direction only: 1505 of the table's
+        # 1779 sign sequences carry more than one reading, so the reverse is
+        # a question about the language and `sign-names` is the reverse that
+        # has one answer.
+        Edge("sign-readings", "cuneiform", readings_to_cuneiform,
+             lossless=False, requires="cuneiscribe"),
         Edge("japanese", "hira", japanese_to_hira, requires="ja"),
         Edge("japanese", "kana", japanese_to_kana, requires="ja"),
         Edge("hanzi", "pinyin", hanzi_to_pinyin, requires="zh"),

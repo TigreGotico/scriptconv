@@ -128,7 +128,7 @@ is the phonetic alphabet of the Halabi Arabic-Phonetiser. Text in it
 converts one way to IPA (`halabi_to_ipa("mrHbaa")` → `'mrħbaː'`) and onward
 through the graph. Details: [docs/notation.md](docs/notation.md).
 
-### Rewriting the writing: `translit`, `readings`, `cangjie`
+### Rewriting the writing: `translit`, `readings`, `cangjie`, `cuneiform`
 
 Deterministic, table-driven operations on the writing system itself:
 
@@ -152,6 +152,33 @@ to_pinyin("中国人")          # 'zhōng guó rén'           pip install scrip
 to_bopomofo("中国")          # 'ㄓㄨㄥ ㄍㄨㄛˊ'
 to_cangjie("倉頡")           # 'oiar grmbc'              vendored table, no extra
 ```
+
+Cuneiform converts against the sign names Unicode itself assigns, so no table
+ships and none can drift:
+
+```python
+from scriptconv import cuneiform_to_sign_names, sign_names_to_cuneiform
+
+cuneiform_to_sign_names("𒀭 𒈗 𒂍")   # 'AN LUGAL E2'
+sign_names_to_cuneiform("AN LUGAL")   # '𒀭𒈗'
+```
+
+Readings — the transliteration Assyriology actually writes — need a scholarly
+reading list, which is not derivable and is not shipped. Install
+`scriptconv[cuneiscribe]` and that edge appears too:
+
+```python
+from scriptconv import readings_to_cuneiform
+
+readings_to_cuneiform("a-na KUR as-sur")   # '𒀀𒈾 𒆳 𒊍𒋩'
+```
+
+The built-in direction converts sign *values*, not readings. `𒀭` is read `an`, `dingir` or `il`
+depending on the word it stands in, and Akkadian, Sumerian and Hittite
+disagree about the same sign — choosing between readings needs a lexicon and
+a language, which is not a question about the writing system. Signs survive
+the round trip; spacing does not, because sign names need separating from
+each other and signs do not.
 
 `readings.tokens()` exposes the per-token stream underneath, for consumers
 that need word boundaries. The Cangjie table (103,601 glyphs) ships inside
