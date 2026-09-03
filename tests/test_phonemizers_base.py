@@ -248,3 +248,47 @@ class TestEspeakGetLangChinese(unittest.TestCase):
             get_lang("xx-not-a-real-lang")
 
 
+class TestChunkTextDigitColon(unittest.TestCase):
+    """A delimiter directly between two digits (a clock time, a score) is
+    not a sentence-internal boundary — splitting "16:30" into "16" and "30"
+    sends "... às 16" and "30 ..." to the per-chunk phonemizer/normalizer,
+    which reads the time as two separate numbers instead of one."""
+
+    def test_clock_time_stays_in_one_chunk(self):
+        chunks = BasePhonemizer.chunk_text(
+            "A reunião é às 16:30, não te esqueças.")
+        self.assertEqual(chunks, [
+            ("A reunião é às 16:30, não te esqueças.", ".", True),
+        ])
+
+    def test_score_splits_only_at_the_first_colon(self):
+        chunks = BasePhonemizer.chunk_text(
+            "Placar final: 3:2 para o Porto.")
+        self.assertEqual(chunks, [
+            ("Placar final", ":", False),
+            ("3:2 para o Porto.", ".", True),
+        ])
+
+    def test_word_colon_still_splits(self):
+        chunks = BasePhonemizer.chunk_text("Nota: fim.")
+        self.assertEqual(chunks, [
+            ("Nota", ":", False),
+            ("fim.", ".", True),
+        ])
+
+    def test_semicolons_unaffected(self):
+        chunks = BasePhonemizer.chunk_text("Um; dois; três.")
+        self.assertEqual(chunks, [
+            ("Um", ";", False),
+            ("dois", ";", False),
+            ("três.", ".", True),
+        ])
+
+    def test_digit_colon_space_still_splits(self):
+        # a digit on only one side of the delimiter is not a digit:digit
+        # token, so it keeps splitting as before.
+        chunks = BasePhonemizer.chunk_text("12: pontos")
+        self.assertEqual(chunks, [
+            ("12", ":", False),
+            ("pontos", ".", True),
+        ])
