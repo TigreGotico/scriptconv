@@ -28,9 +28,11 @@ class Alphabet(str, Enum):
     COTOVIA = "cotovia" # gl
     HANZI = "hanzi" # zh
     BUCKWALTER = "buckwalter"
-    MANTOQ = "mantoq"  # ar — Halabi Arabic-Phonetiser inventory # ar
+    HALABI = "halabi"  # ar — Halabi Arabic-Phonetiser phoneme notation
     CANGJIE = "cangjie" # zh (Cangjie input method)
+    VOSK = "vosk" # ru — vosk-tts phoneme inventory (a0, bj, sch ...)
     GRAPHEMES = "graphemes"  # plain text / grapheme input (user-side)
+    AFRICA_G2P = "africa_g2p"  # africa-g2p native-orthography phoneme units (400+ African languages)
 
 
 class Phonemizer(str, Enum):
@@ -64,7 +66,9 @@ class Phonemizer(str, Enum):
     COTOVIA = "cotovia"  # galician  (no ipa!)
     AHOTTS = "ahotts"  # basque
     PHONIKUD = "phonikud"  # hebrew
-    MANTOQ = "mantoq"  # arabic
+    MANTOQ = "mantoq"  # arabic — the mantoq wrapper around Halabi's Arabic-Phonetiser
+    HALABI = "halabi"  # arabic — raw Halabi Arabic-Phonetiser, no diacritizer (vowelized input only)
+    IQRA = "iqra"  # arabic — Halabi phonetiser output post-processed to the IqraEval phoneme_ref convention
     VIPHONEME = "viphoneme" # vietnamese
     G2PK = "g2pk" # korean
     KOG2PK = "kog2p" # korean
@@ -73,8 +77,10 @@ class Phonemizer(str, Enum):
     PYPINYIN = "pypinyin" # chinese
     XPINYIN = "xpinyin" # chinese
     JIEBA = "jieba" # chinese  (not a real phonemizer!)
+    VOSK = "vosk"  # russian  (no ipa!)
     SHAMI = "shami"  # Levantine Arabic / English code-switching (ShamiVITS)
     ARBTOK = "arbtok"  # arabic (dialect-aware, undiacritized text; o2i lattice)
     EUSKAPHONE = "euskaphone"  # basque (dialect-aware; o2i lattice)
     BARRANQUENHO = "barranquenho"  # barranquenho (pt/es contact variety; o2i lattice)
     ORTHOGRAPHY2IPA = "orthography2ipa"  # multilingual data-driven IPA (o2i lattice)
+    AFRICA_G2P = "africa_g2p"  # rule-based G2P for 400+ African languages (native units or IPA)
