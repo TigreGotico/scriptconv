@@ -196,13 +196,21 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         non-ASCII punctuation such as Arabic ``،``/``؟`` and curly quotes.
 
         Apostrophes and hyphens sandwiched between letters (e.g. "don't", "well-known")
-        are preserved so contractions and compounds aren't broken apart.
+        are preserved so contractions and compounds aren't broken apart, and any
+        punctuation character sandwiched between two digits (e.g. the ":" in a clock
+        time "16:30", the "," in "10,4", the "." in "92.073", the "-" in "1139-1185")
+        is preserved so the per-language normalizers still see it as a single token,
+        matching the digit:digit exemption in ``chunk_text``.
         """
         out = []
         chars = list(text)
         for i, c in enumerate(chars):
             if c in ("'", "’", "-") and 0 < i < len(chars) - 1 \
                     and chars[i - 1].isalpha() and chars[i + 1].isalpha():
+                out.append(c)
+                continue
+            if 0 < i < len(chars) - 1 \
+                    and chars[i - 1].isdigit() and chars[i + 1].isdigit():
                 out.append(c)
                 continue
             if unicodedata.category(c).startswith("P"):
