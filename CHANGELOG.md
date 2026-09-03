@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a24](https://github.com/TigreGotico/scriptconv/tree/0.0.4a24) (2026-09-03)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a23...0.0.4a24)
+
+**Merged pull requests:**
+
+- fix: keep digit:digit tokens such as clock times in one chunk [\#115](https://github.com/TigreGotico/scriptconv/pull/115) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a23](https://github.com/TigreGotico/scriptconv/tree/0.0.4a23) (2026-08-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a22...0.0.4a23)
