@@ -238,10 +238,19 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         results: TextChunks = []
         delimiters = delimiters or [":", ";", "...", "|"]
 
-        # Create a regex pattern that matches any of the delimiters
-        delimiter_pattern = re.escape(delimiters[0])
+        # Create a regex pattern that matches any of the delimiters. A
+        # delimiter sitting directly between two digits (eg. the ":" in a
+        # clock time "16:30" or a score "3:2") is not a sentence-internal
+        # boundary, so it is only excluded when *both* neighbours are
+        # digits — a delimiter with a digit on just one side (eg. "12: ")
+        # still splits as before.
+        def _delim_alt(delimiter: str) -> str:
+            escaped = re.escape(delimiter)
+            return f"(?:(?<!\\d){escaped}|{escaped}(?!\\d))"
+
+        delimiter_pattern = _delim_alt(delimiters[0])
         for delimiter in delimiters[1:]:
-            delimiter_pattern += f"|{re.escape(delimiter)}"
+            delimiter_pattern += f"|{_delim_alt(delimiter)}"
 
         for sentence in sentence_tokenize(text):
             # Default punctuation if no specific punctuation found
