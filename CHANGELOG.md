@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a26](https://github.com/TigreGotico/scriptconv/tree/0.0.4a26) (2026-09-03)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a25...0.0.4a26)
+
+**Merged pull requests:**
+
+- fix: keep punctuation between digits so clock times and decimals reach the phonemizer [\#118](https://github.com/TigreGotico/scriptconv/pull/118) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a25](https://github.com/TigreGotico/scriptconv/tree/0.0.4a25) (2026-09-03)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a24...0.0.4a25)
