@@ -292,3 +292,39 @@ class TestChunkTextDigitColon(unittest.TestCase):
             ("12", ":", False),
             ("pontos", ".", True),
         ])
+
+
+class TestRemovePunctuationKeepsDigitInternal(unittest.TestCase):
+    """remove_punctuation must keep a punctuation character sandwiched
+    between two digits (clock times, decimals, ranges) — otherwise
+    "16:30" reaches the phonemizer as "1630" and gets read as one large
+    integer instead of an hour and a minute, matching chunk_text's
+    digit:digit exemption above."""
+
+    def test_clock_time_colon_kept(self):
+        self.assertEqual(
+            BasePhonemizer.remove_punctuation(
+                "A reunião é às 16:30, não te esqueças."),
+            "A reunião é às 16:30 não te esqueças",
+        )
+
+    def test_decimal_comma_kept(self):
+        self.assertEqual(BasePhonemizer.remove_punctuation("10,4"), "10,4")
+
+    def test_decimal_dot_kept(self):
+        self.assertEqual(
+            BasePhonemizer.remove_punctuation("92.073"), "92.073")
+
+    def test_range_hyphen_kept(self):
+        self.assertEqual(
+            BasePhonemizer.remove_punctuation("1139-1185"), "1139-1185")
+
+    def test_word_colon_still_stripped(self):
+        self.assertEqual(
+            BasePhonemizer.remove_punctuation("Nota: fim."), "Nota fim")
+
+    def test_ordinal_mark_still_stripped(self):
+        # "3.º" — the dot follows a digit but precedes a letter (the
+        # masculine ordinal indicator), so it is not digit:digit and is
+        # stripped like any other punctuation, giving "3º".
+        self.assertEqual(BasePhonemizer.remove_punctuation("3.º"), "3º")
