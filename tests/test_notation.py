@@ -1155,59 +1155,59 @@ def test_convert_routes_through_rfe():
 # Mantoq → IPA (Halabi Arabic-Phonetiser inventory; one-directional)
 # ---------------------------------------------------------------------------
 
-from scriptconv.notation import mantoq_to_ipa, UnknownSymbolError  # noqa: E402
+from scriptconv.notation import halabi_to_ipa, UnknownSymbolError  # noqa: E402
 
 def test_mantoq_basic_word():
-    assert mantoq_to_ipa("salaam") == "salaːm"
+    assert halabi_to_ipa("salaam") == "salaːm"
 
 
 def test_mantoq_theta_is_caret_not_shadda():
     # mantoq's "^" is θ — the same character is NOT a Buckwalter shadda here
-    assert mantoq_to_ipa("^") == "θ"
+    assert halabi_to_ipa("^") == "θ"
 
 
 def test_mantoq_gemination_marker():
-    assert mantoq_to_ipa("b_dbl_a") == "bːa"
+    assert halabi_to_ipa("b_dbl_a") == "bːa"
 
 
 def test_mantoq_dbl_after_vowel_is_inert():
     # upstream only emits _dbl_ after consonants (tokenization.py splits
     # doubled consonant phonemes); a vowel+_dbl_ input is left unchanged
-    assert mantoq_to_ipa("aa_dbl_") == "aː"
+    assert halabi_to_ipa("aa_dbl_") == "aː"
 
 
 def test_mantoq_special_tokens():
     # inventory special tokens: _sil_ -> pause (space), _eos_/_pad_ dropped —
     # and never shredded into letter phonemes
-    assert mantoq_to_ipa("m_sil_n") == "m n"
-    assert mantoq_to_ipa("m a_eos_") == "m a"
-    assert mantoq_to_ipa("_pad_b") == "b"
+    assert halabi_to_ipa("m_sil_n") == "m n"
+    assert halabi_to_ipa("m a_eos_") == "m a"
+    assert halabi_to_ipa("_pad_b") == "b"
 
 
 def test_mantoq_word_separator_and_glottal():
-    assert mantoq_to_ipa("m_+_<a") == "m ʔa"
+    assert halabi_to_ipa("m_+_<a") == "m ʔa"
 
 
 def test_mantoq_emphatics_and_superlong():
-    assert mantoq_to_ipa("SaaaaD") == "sˤaːːdˤ"
+    assert halabi_to_ipa("SaaaaD") == "sˤaːːdˤ"
 
 
 def test_mantoq_via_convert_facade():
-    assert convert("salaam", "mantoq", "ipa") == "salaːm"
-    assert can_convert("mantoq", "ipa") is True
-    assert can_convert("ipa", "mantoq") is False
+    assert convert("salaam", "halabi", "ipa") == "salaːm"
+    assert can_convert("halabi", "ipa") is True
+    assert can_convert("ipa", "halabi") is False
 
 
-def test_mantoq_chains_to_xsampa_via_graph():
-    # mantoq -> ipa -> x-sampa multi-hop through the conversion graph
-    out = convert("salaam", "mantoq", "x-sampa")
+def test_halabi_chains_to_xsampa_via_graph():
+    # halabi -> ipa -> x-sampa multi-hop through the conversion graph
+    out = convert("salaam", "halabi", "x-sampa")
     assert "a:" in out
 
 
-def test_mantoq_errors_strict():
+def test_halabi_errors_strict():
     import pytest as _pytest
     with _pytest.raises(UnknownSymbolError):
-        mantoq_to_ipa("Q", errors="strict")
+        halabi_to_ipa("Q", errors="strict")
 
 
 def test_buckwalter_wasla_and_dagger_alef():

@@ -17,6 +17,7 @@ from __future__ import annotations
 import importlib
 from typing import Dict, Optional, Tuple
 
+from scriptconv.phonemizers.base import _primary_subtag
 from scriptconv.phonemizers.enums import Alphabet, Phonemizer
 
 __all__ = ["PHONEMIZER_REGISTRY", "LANG_DEFAULTS", "get_phonemizer",
@@ -55,6 +56,8 @@ PHONEMIZER_REGISTRY: Dict[Phonemizer, Tuple[str, str, Optional[str]]] = {
     _P.G2PFA: (f"{_BASE}.fa", "PersianPhonemizer", "fa"),
     _P.VIPHONEME: (f"{_BASE}.vi", "VIPhonemePhonemizer", "vi"),
     _P.ORTHOGRAPHY2IPA: (f"{_BASE}.o2ipa", "Orthography2IPAPhonemizer", "o2i"),
+    # vendored (not an optional extra) -- see _vendored/africa_g2p
+    _P.AFRICA_G2P: (f"{_BASE}.africa", "AfricaG2PPhonemizer", None),
     # ported in the CJK/AR stage; registered here so no member is silently
     # unmapped — resolution raises ImportError naming the pending extra
     _P.OPENJTALK: (f"{_BASE}.ja", "OpenJTaklPhonemizer", "ja-phonemizers"),
@@ -68,8 +71,11 @@ PHONEMIZER_REGISTRY: Dict[Phonemizer, Tuple[str, str, Optional[str]]] = {
     _P.PYPINYIN: (f"{_BASE}.zh", "PypinyinPhonemizer", "zh-phonemizers"),
     _P.XPINYIN: (f"{_BASE}.zh", "XpinyinPhonemizer", "zh-phonemizers"),
     _P.MANTOQ: (f"{_BASE}.ar", "MantoqPhonemizer", "ar-phonemizers"),
+    _P.HALABI: (f"{_BASE}.ar", "HalabiPhonemizer", "ar-phonemizers"),
+    _P.IQRA: (f"{_BASE}.ar", "IqraPhonemizer", "ar-phonemizers"),
     _P.ARBTOK: (f"{_BASE}.ar", "ArbtokPhonemizer", "ar-phonemizers"),
     _P.SHAMI: (f"{_BASE}.shami", "ShamiPhonemizer", "shami"),
+    _P.VOSK: (f"{_BASE}.ru", "VoskPhonemizer", "phonemizers"),
 }
 
 
@@ -101,10 +107,9 @@ def get_phonemizer(phonemizer: Phonemizer,
     """
     phonemizer = Phonemizer(phonemizer)
     cls = get_phonemizer_class(phonemizer)
-    # normalizer/phonikud_model are plain BasePhonemizer attributes; set them
-    # after construction so wrapper __init__ signatures stay untouched
+    # normalizer is a plain BasePhonemizer attribute; set it after
+    # construction so wrapper __init__ signatures stay untouched
     normalizer = kwargs.pop("normalizer", None)
-    phonikud_model = kwargs.pop("phonikud_model", None)
     if phonemizer in (_P.BYT5, _P.CHARSIU, _P.DEEPPHONEMIZER):
         inst = cls(model, **kwargs)
     else:
@@ -123,8 +128,6 @@ def get_phonemizer(phonemizer: Phonemizer,
         inst = cls(**kwargs)
     if normalizer is not None:
         inst.normalizer = normalizer
-    if phonikud_model is not None:
-        inst.phonikud_model = phonikud_model
     return inst
 
 
@@ -137,6 +140,7 @@ _EMITS: Dict[Phonemizer, Tuple[Alphabet, ...]] = {
     _P.TUGAPHONE: (Alphabet.IPA,),
     _P.PHONIKUD: (Alphabet.IPA,),
     _P.COTOVIA: (Alphabet.COTOVIA,),
+    _P.VOSK: (Alphabet.VOSK,),
     _P.ESPEAK: (Alphabet.IPA,),
 }
 
@@ -149,6 +153,9 @@ LANG_DEFAULTS: Dict[str, Tuple[Phonemizer, ...]] = {
     "pt": (_P.TUGAPHONE,),
     "he": (_P.PHONIKUD,),
     "gl": (_P.COTOVIA, _P.ORTHOGRAPHY2IPA, _P.ESPEAK),
+    # vosk emits its own inventory, so it is the Russian default only
+    # when that notation is requested (same shape as Cotovía above)
+    "ru": (_P.VOSK, _P.ORTHOGRAPHY2IPA, _P.ESPEAK),
 }
 
 # Languages whose explicit entry is exhaustive: no generic fallback beyond it.
@@ -184,7 +191,7 @@ def phonemizer_for_lang(lang: str, alphabet: Alphabet = Alphabet.IPA,
     """
     if override is not None:
         return get_phonemizer(override, alphabet, model, **kwargs)
-    key = lang.replace("_", "-").split("-")[0].lower()
+    key = _primary_subtag(lang)
     explicit = LANG_DEFAULTS.get(key, ())
     for candidate in explicit:
         if alphabet in _EMITS.get(candidate, (Alphabet.IPA,)):
@@ -219,7 +226,9 @@ def register(graph) -> None:
     routing context, and present only in graphs that opted in (the
     :data:`scriptconv.graph.DEFAULT_GRAPH` stays orthography-only by
     design) — and one dispatching ``text -> ipa`` edge that resolves the
-    per-language default (honouring an ``override=`` context key).
+    per-language default (honouring an ``override=`` context key). It also
+    accepts already-diacritized input via a ``"text-diacritized" -> "ipa"``
+    edge (the same phonemization; pair with :func:`scriptconv.diacritics.register`).
 
     Usage::
 
@@ -231,8 +240,13 @@ def register(graph) -> None:
     from scriptconv.graph import Edge
 
     def _text_to_ipa(text: str, lang: str = "und",
-                     override: Optional[Phonemizer] = None, **_):
-        return phonemizer_for_lang(lang, Alphabet.IPA,
-                                   override).phonemize_string(text, lang)
+                     override: Optional[Phonemizer] = None,
+                     phonemizer_model: Optional[str] = None, **_):
+        # phonemizer_model is the model knob for this (phonemizer) edge —
+        # forwarded to model-backed phonemizers (ByT5/Charsiu/…); parallel to
+        # diacritizer_model on the text -> text-diacritized edge.
+        return phonemizer_for_lang(lang, Alphabet.IPA, override,
+                                   phonemizer_model).phonemize_string(text, lang)
 
     graph.register(Edge("text", "ipa", _text_to_ipa, lossless=False))
+    graph.register(Edge("text-diacritized", "ipa", _text_to_ipa, lossless=False))
