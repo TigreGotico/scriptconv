@@ -41,6 +41,8 @@ __all__ = [
     "ipa_to_cotovia",
     "rfe_to_ipa",
     "ipa_to_rfe",
+    "halabi_to_ipa",
+    "iqra_halabi_to_ipa",
     "looks_like_ipa",
 ]
 
@@ -57,7 +59,7 @@ class Notation(str, Enum):
     KIRSHENBAUM = "kirshenbaum"  # ASCII-IPA (espeak-ng native notation)
     COTOVIA = "cotovia"  # Universidade de Vigo Cotovía TTS notation (gl)
     RFE = "rfe"
-    MANTOQ = "mantoq"  # Revista de Filología Española phonetic alphabet
+    HALABI = "halabi"  # Halabi Arabic-Phonetiser phoneme notation (ar)
 
     def __repr__(self) -> str:
         return f"Notation.{self.name}"
@@ -153,6 +155,18 @@ for _arpa, _ipa in _ARPA_BASE.items():
         _IPA_TO_ARPA[_ipa] = _arpa
 # Accept ASCII "g" (U+0067) as well as canonical script "ɡ" (U+0261) on input.
 _IPA_TO_ARPA.setdefault("g", "G")
+# Bare/long NURSE vowel (non-rhotic British ɜ, ɜː) has no dedicated ARPA symbol —
+# ARPABET is rhotic-only, so it collapses onto the same "ER" as the r-colored ɜr.
+_IPA_TO_ARPA.setdefault("ɜː", "ER")
+_IPA_TO_ARPA.setdefault("ɜ", "ER")
+# English rhotic approximant: ARPABET "R" canonically maps back to plain "r",
+# but real transcriptions overwhelmingly write ɹ — accept it on input.
+_IPA_TO_ARPA.setdefault("ɹ", "R")
+# British (SSB) GOAT diphthong: ARPABET is GA-based so OW round-trips as oʊ,
+# but əʊ is the same phoneme in RP/SSB transcriptions.
+_IPA_TO_ARPA.setdefault("əʊ", "OW")
+# British LOT vowel: GA merges it into ɑ (AA); ɒ has no ARPA symbol of its own.
+_IPA_TO_ARPA.setdefault("ɒ", "AA")
 
 # Precompiled regex for IPA → ARPA (longest-first)
 _IPA_ARPA_KEYS_SORTED = sorted(_IPA_TO_ARPA.keys(), key=len, reverse=True)
@@ -306,6 +320,7 @@ _XSAMPA_TO_IPA: dict[str, str] = {
     "p\\": "ɸ",
     "B\\": "ʙ",
     "r\\": "ɹ",
+    "r": "r",     # plain r = alveolar TRILL in canonical X-SAMPA (tap is "4")
     "r`": "ɽ",    # retroflex FLAP (not approximant)
     "R\\": "ʀ",
     "l`": "ɭ",
@@ -324,6 +339,7 @@ _XSAMPA_TO_IPA: dict[str, str] = {
     "R": "ʁ",
     "H\\": "ʜ",
     "?\\": "ʕ",
+    "h": "h",     # plain h = voiceless glottal fricative in canonical X-SAMPA
     "h\\": "ɦ",
     "?": "ʔ",
     "H": "ɥ",
@@ -1006,7 +1022,7 @@ def ipa_to_rfe(ipa: str, errors: str = "pass") -> str:
 
 
 # ---------------------------------------------------------------------------
-# Mantoq → IPA
+# Halabi → IPA
 #
 # Mantoq is the phonetic alphabet of Nawar Halabi's Arabic-Phonetiser (the
 # inventory emitted by the mantoq G2P pipeline): an ASCII phoneme notation
@@ -1017,10 +1033,19 @@ def ipa_to_rfe(ipa: str, errors: str = "pass") -> str:
 # the inventory's phonetic values — the phonetiser CODE is CC BY-NC and lives
 # elsewhere; a factual symbol table is not encumbered by it.  Published
 # models trained on mantoq sequences make this notation worth transcoding.
-# One-directional: IPA → mantoq is not defined.
+# One-directional: IPA → halabi is not defined.
+#
+# Naming and lineage: this notation originates in Nawar Halabi's
+# Arabic-Phonetiser (2016, CC BY-NC 4.0), written for his Arabic speech
+# corpus. The mantoq package wraps that phonetiser (with a diacritizer);
+# phoonnx and scriptconv vendor mantoq; the IqraEval shared task generates
+# its reference phonemes with the same rules (Interspeech 2025,
+# doi:10.21437/Interspeech.2025-2411 — "we employed the phonetizer
+# introduced by Nawar Halabi"). One engine, several package names — the
+# notation is named for its author, not for any wrapper.
 # ---------------------------------------------------------------------------
 
-_MANTOQ_CONSONANTS: dict[str, str] = {
+_HALABI_CONSONANTS: dict[str, str] = {
     "b": "b", "t": "t", "^": "θ", "j": "d͡ʒ", "H": "ħ", "x": "x",
     "d": "d", "*": "ð", "r": "r", "z": "z", "s": "s", "$": "ʃ",
     "S": "sˤ", "D": "dˤ", "T": "tˤ", "Z": "ðˤ", "E": "ʕ", "g": "ɣ",
@@ -1028,21 +1053,31 @@ _MANTOQ_CONSONANTS: dict[str, str] = {
     "h": "h", "w": "w", "y": "j", "v": "v",
 }
 
-_MANTOQ_VOWELS: dict[str, str] = {
+_HALABI_VOWELS: dict[str, str] = {
     "a": "a", "aa": "aː", "aaaa": "aːː",
     "i": "i", "ii": "iː",
     "u": "u", "uu": "uː",
+    # emphatic-context allophones from the RAW (pre-mantoq-simplification)
+    # Halabi phonetiser layer — mantoq's own g2p folds these to the plain
+    # forms above via ``simplify_phonemes``, but scriptconv's raw
+    # ``Phonemizer.HALABI``/``Phonemizer.IQRA`` edges call the phonetiser
+    # directly and preserve the distinction (see arbtok's
+    # scripts/benchmark_iqraeval.py, verified symbol-by-symbol against the
+    # IqraEval/Iqra_train corpus).
+    "A": "ɑ", "AA": "ɑː",
+    "I": "ɪ", "II": "ɪː",
+    "U": "ʊ", "UU": "ʊː",
 }
 
-_MANTOQ_MULTI = ("_dbl_", "_+_", "_sil_", "_eos_", "_pad_",
-                 "aaaa", "aa", "ii", "uu")
+_HALABI_MULTI = ("_dbl_", "_+_", "_sil_", "_eos_", "_pad_",
+                 "aaaa", "aa", "ii", "uu", "AA", "II", "UU")
 
 
-def _tokenize_mantoq(text: str) -> list[str]:
+def _tokenize_halabi(text: str) -> list[str]:
     tokens = []
     i = 0
     while i < len(text):
-        for sym in _MANTOQ_MULTI:
+        for sym in _HALABI_MULTI:
             if text.startswith(sym, i):
                 tokens.append(sym)
                 i += len(sym)
@@ -1053,8 +1088,8 @@ def _tokenize_mantoq(text: str) -> list[str]:
     return tokens
 
 
-def mantoq_to_ipa(mantoq, errors: str = "pass") -> str:
-    """Convert a Mantoq phoneme string to IPA.
+def halabi_to_ipa(halabi: str | list[str], errors: str = "pass") -> str:
+    """Convert a Halabi-notation phoneme string to IPA.
 
     ``_dbl_`` lengthens/geminates the preceding symbol (``ː``), ``_+_``
     becomes a space, ``<`` is the glottal stop.  Unknown characters follow
@@ -1062,9 +1097,9 @@ def mantoq_to_ipa(mantoq, errors: str = "pass") -> str:
 
     Examples
     --------
-    >>> mantoq_to_ipa("s a l aa m")
+    >>> halabi_to_ipa("s a l aa m")
     's a l aː m'
-    >>> mantoq_to_ipa("b_dbl_a")
+    >>> halabi_to_ipa("b_dbl_a")
     'bːa'
 
     The inventory's special tokens are honoured: ``_sil_`` becomes a space,
@@ -1073,7 +1108,7 @@ def mantoq_to_ipa(mantoq, errors: str = "pass") -> str:
     # a pre-tokenized sequence (as returned by the mantoq package's g2p)
     # is consumed directly — joining tokens into a string is ambiguous
     # ("a"+"aa" and "aa"+"a" both join to "aaa")
-    tokens = _tokenize_mantoq(mantoq) if isinstance(mantoq, str) else mantoq
+    tokens = _tokenize_halabi(halabi) if isinstance(halabi, str) else halabi
     out: list[str] = []
     last_tok = None
     for pos, tok in enumerate(tokens):
@@ -1083,7 +1118,7 @@ def mantoq_to_ipa(mantoq, errors: str = "pass") -> str:
             # phon[0] == phon[1]`); geminate it with a length mark.  A
             # vowel+_dbl_ sequence does not occur in genuine mantoq output
             # and is left unchanged.
-            if out and last_tok in _MANTOQ_CONSONANTS \
+            if out and last_tok in _HALABI_CONSONANTS \
                     and not out[-1].endswith("ː"):
                 out[-1] += "ː"
             continue
@@ -1102,21 +1137,82 @@ def mantoq_to_ipa(mantoq, errors: str = "pass") -> str:
             out.append("ʔ")
             last_tok = tok
             continue
-        if tok in _MANTOQ_VOWELS:
-            out.append(_MANTOQ_VOWELS[tok])
-        elif tok in _MANTOQ_CONSONANTS:
-            out.append(_MANTOQ_CONSONANTS[tok])
+        if tok in _HALABI_VOWELS:
+            out.append(_HALABI_VOWELS[tok])
+        elif tok in _HALABI_CONSONANTS:
+            out.append(_HALABI_CONSONANTS[tok])
         elif tok.isspace() or tok in ".,;:!?()[]{}\"'":
             out.append(tok)
             last_tok = None
             continue
         else:
-            res = _unknown(tok, pos, "mantoq", errors)
+            res = _unknown(tok, pos, "halabi", errors)
             if res:
                 out.append(res)
             last_tok = None
             continue
         last_tok = tok
+    return "".join(out)
+
+
+# ---------------------------------------------------------------------------
+# IqraEval phoneme_ref -> IPA
+#
+# The IqraEval shared task (Interspeech 2025, doi:10.21437/Interspeech.2025-2411
+# — "we employed the phonetizer introduced by Nawar Halabi") scores against a
+# space-separated ``phoneme_ref`` column that is the raw Halabi phonetiser
+# output with the stress/vowel-realization digits, the ``+`` word separator
+# and the ``sil`` pause token stripped — but, unlike mantoq's own
+# ``simplify_phonemes``, keeping the emphatic-allophone uppercase vowels
+# (``A``/``AA``/``I``/``II``/``U``/``UU``) and gemination as a literal doubled
+# consonant letter (``bb``, ``nn``, …) rather than a ``_dbl_`` marker. Table
+# verified symbol-by-symbol against a 5,050-row IqraEval/Iqra_train sample by
+# TigreGotico/arbtok's ``scripts/benchmark_iqraeval.py``; reproduced here
+# (same license posture as ``halabi_to_ipa`` above: a factual symbol table,
+# not the CC BY-NC phonetiser code).
+# ---------------------------------------------------------------------------
+
+_IQRA_CONSONANTS: dict[str, str] = {
+    "b": "b", "t": "t", "^": "θ", "j": "dʒ", "H": "ħ", "x": "x", "d": "d",
+    "*": "ð", "r": "r", "z": "z", "s": "s", "$": "ʃ", "S": "sˤ", "D": "dˤ",
+    "T": "tˤ", "Z": "ðˤ", "E": "ʕ", "g": "ɣ", "f": "f", "q": "q", "k": "k",
+    "l": "l", "m": "m", "n": "n", "h": "h", "w": "w", "y": "j", "<": "ʔ",
+}
+_IQRA_VOWELS: dict[str, str] = {
+    "a": "a", "aa": "aː", "A": "ɑ", "AA": "ɑː",
+    "i": "i", "ii": "iː", "I": "ɪ", "II": "ɪː",
+    "u": "u", "uu": "uː", "U": "ʊ", "UU": "ʊː",
+}
+_IQRA_NOTATION: dict[str, str] = dict(_IQRA_VOWELS)
+for _sym, _ipa in _IQRA_CONSONANTS.items():
+    _IQRA_NOTATION[_sym] = _ipa
+    _IQRA_NOTATION[_sym * 2] = _ipa + "ː"  # gemination: doubled token, shadda
+
+
+def iqra_halabi_to_ipa(tokens: str, errors: str = "pass") -> str:
+    """Convert IqraEval-flavored (already digit/separator/sil-stripped)
+    space-separated Halabi tokens to IPA.
+
+    Unlike :func:`halabi_to_ipa` (which targets mantoq's own simplified,
+    lowercase-only inventory), this keeps the emphatic-allophone uppercase
+    vowels distinct and reads gemination off a literal doubled consonant
+    letter — the ``phoneme_ref`` convention.  Unknown tokens follow the
+    ``errors`` policy (``"pass"`` by default: passed through verbatim).
+
+    Examples
+    --------
+    >>> iqra_halabi_to_ipa("f ii h i x A y r aa t u n")
+    'fiːhixɑjraːtun'
+    """
+    out = []
+    for pos, tok in enumerate(tokens.split()):
+        ipa = _IQRA_NOTATION.get(tok)
+        if ipa is not None:
+            out.append(ipa)
+        else:
+            res = _unknown(tok, pos, "halabi", errors, replacement=f"{{{{{tok}}}}}")
+            if res:
+                out.append(res)
     return "".join(out)
 
 
@@ -1184,7 +1280,7 @@ def convert(text: str, src: str | Notation, dst: str | Notation,
 # ---------------------------------------------------------------------------
 
 _TO_IPA: dict[Notation, "callable"] = {
-    Notation.MANTOQ: mantoq_to_ipa,
+    Notation.HALABI: halabi_to_ipa,
     Notation.ARPA: arpa_to_ipa,
     Notation.XSAMPA: xsampa_to_ipa,
     Notation.LEXIQUE: lexique_to_ipa,
@@ -1235,15 +1331,19 @@ def can_convert(src: str | Notation, dst: str | Notation) -> bool:
     src = Notation(src)
     dst = Notation(dst)
     if src == dst:
-        # historical contract: identity is not a "conversion"
+        # historical contract: identity is not a "conversion" here, unlike
+        # graph.ConversionGraph.can_convert (which deliberately returns True
+        # for identity — an empty route is a valid, zero-cost conversion there)
         return False
     from scriptconv.graph import DEFAULT_GRAPH
-    if not DEFAULT_GRAPH.can_convert(src.value, dst.value):
+    try:
+        route = DEFAULT_GRAPH.route(src.value, dst.value)
+    except ValueError:
         return False
     # only notation-to-notation reachability counts here; guard against paths
     # that would leave the notation node set (none exist today, cheap to keep)
     return all(e.src in _NOTATION_VALUES and e.dst in _NOTATION_VALUES
-               for e in DEFAULT_GRAPH.route(src.value, dst.value))
+               for e in route)
 
 
 # ---------------------------------------------------------------------------
@@ -1310,8 +1410,8 @@ NOTATION_INFO: dict[Notation, NotationInfo] = {
         token_separated=False,
         reference="RFE phonetic alphabet (Revista de Filología Española, 1915)",
     ),
-    Notation.MANTOQ: NotationInfo(
-        Notation.MANTOQ, lossless_to_ipa=False, lossless_from_ipa=False,
+    Notation.HALABI: NotationInfo(
+        Notation.HALABI, lossless_to_ipa=False, lossless_from_ipa=False,
         token_separated=False,
         reference="Phonetic alphabet of Nawar Halabi's Arabic-Phonetiser "
                   "(mantoq G2P inventory); one-directional to IPA",
