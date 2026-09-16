@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a27](https://github.com/TigreGotico/scriptconv/tree/0.0.4a27) (2026-09-16)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a26...0.0.4a27)
+
+**Merged pull requests:**
+
+- docs: add OVOS G2P plugin page [\#104](https://github.com/TigreGotico/scriptconv/pull/104) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a26](https://github.com/TigreGotico/scriptconv/tree/0.0.4a26) (2026-09-03)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a25...0.0.4a26)
