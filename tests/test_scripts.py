@@ -23,7 +23,7 @@ def test_registry_contains_required_scripts():
         "Kana", "Hani", "Grek", "Armn", "Geor", "Ethi", "Khmr",
         "Telu", "Cans", "Tfng", "Thai", "Beng", "Guru", "Gujr",
         "Taml", "Sinh", "Mymr", "Tibt", "Laoo", "Ogam", "Runr",
-        "Phnx", "Cprt", "Glag", "Knda", "Mlym", "Orya",
+        "Phnx", "Cprt", "Glag", "Knda", "Mlym", "Orya", "Xsux",
     }
     assert set(SCRIPT_REGISTRY.keys()) == required
 
@@ -524,8 +524,8 @@ def test_han_cjk_extensions(ch, expected):
 # Registry size
 # ---------------------------------------------------------------------------
 
-def test_registry_has_34_scripts():
-    assert len(SCRIPT_REGISTRY) == 34
+def test_registry_has_35_scripts():
+    assert len(SCRIPT_REGISTRY) == 35
 
 
 # ---------------------------------------------------------------------------
