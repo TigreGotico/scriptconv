@@ -18,13 +18,16 @@ Both are exposed here as selectable alphabets — :attr:`Alphabet.IPA` and
 (pinyin vs. IPA) rather than a single fixed alphabet: africa-g2p is not a
 one-notation engine like Cotovía or Vosk.
 
-``africa-g2p`` was vendored when it was not published to PyPI (scriptconv
-does not take ``git+`` dependencies), so — unlike every other wrapper in this
-package — it is vendored rather than an optional extra. The copy is pinned at
-release ``v0.2.4``: see
-``scriptconv.phonemizers._vendored.africa_g2p`` and its ``LICENSE.md`` /
-``DATA_LICENSE.md`` (code is Apache-2.0; the language data carries its own
-attribution requirements). It is always available, no extra to install.
+``africa-g2p`` is published on PyPI and is an optional extra here:
+``pip install scriptconv[africa]``. It was vendored while it was unpublished;
+that copy is gone, because this project does not vendor what PyPI publishes.
+The extra pins ``>=0.2.4,<0.3``: the 0.2.4 line's 400 rule tables are all
+chart-sourced, while upstream master adds 238 tables marked ``llm-draft``.
+
+The library's code is Apache-2.0. Its language data is derived from Omniglot
+script charts (© Simon Ager) and Hartell (ed.), *Alphabets of Africa*
+(UNESCO/SIL, 1993), and carries its own attribution requirements, which the
+installed distribution ships.
 """
 from typing import Dict, List
 
@@ -34,31 +37,23 @@ from scriptconv.phonemizers.enums import Alphabet
 __all__ = ["AfricaG2PPhonemizer"]
 
 
-def _vendored_africa_g2p():
-    """Return the vendored ``africa_g2p`` module, importing it lazily.
-
-    This always resolves to the quarantined vendored copy, never to an
-    installed ``africa-g2p`` distribution, so the rules a caller gets do not
-    depend on what else is installed.
-    An :class:`ImportError` here means the scriptconv install itself is
-    broken (the vendored tree ships with every install), not that an
-    optional extra is missing.
-    """
+def _africa_g2p():
+    """Import the installed ``africa_g2p`` lazily, naming the extra if absent."""
     try:
-        from scriptconv.phonemizers._vendored import africa_g2p as _pkg
+        import africa_g2p as _pkg
     except ImportError as e:
         raise ImportError(
-            "scriptconv's vendored africa_g2p copy is missing or broken — "
-            "this is a bundled backend, not an optional extra, so this "
-            "indicates a corrupted scriptconv installation."
+            "africa-g2p is required for the African-language phonemizer. "
+            "Install it with 'pip install africa-g2p' "
+            "(or 'pip install scriptconv[africa]')."
         ) from e
     return _pkg
 
 
 class AfricaG2PPhonemizer(BasePhonemizer):
     """
-    Rule-based G2P phonemizer backed by the vendored africa-g2p copy,
-    covering 400+ African languages by ISO 639-3 code.
+    Rule-based G2P phonemizer backed by ``africa-g2p``, covering 400+
+    African languages by ISO 639-3 code.
 
     Supported languages are enumerated at runtime from the vendored package's
     rule-file listing (``africa_g2p.available_languages()``) rather than
@@ -77,15 +72,15 @@ class AfricaG2PPhonemizer(BasePhonemizer):
     def _engine(self, resolved_lang: str):
         """Return, lazily creating and caching, the pipeline for *resolved_lang*."""
         if resolved_lang not in self._cache:
-            _pkg = _vendored_africa_g2p()
+            _pkg = _africa_g2p()
             output = "ipa" if self.alphabet == Alphabet.IPA else "grapheme"
             self._cache[resolved_lang] = _pkg.AfricaPipeline(lang=resolved_lang, output=output)
         return self._cache[resolved_lang]
 
     @classmethod
     def supported_langs(cls) -> List[str]:
-        """Return every ISO 639-3 code the vendored africa_g2p ships a rule file for."""
-        return _vendored_africa_g2p().available_languages()
+        """Return every ISO 639-3 code africa_g2p ships a rule file for."""
+        return _africa_g2p().available_languages()
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
