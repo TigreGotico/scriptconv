@@ -84,3 +84,4 @@ class Phonemizer(str, Enum):
     BARRANQUENHO = "barranquenho"  # barranquenho (pt/es contact variety; o2i lattice)
     ORTHOGRAPHY2IPA = "orthography2ipa"  # multilingual data-driven IPA (o2i lattice)
     AFRICA_G2P = "africa_g2p"  # rule-based G2P for 400+ African languages (native units or IPA)
+    GHANA_G2P = "ghana_g2p"  # africa-g2p rules patched for 42 Ghanaian languages (native units or IPA)
