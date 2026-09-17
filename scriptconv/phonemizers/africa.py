@@ -18,9 +18,10 @@ Both are exposed here as selectable alphabets — :attr:`Alphabet.IPA` and
 (pinyin vs. IPA) rather than a single fixed alphabet: africa-g2p is not a
 one-notation engine like Cotovía or Vosk.
 
-``africa-g2p`` is not published to PyPI, and scriptconv does not take
-``git+`` dependencies, so — unlike every other wrapper in this package — it
-is vendored rather than an optional extra: see
+``africa-g2p`` was vendored when it was not published to PyPI (scriptconv
+does not take ``git+`` dependencies), so — unlike every other wrapper in this
+package — it is vendored rather than an optional extra. The copy is pinned at
+release ``v0.2.4``: see
 ``scriptconv.phonemizers._vendored.africa_g2p`` and its ``LICENSE.md`` /
 ``DATA_LICENSE.md`` (code is Apache-2.0; the language data carries its own
 attribution requirements). It is always available, no extra to install.
@@ -36,8 +37,9 @@ __all__ = ["AfricaG2PPhonemizer"]
 def _vendored_africa_g2p():
     """Return the vendored ``africa_g2p`` module, importing it lazily.
 
-    There is no external ``africa_g2p`` distribution to prefer (the package
-    is not on PyPI) — this always resolves to the quarantined vendored copy.
+    This always resolves to the quarantined vendored copy, never to an
+    installed ``africa-g2p`` distribution, so the rules a caller gets do not
+    depend on what else is installed.
     An :class:`ImportError` here means the scriptconv install itself is
     broken (the vendored tree ships with every install), not that an
     optional extra is missing.

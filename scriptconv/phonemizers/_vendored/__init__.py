@@ -9,8 +9,9 @@ distributed under ITS OWN license, stated in its directory:
 * ``kog2p/`` — Korean G2P (github.com/scarletcho/KoG2P), **GPL-3.0**.
   See ``kog2p/LICENSE.md``.
 * ``africa_g2p/`` — African-language G2P (github.com/AfriSpeech/africa-g2p),
-  400+ ISO 639-3 rule files. Vendored (not depended on) because it is not
-  published to PyPI and this project does not take ``git+`` dependencies.
+  400 ISO 639-3 rule files, pinned at release ``v0.2.4`` (commit e3642dea).
+  It was vendored when it was not yet on PyPI; it is now published there as
+  ``africa-g2p``, but the vendored copy is kept so the backend has no extra.
   Its **code** is Apache-2.0 — same license as the rest of this repository,
   unlike the other two entries here — but its **data** (the ``languages/``
   rule files and ``data/registry.json``) is derived from Omniglot script
