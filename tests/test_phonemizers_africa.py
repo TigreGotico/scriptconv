@@ -24,6 +24,20 @@ class TestAfricaG2PPhonemizer(unittest.TestCase):
         p = AfricaG2PPhonemizer(alphabet=Alphabet.AFRICA_G2P)
         self.assertEqual(p.phonemize_string("Akwaaba", "twi"), "a kw a a b a")
 
+    def test_ethiopic_g_is_the_ipa_letter(self):
+        # africa-g2p v0.2.4 fixed the Ethiopic tables, which wrote ASCII g
+        # (U+0067) where IPA uses ɡ (U+0261).
+        p = AfricaG2PPhonemizer(alphabet=Alphabet.IPA)
+        self.assertEqual(p.phonemize_string("ግብር", "amh"), "ɡɨ bɨ rɨ")
+        self.assertNotIn("g", p.phonemize_string("ገና", "amh"))
+
+    def test_kabuverdianu_reads_letters_not_letter_names(self):
+        # Before v0.2.4 the kea table read letter NAMES: kasa gave
+        # 'ˈkapɐ a ˈɛs(i) a'.
+        p = AfricaG2PPhonemizer(alphabet=Alphabet.IPA)
+        self.assertEqual(p.phonemize_string("kasa", "kea"), "k a s a")
+        self.assertEqual(p.phonemize_string("djuntu", "kea"), "d͡ʒ u n t u")
+
     def test_engine_is_cached_per_language(self):
         p = AfricaG2PPhonemizer()
         first = p._engine("twi")
