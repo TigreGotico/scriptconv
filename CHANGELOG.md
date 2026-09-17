@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a28](https://github.com/TigreGotico/scriptconv/tree/0.0.4a28) (2026-09-17)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a27...0.0.4a28)
+
+**Merged pull requests:**
+
+- chore\(deps\): refresh the vendored africa-g2p copy to v0.2.4 [\#121](https://github.com/TigreGotico/scriptconv/pull/121) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a27](https://github.com/TigreGotico/scriptconv/tree/0.0.4a27) (2026-09-16)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a26...0.0.4a27)
