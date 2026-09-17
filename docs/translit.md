@@ -20,14 +20,14 @@ Non-Hangul characters pass through unchanged.
 ```python
 decompose_hangul("한국어")   # "ㅎㅏㄴㄱㅜㄱㅇㅓ"
 decompose_hangul("값")      # "ㄱㅏㅄ"   (double coda preserved as written)
-decompose_hangul("가")      # "ㄱㅏ"     (no coda — empty string omitted)
+decompose_hangul("가")      # "ㄱㅏ"     (no coda, empty string omitted)
 decompose_hangul("hello 한 world")  # "hello ㅎㅏㄴ world"
 decompose_hangul("")        # ""
 ```
 
 ### Unicode arithmetic
 
-Hangul syllable blocks occupy U+AC00–U+D7A3. Each code point encodes an onset jamo,
+Hangul syllable blocks occupy U+AC00-U+D7A3. Each code point encodes an onset jamo,
 a vowel jamo, and a (possibly null) coda jamo via the formula:
 
 ```
@@ -37,21 +37,21 @@ vowel  = VOWELS[(index % 588) // 28]
 coda   = CODAS[index % 28]
 ```
 
-There are 19 onsets, 21 vowels, and 28 coda slots (index 0 = no coda; indices 1–27
+There are 19 onsets, 21 vowels, and 28 coda slots (index 0 = no coda, indices 1-27
 = the 27 coda jamo, including compound codas such as `ㅄ` = *bs*).
 
 ### Jamo tables
 
-**Onsets** (19, index 0–18):
+**Onsets** (19, index 0-18):
 `ㄱ ㄲ ㄴ ㄷ ㄸ ㄹ ㅁ ㅂ ㅃ ㅅ ㅆ ㅇ ㅈ ㅉ ㅊ ㅋ ㅌ ㅍ ㅎ`
 
-**Vowels** (21, index 0–20):
+**Vowels** (21, index 0-20):
 `ㅏ ㅐ ㅑ ㅒ ㅓ ㅔ ㅕ ㅖ ㅗ ㅘ ㅙ ㅚ ㅛ ㅜ ㅝ ㅞ ㅟ ㅠ ㅡ ㅢ ㅣ`
 
-**Codas** (28 slots; slot 0 is empty string, slots 1–27 are jamo):
+**Codas** (28 slots, slot 0 is empty string, slots 1-27 are jamo):
 `"" ㄱ ㄲ ㄳ ㄴ ㄵ ㄶ ㄷ ㄹ ㄺ ㄻ ㄼ ㄽ ㄾ ㄿ ㅀ ㅁ ㅂ ㅄ ㅅ ㅆ ㅇ ㅈ ㅊ ㅋ ㅌ ㅍ ㅎ`
 
-### Scope boundary — what decompose_hangul deliberately does NOT do
+### Scope boundary, what decompose_hangul deliberately does NOT do
 
 `decompose_hangul` is an **orthographic** operation. It reflects the written form of
 each syllable block and applies no sound rules. Korean phonology involves many
@@ -66,7 +66,7 @@ certain onsets:
 | Resyllabification | 음악 | ㅇㅡㅁ·ㅇㅏㄱ | \[ɯmak\] |
 
 `decompose_hangul` returns the orthographic jamo sequence. For 국민 it returns
-`ㄱㅜㄱㅁㅣㄴ` — the written letters — not `ㄱㅜㅇㅁㅣㄴ` (which would reflect the
+`ㄱㅜㄱㅁㅣㄴ`, the written letters, not `ㄱㅜㅇㅁㅣㄴ` (which would reflect the
 assimilation). Mapping from jamo to IPA with phonological rules is phonemization and
 is outside scriptconv's scope.
 
@@ -86,7 +86,7 @@ Jamo tables derived from [stannam/hangul_to_ipa](https://github.com/stannam/hang
 
 Hiragana and Katakana are two encodings of the same syllabary, separated by a
 fixed `+0x60` codepoint offset. `hira_to_kana` and `kana_to_hira` swap between
-them; the katakana-only long-vowel mark `ー` (U+30FC) has no hiragana form and
+them, the katakana-only long-vowel mark `ー` (U+30FC) has no hiragana form and
 passes through unchanged.
 
 ```python
@@ -96,8 +96,8 @@ kana_to_hira("カタカナ")   # "かたかな"
 
 ## Hanzi → Cangjie input codes
 
-Cangjie codes encode a glyph's **shape** — its decomposition into geometric
-radicals — not its reading: 日 is `a` because of what it looks like, however
+Cangjie codes encode a glyph's **shape**, its decomposition into geometric
+radicals, not its reading: 日 is `a` because of what it looks like, however
 it is pronounced. That makes this a deterministic, table-driven transcode
 like the rest of this page. The 103,601-glyph traditional-Chinese table
 (from the Cangjie5 project, MIT) ships gzipped inside the wheel and loads
@@ -112,4 +112,7 @@ to_cangjie("我有ABC 123")     # 'hqi kb ABC 123'   (unmapped runs pass through
 ```
 
 Where the upstream table lists alternative codes for a glyph, the primary
-code is kept; `cangjie_code` returns `None` for unmapped characters.
+code is kept, `cangjie_code` returns `None` for unmapped characters.
+
+---
+[← notation](notation.md) · [Home](../README.md) · [readings →](readings.md)

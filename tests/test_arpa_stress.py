@@ -48,9 +48,11 @@ class TestRoundTrip(unittest.TestCase):
         spelling must itself be IPA-stable.  The overwhelming majority
         round-trip byte-exactly."""
         random.seed(20260721)
-        cons = [c for c in _ARPA_BASE
-                if c not in _ARPA_VOWELS and c not in ("AX", "AXR")]
-        vows = [v for v in _ARPA_VOWELS if v not in ("AX", "AXR")]
+        # sorted: _ARPA_VOWELS is a set, and set order follows
+        # PYTHONHASHSEED, so without sorting the seeded draw differs per run
+        cons = sorted(c for c in _ARPA_BASE
+                      if c not in _ARPA_VOWELS and c not in ("AX", "AXR"))
+        vows = sorted(v for v in _ARPA_VOWELS if v not in ("AX", "AXR"))
         exact = fused = 0
         for _ in range(400):
             seq = []
@@ -66,8 +68,10 @@ class TestRoundTrip(unittest.TestCase):
                 exact += 1
             else:
                 fused += 1
-                # fusion residue must be IPA-stable
-                self.assertEqual(arpa_to_ipa(rt, stress=True), ipa, s)
+                # fusion residue must be IPA-stable, up to the one lossy
+                # alias: British GOAT əʊ is read as OW, which writes oʊ
+                self.assertEqual(arpa_to_ipa(rt, stress=True),
+                                 ipa.replace("əʊ", "oʊ"), s)
         self.assertGreater(exact, 350)
         self.assertLess(fused, 50)
 
@@ -82,7 +86,34 @@ class TestRoundTrip(unittest.TestCase):
         self.assertEqual(ipa_to_arpa(arpa_to_ipa("T SH")), "CH")
         self.assertEqual(arpa_to_ipa(fused, stress=True),
                          arpa_to_ipa("AH0 R", stress=True))
+        # schwa + UH is contiguous əʊ, the British GOAT alias for OW. This
+        # residue is lossy: OW writes back as oʊ, not əʊ.
+        goat = ipa_to_arpa(arpa_to_ipa("AH0 UH0", stress=True), stress=True)
+        self.assertEqual(goat, "OW0")
+        self.assertEqual(arpa_to_ipa(goat, stress=True), "oʊ")
 
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestEnglishInputAliases(unittest.TestCase):
+    """British/phonetic-detail IPA symbols accepted on ARPA input."""
+
+    def test_rhotic_approximant(self):
+        from scriptconv import ipa_to_arpa
+        self.assertEqual(ipa_to_arpa("ɹ"), "R")
+        self.assertEqual(ipa_to_arpa("maɪkɹɑft"), "M AY K R AA F T")
+
+    def test_british_goat_diphthong(self):
+        from scriptconv import ipa_to_arpa
+        self.assertEqual(ipa_to_arpa("əʊ"), "OW")
+
+    def test_british_lot_vowel(self):
+        from scriptconv import ipa_to_arpa
+        self.assertEqual(ipa_to_arpa("ɒ"), "AA")
+
+    def test_canonical_round_trip_unchanged(self):
+        from scriptconv import arpa_to_ipa, ipa_to_arpa
+        self.assertEqual(ipa_to_arpa(arpa_to_ipa("OW")), "OW")
+        self.assertEqual(ipa_to_arpa(arpa_to_ipa("R")), "R")

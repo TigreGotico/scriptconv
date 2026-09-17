@@ -35,64 +35,53 @@ RawPhonemizedChunks = List[Tuple[str, str, bool]]
 PhonemizedChunks = list[list[str]]
 
 
+class MissingLanguageError(ValueError):
+    """No language reached :meth:`BasePhonemizer.match_lang` at all.
+
+    Raised for ``None``/``""``/``"und"`` targets, which is a distinct failure
+    from an unsupported-but-present tag: it means whatever called into the
+    phonemizer never determined a language for the text, an upstream
+    config/data defect rather than a phonemizer capability gap.
+    """
+
+
+def _primary_subtag(lang: str) -> str:
+    """Lowercase, ``_``→``-`` normalized primary language subtag.
+
+    Used for exact-match language routing (e.g. registry lang defaults,
+    diacritization backend selection) rather than ``str.startswith``, so
+    e.g. Berber (``ber``) never false-matches Belarusian (``be``).
+    """
+    return lang.lower().replace("_", "-").split("-")[0]
+
+
+def _check_alphabet(phonemizer, alphabet: Alphabet,
+                    supported: List[Alphabet]) -> None:
+    """Reject an output alphabet a wrapper cannot emit, with a usable message.
+
+    Wrappers used to guard this with a bare ``assert``, which surfaced as an
+    ``AssertionError`` carrying an empty message — the caller learned nothing
+    about which alphabet it asked for or which ones exist. That matters because
+    :func:`~scriptconv.phonemizers.registry.get_phonemizer` injects its own
+    ``alphabet=`` default into every constructor that declares the parameter,
+    so an unsupported default is hit by ordinary registry use, not just by
+    callers passing an odd value.
+    """
+    if alphabet not in supported:
+        raise ValueError(
+            f"{type(phonemizer).__name__} cannot emit "
+            f"{Alphabet(alphabet).value!r}; supported alphabets are "
+            f"{[Alphabet(a).value for a in supported]}")
+
+
 class BasePhonemizer(metaclass=abc.ABCMeta):
     def __init__(self, alphabet: Alphabet = Alphabet.UNICODE,
-                 diacritizer_model: str = "rawi-ensemble",
-                 normalizer: Optional[Callable[[str, str], str]] = None,
-                 phonikud_model: Optional[str] = None):
+                 normalizer: Optional[Callable[[str, str], str]] = None):
         super().__init__()
         self.alphabet = alphabet
         # optional (text, lang) -> str hook run before chunking; see module
         # docstring — scriptconv performs no normalization of its own
         self.normalizer = normalizer
-        # local path to a phonikud ONNX model (Hebrew diacritization), or a
-        # zero-arg callable resolving one lazily; scriptconv never downloads
-        # — the consumer resolves the file
-        self.phonikud_model = phonikud_model
-
-        # diacritizer model name, for languages that need one. Arabic uses
-        # text2tashkeel; the default "rawi-ensemble" restores hamza and the dagger
-        # alef in addition to the standard marks.
-        self.diacritizer_model = diacritizer_model
-        self._phonikud = None  # hebrew only
-        self._tashkeel: dict = {}  # model name -> text2tashkeel Diacritizer
-
-    @property
-    def phonikud(self):
-        if self._phonikud is None:
-            model = self.phonikud_model() if callable(self.phonikud_model) \
-                else self.phonikud_model
-            if not model:
-                raise ValueError(
-                    "Hebrew diacritization needs a local phonikud ONNX model: "
-                    "pass phonikud_model=<path> (scriptconv never downloads "
-                    "models; obtain one from the phonikud-onnx release)")
-            try:
-                from phonikud_onnx import Phonikud
-            except ImportError:
-                raise ImportError(
-                    "Hebrew diacritization needs phonikud-onnx — install "
-                    "with `pip install scriptconv[he]`") from None
-            self._phonikud = Phonikud(model)
-        return self._phonikud
-
-    def tashkeel(self, model: Optional[str] = None):
-        """Lazily build (and cache) the text2tashkeel Diacritizer used for Arabic.
-
-        text2tashkeel is a dependency of the ``[ar]`` extra; it restores hamza and the
-        dagger alef in addition to the standard marks. Install with
-        ``pip install scriptconv[tashkeel]`` (or ``pip install text2tashkeel``)."""
-        model = model or self.diacritizer_model
-        if model not in self._tashkeel:
-            try:
-                from text2tashkeel import Diacritizer
-            except ImportError as e:
-                raise ImportError(
-                    "Arabic diacritization requires the text2tashkeel package: "
-                    "pip install scriptconv[tashkeel]  (or pip install text2tashkeel)"
-                ) from e
-            self._tashkeel[model] = Diacritizer(model)
-        return self._tashkeel[model]
 
     @abc.abstractmethod
     def phonemize_string(self, text: str, lang: str) -> str:
@@ -100,14 +89,6 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
 
     def phonemize_to_list(self, text: str, lang: str) -> List[str]:
         return list(self.phonemize_string(text, lang))
-
-    def add_diacritics(self, text: str, lang: str,
-                       model: Optional[str] = None) -> str:
-        if lang.startswith("he"):
-            return self.phonikud.add_diacritics(text)
-        elif lang.startswith("ar"):
-            return self.tashkeel(model).diacritize(text)
-        return text
 
     def phonemize(self, text: str, lang: str) -> PhonemizedChunks:
         # PhonemizedChunks is list[list[str]]; empty text yields no
@@ -194,8 +175,13 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
             str: The validated language code.
 
         Raises:
+            MissingLanguageError: If no language reached the matcher at all
+                (``None``/``""``/``"und"``).
             ValueError: If the language code is unsupported.
         """
+        if target_lang in (None, "", "und"):
+            raise MissingLanguageError(
+                f"no language provided to phonemize: {target_lang!r}")
         lang, score = BasePhonemizer._match_lang(target_lang, valid_langs)
         if score > 10:
             # raise an error for unsupported language
@@ -210,13 +196,21 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         non-ASCII punctuation such as Arabic ``،``/``؟`` and curly quotes.
 
         Apostrophes and hyphens sandwiched between letters (e.g. "don't", "well-known")
-        are preserved so contractions and compounds aren't broken apart.
+        are preserved so contractions and compounds aren't broken apart, and any
+        punctuation character sandwiched between two digits (e.g. the ":" in a clock
+        time "16:30", the "," in "10,4", the "." in "92.073", the "-" in "1139-1185")
+        is preserved so the per-language normalizers still see it as a single token,
+        matching the digit:digit exemption in ``chunk_text``.
         """
         out = []
         chars = list(text)
         for i, c in enumerate(chars):
             if c in ("'", "’", "-") and 0 < i < len(chars) - 1 \
                     and chars[i - 1].isalpha() and chars[i + 1].isalpha():
+                out.append(c)
+                continue
+            if 0 < i < len(chars) - 1 \
+                    and chars[i - 1].isdigit() and chars[i + 1].isdigit():
                 out.append(c)
                 continue
             if unicodedata.category(c).startswith("P"):
@@ -252,10 +246,19 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         results: TextChunks = []
         delimiters = delimiters or [":", ";", "...", "|"]
 
-        # Create a regex pattern that matches any of the delimiters
-        delimiter_pattern = re.escape(delimiters[0])
+        # Create a regex pattern that matches any of the delimiters. A
+        # delimiter sitting directly between two digits (eg. the ":" in a
+        # clock time "16:30" or a score "3:2") is not a sentence-internal
+        # boundary, so it is only excluded when *both* neighbours are
+        # digits — a delimiter with a digit on just one side (eg. "12: ")
+        # still splits as before.
+        def _delim_alt(delimiter: str) -> str:
+            escaped = re.escape(delimiter)
+            return f"(?:(?<!\\d){escaped}|{escaped}(?!\\d))"
+
+        delimiter_pattern = _delim_alt(delimiters[0])
         for delimiter in delimiters[1:]:
-            delimiter_pattern += f"|{re.escape(delimiter)}"
+            delimiter_pattern += f"|{_delim_alt(delimiter)}"
 
         for sentence in sentence_tokenize(text):
             # Default punctuation if no specific punctuation found
