@@ -7,7 +7,14 @@ from scriptconv.phonemizers.enums import Alphabet
 class TugaphonePhonemizer(BasePhonemizer):
 
     def __init__(self):
-        from tugaphone import TugaPhonemizer
+        try:
+            from tugaphone import TugaPhonemizer
+        except ImportError as e:
+            raise ImportError(
+                "tugaphone is required for the Tugaphone phonemizer. "
+                "Install it with 'pip install tugaphone' "
+                "(or 'pip install scriptconv[pt-phonemizers]')."
+            ) from e
         self.tuga = TugaPhonemizer()
         super().__init__(Alphabet.IPA)
 
@@ -15,6 +22,13 @@ class TugaphonePhonemizer(BasePhonemizer):
     def get_lang(cls, target_lang: str) -> str:
         """
         Validates and returns the closest supported language code.
+
+        A full sub-regional lect tag tugaphone itself knows about (e.g.
+        ``pt-PT-x-lisbon``, ``pt-PT-x-porto``) is passed through unchanged,
+        so its output stays distinct from the generic country lect. A loose
+        tag (``pt``, ``pt-PT``) falls back to :meth:`match_lang` against the
+        country-level lects, since ``tugaphone.resolve_lect`` silently
+        defaults an unrecognized tag to ``pt-PT`` rather than raising.
 
         Args:
             target_lang (str): The language code to validate.
@@ -25,12 +39,15 @@ class TugaphonePhonemizer(BasePhonemizer):
         Raises:
             ValueError: If the language code is unsupported.
         """
+        import tugaphone
+        dialects = {d.lower(): d for d in tugaphone.list_dialects()}
+        if target_lang and target_lang.replace("_", "-").lower() in dialects:
+            return dialects[target_lang.replace("_", "-").lower()]
         # this check is here only to throw an exception if invalid language is provided
         return cls.match_lang(target_lang, ["pt-PT", "pt-BR", "pt-AO", "pt-MZ", "pt-TL"])
 
     def phonemize_string(self, text: str, lang: str) -> str:
         lang = self.get_lang(lang)
-        # TODO - support regional dialects
         return self.tuga.phonemize_sentence(text, lang)
 
 

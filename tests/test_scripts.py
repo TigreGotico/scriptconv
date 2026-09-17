@@ -742,3 +742,15 @@ def test_script_runs_empty_and_pure_punctuation():
 def test_script_runs_reconstructs_input():
     for text in ["привет hello", "Hello مرحبا world", "приве́т", "  hi", "日本語 abc"]:
         assert "".join(t for _, t in script_runs(text)) == text
+
+
+def test_char_script_ranges_are_non_overlapping():
+    # char_script's binary search only checks one candidate interval; that
+    # is only correct if no two registered char_ranges overlap.
+    ranges = sorted(
+        (lo, hi)
+        for script in SCRIPT_REGISTRY.values()
+        for lo, hi in script.char_ranges
+    )
+    for (_, prev_hi), (next_lo, _) in zip(ranges, ranges[1:]):
+        assert next_lo > prev_hi
