@@ -52,6 +52,7 @@ class Phonemizer(str, Enum):
     BYT5 = "byt5"
     CHARSIU = "charsiu"  # technically same as byt5, but needs special handling for whitespace
     TRANSPHONE = "transphone"
+    PHONETISAURUS = "phonetisaurus"  # WFST g2p; language and symbols come from the model
     MIRANDESE = "mwl_phonemizer"
 
     DEEPPHONEMIZER = "deepphonemizer" # en

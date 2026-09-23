@@ -35,6 +35,7 @@ PHONEMIZER_REGISTRY: Dict[Phonemizer, Tuple[str, str, Optional[str]]] = {
     _P.GORUUT: (f"{_BASE}.mul", "GoruutPhonemizer", "goruut"),
     _P.EPITRAN: (f"{_BASE}.mul", "EpitranPhonemizer", "epitran"),
     _P.TRANSPHONE: (f"{_BASE}.mul", "TransphonePhonemizer", "transphone"),
+    _P.PHONETISAURUS: (f"{_BASE}.mul", "PhonetisaurusPhonemizer", "phonetisaurus"),
     _P.BYT5: (f"{_BASE}.mul", "ByT5Phonemizer", "byt5"),
     _P.CHARSIU: (f"{_BASE}.mul", "CharsiuPhonemizer", "byt5"),
     _P.MISAKI: (f"{_BASE}.mul", "MisakiPhonemizer", "misaki"),
