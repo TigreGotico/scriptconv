@@ -33,15 +33,31 @@ def _fake_phonetisaurus(answers, reorder=True):
     word the model cannot read. The stub returns pairs in REVERSE order by
     default for exactly that reason: a wrapper that consumed the pairs
     positionally would pass this suite if the stub echoed the request order,
-    and would put the wrong pronunciation on every word in production."""
+    and would put the wrong pronunciation on every word in production.
+
+    ``nbest`` is modelled too, because it changes the SHAPE of the answer and
+    not just its length: the engine prints one line per ranked pronunciation,
+    BEST FIRST, and ``predict`` yields one pair per line, so a word appears
+    ``nbest`` times. ``answers`` maps a word to its ranked list, best first.
+
+    The reversal therefore applies to the WORDS and never inside one word's
+    ranked lines. Word order is a freedom the engine has; rank order is a
+    promise it keeps, and a stub that broke it would be testing a different
+    engine.
+    """
     mod = ModuleType("phonetisaurus")
 
     def predict(words, model_path, nbest=1, env=None):
-        found = [(w, answers[w]) for w in words if w in answers]
+        # one group per word, the group's pairs in rank order
+        groups = [[(w, ranked) for ranked in answers[w][:nbest]]
+                  for w in words if w in answers]
         if reorder:
-            found.reverse()
-        for pair in found:
-            yield pair
+            # the WORDS may come back in any order; the ranked lines of one
+            # word may not, so the groups reverse and their contents do not
+            groups.reverse()
+        for group in groups:
+            for pair in group:
+                yield pair
 
     mod.predict = predict
     return mod
@@ -116,23 +132,23 @@ class TestOutputString(unittest.TestCase):
             return cls(model=fst.name, **kw)
 
     def test_one_word(self):
-        p = self._phonemizer({"cat": ["k", "a", "t"]})
+        p = self._phonemizer({"cat": [["k", "a", "t"]]})
         self.assertEqual(p.phonemize_string("cat", "en"), "k a t")
 
     def test_two_words_keep_their_order(self):
-        p = self._phonemizer({"cat": ["k", "a", "t"],
-                              "bat": ["b", "a", "t"]})
+        p = self._phonemizer({"cat": [["k", "a", "t"]],
+                              "bat": [["b", "a", "t"]]})
         self.assertEqual(p.phonemize_string("cat bat", "en"), "k a t b a t")
 
     def test_an_empty_separator_gives_a_bare_string(self):
-        p = self._phonemizer({"cat": ["k", "a", "t"]}, separator="")
+        p = self._phonemizer({"cat": [["k", "a", "t"]]}, separator="")
         self.assertEqual(p.phonemize_string("cat", "en"), "kat")
 
     def test_a_word_the_engine_drops_is_skipped(self):
         """predict() yields nothing for a word the model cannot read. The
         wrapper drops it rather than raising."""
-        p = self._phonemizer({"cat": ["k", "a", "t"],
-                              "bat": ["b", "a", "t"]})
+        p = self._phonemizer({"cat": [["k", "a", "t"]],
+                              "bat": [["b", "a", "t"]]})
         self.assertEqual(p.phonemize_string("cat xyzzy bat", "en"),
                          "k a t b a t")
 
@@ -140,25 +156,43 @@ class TestOutputString(unittest.TestCase):
         """The discriminating case. The stub answers in reverse, so a wrapper
         that consumed the pairs positionally would return them reversed. The
         wrapper indexes by word, so the sentence keeps its own order."""
-        p = self._phonemizer({"cat": ["k", "a", "t"],
-                              "dog": ["d", "o", "g"],
-                              "bat": ["b", "a", "t"]})
+        p = self._phonemizer({"cat": [["k", "a", "t"]],
+                              "dog": [["d", "o", "g"]],
+                              "bat": [["b", "a", "t"]]})
         self.assertEqual(p.phonemize_string("cat dog bat", "en"),
                          "k a t d o g b a t")
 
+    def test_nbest_2_keeps_the_BEST_ranked_pronunciation(self):
+        """With nbest > 1 the engine yields one pair per ranked reading, best
+        first, so a word appears twice. Building a dict over the pairs keeps
+        the LAST one, which is the worst-ranked reading, while the docstring
+        promises the best. The wrapper keeps the first pair per word.
+
+        This is the case that tells the two apart: both readings are present,
+        both are well-formed, and only the ORDER says which is right."""
+        p = self._phonemizer({"cat": [["k", "a", "t"], ["k", "a", "ts"]]},
+                             nbest=2)
+        self.assertEqual(p.phonemize_string("cat", "en"), "k a t")
+
+    def test_nbest_2_over_several_words(self):
+        p = self._phonemizer({"cat": [["k", "a", "t"], ["k", "a", "ts"]],
+                              "bat": [["b", "a", "t"], ["b", "a", "ts"]]},
+                             nbest=2)
+        self.assertEqual(p.phonemize_string("cat bat", "en"), "k a t b a t")
+
     def test_empty_text(self):
-        p = self._phonemizer({"cat": ["k", "a", "t"]})
+        p = self._phonemizer({"cat": [["k", "a", "t"]]})
         self.assertEqual(p.phonemize_string("", "en"), "")
 
     def test_the_language_argument_does_not_route(self):
         """The model decides the language. Any tag must give the same answer,
         because the wrapper claims no routing."""
-        p = self._phonemizer({"cat": ["k", "a", "t"]})
+        p = self._phonemizer({"cat": [["k", "a", "t"]]})
         self.assertEqual(p.phonemize_string("cat", "en"),
                          p.phonemize_string("cat", "oc"))
 
     def test_the_declared_alphabet_is_kept(self):
-        p = self._phonemizer({"cat": ["K", "AE", "T"]}, alphabet=Alphabet.ARPA)
+        p = self._phonemizer({"cat": [["K", "AE", "T"]]}, alphabet=Alphabet.ARPA)
         self.assertEqual(p.alphabet, Alphabet.ARPA)
         self.assertEqual(p.phonemize_string("cat", "en"), "K AE T")
 

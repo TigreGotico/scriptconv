@@ -1513,9 +1513,12 @@ class PhonetisaurusPhonemizer(BasePhonemizer):
         Args:
             model: path to a trained Phonetisaurus FST. Required.
             alphabet: the symbol set the model emits. The caller states it.
-            nbest: how many pronunciations the engine ranks. The best one is
-                returned; a higher value changes the search, not the output
-                shape.
+            nbest: how many pronunciations the engine ranks per word. The
+                BEST one is returned whatever this is, so a higher value
+                changes the search, not the output shape. ``predict`` prints
+                one line per ranked pronunciation, best first, and yields one
+                pair per line, so the wrapper keeps the FIRST pair it sees for
+                a word and drops the rest.
             separator: joins the symbols of one word. Models are trained on
                 symbol sequences, so the parts need a separator to stay
                 readable; pass "" for a bare string.
@@ -1550,7 +1553,13 @@ class PhonetisaurusPhonemizer(BasePhonemizer):
             return ""
         # predict() yields (word, symbols) and may reorder or drop a word it
         # cannot read, so the result is indexed by word rather than zipped.
-        guesses = dict(self.phonetisaurus.predict(
-            words, self.model, nbest=self.nbest))
+        #
+        # With nbest > 1 it yields one pair PER RANKED PRONUNCIATION, best
+        # first, so a word appears more than once. dict() would keep the last
+        # pair, which is the WORST-ranked reading. Keep the first instead.
+        guesses: Dict[str, List[str]] = {}
+        for word, symbols in self.phonetisaurus.predict(
+                words, self.model, nbest=self.nbest):
+            guesses.setdefault(word, symbols)
         return " ".join(self.separator.join(guesses[w])
                         for w in words if w in guesses)
