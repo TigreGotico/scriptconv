@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     import numpy as np
 
 from scriptconv.phonemizers.enums import Alphabet
-from scriptconv.phonemizers.base import BasePhonemizer
+from scriptconv.phonemizers.base import BasePhonemizer, _check_alphabet
 # minimal ONNX session construction — scriptconv has no provider
 # machinery; consumers wanting CUDA/etc. pass providers= explicitly
 ProviderSpec = str
@@ -1465,3 +1465,101 @@ class TransphonePhonemizer(BasePhonemizer):
             [p if p != "<SPACE>" else " "
              for p in pho.tokenize(text, use_space=True)]
         ).strip()
+
+
+class PhonetisaurusPhonemizer(BasePhonemizer):
+    """WFST grapheme-to-phoneme, through the ``phonetisaurus`` bindings.
+
+    https://github.com/AdolfVonKleist/Phonetisaurus
+
+    Phonetisaurus has no rules and no language list of its own: all of its
+    knowledge is in one trained FST, so the language and the symbol set are
+    properties of the MODEL, not of this wrapper. That has three consequences,
+    and each one is a design decision rather than a limitation to work around:
+
+    * ``model`` is required. scriptconv never downloads a model (the same rule
+      :class:`ByT5Phonemizer` follows). ``MODEL_SOURCES`` names where published
+      models live; a caller resolves one and passes the path.
+    * ``alphabet`` is declared by the caller, because only the caller knows
+      what the model was trained to emit. A CMUdict-trained model emits ARPA,
+      an o2i-trained or espeak-trained one emits IPA. The wrapper cannot read
+      it off the FST, so it does not guess.
+    * There is no language check and no ``LANG_DEFAULTS`` entry. A wrapper that
+      cannot know its own model's language must not be any language's default.
+
+    ``phonetisaurus`` ships the binaries it drives, so no system package is
+    needed. Training a model needs the bundled ``estimate-ngram``, which is not
+    exercised here: this wrapper only applies a model.
+    """
+
+    #: Where published FSTs come from. Documentation, never a download.
+    MODEL_SOURCES = {
+        "rhasspy": "https://github.com/rhasspy/*-g2p (one g2p.fst per language)",
+        "cmudict": "trained from CMUdict with 'phonetisaurus train' (ARPA symbols)",
+    }
+
+    #: Symbol sets a Phonetisaurus model is known to be trained on. The wrapper
+    #: passes the model's symbols through untouched, so this list says which
+    #: declarations are meaningful, not which conversions happen.
+    SUPPORTED_ALPHABETS = [Alphabet.IPA, Alphabet.ARPA, Alphabet.SAMPA,
+                           Alphabet.XSAMPA, Alphabet.GRAPHEMES]
+
+    def __init__(self, model: Optional[str] = None,
+                 alphabet: Alphabet = Alphabet.IPA,
+                 nbest: int = 1,
+                 separator: str = " ",
+                 normalizer=None):
+        """
+        Args:
+            model: path to a trained Phonetisaurus FST. Required.
+            alphabet: the symbol set the model emits. The caller states it.
+            nbest: how many pronunciations the engine ranks per word. The
+                BEST one is returned whatever this is, so a higher value
+                changes the search, not the output shape. ``predict`` prints
+                one line per ranked pronunciation, best first, and yields one
+                pair per line, so the wrapper keeps the FIRST pair it sees for
+                a word and drops the rest.
+            separator: joins the symbols of one word. Models are trained on
+                symbol sequences, so the parts need a separator to stay
+                readable; pass "" for a bare string.
+            normalizer: see :class:`BasePhonemizer`.
+        """
+        _check_alphabet(self, alphabet, self.SUPPORTED_ALPHABETS)
+        super().__init__(alphabet, normalizer=normalizer)
+        try:
+            import phonetisaurus
+        except ImportError as e:
+            raise ImportError(
+                "phonetisaurus is required for the Phonetisaurus phonemizer. "
+                "Install it with 'pip install phonetisaurus' "
+                "(or 'pip install scriptconv[phonetisaurus]')."
+            ) from e
+        if not model or not os.path.isfile(model):
+            raise ValueError(
+                "Phonetisaurus phonemization needs a local trained FST: pass "
+                "model=<path> (scriptconv never downloads — see "
+                "MODEL_SOURCES for where published models live)")
+        self.phonetisaurus = phonetisaurus
+        self.model = model
+        self.nbest = nbest
+        self.separator = separator
+
+    def phonemize_string(self, text: str, lang: str) -> str:
+        """Phonemize ``text``. ``lang`` is accepted and not used: the model
+        decides the language, so a language argument here would claim a
+        routing this wrapper does not do."""
+        words = text.split()
+        if not words:
+            return ""
+        # predict() yields (word, symbols) and may reorder or drop a word it
+        # cannot read, so the result is indexed by word rather than zipped.
+        #
+        # With nbest > 1 it yields one pair PER RANKED PRONUNCIATION, best
+        # first, so a word appears more than once. dict() would keep the last
+        # pair, which is the WORST-ranked reading. Keep the first instead.
+        guesses: Dict[str, List[str]] = {}
+        for word, symbols in self.phonetisaurus.predict(
+                words, self.model, nbest=self.nbest):
+            guesses.setdefault(word, symbols)
+        return " ".join(self.separator.join(guesses[w])
+                        for w in words if w in guesses)
