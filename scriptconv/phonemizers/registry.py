@@ -59,6 +59,7 @@ PHONEMIZER_REGISTRY: Dict[Phonemizer, Tuple[str, str, Optional[str]]] = {
     _P.ORTHOGRAPHY2IPA: (f"{_BASE}.o2ipa", "Orthography2IPAPhonemizer", "o2i"),
     # vendored (not an optional extra) -- see _vendored/africa_g2p
     _P.AFRICA_G2P: (f"{_BASE}.africa", "AfricaG2PPhonemizer", None),
+    _P.MATOUB_KAB: (f"{_BASE}.ber", "MatoubKabylePhonemizer", None),
     _P.GHANA_G2P: (f"{_BASE}.ghana", "GhanaG2PPhonemizer", "ghana"),
     # ported in the CJK/AR stage; registered here so no member is silently
     # unmapped — resolution raises ImportError naming the pending extra
