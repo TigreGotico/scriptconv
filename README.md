@@ -345,6 +345,39 @@ The core installs with zero dependencies. Capabilities opt in:
 | `tashkeel` | Arabic diacritization for the phonemizer pipeline (text2tashkeel) |
 | `stress` | Word-stress restoration for 26 stressonnx language tags: East Slavic; Bulgarian, Macedonian, and Slovene; Latvian; Armenian; Georgian; and Turkic/Caucasian, for the phonemizer pipeline (stressonnx; not yet on PyPI) |
 | `pt` | European-Portuguese heterophonic-homograph sense diacritics for the phonemizer pipeline (bifonia) |
+| `phonetisaurus` | WFST grapheme-to-phoneme through a trained FST the caller supplies (phonetisaurus). Training also needs `libquadmath0` on the host: see below |
+
+### The `phonetisaurus` extra and its libraries
+
+`pip install scriptconv[phonetisaurus]` completes, and the `phonetisaurus`
+0.3.0 wheel bundles its own executables and most of its own shared objects
+(`libfst.so.13`, `libmitlm.so.1`, `libgfortran.so.3` and the OpenFST
+companions) under `phonetisaurus/lib/<machine>`. The binaries find them only
+through the `PATH` and `LD_LIBRARY_PATH` that `phonetisaurus.guess_environment()`
+builds, which is the environment `phonetisaurus.predict` and
+`phonetisaurus.train` pass to every call. A binary started with the plain
+shell environment exits 127 from the dynamic loader; that is a report about
+the caller, not about the box.
+
+The apply path therefore runs out of the box, and this wrapper only applies a
+model. One object is NOT bundled:
+
+| Missing object | Needed by | Where it comes from |
+|---|---|---|
+| `libquadmath.so.0` | `estimate-ngram`, and so `phonetisaurus.train` | the GCC runtime: package `libquadmath0` on Debian and Ubuntu |
+
+So a box without `libquadmath0` can phonemize with a model it is given, and
+cannot train one.
+
+`model=` is required and scriptconv never downloads: see `MODEL_SOURCES` on
+the class, or train a model with `phonetisaurus.train` from a lexicon such as
+CMUdict.
+
+`tests/test_phonemizers_phonetisaurus_engine.py` is the real-engine cell. It
+runs the same word through the engine at `nbest=1` and `nbest=2` and checks
+the wrapper returns the engine's own best-ranked line both times. It skips,
+and names the loader error or the missing model, when the engine cannot run.
+Set `SCRIPTCONV_PHONETISAURUS_MODEL` to a trained FST to run it.
 
 ## Licensing
 
