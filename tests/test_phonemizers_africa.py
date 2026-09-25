@@ -1,8 +1,9 @@
 """Tests for the africa-g2p-backed phonemizer.
 
-africa-g2p is vendored (``scriptconv.phonemizers._vendored.africa_g2p``),
-not an optional extra, so it is always present -- these tests never skip.
+africa-g2p is an optional extra (``scriptconv[africa]``) and is in the
+``test`` extra, so these tests call the real library and never skip.
 """
+import sys
 import unittest
 
 from scriptconv.phonemizers import (
@@ -13,6 +14,30 @@ from scriptconv.phonemizers import (
     get_phonemizer_class,
 )
 from scriptconv.phonemizers.africa import AfricaG2PPhonemizer
+
+
+class TestAfricaG2PExtra(unittest.TestCase):
+    def test_registry_names_the_extra(self):
+        module, cls, extra = PHONEMIZER_REGISTRY[Phonemizer.AFRICA_G2P]
+        self.assertEqual(extra, "africa")
+
+    def test_a_missing_library_names_the_extra(self):
+        import builtins
+        real_import = builtins.__import__
+
+        def fake_import(name, *a, **k):
+            if name == "africa_g2p":
+                raise ImportError("no module named africa_g2p")
+            return real_import(name, *a, **k)
+
+        from scriptconv.phonemizers import africa as mod
+        builtins.__import__ = fake_import
+        try:
+            with self.assertRaises(ImportError) as ctx:
+                mod._africa_g2p()
+        finally:
+            builtins.__import__ = real_import
+        self.assertIn("scriptconv[africa]", str(ctx.exception))
 
 
 class TestAfricaG2PPhonemizer(unittest.TestCase):
@@ -76,8 +101,9 @@ class TestAfricaG2PRegistration(unittest.TestCase):
     def test_registered(self):
         self.assertIn(Phonemizer.AFRICA_G2P, PHONEMIZER_REGISTRY)
 
-    def test_class_resolves_without_any_extra(self):
-        # vendored -- always resolves, never an ImportError naming an extra
+    def test_class_resolves_with_the_extra_installed(self):
+        # africa-g2p is in the test extra, so it resolves here; without it,
+        # resolution raises an ImportError naming scriptconv[africa]
         cls = get_phonemizer_class(Phonemizer.AFRICA_G2P)
         self.assertIs(cls, AfricaG2PPhonemizer)
 
