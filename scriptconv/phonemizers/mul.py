@@ -1487,9 +1487,13 @@ class PhonetisaurusPhonemizer(BasePhonemizer):
     * There is no language check and no ``LANG_DEFAULTS`` entry. A wrapper that
       cannot know its own model's language must not be any language's default.
 
-    ``phonetisaurus`` ships the binaries it drives, so no system package is
-    needed. Training a model needs the bundled ``estimate-ngram``, which is not
-    exercised here: this wrapper only applies a model.
+    ``phonetisaurus`` ships the binaries it drives and the shared objects they
+    link against, and ``predict`` runs them under the ``PATH`` and
+    ``LD_LIBRARY_PATH`` from ``phonetisaurus.guess_environment()``. The apply
+    path needs no system package. Training is the exception: ``estimate-ngram``
+    also needs ``libquadmath.so.0`` from the host GCC runtime (``libquadmath0``
+    on Debian and Ubuntu). Training is not exercised here: this wrapper only
+    applies a model.
     """
 
     #: Where published FSTs come from. Documentation, never a download.
