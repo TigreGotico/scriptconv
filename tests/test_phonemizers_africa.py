@@ -47,6 +47,30 @@ class TestAfricaG2PPhonemizer(unittest.TestCase):
         self.assertIn("twi", AfricaG2PPhonemizer.supported_langs())
         self.assertGreater(len(AfricaG2PPhonemizer.supported_langs()), 300)
 
+    def test_region_suffixed_rule_files_resolve_by_their_own_name(self):
+        # 11 rule files carry a region suffix instead of a bare ISO 639-3
+        # code; each must be selectable by that name (T-2701).
+        for code in ("hau-nigeria", "hau-niger", "dop-benin", "ngb-zaire",
+                     "sag-congo", "sef-cote_d_ivoire", "snk-senegal"):
+            self.assertEqual(AfricaG2PPhonemizer.get_lang(code), code)
+            self.assertIn(code, AfricaG2PPhonemizer.supported_langs())
+
+    def test_a_region_suffixed_code_phonemizes(self):
+        p = AfricaG2PPhonemizer(alphabet=Alphabet.IPA)
+        self.assertEqual(p.phonemize_string("ƙasa", "hau-nigeria"),
+                         "kʼ a s a")
+
+    def test_an_underscore_is_read_as_a_hyphen(self):
+        self.assertEqual(AfricaG2PPhonemizer.get_lang("HAU_NIGERIA"),
+                         "hau-nigeria")
+
+    def test_a_bare_code_with_only_region_files_still_raises(self):
+        # africa-g2p ships no bare 'hau'. Choosing a region for the caller
+        # would be a claim this wrapper does not make.
+        self.assertNotIn("hau", AfricaG2PPhonemizer.supported_langs())
+        with self.assertRaises(ValueError):
+            AfricaG2PPhonemizer.get_lang("hau")
+
     def test_get_lang_resolves_exact_iso_639_3_code(self):
         self.assertEqual(AfricaG2PPhonemizer.get_lang("twi"), "twi")
         # region subtag is stripped to the primary subtag before lookup
