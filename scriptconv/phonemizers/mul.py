@@ -336,13 +336,19 @@ class EspeakPhonemizer(BasePhonemizer):
             "zh-tw": "cmn", "zh-hant": "cmn", "zh-hant-tw": "cmn",
             "zh-hk": "yue", "zh-mo": "yue",
         }
-        if target_lang.lower() in ZH_ALIASES:
-            return ZH_ALIASES[target_lang.lower()]
-        if target_lang in cls.ESPEAK_LANGS:
-            return target_lang
-        if target_lang.lower().split("-")[0] in cls.ESPEAK_LANGS:
-            return target_lang.lower().split("-")[0]
-        return cls.match_lang(target_lang, cls.ESPEAK_LANGS)
+        # ESPEAK_LANGS is all lowercase, so the tag is lowercased once and
+        # matched as a whole BEFORE the primary subtag. A BCP-47 tag such as
+        # pt-BR or fr-BE used to miss the exact check on case and fall to the
+        # bare pt or fr, which are European Portuguese and metropolitan
+        # French: a Brazilian voice phonemized as European.
+        tag = target_lang.lower().replace("_", "-")
+        if tag in ZH_ALIASES:
+            return ZH_ALIASES[tag]
+        if tag in cls.ESPEAK_LANGS:
+            return tag
+        if tag.split("-")[0] in cls.ESPEAK_LANGS:
+            return tag.split("-")[0]
+        return cls.match_lang(tag, cls.ESPEAK_LANGS)
 
     @staticmethod
     def _run_espeak_command(args: List[str], input_text: str = None, check: bool = True) -> str:
