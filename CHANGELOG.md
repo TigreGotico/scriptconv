@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a33](https://github.com/TigreGotico/scriptconv/tree/0.0.4a33) (2026-09-26)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a32...0.0.4a33)
+
+**Merged pull requests:**
+
+- docs\(phonetisaurus\): name the one library the wheel does not ship, and add the real-engine cell [\#132](https://github.com/TigreGotico/scriptconv/pull/132) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a32](https://github.com/TigreGotico/scriptconv/tree/0.0.4a32) (2026-09-26)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a31...0.0.4a32)
@@ -414,11 +422,6 @@
 ## [0.0.3a6](https://github.com/TigreGotico/scriptconv/tree/0.0.3a6) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a5...0.0.3a6)
-
-**Merged pull requests:**
-
-- Release 0.0.3a6 [\#29](https://github.com/TigreGotico/scriptconv/pull/29) ([github-actions[bot]](https://github.com/apps/github-actions))
-- feat: token-level Japanese reading API and wakachigaki segmentation [\#28](https://github.com/TigreGotico/scriptconv/pull/28) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.3a5](https://github.com/TigreGotico/scriptconv/tree/0.0.3a5) (2026-07-21)
 
