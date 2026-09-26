@@ -416,6 +416,10 @@ def char_script(ch: str) -> Optional[str]:
     if len(ch) != 1:
         return None
     cp = ord(ch)
+    # Only the interval immediately at-or-before cp (idx) is ever checked —
+    # correct only because SCRIPT_REGISTRY's char_ranges are non-overlapping,
+    # so at most one interval can ever contain cp. If ranges ever overlapped,
+    # this single-candidate check would silently miss matches.
     idx = bisect_right(_SORTED_STARTS, cp) - 1
     if idx >= 0 and cp <= _SORTED_ENDS[idx]:
         return _SORTED_SCRIPTS[idx]

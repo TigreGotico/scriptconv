@@ -10,7 +10,8 @@ class CotoviaPhonemizer(BasePhonemizer):
     G2P engine that has verified parity with the original C binary.
 
     Output alphabets:
-    - ``Alphabet.COTOVIA`` — raw Cotovia phoneme notation (e.g. ``"Este e uN ..."``)
+    - ``Alphabet.COTOVIA`` (default) — raw Cotovia phoneme notation (e.g.
+      ``"Este e uN ..."``), the binary-parity-tested native phoneset
     - ``Alphabet.IPA`` — IPA string produced by pycotovia's ``cotovia_to_ipa``
 
     Voices trained on Cotovia-alphabet output continue to receive the same
@@ -21,11 +22,12 @@ class CotoviaPhonemizer(BasePhonemizer):
     lazily so that ``import scriptconv.phonemizers`` works without it installed.
     """
 
-    def __init__(self, alphabet: Alphabet = Alphabet.IPA,
+    def __init__(self, alphabet: Alphabet = Alphabet.COTOVIA,
                  model: Optional[str] = None):
         """
         Args:
-            alphabet (Alphabet): ``COTOVIA`` (raw notation) or ``IPA``.
+            alphabet (Alphabet): ``COTOVIA`` (raw notation, the default) or
+                ``IPA``.
             model (Optional[str]): phonemizer variant, from the voice's
                 ``phonemizer_model``.  ``"stress"`` emits the cotovia notation
                 with the stressed vowel marked by a trailing ``^`` (e.g.

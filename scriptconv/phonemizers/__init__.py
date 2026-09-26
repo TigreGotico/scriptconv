@@ -10,6 +10,7 @@ from scriptconv.phonemizers.enums import Alphabet, Phonemizer
 from scriptconv.phonemizers.base import (
     BasePhonemizer,
     GraphemePhonemizer,
+    MissingLanguageError,
     UnicodeCodepointPhonemizer,
     TextChunks,
     RawPhonemizedChunks,
@@ -30,6 +31,7 @@ __all__ = [
     "Phonemizer",
     "BasePhonemizer",
     "GraphemePhonemizer",
+    "MissingLanguageError",
     "UnicodeCodepointPhonemizer",
     "TextChunks",
     "RawPhonemizedChunks",
