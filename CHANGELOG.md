@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a34](https://github.com/TigreGotico/scriptconv/tree/0.0.4a34) (2026-09-26)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a33...0.0.4a34)
+
+**Merged pull requests:**
+
+- fix: EspeakPhonemizer.get\_lang reads a BCP-47 tag whatever its case [\#129](https://github.com/TigreGotico/scriptconv/pull/129) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a33](https://github.com/TigreGotico/scriptconv/tree/0.0.4a33) (2026-09-26)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a32...0.0.4a33)
@@ -413,11 +421,6 @@
 ## [0.0.3a7](https://github.com/TigreGotico/scriptconv/tree/0.0.3a7) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a6...0.0.3a7)
-
-**Merged pull requests:**
-
-- Release 0.0.3a7 [\#31](https://github.com/TigreGotico/scriptconv/pull/31) ([github-actions[bot]](https://github.com/apps/github-actions))
-- feat: first-class orthographic-convention axis [\#30](https://github.com/TigreGotico/scriptconv/pull/30) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.3a6](https://github.com/TigreGotico/scriptconv/tree/0.0.3a6) (2026-07-21)
 
