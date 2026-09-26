@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a32](https://github.com/TigreGotico/scriptconv/tree/0.0.4a32) (2026-09-26)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a31...0.0.4a32)
+
+**Merged pull requests:**
+
+- feat\(kab\): add the Matoub Kabyle phonemizer as its own route [\#133](https://github.com/TigreGotico/scriptconv/pull/133) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a31](https://github.com/TigreGotico/scriptconv/tree/0.0.4a31) (2026-09-23)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a30...0.0.4a31)
@@ -416,18 +424,9 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a4...0.0.3a5)
 
-**Merged pull requests:**
-
-- Release 0.0.3a5 [\#27](https://github.com/TigreGotico/scriptconv/pull/27) ([github-actions[bot]](https://github.com/apps/github-actions))
-- fix: include cangjie table in built distributions [\#26](https://github.com/TigreGotico/scriptconv/pull/26) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [0.0.3a4](https://github.com/TigreGotico/scriptconv/tree/0.0.3a4) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a3...0.0.3a4)
-
-**Merged pull requests:**
-
-- Release 0.0.3a4 [\#25](https://github.com/TigreGotico/scriptconv/pull/25) ([github-actions[bot]](https://github.com/apps/github-actions))
 
 ## [0.0.3a3](https://github.com/TigreGotico/scriptconv/tree/0.0.3a3) (2026-07-21)
 
