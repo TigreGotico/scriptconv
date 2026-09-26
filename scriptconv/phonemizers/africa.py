@@ -90,18 +90,41 @@ class AfricaG2PPhonemizer(BasePhonemizer):
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
         """
-        Resolve *target_lang* to a supported africa-g2p ISO 639-3 code.
+        Resolve *target_lang* to a supported africa-g2p rule-file name.
 
-        Only the primary subtag is matched (e.g. ``tw-GH`` -> ``twi`` is *not*
-        attempted — africa-g2p keys its rule files by exact ISO 639-3 code, not
-        BCP-47 macrolanguage/region mapping, so this is an exact-match lookup,
-        not the closest-match fuzzing :meth:`BasePhonemizer.match_lang` does).
+        Two exact lookups, in order, and no fuzzing (africa-g2p keys its rule
+        files by name, not by BCP-47 macrolanguage/region mapping, so
+        :meth:`BasePhonemizer.match_lang`'s closest-match search does not
+        apply):
+
+        1. the whole tag, lowercased, first as written and then with ``_``
+           read as ``-``. 11 of the rule
+           files carry a region suffix rather than a bare ISO 639-3 code
+           (``hau-nigeria``, ``hau-niger``, ``dop-benin``, ``dop-benin2``,
+           ``ngb-zaire``, ``ngb-zaire2``, ``sag-congo``,
+           ``sag-central_african_republic``, ``sef-cote_d_ivoire``,
+           ``sef-cote_d_ivoire2``, ``snk-senegal``), and before this step none
+           of them could be reached at all: the primary subtag ``hau`` is not
+           a rule file, so Hausa raised.
+        2. the primary subtag (``twi-GH`` -> ``twi``).
+
+        A bare code whose only rule files carry region suffixes still raises.
+        Picking one region for ``hau`` would be a claim about which variety a
+        caller meant, and this wrapper does not make it.
 
         Raises:
             ValueError: If africa-g2p has no rule file for *target_lang*.
         """
+        langs = cls.supported_langs()
+        lowered = target_lang.lower()
+        # Two of the names keep an underscore of their own
+        # (sef-cote_d_ivoire, sag-central_african_republic), so the tag is
+        # tried as written before ``_`` is read as ``-``.
+        for whole in (lowered, lowered.replace("_", "-")):
+            if whole in langs:
+                return whole
         key = _primary_subtag(target_lang)
-        if key in cls.supported_langs():
+        if key in langs:
             return key
         raise ValueError(f"africa-g2p: unsupported language {target_lang!r}")
 
