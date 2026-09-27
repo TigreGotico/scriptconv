@@ -343,12 +343,25 @@ SCRIPT_REGISTRY: dict[str, Script] = {
         direction="rtl",
         char_ranges=((0x10900, 0x1091F),),
     ),
+    "Xsux": Script(
+        iso15924="Xsux",
+        name="Sumero-Akkadian Cuneiform",
+        direction="ltr",
+        char_ranges=(
+            (0x12000, 0x123FF),  # Cuneiform
+            (0x12400, 0x1247F),  # Cuneiform Numbers and Punctuation
+            (0x12480, 0x1254F),  # Early Dynastic Cuneiform
+        ),
+    ),
 }
 
 # Typological class per script (Daniels & Bright, *The World's Writing
 # Systems*, 1996). Kept as a compact map so the registry literal above stays
 # focused on codepoint ranges; applied to each entry below.
 _SCRIPT_TYPES: dict[str, str] = {
+    # Cuneiform signs stand for syllables and for whole words in the same
+    # text, so neither "syllabary" nor "logographic" is the whole truth.
+    "Xsux": "logographic",
     "Latn": "alphabet", "Cyrl": "alphabet", "Grek": "alphabet",
     "Armn": "alphabet", "Geor": "alphabet", "Glag": "alphabet",
     "Runr": "alphabet", "Ogam": "alphabet", "Tfng": "alphabet",

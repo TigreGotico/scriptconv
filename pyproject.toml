@@ -35,6 +35,10 @@ dependencies = {file = ["requirements.txt"]}
 [project.optional-dependencies]
 ja = ["pykakasi>=2.3,<3"]
 zh = ["pypinyin>=0.50,<1"]
+# Assyriological readings -> cuneiform signs. Installed for its bundled sign
+# table only; scriptconv locates the data file rather than importing the
+# package, whose top level pulls in torch and transformers.
+cuneiscribe = ["cuneiscribe>=0.2"]
 # --- phonemizer wrappers (scriptconv.phonemizers) ---
 phonemizers = ["quebra-frases", "langcodes"]
 espeak = ["scriptconv[phonemizers]", "espyak"]
