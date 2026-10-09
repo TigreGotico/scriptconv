@@ -1,5 +1,6 @@
 """Phoneme-notation transcoding — IPA ↔ ARPABET, IPA ↔ X-SAMPA,
-IPA ↔ Lexique, IPA ↔ Kirshenbaum, Buckwalter ↔ Arabic script.
+IPA ↔ Lexique, IPA ↔ Kirshenbaum, Buckwalter ↔ Arabic script, and the output
+units of the Allosaurus and espeak-ng phone recognisers → IPA.
 
 All tables are pure Python data; zero runtime dependencies.
 
@@ -43,6 +44,8 @@ __all__ = [
     "ipa_to_rfe",
     "halabi_to_ipa",
     "iqra_halabi_to_ipa",
+    "allosaurus_to_ipa",
+    "espeak_ipa_to_ipa",
     "looks_like_ipa",
 ]
 
@@ -60,6 +63,8 @@ class Notation(str, Enum):
     COTOVIA = "cotovia"  # Universidade de Vigo Cotovía TTS notation (gl)
     RFE = "rfe"
     HALABI = "halabi"  # Halabi Arabic-Phonetiser phoneme notation (ar)
+    ALLOSAURUS = "allosaurus"  # Allosaurus phone-recogniser output units
+    ESPEAK_IPA = "espeak-ipa"  # espeak-ng --ipa phoneme units
 
     def __repr__(self) -> str:
         return f"Notation.{self.name}"
@@ -1217,6 +1222,136 @@ def iqra_halabi_to_ipa(tokens: str, errors: str = "pass") -> str:
 
 
 # ---------------------------------------------------------------------------
+# Phone-recogniser output units -> IPA
+#
+# A CTC phone recogniser emits one unit per phone from a fixed inventory, and
+# its units are near-IPA: most already are IPA, and the rest spell an IPA phone
+# another way. Both converters take a unit sequence (a list, or a string of
+# whitespace-separated units) and rewrite only spellings; a unit with no exact
+# IPA reading follows ``errors``. Units are converted one at a time, because
+# the unit boundary carries information a string does not: the Allosaurus unit
+# ``ts`` is one affricate phone, which IPA writes ``t͡s``, while the IPA string
+# ``ts`` is a stop followed by a fricative.
+#
+# Allosaurus (Li et al. 2020, https://github.com/xinjli/allosaurus) writes its
+# affricate units without the tie bar, a few units with ASCII ``g`` for IPA
+# ``ɡ``, and one schwa with the Cyrillic letter U+04D9. Its unit ``I`` has no
+# phone value and its bare length mark ``ː`` no segment.
+#
+# espeak-ng's ``--ipa`` output, the label set of phone recognisers trained on
+# espeak-ng transcriptions (facebook/wav2vec2-xlsr-53-espeak-cv-ft), leaves the
+# phoneme mnemonics its IPA table lacks in espeak-ng's own ASCII notation,
+# which is Kirshenbaum's: ``S`` ʃ, ``N`` ŋ, ``dZ`` d͡ʒ, ``t[`` dental t,
+# ``u:`` long u; its retroflex mnemonic is a following ``.`` (``s.`` ʂ) and
+# its aspiration a following ``h`` after a stop. Tone numbers, and the tone-3
+# digit that the Kirshenbaum reading turns into ``ɜ`` after a vowel, have no
+# segmental IPA reading and follow ``errors``.
+# ---------------------------------------------------------------------------
+
+_TIE = "͡"
+_AFFRICATE_PAIRS = frozenset({
+    ("t", "s"), ("d", "z"), ("t", "ʃ"), ("d", "ʒ"), ("t", "ɕ"), ("d", "ʑ"),
+    ("t", "ʂ"), ("d", "ʐ"), ("ʈ", "ʂ"), ("ɖ", "ʐ"), ("p", "f"), ("b", "v"),
+    ("k", "x"), ("t", "θ"), ("d", "ð"), ("t", "ɬ"), ("d", "ɮ"),
+})
+_UNIT_MODIFIERS = frozenset("ʰʲʷːʼ̤̥̩̪̚")
+
+
+def _tie_affricate(unit: str) -> str:
+    """Write a two-letter affricate unit with the tie bar; any trailing
+    modifiers (aspiration, palatalisation, length) stay after it."""
+    base = unit.rstrip("".join(_UNIT_MODIFIERS))
+    if len(base) == 2 and (base[0], base[1]) in _AFFRICATE_PAIRS:
+        return base[0] + _TIE + base[1] + unit[len(base):]
+    return unit
+
+
+def _units(units: str | list[str]) -> list[str]:
+    return units.split() if isinstance(units, str) else list(units)
+
+
+_ALLOSAURUS_CODEPOINTS = {"g": "ɡ", "ә": "ə"}
+_ALLOSAURUS_NO_IPA = frozenset({"I", "ː"})
+
+
+def allosaurus_to_ipa(units: str | list[str], errors: str = "pass") -> str:
+    """Convert Allosaurus output units to IPA.
+
+    Affricate units take the tie bar, ASCII ``g`` and the Cyrillic schwa take
+    their IPA code points, and every other unit is already IPA. The units
+    ``I`` and a bare ``ː`` have no IPA reading and follow ``errors``.
+
+    Examples
+    --------
+    >>> allosaurus_to_ipa("tʃ a g ә")
+    't͡ʃaɡə'
+    >>> allosaurus_to_ipa(["ts", "I"], errors="ignore")
+    't͡s'
+    """
+    out = []
+    for pos, unit in enumerate(_units(units)):
+        if unit in _ALLOSAURUS_NO_IPA:
+            res = _unknown(unit, pos, "allosaurus", errors)
+            if res:
+                out.append(res)
+            continue
+        unit = "".join(_ALLOSAURUS_CODEPOINTS.get(c, c) for c in unit)
+        out.append(_tie_affricate(unit))
+    return unicodedata.normalize("NFC", "".join(out))
+
+
+_ESPEAK_RETROFLEX = {"s": "ʂ", "z": "ʐ", "t": "ʈ", "d": "ɖ", "n": "ɳ", "l": "ɭ"}
+_ESPEAK_ASPIRABLE = frozenset("ptkcq")
+_ESPEAK_NOT_IPA = re.compile(r"[0-9.^\"?<>]")
+#: espeak-ng's mark for a phoneme it could not transcribe; read as Kirshenbaum
+#: it would become two glottal stops.
+_ESPEAK_NO_IPA = frozenset({"??"})
+
+
+def _espeak_unit(unit: str) -> str:
+    if unit.endswith("h") and unit[:1] in _ESPEAK_ASPIRABLE and len(unit) > 1:
+        unit = unit[:-1] + "ʰ"
+    head, dot, tail = unit.partition(".")
+    if dot and head and head[-1] in _ESPEAK_RETROFLEX and not tail[:1].isdigit():
+        unit = head[:-1] + _ESPEAK_RETROFLEX[head[-1]] + tail
+    if any(c.isascii() and not c.islower() and not c.isdigit() for c in unit):
+        unit = kirshenbaum_to_ipa(unit)
+    return _tie_affricate(unit)
+
+
+def espeak_ipa_to_ipa(units: str | list[str], errors: str = "pass") -> str:
+    """Convert espeak-ng ``--ipa`` phoneme units to IPA.
+
+    ASCII mnemonics are read as Kirshenbaum (``S`` ʃ, ``dZ`` d͡ʒ, ``t[``
+    t̪, ``u:`` uː), a following ``.`` marks a retroflex (``s.`` ʂ), a
+    following ``h`` aspirates a stop (``th`` tʰ), and two-letter affricate
+    units take the tie bar. A unit that holds a tone number, a vowel with the
+    tone-3 mark ``ɜ``, espeak-ng's ``??``, or another character with no IPA
+    reading follows ``errors``.
+
+    Examples
+    --------
+    >>> espeak_ipa_to_ipa("dZ S u: t[")
+    'd͡ʒʃuːt̪'
+    >>> espeak_ipa_to_ipa("ts. th")
+    't͡ʂtʰ'
+    >>> espeak_ipa_to_ipa(["a", "i5"], errors="ignore")
+    'a'
+    """
+    out = []
+    for pos, unit in enumerate(_units(units)):
+        tone_3 = len(unit) > 1 and unit.endswith("ɜ")
+        ipa = None if unit in _ESPEAK_NO_IPA or tone_3 else _espeak_unit(unit)
+        if ipa is None or _ESPEAK_NOT_IPA.search(ipa):
+            res = _unknown(unit, pos, "espeak-ipa", errors)
+            if res:
+                out.append(res)
+            continue
+        out.append(ipa)
+    return unicodedata.normalize("NFC", "".join(out))
+
+
+# ---------------------------------------------------------------------------
 # convert — facade routing through IPA where no direct map exists
 # ---------------------------------------------------------------------------
 
@@ -1281,6 +1416,8 @@ def convert(text: str, src: str | Notation, dst: str | Notation,
 
 _TO_IPA: dict[Notation, "callable"] = {
     Notation.HALABI: halabi_to_ipa,
+    Notation.ALLOSAURUS: allosaurus_to_ipa,
+    Notation.ESPEAK_IPA: espeak_ipa_to_ipa,
     Notation.ARPA: arpa_to_ipa,
     Notation.XSAMPA: xsampa_to_ipa,
     Notation.LEXIQUE: lexique_to_ipa,
@@ -1415,6 +1552,19 @@ NOTATION_INFO: dict[Notation, NotationInfo] = {
         token_separated=False,
         reference="Phonetic alphabet of Nawar Halabi's Arabic-Phonetiser "
                   "(mantoq G2P inventory); one-directional to IPA",
+    ),
+    Notation.ALLOSAURUS: NotationInfo(
+        Notation.ALLOSAURUS, lossless_to_ipa=False, lossless_from_ipa=False,
+        token_separated=True,
+        reference="Allosaurus universal phone recogniser output units "
+                  "(Li et al. 2020, https://github.com/xinjli/allosaurus); "
+                  "one-directional to IPA",
+    ),
+    Notation.ESPEAK_IPA: NotationInfo(
+        Notation.ESPEAK_IPA, lossless_to_ipa=False, lossless_from_ipa=False,
+        token_separated=True,
+        reference="espeak-ng --ipa phoneme units, the label set of "
+                  "facebook/wav2vec2-xlsr-53-espeak-cv-ft; one-directional to IPA",
     ),
     Notation.BUCKWALTER: NotationInfo(
         Notation.BUCKWALTER, lossless_to_ipa=True, lossless_from_ipa=False,
