@@ -97,7 +97,7 @@ Cyrillic never splits. Details: [docs/scripts.md](docs/scripts.md).
 ### Same sounds, different symbols: the `notation` module
 
 Nine phoneme notations transcode through an IPA hub: ARPABET, X-SAMPA,
-Kirshenbaum, Lexique, Cotovía, RFE, Buckwalter to Arabic, and Halabi (the Nawar Halabi Arabic-Phonetiser notation, popularized by the mantoq package).
+Kirshenbaum, Lexique, Cotovía, RFE, Buckwalter to Arabic, Halabi (the Nawar Halabi Arabic-Phonetiser notation, popularized by the mantoq package), and the output units of the Allosaurus and espeak-ng phone recognisers.
 
 ```python
 from scriptconv import convert, arpa_to_ipa, ipa_to_arpa
@@ -323,6 +323,8 @@ placeholder (`?`, the historical `ipa_to_arpa` default, tunable via
 | **X-SAMPA** | Exact for all canonical symbols | Exact except aliases (`f\`→ɸ, `&`→æ) normalise to their canonical spelling | Passed through unchanged |
 | **Buckwalter ↔ Arabic** | Exact (precomposed lam-alef ligatures decompose to two characters, visually identical) | Exact | Follows `errors=` (default: passed through) |
 | **Halabi → IPA** | One-directional (gemination and word markers are consumed; there is no IPA to Halabi) | Not applicable | Follows `errors=` (default: passed through) |
+| **Allosaurus units → IPA** | One-directional; each unit's spelling only (affricate tie bar, IPA `ɡ` and `ə` code points) | Not applicable | `I` and a bare `ː` follow `errors=` (default: passed through) |
+| **espeak-ng IPA units → IPA** | One-directional; each unit's spelling only (Kirshenbaum ASCII mnemonics, `.` retroflex, `h` aspiration, affricate tie bar) | Not applicable | Tone numbers, the tone-3 `ɜ`, `??` and other unconverted mnemonics follow `errors=` (default: passed through) |
 | **Lexique ↔ IPA** | Exact except the `°`/`3` schwa pair (both map to `ə`; the reverse always produces `°`) | Exact | Passed through unchanged |
 | **Kirshenbaum ↔ IPA** | Exact | **Lossy** (restricted ASCII inventory; IPA outside it passes through) | Passed through unchanged |
 | **Cotovía ↔ IPA** | Exact except the three `L`/`Z`/`jj` symbols for `ʎ` normalise to `L` | **Lossy** (Galician/Spanish inventory; IPA outside it passes through) | Passed through unchanged |
