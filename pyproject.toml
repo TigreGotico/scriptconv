@@ -63,7 +63,7 @@ zh-phonemizers = ["scriptconv[phonemizers]", "jieba", "pypinyin>=0.50,<1", "xpin
 en-phonemizers = ["scriptconv[phonemizers]", "g2p_en", "openphonemizer", "deep-phonemizer", "requests"]
 ar-phonemizers = ["scriptconv[phonemizers]", "arbtok", "ovos-number-parser"]
 shami = ["scriptconv[phonemizers]", "regex"]
-test = ["pytest", "pytest-timeout", "pykakasi>=2.3,<3", "pypinyin>=0.50,<1", "quebra-frases", "langcodes", "regex", "ovos-number-parser", "bifonia>=0.1.1", "stressonnx>=0.0.3a2", "tugaphone>=1.2.0a1", "ghana-g2p>=0.1.1", "tomli; python_version < '3.11'"]
+test = ["pytest", "pytest-timeout", "pykakasi>=2.3,<3", "pypinyin>=0.50,<1", "quebra-frases", "langcodes", "regex", "ovos-number-parser", "bifonia>=0.1.1", "stressonnx>=0.0.3a2", "tugaphone>=1.2.0a1", "ghana-g2p>=0.1.1", "espyak", "tomli; python_version < '3.11'"]
 
 [project.urls]
 Homepage = "https://github.com/TigreGotico/scriptconv"
