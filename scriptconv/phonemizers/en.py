@@ -1,7 +1,3 @@
-import os
-
-import requests
-
 from scriptconv.notation import _ARPA_TO_IPA as arpa_to_ipa_lookup
 from scriptconv.phonemizers.base import BasePhonemizer
 from scriptconv.phonemizers.enums import Alphabet
@@ -18,9 +14,18 @@ class DeepPhonemizer(BasePhonemizer):
     }
 
     def __init__(self, model="latin_ipa_forward.pt"):
-        import dp
-        from dp.phonemizer import Phonemizer
-        import torch
+        import os
+
+        try:
+            import dp
+            from dp.phonemizer import Phonemizer
+            import torch
+        except ImportError as e:
+            raise ImportError(
+                "deep-phonemizer and torch are required for the DeepPhonemizer "
+                "phonemizer. Install them with 'pip install deep-phonemizer torch' "
+                "(or 'pip install scriptconv[en-phonemizers]')."
+            ) from e
         # needed for latest torch version
         torch.serialization.add_safe_globals([dp.preprocessing.text.Preprocessor])
         torch.serialization.add_safe_globals([dp.preprocessing.text.LanguageTokenizer])
@@ -38,6 +43,7 @@ class DeepPhonemizer(BasePhonemizer):
                 os.makedirs(cache_dir, exist_ok=True)
                 model_path = os.path.join(cache_dir, model)
                 if not os.path.isfile(model_path):
+                    import requests
                     print(f"Downloading {model} from {url}...")
                     with requests.get(url, stream=True) as r:
                         r.raise_for_status()
@@ -91,10 +97,17 @@ class OpenPhonemizer(BasePhonemizer):
     """
 
     def __init__(self):
-        from openphonemizer import OpenPhonemizer
-        import torch
-        # needed for latest torch version
-        import dp
+        try:
+            from openphonemizer import OpenPhonemizer
+            import torch
+            # needed for latest torch version
+            import dp
+        except ImportError as e:
+            raise ImportError(
+                "openphonemizer and torch are required for the OpenPhonemizer "
+                "phonemizer. Install them with 'pip install openphonemizer torch' "
+                "(or 'pip install scriptconv[en-phonemizers]')."
+            ) from e
         torch.serialization.add_safe_globals([dp.preprocessing.text.Preprocessor])
         torch.serialization.add_safe_globals([dp.preprocessing.text.LanguageTokenizer])
         torch.serialization.add_safe_globals([dp.preprocessing.text.SequenceTokenizer])
@@ -143,10 +156,17 @@ class G2PEnPhonemizer(BasePhonemizer):
 
     def __init__(self, alphabet=Alphabet.IPA):
         assert alphabet in [Alphabet.IPA, Alphabet.ARPA]
-        import nltk
-        nltk.download('averaged_perceptron_tagger_eng')
-        nltk.download('cmudict')
-        from g2p_en import G2p
+        try:
+            import nltk
+            nltk.download('averaged_perceptron_tagger_eng')
+            nltk.download('cmudict')
+            from g2p_en import G2p
+        except ImportError as e:
+            raise ImportError(
+                "g2p_en is required for the G2PEn phonemizer. "
+                "Install it with 'pip install g2p_en' "
+                "(or 'pip install scriptconv[en-phonemizers]')."
+            ) from e
         self.g2p = G2p()
         super().__init__(alphabet)
 
