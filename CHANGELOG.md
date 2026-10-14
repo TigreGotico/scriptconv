@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a36](https://github.com/TigreGotico/scriptconv/tree/0.0.4a36) (2026-10-14)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a35...0.0.4a36)
+
+**Merged pull requests:**
+
+- fix: keep clause punctuation as an opt-in, never return espeak newlines [\#139](https://github.com/TigreGotico/scriptconv/pull/139) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a35](https://github.com/TigreGotico/scriptconv/tree/0.0.4a35) (2026-09-26)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a34...0.0.4a35)
@@ -406,7 +414,6 @@
 **Merged pull requests:**
 
 - Release 0.0.3a10 [\#37](https://github.com/TigreGotico/scriptconv/pull/37) ([github-actions[bot]](https://github.com/apps/github-actions))
-- feat: guarantee script-tag stability for downstream enums [\#35](https://github.com/TigreGotico/scriptconv/pull/35) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.3a9](https://github.com/TigreGotico/scriptconv/tree/0.0.3a9) (2026-07-21)
 
@@ -415,7 +422,6 @@
 **Merged pull requests:**
 
 - Release 0.0.3a9 [\#36](https://github.com/TigreGotico/scriptconv/pull/36) ([github-actions[bot]](https://github.com/apps/github-actions))
-- feat: codecs-style errors= policy on all notation converters [\#34](https://github.com/TigreGotico/scriptconv/pull/34) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.3a8](https://github.com/TigreGotico/scriptconv/tree/0.0.3a8) (2026-07-21)
 
