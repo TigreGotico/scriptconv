@@ -106,13 +106,15 @@ def get_phonemizer(phonemizer: Phonemizer,
 
     ``model`` is forwarded to model-backed phonemizers (ByT5/Charsiu/
     DeepPhonemizer); ``alphabet`` to those with a selectable output alphabet.
-    Extra ``kwargs`` (e.g. ``normalizer=``) pass to the constructor.
+    Extra ``kwargs`` pass to the constructor, except ``normalizer=`` and
+    ``keep_punctuation=``, which are set on the instance.
     """
     phonemizer = Phonemizer(phonemizer)
     cls = get_phonemizer_class(phonemizer)
     # normalizer is a plain BasePhonemizer attribute; set it after
     # construction so wrapper __init__ signatures stay untouched
     normalizer = kwargs.pop("normalizer", None)
+    keep_punctuation = kwargs.pop("keep_punctuation", None)
     if phonemizer in (_P.BYT5, _P.CHARSIU, _P.DEEPPHONEMIZER):
         inst = cls(model, **kwargs)
     else:
@@ -131,6 +133,8 @@ def get_phonemizer(phonemizer: Phonemizer,
         inst = cls(**kwargs)
     if normalizer is not None:
         inst.normalizer = normalizer
+    if keep_punctuation is not None:
+        inst.keep_punctuation = keep_punctuation
     return inst
 
 

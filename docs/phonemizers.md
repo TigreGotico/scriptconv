@@ -34,6 +34,18 @@ inside `phonemize_lazy`, without it, the raw text is phonemized as-is. A
 pipeline that injects its own normalizer and one that doesn't will therefore
 legitimately differ on text containing digits.
 
+**Punctuation is opt-in.** By default no punctuation reaches the phonemes,
+which is what every voice trained on scriptconv's output so far has learned.
+Set `keep_punctuation = True` on the instance (or pass `keep_punctuation=True`
+to `get_phonemizer`) to keep it the way Piper does: each clause is phonemized
+on its own and followed by its symbol, `.` `?` `!` alone and `,` `:` `;`
+followed by a space (Arabic `،` `؛` `؟` map to the same symbols). With the
+flag set, `phonemize_to_list(text)` equals the sentences of `phonemize(text)`
+joined, so a voice trains on the same sequence it is later fed. Backends that
+override `phonemize_to_list` or `phonemize_lazy` keep their own output and
+ignore the flag. In either mode `phonemize_to_list` never returns the newline
+espeak-ng prints at a clause break.
+
 ## The registry and per-language defaults
 
 Every backend is a `Phonemizer` enum member whose string value is wire

@@ -34,6 +34,52 @@ RawPhonemizedChunks = List[Tuple[str, str, bool]]
 
 PhonemizedChunks = list[list[str]]
 
+# Clause punctuation kept by ``keep_punctuation``, mapped to the symbol a voice
+# is trained on. These are the six clause types Piper appends after every
+# espeak-ng clause (piper-phonemize ``src/phonemize.cpp``): a full stop,
+# question mark and exclamation mark stand alone, a comma, colon and semicolon
+# are followed by a space. Arabic script has its own comma, semicolon and
+# question mark; they map onto the same symbols.
+CLAUSE_PUNCTUATION = {".": ".", "?": "?", "!": "!", ",": ",", ":": ":", ";": ";",
+                      "\u060c": ",", "\u061b": ";", "\u061f": "?"}
+_PAUSE_PUNCTUATION = {",", ":", ";"}
+# A clause ends at punctuation followed by whitespace, as in espeak-ng, so the
+# "," in "10,4" or the ":" in "16:30" never splits. A lone "." is left to the
+# sentence tokenizer, which knows abbreviations; inside a sentence an ellipsis
+# or "|" still ends a clause, as in chunk_text, but carries no symbol (espeak-ng
+# reads an ellipsis as a spoken-name pause, which Piper does not keep).
+_CLAUSE_BREAK = re.compile(r"(?:\.\.+|\u2026|[,:;!?|\u060c\u061b\u061f])[^\w\s]*(?=\s)")
+_TRAILING_PUNCTUATION = re.compile(r"[^\w\s]+\s*$")
+_LANG_FLAGS = re.compile(r"\([^)]+\)")
+
+
+def _clause_mark(punctuation: str) -> Optional[str]:
+    """The symbol a run of clause-final punctuation is kept as, if any."""
+    if ".." in punctuation or "\u2026" in punctuation:
+        return None
+    for char in punctuation:
+        if char in CLAUSE_PUNCTUATION:
+            return CLAUSE_PUNCTUATION[char]
+    return None
+
+
+def split_clauses(sentence: str) -> List[Tuple[str, Optional[str]]]:
+    """Split one sentence into ``(clause, mark)`` pairs.
+
+    ``mark`` is the symbol from :data:`CLAUSE_PUNCTUATION` that ends the
+    clause, or ``None`` when the clause ends without one (no punctuation, an
+    ellipsis, ``|``). The clause text still carries its own punctuation.
+    """
+    clauses: List[Tuple[str, Optional[str]]] = []
+    start = 0
+    for match in _CLAUSE_BREAK.finditer(sentence):
+        clauses.append((sentence[start:match.start()], _clause_mark(match.group())))
+        start = match.end()
+    tail = sentence[start:]
+    trailing = _TRAILING_PUNCTUATION.search(tail)
+    clauses.append((tail, _clause_mark(trailing.group()) if trailing else None))
+    return clauses
+
 
 class MissingLanguageError(ValueError):
     """No language reached :meth:`BasePhonemizer.match_lang` at all.
@@ -75,6 +121,18 @@ def _check_alphabet(phonemizer, alphabet: Alphabet,
 
 
 class BasePhonemizer(metaclass=abc.ABCMeta):
+    keep_punctuation: bool = False
+    """Keep clause punctuation (``, . ? ! : ;``) in the phoneme output.
+
+    Off by default, so voices trained without punctuation receive exactly the
+    sequences they were trained on. When on, :meth:`phonemize_to_list` and
+    :meth:`phonemize_lazy` phonemize clause by clause and append each clause's
+    symbol the way Piper does, and the two return the same phonemes for the
+    same text. A backend that overrides either method owns its own output and
+    ignores this flag, since honouring it on one side only would make training
+    and synthesis disagree.
+    """
+
     def __init__(self, alphabet: Alphabet = Alphabet.UNICODE,
                  normalizer: Optional[Callable[[str, str], str]] = None):
         super().__init__()
@@ -88,7 +146,17 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     def phonemize_to_list(self, text: str, lang: str) -> List[str]:
-        return list(self.phonemize_string(text, lang))
+        """Phonemes of *text* as one flat list, without normalization.
+
+        Clause breaks that a backend prints as ``"\\n"`` (espeak-ng does at
+        every comma, question mark and exclamation mark) are not phonemes and
+        are dropped; with :attr:`keep_punctuation` the clause's punctuation
+        takes their place.
+        """
+        if self._keeps_punctuation():
+            return [p for sentence in self._punctuated_sentences(text, lang)
+                    for p in sentence]
+        return [p for p in self.phonemize_string(text, lang) if p != "\n"]
 
     def phonemize(self, text: str, lang: str) -> PhonemizedChunks:
         # PhonemizedChunks is list[list[str]]; empty text yields no
@@ -114,6 +182,9 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
             return
         if self.normalizer is not None:
             text = self.normalizer(text, lang)
+        if self._keeps_punctuation():
+            yield from self._punctuated_sentences(text, lang)
+            return
         for chunk, punct, eos in self.chunk_text(text):
             phoneme_str = self.phonemize_string(self.remove_punctuation(chunk), lang)
             # Filter out (lang) switch (flags) that surround words from languages
@@ -122,6 +193,44 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
             # phonemize() marks every chunk as end-of-sentence, so each chunk is
             # its own sentence.
             yield list(phoneme_str)
+
+    def _keeps_punctuation(self) -> bool:
+        cls = type(self)
+        return (self.keep_punctuation
+                and cls.phonemize_to_list is BasePhonemizer.phonemize_to_list
+                and cls.phonemize_lazy is BasePhonemizer.phonemize_lazy)
+
+    def _punctuated_sentences(self, text: str, lang: str) -> Iterator[List[str]]:
+        """Per-sentence phonemes with each clause's punctuation appended.
+
+        Each clause is phonemized on its own with its punctuation removed, so
+        the backend sees the same words in training and in synthesis, and the
+        clause's symbol is appended after it: bare for ``. ? !``, followed by a
+        space for ``, : ;``.
+        """
+        try:
+            from quebra_frases import sentence_tokenize
+        except ImportError:
+            raise ImportError(
+                "sentence chunking needs quebra-frases — install with "
+                "`pip install scriptconv[phonemizers]`") from None
+        for sentence in sentence_tokenize(text):
+            phonemes: List[str] = []
+            for clause, mark in split_clauses(sentence):
+                clause = self.remove_punctuation(clause)
+                if not clause:
+                    continue
+                phoneme_str = _LANG_FLAGS.sub("", self.phonemize_string(clause, lang))
+                clause_phonemes = [p for p in phoneme_str if p != "\n"]
+                if not clause_phonemes:
+                    continue
+                phonemes.extend(clause_phonemes)
+                if mark:
+                    phonemes.append(mark)
+                    if mark in _PAUSE_PUNCTUATION:
+                        phonemes.append(" ")
+            if phonemes:
+                yield phonemes
 
     @staticmethod
     def _process_phones(raw_phones: RawPhonemizedChunks) -> PhonemizedChunks:
