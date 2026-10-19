@@ -22,14 +22,17 @@ zero-to-hero arc, or jump straight to the module you need.
 4. **[readings.md](readings.md)**, dictionary-backed respelling, where the
    answer is lexical rather than mechanical: kanji → kana (with the token
    stream and wakachigaki segmentation), hanzi → pinyin / bopomofo.
-5. **[conventions.md](conventions.md)**, orthographic decorations as
+5. **[cuneiform.md](cuneiform.md)**, cuneiform signs against the sign names
+   Unicode assigns them — sign values rather than readings, with the table
+   read from `unicodedata` rather than shipped.
+6. **[conventions.md](conventions.md)**, orthographic decorations as
    ordinary data: tashkeel, kashida, Quranic marks, niqqud, teamim,
    wakachigaki, pinyin tone spelling, jamo form, with the
    `strip` / `restyle` / `apply` / `detect` algebra.
-6. **[graph.md](graph.md)**, the conversion graph that ties every
+7. **[graph.md](graph.md)**, the conversion graph that ties every
    representation together: nodes, edges, lossless-preferring routing, and
    explicit extension.
-7. **[phonemizers.md](phonemizers.md)**, from spelling to sound: the
+8. **[phonemizers.md](phonemizers.md)**, from spelling to sound: the
    wrapper layer over G2P engines, per-language defaults with override, the
    injectable normalizer, and the licensing quarantine for vendored
    third-party engines.
