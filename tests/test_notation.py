@@ -948,7 +948,7 @@ def test_notation_enum_values():
 
 
 def test_notation_enum_count():
-    assert len(Notation) == 10
+    assert len(Notation) == 12
 
 
 def test_notation_str():
