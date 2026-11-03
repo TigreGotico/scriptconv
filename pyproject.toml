@@ -35,7 +35,7 @@ dependencies = {file = ["requirements.txt"]}
 ja = ["pykakasi>=2.3,<3"]
 zh = ["pypinyin>=0.50,<1"]
 # --- phonemizer wrappers (scriptconv.phonemizers) ---
-phonemizers = ["quebra-frases", "langcodes"]
+phonemizers = ["quebra-frases", "linguatag[langcodes]>=0.1.1a1"]
 espeak = ["scriptconv[phonemizers]", "espyak"]
 gruut = ["scriptconv[phonemizers]", "gruut"]
 goruut = ["scriptconv[phonemizers]", "pygoruut"]
@@ -62,7 +62,7 @@ zh-phonemizers = ["scriptconv[phonemizers]", "jieba", "pypinyin>=0.50,<1", "xpin
 en-phonemizers = ["scriptconv[phonemizers]", "g2p_en", "openphonemizer", "deep-phonemizer", "requests"]
 ar-phonemizers = ["scriptconv[phonemizers]", "arbtok", "ovos-number-parser"]
 shami = ["scriptconv[phonemizers]", "regex"]
-test = ["pytest", "pytest-timeout", "pykakasi>=2.3,<3", "pypinyin>=0.50,<1", "quebra-frases", "langcodes", "regex", "ovos-number-parser", "bifonia>=0.1.1", "stressonnx>=0.0.3a2", "tugaphone>=1.2.0a1", "ghana-g2p>=0.1.1", "espyak", "orthography2ipa>=7.112.0a1", "o2i-lexicons>=0.1.0a1", "tomli; python_version < '3.11'"]
+test = ["pytest", "pytest-timeout", "pykakasi>=2.3,<3", "pypinyin>=0.50,<1", "quebra-frases", "linguatag[langcodes]>=0.1.1a1", "regex", "ovos-number-parser", "bifonia>=0.1.1", "stressonnx>=0.0.3a2", "tugaphone>=1.2.0a1", "ghana-g2p>=0.1.1", "espyak", "orthography2ipa>=7.112.0a1", "o2i-lexicons>=0.1.0a1", "tomli; python_version < '3.11'"]
 
 [project.urls]
 Homepage = "https://github.com/TigreGotico/scriptconv"
