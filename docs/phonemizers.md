@@ -246,7 +246,9 @@ xpinyin, pypinyin), Arabic (arbtok, mantoq), Hebrew (phonikud), Persian,
 Vietnamese (viphoneme), Portuguese (tugaphone, barranquenho), Galician
 (Cotovía), Russian (vosk, the vosk-tts inventory, `Alphabet.VOSK`, with the
 voice's pronunciation dictionary passed as `phonemizer_model`), Basque
-(AhoTTS, euskaphone), Mirandese, Levantine Arabic/English
+(AhoTTS, euskaphone), Mirandese, Pali (pali-tts, the rules
+`dhammagift/pali-tts` feeds Piper hi_IN voices, vendored with no extra;
+orthography2ipa stays the `pi` default), Levantine Arabic/English
 code-switching (shami, whose `phonemize_with_language_ids` also returns the
 parallel per-phoneme language-ID stream), and orthography2ipa for its
 data-driven language specs. Trivial built-ins that need no extra:
