@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a37](https://github.com/TigreGotico/scriptconv/tree/0.0.4a37) (2026-11-03)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a36...0.0.4a37)
+
+**Merged pull requests:**
+
+- feat\(o2i\): enable the packaged orthography2ipa lexicons [\#142](https://github.com/TigreGotico/scriptconv/pull/142) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a36](https://github.com/TigreGotico/scriptconv/tree/0.0.4a36) (2026-10-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a35...0.0.4a36)
@@ -411,17 +419,9 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a9...0.0.3a10)
 
-**Merged pull requests:**
-
-- Release 0.0.3a10 [\#37](https://github.com/TigreGotico/scriptconv/pull/37) ([github-actions[bot]](https://github.com/apps/github-actions))
-
 ## [0.0.3a9](https://github.com/TigreGotico/scriptconv/tree/0.0.3a9) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a8...0.0.3a9)
-
-**Merged pull requests:**
-
-- Release 0.0.3a9 [\#36](https://github.com/TigreGotico/scriptconv/pull/36) ([github-actions[bot]](https://github.com/apps/github-actions))
 
 ## [0.0.3a8](https://github.com/TigreGotico/scriptconv/tree/0.0.3a8) (2026-07-21)
 
