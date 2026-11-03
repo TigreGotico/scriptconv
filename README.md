@@ -252,7 +252,7 @@ g.convert("bom dia", "text", "ipa", lang="pt")     # 'ˈbõ ˈdʒiɐ'
 g.can_convert("text", "arpa")                      # True (chains through IPA)
 ```
 
-Two design points worth knowing:
+Three design points worth knowing:
 
 - **Normalization is injectable.** TTS stacks expand numbers and dates
   before phonemizing, and that needs language resources scriptconv does
@@ -266,6 +266,17 @@ Two design points worth knowing:
   its ONNX model to a cache dir on first use (`phonikud_model=` still
   overrides it with a path or callable; the cache location is set via
   `SCRIPTCONV_CACHE` or `XDG_CACHE_HOME`).
+
+- **The orthography2ipa phonemizer uses the packaged lexicons.** The `o2i`
+  extra installs [o2i-lexicons](https://github.com/TigreGotico/o2i-lexicons),
+  which holds the words that the orthography2ipa rules get wrong, such as
+  en-GB ⟨yacht⟩. The key `packaged_lexicons` (default `True`) enables the
+  packaged lexicon for each language that the phonemizer transcribes, when a
+  package serves that language. Set it to `False` to use the rules only:
+  `get_phonemizer(Phonemizer.ORTHOGRAPHY2IPA, packaged_lexicons=False)`.
+  orthography2ipa keeps its lexicons for the whole process. After one caller
+  enables a lexicon, every orthography2ipa caller in the process uses it, and
+  `packaged_lexicons=False` does not disable it again.
 
 **Pre-G2P disambiguation.** `add_diacritics(text, lang, model=None)`
 restores information ordinary orthography omits but a G2P needs, before
