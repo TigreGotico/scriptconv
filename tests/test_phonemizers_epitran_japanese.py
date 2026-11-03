@@ -3,6 +3,7 @@
 epitran 1.26.1 renamed its Japanese maps from ``jpn-Ktkn``/``jpn-Hrgn`` to
 the ISO 15924 script codes ``jpn-Kana``/``jpn-Hira``. The Japanese maps
 convert kana only, so a Japanese request must name a kana script.
+A language request gets the full map, not the reduced ``-red`` map.
 """
 import os
 import unittest
@@ -59,6 +60,28 @@ class TestEpitranMapFiles(unittest.TestCase):
                 continue
             with self.subTest(lang=lang):
                 self.assertTrue(os.path.isfile(os.path.join(MAP_DIR, f"{lang}.csv")))
+
+
+class TestEpitranReducedMaps(unittest.TestCase):
+    def test_full_map_is_listed_before_its_reduced_map(self):
+        langs = EpitranPhonemizer.EPITRAN_LANGS
+        for reduced in [lang for lang in langs if lang.endswith("-red")]:
+            full = reduced[:-len("-red")]
+            if full in langs:
+                with self.subTest(full=full):
+                    self.assertLess(langs.index(full), langs.index(reduced))
+
+    def test_language_request_gets_the_full_map(self):
+        expected = {
+            "bn": "ben-Beng", "ben": "ben-Beng", "bn-BD": "ben-Beng",
+            "ti": "tir-Ethi", "tir": "tir-Ethi", "ti-ER": "tir-Ethi",
+            "tl": "tgl-Latn", "tgl": "tgl-Latn", "tl-PH": "tgl-Latn",
+            "sw": "swa-Latn", "swa": "swa-Latn", "sw-KE": "swa-Latn",
+            "kmr": "kmr-Latn", "ku": "kmr-Latn", "kmr-TR": "kmr-Latn",
+        }
+        for tag, lang in expected.items():
+            with self.subTest(tag=tag):
+                self.assertEqual(EpitranPhonemizer.get_lang(tag), lang)
 
 
 if __name__ == "__main__":
