@@ -13,7 +13,8 @@ _VENDORED = pathlib.Path(_vendored_module.__file__)
 
 # The upstream self-test of pali_ipa.py at commit a9383004, one row per
 # equality it asserts. Expected strings are upstream's own, measured by ear on
-# the voices; the to_script rows are left out with to_script itself.
+# the voices; the to_script rows are left out with to_script itself. Upstream
+# keeps clause punctuation, so these run with keep_punctuation on.
 UPSTREAM_CASES = [
     ('jarā', {'stress': False}, 'ɟəɾaː'),
     ('sañjāti', {'stress': False}, 'səɲɟaːtɪ'),
@@ -63,7 +64,13 @@ UPSTREAM_CASES = [
 
 
 def _phonemize(text, **options):
-    return PaliPhonemizer(**options).phonemize_string(text, "pi")
+    p = PaliPhonemizer(**options)
+    p.keep_punctuation = True
+    return p.phonemize_string(text, "pi")
+
+
+# DN 1: a passage left out ("…pe…") and two quotative "ti" after a closing quote.
+CANON = "“Kiñci, bhante”ti. Sīlaṁ …pe… paññā. “Evaṁ, āvuso”ti."
 
 
 class TestPaliTTS(unittest.TestCase):
@@ -95,6 +102,39 @@ class TestPaliTTS(unittest.TestCase):
         self.assertEqual(_phonemize("evaṃ"), _phonemize("evaṁ"))
         self.assertEqual(_phonemize("evaŋ"), _phonemize("evaṁ"))
 
+    def test_no_punctuation_by_default(self):
+        p = PaliPhonemizer()
+        self.assertEqual(p.phonemize_string("Katame dve?", "pi"), "kˈʌtəmeː dʋˈeː")
+        for sentence in p.phonemize(CANON, "pi"):
+            self.assertFalse(set(sentence) & set(",.?!"), sentence)
+
+    def test_training_and_synthesis_agree(self):
+        for keep in (False, True):
+            p = PaliPhonemizer(full_a=True, tune=True)
+            p.keep_punctuation = keep
+            with self.subTest(keep_punctuation=keep):
+                joined = [c for s in p.phonemize(CANON, "pi") for c in s]
+                self.assertEqual(joined, p.phonemize_to_list(CANON, "pi"))
+
+    def test_sentences_reach_the_rules_with_their_punctuation(self):
+        p = PaliPhonemizer(full_a=True, tune=True)
+        p.keep_punctuation = True
+        sentences = ["".join(s) for s in p.phonemize(CANON, "pi")]
+        self.assertEqual(" ".join(sentences),
+                         _vendored_module.tune(_vendored_module.to_ipa(CANON, full_a=True)))
+        # the ellipsis expands, and the quote keeps "ti" a word of its own
+        self.assertIn("pejjˈaːlʌ", sentences[1])
+        self.assertTrue(sentences[0].endswith(" tˈɪ."), sentences[0])
+
+    def test_voice_profiles(self):
+        self.assertEqual(_phonemize("rūpa", profile="ur"), "rˈuːpə")
+        self.assertEqual(_phonemize("bhikkhu", profile="ne"), "bʰˈɪkkʰu")
+        self.assertEqual(_phonemize("bhikkhu rūpa", profile="te"), "bʰˈikkʰu rˈuːpə")
+
+    def test_heavy_back_off_keeps_the_antepenult(self):
+        self.assertEqual(_phonemize("pītisukhaṁ", full_a=True, heavy_back=False),
+                         "piːtˈɪsʊkʰʌŋ")
+
     def test_language_is_pali_only(self):
         p = PaliPhonemizer()
         self.assertEqual(p.get_lang("pli"), "pi")
@@ -115,6 +155,8 @@ class TestPaliTTS(unittest.TestCase):
         self.assertIsInstance(p, PaliPhonemizer)
         self.assertEqual(p.alphabet, Alphabet.IPA)
         self.assertEqual(p.phonemize_string("dhamma", "pi"), "dʰˈɐmmɐ")
+        p = get_phonemizer(Phonemizer.PALI_TTS, keep_punctuation=True)
+        self.assertEqual(p.phonemize_string("dve?", "pi"), "dʋˈeː?")
 
     def test_vendored_rules_import_only_the_standard_library(self):
         roots = set()

@@ -6,15 +6,19 @@ Pali in IAST (``ṃ`` or ``ṁ`` for niggahita) through the rule set that
 This is a separate route from orthography2ipa, which also answers ``pi``. The
 orthography2ipa spec describes Pali phonology. These rules emit the espeak-hi
 inventory a Hindi voice was trained on, with a reduced ``ə`` for short ``a``
-and a stress mark on the syllable a Hindi reader would stress. orthography2ipa
-stays the ``pi`` default; ask for :data:`~Phonemizer.PALI_TTS` by name to get
-this string.
+and a stress mark on the penult when it is heavy, else on the antepenult.
+orthography2ipa stays the ``pi`` default; ask for
+:data:`~Phonemizer.PALI_TTS` by name to get this string.
 """
-from typing import List
+import re
+from typing import Iterator, List
 
 from scriptconv.phonemizers.base import BasePhonemizer
 from scriptconv.phonemizers.enums import Alphabet
 from scriptconv.phonemizers._vendored import pali_tts
+
+# the clause symbols the rules emit (the values of pali_tts.PUNCT)
+_CLAUSE_MARKS = re.compile(r" *[,.?!]+ *")
 
 
 class PaliPhonemizer(BasePhonemizer):
@@ -35,6 +39,13 @@ class PaliPhonemizer(BasePhonemizer):
 
     The rules drop a character they have no rule for, digits included, as
     upstream does. Normalize numbers before phonemizing.
+
+    The rules read punctuation: an ellipsis around ``pe`` expands to
+    ``peyyāla``, a comma blocks the long-``o`` and hiatus respellings, and a
+    quote splits a quotative ``ti`` from its word. So every path hands the
+    rules the raw sentence. :attr:`keep_punctuation` decides only whether the
+    clause symbols stay in the output; with it on, :meth:`phonemize_string`
+    returns the upstream string unchanged.
     """
 
     _LANGS: List[str] = ["pi"]
@@ -72,4 +83,27 @@ class PaliPhonemizer(BasePhonemizer):
         ipa = pali_tts.to_ipa(text, stress=self.stress, full_a=self.full_a,
                               final_m=self.final_m, lang=self.profile,
                               heavy_back=self.heavy_back)
-        return pali_tts.tune(ipa) if self.tune else ipa
+        if self.tune:
+            ipa = pali_tts.tune(ipa)
+        if self.keep_punctuation:
+            return ipa
+        return _CLAUSE_MARKS.sub(" ", ipa).strip()
+
+    def phonemize_lazy(self, text: str, lang: str = "pi") -> Iterator[List[str]]:
+        """One phoneme list per sentence, the rules run on the raw sentence."""
+        if text and self.normalizer is not None:
+            text = self.normalizer(text, lang)
+        return self._sentences(text, lang)
+
+    def phonemize_to_list(self, text: str, lang: str = "pi") -> List[str]:
+        """The sentences of :meth:`phonemize_lazy`, joined, without normalization."""
+        return [p for sentence in self._sentences(text, lang) for p in sentence]
+
+    def _sentences(self, text: str, lang: str) -> Iterator[List[str]]:
+        if not text:
+            return
+        from quebra_frases import sentence_tokenize
+        for sentence in sentence_tokenize(text):
+            phonemes = self.phonemize_string(sentence, lang)
+            if phonemes:
+                yield list(phonemes)
