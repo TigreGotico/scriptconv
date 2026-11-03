@@ -8,14 +8,13 @@ dynamic = ["version", "dependencies"]
 description = "Zero-dependency script & phoneme-notation core — ISO-15924 detection & metadata, IPA↔ARPABET/X-SAMPA/Lexique/Kirshenbaum/Cotovía/RFE, Buckwalter↔Arabic, Hangul→jamo, kana"
 readme = "README.md"
 license = {text = "Apache-2.0"}
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "Topic :: Text Processing :: Linguistic",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
