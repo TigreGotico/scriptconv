@@ -216,6 +216,9 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
                 "`pip install scriptconv[phonemizers]`") from None
         for sentence in sentence_tokenize(text):
             phonemes: List[str] = []
+            # a clause that ends with no symbol (an ellipsis, "|") still ends
+            # a word, so the next clause starts after a space
+            word_break = False
             for clause, mark in split_clauses(sentence):
                 clause = self.remove_punctuation(clause)
                 if not clause:
@@ -224,7 +227,10 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
                 clause_phonemes = [p for p in phoneme_str if p != "\n"]
                 if not clause_phonemes:
                     continue
+                if word_break:
+                    phonemes.append(" ")
                 phonemes.extend(clause_phonemes)
+                word_break = not mark
                 if mark:
                     phonemes.append(mark)
                     if mark in _PAUSE_PUNCTUATION:

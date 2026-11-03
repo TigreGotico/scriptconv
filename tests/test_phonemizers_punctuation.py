@@ -127,6 +127,15 @@ class TestKeepPunctuation:
             list("ONE") + [",", " "] + list("TWO") + [":", " "] + list("THREE")
             + [";", " "] + list("FOUR") + ["?"] + list("FIVE") + ["!"] + list("SIX") + ["."])
 
+    def test_a_clause_without_a_symbol_still_ends_its_word(self):
+        # an ellipsis or "|" inside a sentence ends a clause and carries no
+        # symbol; the words on either side stay two words, as with the flag off
+        phonemizer = CliLike()
+        phonemizer.keep_punctuation = True
+        for text in ("one… two three.", "one | two three."):
+            assert phonemizer.phonemize_to_list(text, "en") == (
+                list("ONE TWO THREE") + ["."]), text
+
     def test_sentences_stay_separate_for_synthesis(self):
         phonemizer = CliLike()
         phonemizer.keep_punctuation = True
