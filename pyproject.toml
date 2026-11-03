@@ -79,6 +79,7 @@ scriptconv = ["py.typed"]
 "scriptconv.phonemizers._vendored.kog2p" = ["rulebook.txt", "LICENSE.md"]
 "scriptconv.phonemizers._vendored.mantoq" = ["LICENSE.md"]
 "scriptconv.phonemizers._vendored.iqra_phonetiser" = ["LICENSE.md"]
+"scriptconv.phonemizers._vendored.matoub_kab" = ["LICENSE.md"]
 "scriptconv.phonemizers._vendored.africa_g2p" = [
     "LICENSE.md", "DATA_LICENSE.md",
     "languages/*.json", "data/*.json",
