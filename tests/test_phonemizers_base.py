@@ -27,7 +27,8 @@ class TestEnums(unittest.TestCase):
         self.assertEqual(Alphabet.VOSK.value, "vosk")
         self.assertEqual(Phonemizer.GHANA_G2P.value, "ghana_g2p")
         self.assertEqual(Phonemizer.MATOUB_KAB.value, "matoub_kab")
-        self.assertEqual(len(list(Phonemizer)), 48)  # +HALABI, +IQRA, +GHANA_G2P, +PHONETISAURUS, +MATOUB_KAB
+        self.assertEqual(Phonemizer.PALI_TTS.value, "pali_tts")
+        self.assertEqual(len(list(Phonemizer)), 49)  # +HALABI, +IQRA, +GHANA_G2P, +PHONETISAURUS, +MATOUB_KAB, +PALI_TTS
         self.assertEqual(len(list(Alphabet)), 23)  # incl. HALABI, VOSK, AFRICA_G2P
 
 
