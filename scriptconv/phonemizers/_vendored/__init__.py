@@ -18,6 +18,9 @@ distributed under ITS OWN license, stated in its directory:
   charts (© Simon Ager) and Hartell (ed.), *Alphabets of Africa* (UNESCO/SIL,
   1993), and carries its own attribution requirements. See
   ``africa_g2p/LICENSE.md`` and ``africa_g2p/DATA_LICENSE.md``.
+* ``pali_tts/`` — Pali G2P rules (github.com/dhammagift/pali-tts), commit
+  a9383004, **MIT**. Its licence notice must travel with the code. See
+  ``pali_tts/LICENSE.md``.
 
 Nothing in scriptconv imports these at package import time; they load only
 when a caller explicitly requests the corresponding phonemizer, accepting the
