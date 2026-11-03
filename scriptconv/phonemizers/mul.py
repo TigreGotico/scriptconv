@@ -675,16 +675,16 @@ class GoruutPhonemizer(BasePhonemizer):
 class EpitranPhonemizer(BasePhonemizer):
     """
     """
-    EPITRAN_LANGS = ['hsn-Latn', 'ful-Latn', 'jpn-Kana-red', 'tel-Telu', 'nld-Latn', 'aze-Latn', 'amh-Ethi-pp',
+    EPITRAN_LANGS = ['hsn-Latn', 'ful-Latn', 'jpn-Kana', 'tel-Telu', 'nld-Latn', 'aze-Latn', 'amh-Ethi-pp',
                      'msa-Latn', 'spa-Latn-eu', 'ori-Orya', 'bxk-Latn', 'spa-Latn', 'kir-Cyrl', 'lij-Latn', 'kin-Latn',
                      'ces-Latn', 'sin-Sinh', 'urd-Arab', 'vie-Latn', 'gan-Latn', 'fra-Latn', 'nan-Latn', 'kaz-Latn',
-                     'swe-Latn', 'jpn-Kana', 'tam-Taml', 'sag-Latn', 'csb-Latn', 'pii-latn_Holopainen2019', 'yue-Latn',
+                     'swe-Latn', 'jpn-Kana-red', 'tam-Taml', 'sag-Latn', 'csb-Latn', 'pii-latn_Holopainen2019', 'yue-Latn',
                      'got-Latn', 'tur-Latn', 'aar-Latn', 'jav-Latn', 'ita-Latn', 'sna-Latn', 'ilo-Latn', 'tam-Taml-red',
                      'kmr-Latn-red', 'uzb-Cyrl', 'amh-Ethi', 'mya-Mymr', 'aii-Syrc', 'lit-Latn', 'kmr-Latn',
-                     'hat-Latn-bab', 'ltc-Latn-bax', 'Goth2Latn', 'quy-Latn', 'hau-Latn', 'ood-Latn-alv', 'vie-Latn-so',
+                     'hat-Latn-bab', 'ltc-Latn-bax', 'got-Goth', 'quy-Latn', 'hau-Latn', 'ood-Latn-alv',
                      'run-Latn', 'orm-Latn', 'ind-Latn', 'kir-Latn', 'mal-Mlym', 'ben-Beng-red', 'hun-Latn', 'uew',
                      'sqi-Latn', 'jpn-Hira', 'deu-Latn-np', 'xho-Latn', 'fra-Latn-rev', 'fra-Latn-np', 'kaz-Cyrl-bab',
-                     'jpn-Hira-red', 'Latn2Goth', 'glg-Latn', 'uig-Arab', 'amh-Ethi-red', 'zul-Latn', 'hin-Deva',
+                     'jpn-Hira-red', 'glg-Latn', 'uig-Arab', 'amh-Ethi-red', 'zul-Latn', 'hin-Deva',
                      'uzb-Latn', 'tir-Ethi-red', 'kaz-Cyrl', 'mlt-Latn', 'deu-Latn-nar', 'est-Latn', 'eng-Latn',
                      'pii-latn_Wiktionary', 'ckb-Arab', 'nya-Latn', 'mon-Cyrl-bab', 'fra-Latn-p', 'ood-Latn-sax',
                      'ukr-Cyrl', 'tgl-Latn-red', 'lsm-Latn', 'kor-Hang', 'lav-Latn', 'generic-Latn', 'tur-Latn-red',
@@ -693,8 +693,8 @@ class EpitranPhonemizer(BasePhonemizer):
                      'fin-Latn', 'hmn-Latn', 'lez-Cyrl', 'fas-Arab', 'lao-Laoo-prereform', 'mar-Deva', 'yor-Latn',
                      'ron-Latn', 'tgl-Latn', 'lao-Laoo', 'deu-Latn', 'pan-Guru', 'tuk-Latn', 'tir-Ethi-pp', 'rus-Cyrl',
                      'swa-Latn-red', 'ceb-Latn', 'wuu-Latn', 'hak-Latn', 'mri-Latn', 'epo-Latn', 'pol-Latn',
-                     'tur-Latn-bab', 'kat-Geor', 'tgk-Cyrl', 'aze-Cyrl', 'vie-Latn-ce', 'swa-Latn', 'tuk-Cyrl',
-                     'vie-Latn-no', 'nan-Latn-tl', 'zha-Latn', 'cjy-Latn', 'ava-Cyrl', 'som-Latn', 'kir-Arab']
+                     'tur-Latn-bab', 'kat-Geor', 'tgk-Cyrl', 'aze-Cyrl', 'swa-Latn', 'tuk-Cyrl',
+                     'nan-Latn-tl', 'zha-Latn', 'cjy-Latn', 'ava-Cyrl', 'som-Latn', 'kir-Arab']
 
     def __init__(self):
         super().__init__(Alphabet.IPA)
@@ -721,8 +721,15 @@ class EpitranPhonemizer(BasePhonemizer):
             str: The validated language code.
 
         Raises:
-            ValueError: If the language code is unsupported.
+            ValueError: If the language code is unsupported, or if it is
+                Japanese without a kana script subtag.
         """
+        # epitran converts Japanese kana only. Kanji pass through unchanged,
+        # so a plain Japanese request would come back half converted.
+        subtags = (target_lang or "").replace("_", "-").lower().split("-")
+        if subtags[0] in ("ja", "jpn") and not {"kana", "hira", "hrkt"} & set(subtags[1:]):
+            raise ValueError(f"unsupported language code: {target_lang} "
+                             "(epitran reads Japanese kana only; use ja-Kana or ja-Hira)")
         return cls.match_lang(target_lang, cls.EPITRAN_LANGS)
 
     def phonemize_string(self, text: str, lang: str) -> str:
