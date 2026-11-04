@@ -9,7 +9,7 @@ implementations live under ``_thirdparty`` with their provenance, installed
 only with the ``phonemizers`` extras.
 
 The ``phonemizers`` base extra provides sentence chunking (``quebra_frases``)
-and language matching (``langcodes``).
+and language matching (``linguatag``).
 
 **Normalization is injectable, not built in.**  TTS stacks normalize numbers,
 dates and abbreviations before phonemizing; that requires language resources
@@ -251,21 +251,15 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
 
     @staticmethod
     def _match_lang(target_lang: str, valid_langs: Union[str, List[str]]):
-        """Closest supported language and its distance (langcodes tag_distance)."""
-        from langcodes import tag_distance
+        """Closest supported language and its distance (linguatag lang_distance)."""
+        from linguatag import lang_distance
         if isinstance(valid_langs, str):
             valid_langs = [valid_langs]
         if target_lang in valid_langs:
             return target_lang, 0
         best_lang, best_distance = "und", 10000000
         for l in valid_langs:
-            try:
-                distance = tag_distance(l, target_lang)
-            except Exception:
-                try:
-                    distance = tag_distance(l.split("-")[0], target_lang)
-                except Exception:
-                    continue
+            distance = lang_distance(l, target_lang)
             if distance < best_distance:
                 best_lang, best_distance = l, distance
         if best_distance <= 10:
