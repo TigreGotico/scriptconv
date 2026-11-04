@@ -681,7 +681,7 @@ class EpitranPhonemizer(BasePhonemizer):
                      'swe-Latn', 'jpn-Kana-red', 'tam-Taml', 'sag-Latn', 'csb-Latn', 'pii-latn_Holopainen2019', 'yue-Latn',
                      'got-Latn', 'tur-Latn', 'aar-Latn', 'jav-Latn', 'ita-Latn', 'sna-Latn', 'ilo-Latn', 'tam-Taml-red',
                      'kmr-Latn', 'uzb-Cyrl', 'amh-Ethi', 'mya-Mymr', 'aii-Syrc', 'lit-Latn', 'kmr-Latn-red',
-                     'hat-Latn-bab', 'ltc-Latn-bax', 'got-Goth', 'quy-Latn', 'hau-Latn', 'ood-Latn-alv',
+                     'hat-Latn-bab', 'ltc-Latn-bax', 'quy-Latn', 'hau-Latn', 'ood-Latn-alv',
                      'run-Latn', 'orm-Latn', 'ind-Latn', 'kir-Latn', 'mal-Mlym', 'ben-Beng', 'hun-Latn', 'uew',
                      'sqi-Latn', 'jpn-Hira', 'deu-Latn-np', 'xho-Latn', 'fra-Latn-rev', 'fra-Latn-np', 'kaz-Cyrl-bab',
                      'jpn-Hira-red', 'glg-Latn', 'uig-Arab', 'amh-Ethi-red', 'zul-Latn', 'hin-Deva',
@@ -722,12 +722,13 @@ class EpitranPhonemizer(BasePhonemizer):
 
         Raises:
             ValueError: If the language code is unsupported, or if it is
-                Japanese without a kana script subtag.
+                Japanese without a Kana or Hira script subtag.
         """
-        # epitran converts Japanese kana only. Kanji pass through unchanged,
-        # so a plain Japanese request would come back half converted.
+        # Each epitran Japanese map converts one kana script. Kanji and the
+        # other kana script pass through unchanged, so a request for Jpan or
+        # Hrkt text would come back half converted.
         subtags = (target_lang or "").replace("_", "-").lower().split("-")
-        if subtags[0] in ("ja", "jpn") and not {"kana", "hira", "hrkt"} & set(subtags[1:]):
+        if subtags[0] in ("ja", "jpn") and not {"kana", "hira"} & set(subtags[1:]):
             raise ValueError(f"unsupported language code: {target_lang} "
                              "(epitran reads Japanese kana only; use ja-Kana or ja-Hira)")
         return cls.match_lang(target_lang, cls.EPITRAN_LANGS)

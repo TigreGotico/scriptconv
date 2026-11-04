@@ -2,7 +2,9 @@
 
 epitran 1.26.1 renamed its Japanese maps from ``jpn-Ktkn``/``jpn-Hrgn`` to
 the ISO 15924 script codes ``jpn-Kana``/``jpn-Hira``. The Japanese maps
-convert kana only, so a Japanese request must name a kana script.
+convert one kana script each, so a Japanese request must name Kana or Hira.
+Gothic goes through ``got-Latn`` only, because ``got-Goth`` outputs Latin
+letters, not IPA.
 A language request gets the full map, not the reduced ``-red`` map.
 """
 import os
@@ -47,9 +49,30 @@ class TestEpitranJapaneseScript(unittest.TestCase):
         with self.assertRaises(ValueError):
             EpitranPhonemizer().phonemize_string("今日は東京でコーヒーを飲みました。", "ja")
 
+    def test_mixed_kana_request_raises(self):
+        for tag in ["ja-Hrkt", "jpn-Hrkt", "ja-Hrkt-JP"]:
+            with self.subTest(tag=tag):
+                with self.assertRaises(ValueError):
+                    EpitranPhonemizer.get_lang(tag)
+        with self.assertRaises(ValueError):
+            EpitranPhonemizer().phonemize_string("わたしは コーヒーを のみます", "ja-Hrkt")
+
     def test_kana_script_request_gets_the_full_map(self):
         self.assertEqual(EpitranPhonemizer.get_lang("ja-Kana"), "jpn-Kana")
         self.assertEqual(EpitranPhonemizer.get_lang("ja-Hira"), "jpn-Hira")
+
+
+class TestEpitranGothic(unittest.TestCase):
+    def test_gothic_script_request_raises(self):
+        for tag in ["got", "got-Goth"]:
+            with self.subTest(tag=tag):
+                with self.assertRaises(ValueError):
+                    EpitranPhonemizer.get_lang(tag)
+
+    def test_latin_gothic_request_gives_ipa(self):
+        self.assertEqual(EpitranPhonemizer.get_lang("got-Latn"), "got-Latn")
+        # thorn is a Latin letter; the IPA for it is the dental fricative
+        self.assertEqual(EpitranPhonemizer().phonemize_string("þu", "got-Latn"), "θu")
 
 
 class TestEpitranMapFiles(unittest.TestCase):
