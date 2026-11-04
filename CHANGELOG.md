@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a39](https://github.com/TigreGotico/scriptconv/tree/0.0.4a39) (2026-11-04)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a38...0.0.4a39)
+
+**Merged pull requests:**
+
+- fix\(epitran\): use the Japanese map names epitran ships [\#145](https://github.com/TigreGotico/scriptconv/pull/145) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a38](https://github.com/TigreGotico/scriptconv/tree/0.0.4a38) (2026-11-04)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a37...0.0.4a38)
@@ -408,11 +416,6 @@
 ## [0.0.3a12](https://github.com/TigreGotico/scriptconv/tree/0.0.3a12) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a11...0.0.3a12)
-
-**Merged pull requests:**
-
-- Release 0.0.3a12 [\#41](https://github.com/TigreGotico/scriptconv/pull/41) ([github-actions[bot]](https://github.com/apps/github-actions))
-- feat: phonemizer wrapper layer with lazy registry and per-language defaults [\#40](https://github.com/TigreGotico/scriptconv/pull/40) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.3a11](https://github.com/TigreGotico/scriptconv/tree/0.0.3a11) (2026-07-21)
 
