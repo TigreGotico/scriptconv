@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a41](https://github.com/TigreGotico/scriptconv/tree/0.0.4a41) (2026-11-04)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a40...0.0.4a41)
+
+**Merged pull requests:**
+
+- fix\(deps\): require the linguatag release that rejects empty subtags [\#150](https://github.com/TigreGotico/scriptconv/pull/150) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a40](https://github.com/TigreGotico/scriptconv/tree/0.0.4a40) (2026-11-04)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a39...0.0.4a40)
@@ -406,11 +414,6 @@
 ## [0.0.3a14](https://github.com/TigreGotico/scriptconv/tree/0.0.3a14) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a13...0.0.3a14)
-
-**Merged pull requests:**
-
-- Release 0.0.3a14 [\#45](https://github.com/TigreGotico/scriptconv/pull/45) ([github-actions[bot]](https://github.com/apps/github-actions))
-- feat: phonemize facade, opt-in graph registration, CLI verb [\#44](https://github.com/TigreGotico/scriptconv/pull/44) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.3a13](https://github.com/TigreGotico/scriptconv/tree/0.0.3a13) (2026-07-21)
 
