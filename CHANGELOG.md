@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a40](https://github.com/TigreGotico/scriptconv/tree/0.0.4a40) (2026-11-04)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a39...0.0.4a40)
+
+**Merged pull requests:**
+
+- fix: build the British misaki G2P with british=True [\#146](https://github.com/TigreGotico/scriptconv/pull/146) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a39](https://github.com/TigreGotico/scriptconv/tree/0.0.4a39) (2026-11-04)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a38...0.0.4a39)
@@ -407,11 +415,6 @@
 ## [0.0.3a13](https://github.com/TigreGotico/scriptconv/tree/0.0.3a13) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a12...0.0.3a13)
-
-**Merged pull requests:**
-
-- Release 0.0.3a13 [\#43](https://github.com/TigreGotico/scriptconv/pull/43) ([github-actions[bot]](https://github.com/apps/github-actions))
-- feat: CJK and Arabic phonemizer wrappers with vendored permissive G2P [\#42](https://github.com/TigreGotico/scriptconv/pull/42) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.3a12](https://github.com/TigreGotico/scriptconv/tree/0.0.3a12) (2026-07-21)
 
