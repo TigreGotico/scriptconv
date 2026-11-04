@@ -23,6 +23,20 @@ def make_session(model_path, providers=None, use_cuda=False):
     return onnxruntime.InferenceSession(model_path, providers=list(providers))
 
 
+# Hong Kong and Macau Cantonese. A bare "yue" means mainland Cantonese in
+# Simplified script, so these tags are far from it by language distance. The
+# Cantonese resources of Charsiu, Goruut and Transphone carry no region and are
+# written in Traditional script, so these tags resolve to them directly.
+_HK_CANTONESE = frozenset({
+    "yue-hk", "yue-mo", "yue-hant", "yue-hant-hk", "yue-hant-mo",
+    "zh-hk", "zh-mo", "zh-hant-hk", "zh-hant-mo",
+})
+
+
+def _is_hk_cantonese(lang: str) -> bool:
+    return lang.lower().replace("_", "-") in _HK_CANTONESE
+
+
 class EspeakError(Exception):
     """Custom exception for espeak-ng related errors."""
     pass
@@ -258,7 +272,8 @@ class CharsiuPhonemizer(ByT5Phonemizer):
         Raises:
             ValueError: If the language code is unsupported.
         """
-        # Find the closest match
+        if _is_hk_cantonese(target_lang):
+            return "yue"
         return cls.match_lang(target_lang, cls.BYT5_LANGS)
 
     def phonemize_string(self, text: str, lang: str) -> str:
@@ -327,14 +342,14 @@ class EspeakPhonemizer(BasePhonemizer):
             return "en-gb-x-rp"
         # espeak-ng has no bare "zh"/region-tagged Chinese codes, only "cmn" (Mandarin,
         # any script) and "yue" (Cantonese); map BCP-47 Chinese tags onto those voices
-        # directly instead of falling through to tag_distance, which scores them below
+        # directly instead of falling through to lang_distance, which scores them below
         # the match threshold and raises. Hong Kong/Macau are the only regions where
         # Cantonese, not Mandarin, is the spoken vernacular.
         ZH_ALIASES = {
             "zh": "cmn", "zh-cn": "cmn", "zh-sg": "cmn",
             "zh-hans": "cmn", "zh-hans-cn": "cmn", "zh-hans-sg": "cmn",
             "zh-tw": "cmn", "zh-hant": "cmn", "zh-hant-tw": "cmn",
-            "zh-hk": "yue", "zh-mo": "yue",
+            "zh-hk": "yue", "zh-mo": "yue", "zh-hant-hk": "yue", "zh-hant-mo": "yue",
         }
         # ESPEAK_LANGS is all lowercase, so the tag is lowercased once and
         # matched as a whole BEFORE the primary subtag. A BCP-47 tag such as
@@ -664,6 +679,8 @@ class GoruutPhonemizer(BasePhonemizer):
             return 'EnglishAmerican'
         if target_lang.lower() == "en-gb" or target_lang.lower() == "en-uk":
             return 'EnglishBritish'
+        if _is_hk_cantonese(target_lang):
+            return cls.ISO639["yue"]
         lang = cls.match_lang(target_lang, list(cls.ISO639))
         return cls.ISO639[lang]
 
@@ -1468,6 +1485,8 @@ class TransphonePhonemizer(BasePhonemizer):
         """
         if target_lang.lower() in cls.TRANSPHONE_LANGS:
             return target_lang
+        if _is_hk_cantonese(target_lang):
+            return "yue"
         return cls.match_lang(target_lang, cls.TRANSPHONE_LANGS)
 
     def phonemize_string(self, text: str, lang: str) -> str:
