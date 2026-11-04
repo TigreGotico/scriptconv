@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a42](https://github.com/TigreGotico/scriptconv/tree/0.0.4a42) (2026-11-04)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a41...0.0.4a42)
+
+**Merged pull requests:**
+
+- fix: name the missing lex\_lookup binary for epitran English [\#151](https://github.com/TigreGotico/scriptconv/pull/151) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a41](https://github.com/TigreGotico/scriptconv/tree/0.0.4a41) (2026-11-04)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a40...0.0.4a41)
@@ -405,11 +413,6 @@
 ## [0.0.3a15](https://github.com/TigreGotico/scriptconv/tree/0.0.3a15) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a14...0.0.3a15)
-
-**Merged pull requests:**
-
-- Release 0.0.3a15 [\#47](https://github.com/TigreGotico/scriptconv/pull/47) ([github-actions[bot]](https://github.com/apps/github-actions))
-- fix: accept a callable phonikud model resolver [\#46](https://github.com/TigreGotico/scriptconv/pull/46) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.3a14](https://github.com/TigreGotico/scriptconv/tree/0.0.3a14) (2026-07-21)
 
