@@ -771,6 +771,7 @@ class MisakiPhonemizer(BasePhonemizer):
         # sensible default for all of them.
         super().__init__(alphabet)
         self.g2p_en = self.g2p_zh = self.g2p_ko = self.g2p_vi = self.g2p_ja = None
+        self.g2p_en_gb = None
 
     @property
     def zh_version(self) -> str:
@@ -821,14 +822,17 @@ class MisakiPhonemizer(BasePhonemizer):
                     from misaki.ja import JAG2P
                     self.g2p_ja = JAG2P()
                 return self.g2p_ja
+            elif lang == "en-GB":
+                # misaki loads the British or American lexicon when the G2P is
+                # built, so the variety is a constructor argument.
+                if self.g2p_en_gb is None:
+                    from misaki import en
+                    self.g2p_en_gb = en.G2P(british=True)
+                return self.g2p_en_gb
             else:
                 if self.g2p_en is None:
                     from misaki import en
-                    self.g2p_en = en.G2P()
-                if lang == "en-GB":
-                    self.g2p_en.british = True
-                elif lang == "en-US":
-                    self.g2p_en.british = False
+                    self.g2p_en = en.G2P(british=False)
                 return self.g2p_en
         except ImportError as e:
             raise ImportError(
