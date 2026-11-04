@@ -2,6 +2,7 @@
 
 import json
 import os
+import shutil
 import subprocess
 from typing import List, Dict, Optional, Sequence, TYPE_CHECKING
 
@@ -752,6 +753,11 @@ class EpitranPhonemizer(BasePhonemizer):
 
     def phonemize_string(self, text: str, lang: str) -> str:
         lang = self.get_lang(lang)
+        # epitran reads English through Flite's lex_lookup; without it, epitran
+        # logs a warning and fails with KeyError('') on an empty ARPAbet string
+        if lang == "eng-Latn" and shutil.which("lex_lookup") is None:
+            raise RuntimeError("epitran English (eng-Latn) needs lex_lookup "
+                               "from Flite, and lex_lookup is not on PATH")
         epi = self._epis.get(lang)
         if epi is None:
             epi = self.epitran.Epitran(lang)
