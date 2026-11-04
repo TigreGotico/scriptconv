@@ -92,6 +92,14 @@ class TestBaseContract(unittest.TestCase):
         self.assertNotIsInstance(cm.exception, MissingLanguageError)
         self.assertIn("unsupported language code", str(cm.exception))
 
+    def test_match_lang_rejects_a_tag_with_an_empty_subtag(self):
+        # BCP 47 subtags are 1 to 8 characters, so these tags name no language
+        for malformed in ("ar-", "AR-", "ar_", "-ar", "ar--EG"):
+            with self.subTest(tag=malformed):
+                with self.assertRaises(ValueError) as cm:
+                    BasePhonemizer.match_lang(malformed, ["ar", "en"])
+                self.assertIn("unsupported language code", str(cm.exception))
+
     def test_match_lang_missing_language_raises_distinct_error(self):
         for missing in (None, "", "und"):
             with self.assertRaises(MissingLanguageError) as cm:
