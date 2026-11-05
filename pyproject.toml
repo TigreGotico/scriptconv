@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "scriptconv"
 dynamic = ["version"]
-description = "Zero-dependency script & phoneme-notation core — ISO-15924 detection & metadata, IPA↔ARPABET/X-SAMPA/Lexique/Kirshenbaum/Cotovía/RFE, Buckwalter↔Arabic, Hangul→jamo, kana"
+description = "The one stop for text conversion: a zero-dependency script & phoneme-notation core — ISO-15924 detection & metadata, IPA↔ARPABET/X-SAMPA/Lexique/Kirshenbaum/Cotovía/RFE, Buckwalter↔Arabic, Hangul→jamo, kana — with phonemizer integrations behind optional extras"
 readme = "README.md"
 license = {text = "Apache-2.0"}
 requires-python = ">=3.11"

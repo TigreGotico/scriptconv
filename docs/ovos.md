@@ -2,7 +2,7 @@
 
 [ovos-scriptconv-g2p-plugin](https://github.com/TigreGotico/ovos-scriptconv-g2p-plugin)
 is an [OVOS Plugin Manager](https://github.com/OpenVoiceOS/ovos-plugin-manager)
-(OPM) `opm.g2p` plugin. It implements no phonemization itself, it is a thin
+(OPM) `opm.g2p` plugin. It holds no grapheme-to-phoneme logic of its own, it is a thin
 adapter that exposes `scriptconv.phonemizers` through OVOS's
 `Grapheme2PhonemePlugin` contract, so any OVOS component that asks for G2P
 through OPM gets scriptconv's full backend catalog and per-language
