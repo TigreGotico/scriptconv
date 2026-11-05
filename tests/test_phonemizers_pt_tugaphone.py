@@ -21,13 +21,11 @@ class TestTugaphoneSubregionalLects(unittest.TestCase):
         self.assertEqual(TugaphonePhonemizer.get_lang("pt-PT-x-porto"), "pt-PT-x-porto")
 
     def test_subregional_lects_produce_distinct_output(self):
-        text = "O vinho verde"
-        generic = self.pho.phonemize_string(text, "pt-PT")
-        lisbon = self.pho.phonemize_string(text, "pt-PT-x-lisbon")
-        porto = self.pho.phonemize_string(text, "pt-PT-x-porto")
-        self.assertNotEqual(generic, lisbon)
-        self.assertNotEqual(generic, porto)
-        self.assertNotEqual(lisbon, porto)
+        # Lisbon centralizes <ei> to [ɐj]; Porto merges /v/ into [b].
+        self.assertIn("ˈpejʃ", self.pho.phonemize_string("O peixe", "pt-PT"))
+        self.assertIn("ˈpɐjʃ", self.pho.phonemize_string("O peixe", "pt-PT-x-lisbon"))
+        self.assertIn("ˈviɲu", self.pho.phonemize_string("O vinho", "pt-PT"))
+        self.assertIn("ˈbiɲu", self.pho.phonemize_string("O vinho", "pt-PT-x-porto"))
 
     def test_loose_tag_still_resolves(self):
         # "pt" has no country/lect of its own; it must still resolve to a
