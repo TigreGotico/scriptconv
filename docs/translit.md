@@ -67,8 +67,8 @@ certain onsets:
 
 `decompose_hangul` returns the orthographic jamo sequence. For 국민 it returns
 `ㄱㅜㄱㅁㅣㄴ`, the written letters, not `ㄱㅜㅇㅁㅣㄴ` (which would reflect the
-assimilation). Mapping from jamo to IPA with phonological rules is phonemization and
-is outside scriptconv's scope.
+assimilation). Mapping from jamo to IPA with phonological rules is phonemization, so
+it belongs to a [phonemizer backend](phonemizers.md), not to this module.
 
 Jamo tables derived from [stannam/hangul_to_ipa](https://github.com/stannam/hangul_to_ipa).
 

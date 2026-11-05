@@ -1,10 +1,10 @@
 """Phonemizer contract and base implementations.
 
-Phonemization (orthography → sound) is out of scope for scriptconv's
-zero-dependency core; this subpackage holds *wrappers* around external
-phonemizer engines behind optional extras — the same boundary as
-:mod:`scriptconv.readings` wrapping reading dictionaries.  No
-grapheme-to-phoneme rules are implemented in the core; in-tree
+This subpackage holds scriptconv's phonemizer integrations: *wrappers* around
+external phonemizer engines behind optional extras — the same boundary as
+:mod:`scriptconv.readings` wrapping reading dictionaries.  The zero-dependency
+core stays free of them, and no grapheme-to-phoneme rules are implemented in
+the core; in-tree
 implementations live under ``_thirdparty`` with their provenance, installed
 only with the ``phonemizers`` extras.
 

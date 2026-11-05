@@ -34,9 +34,10 @@ Which transitions exist follows one criterion, applied uniformly:
   diacritics) is always available, zero-dependency.
 - **Dictionary lookup** (applying wakachigaki requires word segmentation) is
   in scope but behind an extra, mirroring [readings](readings.md).
-- **Contextual prediction** (restoring stripped tashkeel or niqqud) is out of
-  scope entirely. That is diacritization, a modelling problem. Its absence
-  is a queryable fact of the registry, not a runtime surprise.
+- **Contextual prediction** (restoring stripped tashkeel or niqqud) is not a
+  convention. That is diacritization, a modelling problem, and it belongs to
+  `scriptconv.diacritics`. Its absence here is a queryable fact of the
+  registry, not a runtime surprise.
 
 Unsupported transitions raise `ValueError` listing the supported ones. A
 transition whose backing extra is missing raises `ImportError` naming it.

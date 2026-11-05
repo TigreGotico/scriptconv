@@ -19,6 +19,9 @@ scriptconv identifies which representation a piece of text is in. It
 converts between them, and it reports *programmatically* how faithful each
 conversion is.
 
+scriptconv is the one stop for text conversion, phonemizer integrations
+included. It gives every language one interface.
+
 The core is pure Python with zero dependencies. Heavier capabilities, such as
 dictionary-backed readings and phonemizer engines, live behind optional
 extras and never load unless asked for.
@@ -403,8 +406,9 @@ exist for both.
 
 ## Related projects
 
-scriptconv sits at the bottom of a family of text and speech libraries that
-build on it:
+scriptconv is the text interface of a family of text and speech libraries.
+phoonnx consumes it, and it wraps the language frontends behind optional
+extras:
 
 - [phoonnx](https://github.com/TigreGotico/phoonnx): multilingual ONNX
   text-to-speech; consumes scriptconv for scripts, notation, conventions,
@@ -431,4 +435,3 @@ pytest tests/
 ```
 
 The documentation lives in [`docs/`](docs/index.md), one page per module.
-</content>
