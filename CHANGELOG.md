@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a44](https://github.com/TigreGotico/scriptconv/tree/0.0.4a44) (2026-11-05)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a43...0.0.4a44)
+
+**Merged pull requests:**
+
+- docs: name scriptconv the one stop for text conversion [\#153](https://github.com/TigreGotico/scriptconv/pull/153) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a43](https://github.com/TigreGotico/scriptconv/tree/0.0.4a43) (2026-11-05)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a42...0.0.4a43)
@@ -407,7 +415,6 @@
 **Merged pull requests:**
 
 - Release 0.0.3a17 [\#51](https://github.com/TigreGotico/scriptconv/pull/51) ([github-actions[bot]](https://github.com/apps/github-actions))
-- fix: forward model selector to backend-specific constructor parameter [\#50](https://github.com/TigreGotico/scriptconv/pull/50) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.3a16](https://github.com/TigreGotico/scriptconv/tree/0.0.3a16) (2026-07-21)
 
