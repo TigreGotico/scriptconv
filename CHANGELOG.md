@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a43](https://github.com/TigreGotico/scriptconv/tree/0.0.4a43) (2026-11-05)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a42...0.0.4a43)
+
+**Merged pull requests:**
+
+- test: assert the sounds that set the tugaphone lects apart [\#154](https://github.com/TigreGotico/scriptconv/pull/154) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a42](https://github.com/TigreGotico/scriptconv/tree/0.0.4a42) (2026-11-04)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a41...0.0.4a42)
@@ -404,11 +412,6 @@
 ## [0.0.3a16](https://github.com/TigreGotico/scriptconv/tree/0.0.3a16) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a15...0.0.3a16)
-
-**Merged pull requests:**
-
-- Release 0.0.3a16 [\#49](https://github.com/TigreGotico/scriptconv/pull/49) ([github-actions[bot]](https://github.com/apps/github-actions))
-- feat: in-house-first language defaults with orthography2ipa as the usual fallback [\#48](https://github.com/TigreGotico/scriptconv/pull/48) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.3a15](https://github.com/TigreGotico/scriptconv/tree/0.0.3a15) (2026-07-21)
 
