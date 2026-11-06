@@ -22,6 +22,9 @@ class MirandesePhonemizer(BasePhonemizer):
     lazily so importing ``scriptconv`` does not hard-require it.
     """
 
+    owned_stages = frozenset({"normalize"})
+    engine_distribution = "mwl_phonemizer"
+
     _LANGS = list(DIALECTS)
 
     def __init__(self):

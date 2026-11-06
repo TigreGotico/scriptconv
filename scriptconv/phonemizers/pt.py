@@ -5,6 +5,8 @@ from scriptconv.phonemizers.enums import Alphabet
 
 
 class TugaphonePhonemizer(BasePhonemizer):
+    owned_stages = frozenset({"normalize", "diacritize"})
+    engine_distribution = "tugaphone"
 
     def __init__(self):
         try:
@@ -48,6 +50,8 @@ class TugaphonePhonemizer(BasePhonemizer):
 
     def phonemize_string(self, text: str, lang: str) -> str:
         lang = self.get_lang(lang)
+        # tugaphone loses a number that touches punctuation it does not read.
+        text = self.bare_numbers(text, keep_before="-", keep_after="%")
         return self.tuga.phonemize_sentence(text, lang)
 
 
@@ -64,6 +68,8 @@ class BarranquenhoPhonemizer(BasePhonemizer):
     ``g2p_barranquenho`` is imported lazily so importing ``scriptconv`` does not
     hard-require it.
     """
+
+    engine_distribution = "g2p_barranquenho"
 
     _LANGS = ["ext-PT-x-barrancos"]
 

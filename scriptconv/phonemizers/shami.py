@@ -36,6 +36,8 @@ __all__ = [
 class ShamiPhonemizer(BasePhonemizer):
     """Phonemizer for Levantine Arabic + English code-switching (ShamiVITS)."""
 
+    owned_stages = frozenset({"normalize"})
+
     def __init__(self, alphabet: Alphabet = Alphabet.IPA,
                  diacritizer_backend: str = "auto"):
         if alphabet != Alphabet.IPA:

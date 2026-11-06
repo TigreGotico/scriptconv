@@ -4,6 +4,10 @@ from scriptconv.phonemizers.enums import Alphabet
 
 class VIPhonemePhonemizer(BasePhonemizer):
     """https://github.com/v-nhandt21/Viphoneme"""
+
+    owned_stages = frozenset({"normalize"})
+    engine_distribution = "viphoneme"
+
     def __init__(self):
         try:
             from viphoneme import vi2IPA
@@ -37,4 +41,6 @@ class VIPhonemePhonemizer(BasePhonemizer):
         """
         """
         lang = self.get_lang(lang)
-        return self.g2p(text)
+        # viphoneme joins the syllables of a word with "_", so a word that touches
+        # one in the input is lost.
+        return self.g2p(text.replace("_", " "))

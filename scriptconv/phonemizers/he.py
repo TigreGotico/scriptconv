@@ -1,8 +1,20 @@
+import re
+
 from scriptconv.phonemizers.enums import Alphabet
 from scriptconv.phonemizers.base import BasePhonemizer
 
+# Hebrew writes a prefix on a number with a hyphen ("ב-5"), and phonikud reads
+# that hyphen as a minus sign.
+_PREFIX_HYPHEN = re.compile(r"(?<=[\u0590-\u05FF])-(?=\d)")
+# phonikud reads "%" only as a token of its own, so "20%." loses the "%".
+_PUNCTUATION_AFTER_PERCENT = re.compile(r"(?<=%)(?=[.,;:!?])")
+# phonikud reads "[word](/ipa/)" as an annotation and drops a bracketed word.
+_BRACKET = re.compile(r"[\[\]]")
+
 
 class PhonikudPhonemizer(BasePhonemizer):
+    owned_stages = frozenset({"normalize"})
+    engine_distribution = "phonikud"
 
     def __init__(self):
         try:
@@ -37,4 +49,5 @@ class PhonikudPhonemizer(BasePhonemizer):
         """
         """
         lang = self.get_lang(lang)
-        return self.g2p(text)
+        text = _PREFIX_HYPHEN.sub(" ", _BRACKET.sub(" ", text))
+        return self.g2p(_PUNCTUATION_AFTER_PERCENT.sub(" ", text))

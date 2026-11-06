@@ -22,6 +22,8 @@ class CotoviaPhonemizer(BasePhonemizer):
     lazily so that ``import scriptconv.phonemizers`` works without it installed.
     """
 
+    engine_distribution = "pycotovia"
+
     def __init__(self, alphabet: Alphabet = Alphabet.COTOVIA,
                  model: Optional[str] = None):
         """

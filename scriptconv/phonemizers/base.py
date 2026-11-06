@@ -18,14 +18,21 @@ callable) at construction to run it inside ``phonemize_lazy``; without it the
 raw text is phonemized as-is.  Downstream TTS injects its own normalizer, so
 calling a wrapper through scriptconv directly and through a TTS stack can
 legitimately differ on text containing digits.
+
+**A backend declares the stages it runs itself.**  :attr:`BasePhonemizer.owned_stages`
+names them.  A backend that owns ``"normalize"`` reads abbreviations and symbols
+from the written text, so it receives that text with its punctuation kept.
 """
 import abc
+import dataclasses
 import re
 import string
 import unicodedata
-from typing import Callable, Iterator, List, Optional, Tuple, Literal, Union
+from importlib import metadata
+from typing import Callable, ClassVar, Iterator, List, Optional, Tuple, Literal, Union
 
 from scriptconv.phonemizers.enums import Alphabet
+from scriptconv.version import VERSION_STR
 
 # list of (substring, terminator, end_of_sentence) tuples.
 TextChunks = List[Tuple[str, str, bool]]
@@ -51,6 +58,9 @@ _PAUSE_PUNCTUATION = {",", ":", ";"}
 _CLAUSE_BREAK = re.compile(r"(?:\.\.+|\u2026|[,:;!?|\u060c\u061b\u061f])[^\w\s]*(?=\s)")
 _TRAILING_PUNCTUATION = re.compile(r"[^\w\s]+\s*$")
 _LANG_FLAGS = re.compile(r"\([^)]+\)")
+# Punctuation characters that spell a phoneme in a backend's notation: "_" in
+# the Mantoq token _dbl_, "*" for the Halabi dhaal and the g2pk tense mark.
+_NOTATION_PUNCTUATION = "_*"
 
 
 def _clause_mark(punctuation: str) -> Optional[str]:
@@ -79,6 +89,54 @@ def split_clauses(sentence: str) -> List[Tuple[str, Optional[str]]]:
     trailing = _TRAILING_PUNCTUATION.search(tail)
     clauses.append((tail, _clause_mark(trailing.group()) if trailing else None))
     return clauses
+
+
+class FrontendError(ValueError):
+    """Text could not become phonemes."""
+
+
+class UnsupportedLanguageError(FrontendError):
+    """A backend has no support for the language it was given."""
+
+
+class StageError(FrontendError):
+    """A text stage failed in strict mode."""
+
+
+class UnreadTextError(FrontendError):
+    """Text reached no phoneme in strict mode.
+
+    ``unread`` holds the pieces of text that gave no phonemes.
+    """
+
+    def __init__(self, message: str, unread: Tuple[str, ...] = ()):
+        super().__init__(message)
+        self.unread = tuple(unread)
+
+
+class ModelUnavailableError(FrontendError):
+    """A model is not cached and cannot be fetched offline."""
+
+
+@dataclasses.dataclass(frozen=True)
+class PhonemizerIdentity:
+    """What produced a phoneme sequence, for a voice to record and compare."""
+
+    backend: str
+    """The registry name, ``"tugaphone"``."""
+    distribution: str
+    """The distribution that holds the engine, ``"tugaphone"``."""
+    version: str
+    """The engine's version. For espeak-ng, the version of the binary."""
+    lang: str
+    """The resolved lect, ``"pt-PT-x-porto"``."""
+    revision: Optional[str] = None
+    """The orthography2ipa spec revision, when the backend has one."""
+
+    def differs_from(self, other: "PhonemizerIdentity") -> Tuple[str, ...]:
+        """Names of the fields that differ from *other*, in field order."""
+        return tuple(field.name for field in dataclasses.fields(self)
+                     if getattr(self, field.name) != getattr(other, field.name))
 
 
 class MissingLanguageError(ValueError):
@@ -133,6 +191,21 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
     and synthesis disagree.
     """
 
+    owned_stages: ClassVar[frozenset[str]] = frozenset()
+    """Stages this backend always runs itself: ``"normalize"``, ``"diacritize"``.
+
+    A stage that runs only with an optional dependency is not owned. A backend
+    that owns ``"normalize"`` receives its text with punctuation kept, because
+    :meth:`remove_punctuation` drops the ``.`` of ``Dr.`` and the ``%`` of
+    ``20%``. Punctuation that such a backend repeats in its output is dropped,
+    so :attr:`keep_punctuation` means the same for every backend.
+    """
+
+    engine_distribution: ClassVar[Optional[str]] = None
+    """The distribution that holds the engine. ``None`` means code inside
+    scriptconv. It is declared, because the module of a wrapper class names
+    scriptconv and not the engine that produced the phonemes."""
+
     def __init__(self, alphabet: Alphabet = Alphabet.UNICODE,
                  normalizer: Optional[Callable[[str, str], str]] = None):
         super().__init__()
@@ -156,7 +229,10 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         if self._keeps_punctuation():
             return [p for sentence in self._punctuated_sentences(text, lang)
                     for p in sentence]
-        return [p for p in self.phonemize_string(text, lang) if p != "\n"]
+        phonemes = self.phonemize_string(text, lang)
+        if self._owns_normalization() and self._uses_base_output():
+            phonemes = self._without_echoed_punctuation(phonemes)
+        return [p for p in phonemes if p != "\n"]
 
     def phonemize(self, text: str, lang: str) -> PhonemizedChunks:
         # PhonemizedChunks is list[list[str]]; empty text yields no
@@ -186,27 +262,47 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
             yield from self._punctuated_sentences(text, lang)
             return
         for chunk, punct, eos in self.chunk_text(text):
-            phoneme_str = self.phonemize_string(self.remove_punctuation(chunk), lang)
-            # Filter out (lang) switch (flags) that surround words from languages
-            # other than the current voice — mirrors _process_phones().
-            phoneme_str = re.sub(r"\([^)]+\)", "", phoneme_str)
             # phonemize() marks every chunk as end-of-sentence, so each chunk is
             # its own sentence.
-            yield list(phoneme_str)
+            yield list(self._read_chunk(chunk, lang))
+
+    def _owns_normalization(self) -> bool:
+        return "normalize" in self.owned_stages
+
+    def _uses_base_output(self) -> bool:
+        cls = type(self)
+        return (cls.phonemize_to_list is BasePhonemizer.phonemize_to_list
+                and cls.phonemize_lazy is BasePhonemizer.phonemize_lazy)
 
     def _keeps_punctuation(self) -> bool:
-        cls = type(self)
-        return (self.keep_punctuation
-                and cls.phonemize_to_list is BasePhonemizer.phonemize_to_list
-                and cls.phonemize_lazy is BasePhonemizer.phonemize_lazy)
+        return self.keep_punctuation and self._uses_base_output()
+
+    def _read_chunk(self, chunk: str, lang: str) -> str:
+        """Phonemes of one chunk or clause, as a string with no punctuation.
+
+        A backend that owns normalization reads the written form. A chunk that
+        holds only punctuation has no words to read, for any backend.
+        """
+        bare = self.remove_punctuation(chunk)
+        if bare and self._owns_normalization():
+            return self._without_echoed_punctuation(
+                self.phonemize_string(chunk.strip(), lang))
+        # Filter out (lang) switch (flags) that surround words from languages
+        # other than the current voice — mirrors _process_phones().
+        return _LANG_FLAGS.sub("", self.phonemize_string(bare, lang))
+
+    def _without_echoed_punctuation(self, phonemes: str) -> str:
+        """*phonemes* with the input punctuation a backend repeated removed."""
+        return " ".join(self.remove_punctuation(
+            phonemes, keep=_NOTATION_PUNCTUATION).split())
 
     def _punctuated_sentences(self, text: str, lang: str) -> Iterator[List[str]]:
         """Per-sentence phonemes with each clause's punctuation appended.
 
-        Each clause is phonemized on its own with its punctuation removed, so
-        the backend sees the same words in training and in synthesis, and the
-        clause's symbol is appended after it: bare for ``. ? !``, followed by a
-        space for ``, : ;``.
+        Each clause is phonemized on its own, so the backend sees the same
+        words in training and in synthesis, and the clause's symbol is appended
+        after it: bare for ``. ? !``, followed by a space for ``, : ;``. See
+        :meth:`_read_chunk` for what happens to the clause's punctuation.
         """
         try:
             from quebra_frases import sentence_tokenize
@@ -217,11 +313,10 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         for sentence in sentence_tokenize(text):
             phonemes: List[str] = []
             for clause, mark in split_clauses(sentence):
-                clause = self.remove_punctuation(clause)
-                if not clause:
+                if not self.remove_punctuation(clause):
                     continue
-                phoneme_str = _LANG_FLAGS.sub("", self.phonemize_string(clause, lang))
-                clause_phonemes = [p for p in phoneme_str if p != "\n"]
+                clause_phonemes = [p for p in self._read_chunk(clause, lang)
+                                   if p != "\n"]
                 if not clause_phonemes:
                     continue
                 phonemes.extend(clause_phonemes)
@@ -280,7 +375,7 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         Raises:
             MissingLanguageError: If no language reached the matcher at all
                 (``None``/``""``/``"und"``).
-            ValueError: If the language code is unsupported.
+            UnsupportedLanguageError: If the language code is unsupported.
         """
         if target_lang in (None, "", "und"):
             raise MissingLanguageError(
@@ -288,11 +383,56 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         lang, score = BasePhonemizer._match_lang(target_lang, valid_langs)
         if score > 10:
             # raise an error for unsupported language
-            raise ValueError(f"unsupported language code: {target_lang}")
+            raise UnsupportedLanguageError(f"unsupported language code: {target_lang}")
         return lang
 
+    def _engine_release(self) -> Tuple[str, str]:
+        """The distribution that produced the phonemes, and its version."""
+        if self.engine_distribution is None:
+            return "scriptconv", VERSION_STR
+        return self.engine_distribution, metadata.version(self.engine_distribution)
+
+    def identity(self, lang: str) -> PhonemizerIdentity:
+        """What phonemizes *lang* here: the engine, its version and the lect.
+
+        Raises:
+            ImportError: If the engine is not installed.
+            UnsupportedLanguageError: If the backend does not support *lang*.
+        """
+        from scriptconv.phonemizers.registry import PHONEMIZER_REGISTRY
+        names = {cls_name: member.value
+                 for member, (_, cls_name, _) in PHONEMIZER_REGISTRY.items()}
+        backend = next((names[cls.__name__] for cls in type(self).__mro__
+                        if cls.__name__ in names), type(self).__name__)
+        distribution, version = self._engine_release()
+        # Grapheme, Unicode and Phonetisaurus backends take any language.
+        resolved = self.get_lang(lang) if hasattr(self, "get_lang") else lang
+        return PhonemizerIdentity(backend, distribution, version, resolved)
+
     @staticmethod
-    def remove_punctuation(text):
+    def bare_numbers(text: str, keep_before: str = "", keep_after: str = "") -> str:
+        """*text* with the punctuation outside each number token removed.
+
+        For an owner whose tokenizer loses a number that touches punctuation, as
+        in ``#20`` or ``'20'``. *keep_before* and *keep_after* name the marks the
+        engine reads on either side, such as the ``-`` of ``-5``.
+        """
+        def bare(match: re.Match) -> str:
+            token = match.group()
+            if not any(char.isdigit() for char in token):
+                return token
+            start, end = 0, len(token)
+            while (start < end and token[start] not in keep_before
+                   and unicodedata.category(token[start]).startswith("P")):
+                start += 1
+            while (start < end and token[end - 1] not in keep_after
+                   and unicodedata.category(token[end - 1]).startswith("P")):
+                end -= 1
+            return token[start:end]
+        return re.sub(r"\S+", bare, text)
+
+    @staticmethod
+    def remove_punctuation(text, keep=""):
         """
         Removes punctuation characters from a string, based on unicode punctuation
         categories (P*) rather than ASCII-only ``string.punctuation``. This also strips
@@ -303,11 +443,14 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         punctuation character sandwiched between two digits (e.g. the ":" in a clock
         time "16:30", the "," in "10,4", the "." in "92.073", the "-" in "1139-1185")
         is preserved so the per-language normalizers still see it as a single token,
-        matching the digit:digit exemption in ``chunk_text``.
+        matching the digit:digit exemption in ``chunk_text``. Characters in *keep* stay.
         """
         out = []
         chars = list(text)
         for i, c in enumerate(chars):
+            if c in keep:
+                out.append(c)
+                continue
             if c in ("'", "’", "-") and 0 < i < len(chars) - 1 \
                     and chars[i - 1].isalpha() and chars[i + 1].isalpha():
                 out.append(c)

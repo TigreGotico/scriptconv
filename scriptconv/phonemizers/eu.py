@@ -1,6 +1,6 @@
 from typing import Optional
 
-from scriptconv.phonemizers.base import BasePhonemizer
+from scriptconv.phonemizers.base import BasePhonemizer, UnsupportedLanguageError
 from scriptconv.phonemizers.enums import Alphabet
 
 
@@ -37,6 +37,9 @@ class AhoTTSPhonemizer(BasePhonemizer):
     string, so no further token folding is needed.  It is imported lazily so
     importing ``scriptconv`` does not hard-require it.
     """
+
+    owned_stages = frozenset({"normalize"})
+    engine_distribution = "ahotts_g2p"
 
     SUPPORTED_LANGS = ["eu-ES", "es-ES"]
 
@@ -125,6 +128,9 @@ class EuskaphonePhonemizer(BasePhonemizer):
     importing ``scriptconv`` does not hard-require it.
     """
 
+    owned_stages = frozenset({"normalize"})
+    engine_distribution = "euskaphone"
+
     def __init__(self, alphabet: Alphabet = Alphabet.IPA):
         if alphabet != Alphabet.IPA:
             raise ValueError("euskaphone only outputs IPA")
@@ -165,8 +171,11 @@ class EuskaphonePhonemizer(BasePhonemizer):
         # resolve_lect silently falls back to Batua for an unknown tag, so gate
         # on is_supported first.
         if not is_supported(target_lang):
-            raise ValueError(f"euskaphone: unsupported language {target_lang!r}")
+            raise UnsupportedLanguageError(f"euskaphone: unsupported language {target_lang!r}")
         return resolve_lect(target_lang)
 
     def phonemize_string(self, text: str, lang: str = "eu") -> str:
+        # euskaphone verbalizes a token only when nothing follows its digits and
+        # case suffix, so "20," or "1975ean." lose the number. Basque writes "%20".
+        text = self.bare_numbers(text, keep_before="-%", keep_after="%")
         return self.pho.phonemize_sentence(text, dialect=self.get_lang(lang))

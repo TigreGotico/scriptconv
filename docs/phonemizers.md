@@ -34,6 +34,28 @@ inside `phonemize_lazy`, without it, the raw text is phonemized as-is. A
 pipeline that injects its own normalizer and one that doesn't will therefore
 legitimately differ on text containing digits.
 
+**A backend can own a stage.** The class attribute `owned_stages` names the
+stages that a backend always runs itself, so a frontend skips them. The names
+are `normalize` and `diacritize`. A stage that a backend runs only with an
+optional dependency is not owned. A backend that owns `normalize` receives each
+sentence with its punctuation, because it needs the `.` of `Dr.` and the `%` of
+`20%`. The punctuation it echoes is removed from its output, so the rule below
+stays true.
+
+**A backend reports what produced its output.** `identity(lang)` returns a
+frozen `PhonemizerIdentity` with the backend, the engine distribution, its
+installed version and the resolved language. `differs_from(other)` names the
+fields that changed, so a cached result can be checked against the engine that
+would produce it now. The class attribute `engine_distribution` names the
+package that supplies the engine, and `None` means the code is in this
+repository.
+
+**Failures have types.** Each error below is a `FrontendError`, which is a
+`ValueError`. `UnsupportedLanguageError` means the backend has no reading for
+the language. `StageError` means a stage failed. `UnreadTextError` means text
+stayed unread, and its `unread` attribute lists that text.
+`ModelUnavailableError` means a model cannot load.
+
 **Punctuation is opt-in.** By default no punctuation reaches the phonemes,
 which is what every voice trained on scriptconv's output so far has learned.
 Set `keep_punctuation = True` on the instance (or pass `keep_punctuation=True`
