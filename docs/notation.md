@@ -85,6 +85,9 @@ convert("Sa", "lexique", "x-sampa")  # "Sa"  (ʃ→S, a→a)
 ## ARPABET ↔ IPA
 
 Table derived from [chorusai/arpa2ipa](https://github.com/chorusai/arpa2ipa) (Apache-2.0).
+Values follow the [CMU Pronouncing Dictionary](http://www.speech.cs.cmu.edu/cgi-bin/cmudict)
+phone set and the [ARPABET table](https://en.wikipedia.org/wiki/ARPABET) that dictionary
+refers to for IPA. `tests/test_notation_sources.py` quotes both.
 
 ### arpa_to_ipa
 
@@ -98,6 +101,7 @@ Converts a space-separated ARPABET token sequence to an IPA string. Stress digit
 **Stress digit handling**:
 - `AH0` is special-cased: maps to `ə` (schwa), not `ʌ`.
 - `AH1`, `AH2` → `ʌ` (stressed vowel).
+- `ER0` is special-cased: maps to `ɚ`, not `ɝ`. CMUdict has no `AXR`, so it spells that phone `ER0`.
 - All other `TOKEN0`/`TOKEN1`/`TOKEN2` → same IPA as `TOKEN` (stress is lost in IPA output).
 
 ```python
@@ -117,7 +121,9 @@ def ipa_to_arpa(ipa_string: str, unknown: str = "?") -> str
 
 Converts an IPA string to a space-separated ARPABET sequence. Matches the longest IPA
 symbol at each position. Characters not in the ARPABET table are replaced by `unknown`
-(default `"?"`), pass `unknown=""` to drop them silently.
+(default `"?"`), pass `unknown=""` to drop them silently. Whitespace of every kind has
+no token and is dropped, so the output keeps no word boundary: `"ɛ ɛ"` and `"ɛɛ"` both
+give `EH EH`.
 
 ```python
 ipa_to_arpa("həloʊ")   # "HH AX L OW"
@@ -143,7 +149,7 @@ P → p → P    B → b → B    TH → θ → TH    NG → ŋ → NG (exact)
 
 It is **lossy** for:
 - Stress digits: `AH1` → `ʌ` → `AH` (digit lost).
-- `AH0` → `ə` → `AX` (token changes).
+- `AH0` → `ə` → `AX` and `ER0` → `ɚ` → `AXR` (token changes).
 
 IPA → ARPA → IPA is also lossy because the reverse table uses base ARPABET forms.
 
@@ -151,7 +157,9 @@ IPA → ARPA → IPA is also lossy because the reverse table uses base ARPABET f
 
 ## X-SAMPA ↔ IPA
 
-Standard X-SAMPA mapping. Reference: [X-SAMPA on Wikipedia](https://en.wikipedia.org/wiki/X-SAMPA).
+The table follows J.C. Wells, [Computer-coding the IPA: a proposed extension of
+SAMPA](https://www.phon.ucl.ac.uk/home/sampa/x-sampa.htm). `tests/test_notation_sources.py`
+quotes it row by row and lists each spelling left out, with the reason.
 
 ### xsampa_to_ipa
 
@@ -169,7 +177,7 @@ at each position. Unknown characters are passed through unchanged.
 | `tS` | `tʃ` | palato-alveolar affricate, must not split as `t` + `S`=`ʃ` |
 | `dZ` | `dʒ` | voiced affricate |
 | `r\` | `ɹ` | approximant r. Must match before plain `r` |
-| *ts\`* | `ʈ͡ʂ` | retroflex affricate. Longest match |
+| *r\\`* | `ɻ` | retroflex approximant. Longest match |
 | `@\` | `ɘ` | close-mid central unrounded. Before `@`=`ə` |
 | *@\`* | `ɚ` | r-coloured schwa. Before `@` |
 | `N\` | `ɴ` | uvular nasal. Before `N`=`ŋ` |
@@ -204,23 +212,38 @@ ipa_to_xsampa("ʉ")   # "}"
 
 ### Round-trip guarantees
 
-IPA → X-SAMPA → IPA is lossless for all symbols in the table. X-SAMPA → IPA → X-SAMPA
-is lossless for symbols with a unique IPA counterpart, aliases (`&` = `{` = `æ`) map
-to the canonical X-SAMPA form on the way back.
+IPA → X-SAMPA → IPA is lossless for every symbol Wells lists, each taken alone,
+including diacritics and tones. A sequence of symbols can differ, as the tie bar
+below shows. `ipa_to_xsampa` decomposes its input first, so precomposed `ã` gives
+`a~`. The labiodental flap `ⱱ` joined the IPA later and has no spelling. The syllabic mark
+above a letter gives `=`, so `ŋ̍` gives `N=`. The voiceless ring above `ŋ` gives `_0`,
+so `ŋ̊` gives `N_0`. Both return with the diacritic below the letter. The ring above any
+other letter stays unknown, because `å` decomposes to `a` plus the same mark.
+The tie bar is `_`, which also opens a diacritic, so `t͡s` gives `t_s` and `t͡θ` gives
+`tT`: Wells assumes affricate status where no tie is written, and the tie itself does
+not come back. `a͡ɨ` gives `a1` for the same reason, because `_1` is a tone number.
+A tone number has no IPA value, so `xsampa_to_ipa` treats each of `_1` to `_6` as one
+unknown symbol. `a_7`, `a_8` and `a_9` are the tie and a vowel, because the tone numbers
+stop at 6.
+X-SAMPA → IPA → X-SAMPA is lossless for every spelling Wells lists. A second spelling
+returns as the first.
 
-**Alias collisions**, several X-SAMPA symbols map to the same IPA value. The reverse
-table uses the canonical form (first defined), so round-tripping non-canonical aliases
-produces the canonical form:
+**Second spellings**: Wells gives more than one spelling for a few symbols. The reverse
+table emits the first:
 
-| X-SAMPA aliases | IPA | Canonical X-SAMPA |
-|-----------------|-----|--------------------|
-| `{` or `&` | æ | `{` |
-| `f\` or `p\` | ɸ | `p\` |
-| `r\` or `4` | ɹ | `r\` |
+| X-SAMPA spellings | IPA | First spelling |
+|-------------------|-----|---------------|
+| `P` or `v\` | ʋ | `P` |
+| `=` or `_=` | ◌̩ | `=` |
+| `~` or `_~` | ◌̃ | `~` |
+| `'` or `_j` | ʲ | `'` |
+| `_R`, `_/` or `_L_H` | ◌̌ | `_R` |
+| `_F`, `_\` or `_H_L` | ◌̂ | `_F` |
+| `_R_F`, `_M_H_L` or `_/_\` | ◌᷈ | `_R_F` |
 
 ```python
-ipa_to_xsampa("æ")   # "{"  (canonical, not "&")
-ipa_to_xsampa("ɸ")   # "p\\"  (not "f\\")
+ipa_to_xsampa("ʋ")   # "P"  (not "v\\")
+ipa_to_xsampa("ã")   # "a~"
 ```
 
 ---
@@ -468,7 +491,7 @@ ipa_to_kirshenbaum("ŋ")   # "N"
 ```
 
 Each character maps independently, characters outside the table pass through.
-`<notation> → IPA → <notation>` round-trips are exact from the Kirshenbaum side, `IPA → Kirshenbaum → IPA` is lossy for IPA outside the ASCII inventory.
+Neither direction is lossless. Kirshenbaum → IPA keeps every key under a round trip, but 31 of the 96 keys give output that is not IPA, such as `F`, `K`, `P`, digits and punctuation. `IPA → Kirshenbaum → IPA` is lossy for IPA outside the ASCII inventory.
 
 ## Queryable fidelity, `NOTATION_INFO`
 
@@ -485,6 +508,30 @@ info.reference           # citation URL/string
 
 Each `NotationInfo` carries `lossless_to_ipa`, `lossless_from_ipa`,
 `token_separated`, and `reference`.
+
+The two flags share one definition. A conversion is lossless when it passes this
+test for every symbol of its source inventory, with `errors="strict"` in both
+directions:
+
+1. The symbol converts, and every output symbol is in the target inventory. An
+   unmapped symbol passed through does not count, and neither does a table row
+   whose output is not in that inventory.
+2. The reverse conversion returns the input. Where the notation's reference gives
+   two spellings of one symbol, the first spelling counts as the input.
+
+The source inventory of `lossless_to_ipa` is the notation's own symbol set. The
+source inventory of `lossless_from_ipa` is the 1993 IPA Chart as X-SAMPA lists it,
+each symbol taken alone, so a flag makes no claim about a sequence of symbols. A
+notation with no converter in the direction under test is not lossless in that
+direction, so Buckwalter, which converts to Arabic script and not to IPA, has both
+flags `False`.
+
+`tests/test_notation_sources.py` measures each flag against both clauses. Towards
+IPA, the target inventory is the set of IPA symbols in the Wells rows of that file.
+ARPABET and X-SAMPA inventories come from their sources. The Lexique, Kirshenbaum,
+Cotovía and RFE inventories are the code's own keys, because no source for them is
+quoted there. A failure on a key proves a flag `False`, and all four notations hold
+`False` in both directions.
 
 ## Notation detection, `looks_like_ipa`
 
@@ -549,13 +596,12 @@ syllabification is performed. Worked examples:
 
 - `HH AH0 L OW1` ↔ `həlˈoʊ` (primary stress on `OW`)
 - `K AE1 T` ↔ `kˈæt`
-- `P ER0 M IH2 T` ↔ `pɜrmˌɪt` (secondary stress on `IH`)
+- `P ER0 M IH2 T` ↔ `pɚmˌɪt` (secondary stress on `IH`)
 
 Unmarked vowels round-trip as digit `0`, consonants never carry digits.
-Residues (all stable from the IPA side): extended-ARPABET `AX` normalises to
-CMUdict's `AH0` spelling of schwa, and symbol sequences that concatenate to a
-single IPA symbol fuse to it, `AH0 R` → `AXR0` (r-colored schwa),
-`T SH` → `CH`, `D ZH` → `JH` (affricates), `EH1 IH0` → `EY1` (diphthongs), contiguous IPA carries no token boundary, so this fusion is inherent and
+Residues (all stable from the IPA side): extended-ARPABET `AX` and `AXR` normalise
+to CMUdict's `AH0` and `ER0` spellings, and symbol sequences that concatenate to a
+single IPA symbol fuse to it, `T SH` → `CH`, `D ZH` → `JH` (affricates), contiguous IPA carries no token boundary, so this fusion is inherent and
 applies in default mode too. The general contract: round-trips are exact up
 to IPA-equivalence, a fused spelling always produces the identical IPA.
 

@@ -333,18 +333,20 @@ placeholder (`?`, the historical `ipa_to_arpa` default, tunable via
 
 | Notation | `to_ipa` → `from_ipa` round-trip | `from_ipa` → `to_ipa` round-trip | Unknown-token behaviour |
 |----------|----------------------------------|----------------------------------|-------------------------|
-| **ARPABET** | **Lossless with `stress=True`** (digits map to IPA `ˈ`/`ˌ` before the stressed vowel; residues: extended-ARPABET `AX` normalises to CMUdict's `AH0` spelling, and `AH0 R` fuses to the r-colored `AXR0`, stable from the IPA side). Default `stress=False` drops digits and merges `AH0` with `AX` | **Lossy** (ARPABET is an English-only inventory, so any IPA symbol outside it becomes the *unknown* placeholder) | `arpa_to_ipa`: passed through unchanged. `ipa_to_arpa`: diacritics and suprasegmentals are dropped. Other out-of-inventory symbols follow `errors=` (default `"replace"` → `?`) |
-| **X-SAMPA** | Exact for all canonical symbols | Exact except aliases (`f\`→ɸ, `&`→æ) normalise to their canonical spelling | Passed through unchanged |
+| **ARPABET** | **Lossless with `stress=True`** (digits map to IPA `ˈ`/`ˌ` before the stressed vowel; residues: extended-ARPABET `AX` and `AXR` normalise to CMUdict's `AH0` and `ER0` spellings, stable from the IPA side). Default `stress=False` drops digits, and merges `AH0` with `AX` and `ER0` with `AXR` | **Lossy** (ARPABET is an English-only inventory, so any IPA symbol outside it becomes the *unknown* placeholder) | `arpa_to_ipa`: passed through unchanged. `ipa_to_arpa`: diacritics, suprasegmentals and word gaps are dropped. Other out-of-inventory symbols follow `errors=` (default `"replace"` → `?`) |
+| **X-SAMPA** | Exact for every spelling Wells lists; a second spelling (`v\`, `_=`, `_~`) returns as the first (`P`, `=`, `~`) | Exact for every symbol Wells lists, each taken alone, including diacritics and tones | Passed through unchanged |
 | **Buckwalter ↔ Arabic** | Exact (precomposed lam-alef ligatures decompose to two characters, visually identical) | Exact | Follows `errors=` (default: passed through) |
 | **Halabi → IPA** | One-directional (gemination and word markers are consumed; there is no IPA to Halabi) | Not applicable | Follows `errors=` (default: passed through) |
-| **Lexique ↔ IPA** | Exact except the `°`/`3` schwa pair (both map to `ə`; the reverse always produces `°`) | Exact | Passed through unchanged |
-| **Kirshenbaum ↔ IPA** | Exact | **Lossy** (restricted ASCII inventory; IPA outside it passes through) | Passed through unchanged |
+| **Lexique ↔ IPA** | Exact except the `°`/`3` schwa pair (both map to `ə`; the reverse always produces `°`) | **Lossy** (French inventory; IPA outside it passes through) | Passed through unchanged |
+| **Kirshenbaum ↔ IPA** | **Lossy** (keys such as `F`, `K` and `P`, the digits and punctuation give output that is not IPA) | **Lossy** (restricted ASCII inventory; IPA outside it passes through) | Passed through unchanged |
 | **Cotovía ↔ IPA** | Exact except the three `L`/`Z`/`jj` symbols for `ʎ` normalise to `L` | **Lossy** (Galician/Spanish inventory; IPA outside it passes through) | Passed through unchanged |
 | **RFE ↔ IPA** | Exact except `ñ`/`n̮` for `ɲ` normalise to `ñ` | **Lossy** (core Spanish/Romance inventory; IPA outside it passes through) | Passed through unchanged |
 
 Every row is backed by a test. `NOTATION_INFO` exposes the same facts to
 code, so a program can branch on whether a conversion is safe before making
-it.
+it. A conversion is lossless when every symbol of its source inventory converts
+under `errors="strict"` to symbols of the target inventory and the reverse
+conversion returns it, so a symbol that only passes through does not count.
 
 ## Extras
 
