@@ -79,13 +79,11 @@ class TestRoundTrip(unittest.TestCase):
         # extended-ARPABET AX normalizes to CMUdict's AH0 spelling
         self.assertEqual(
             ipa_to_arpa(arpa_to_ipa("AX", stress=True), stress=True), "AH0")
-        # schwa+R fuses to the r-colored vowel; stable from the IPA side
-        fused = ipa_to_arpa(arpa_to_ipa("AH0 R", stress=True), stress=True)
-        self.assertEqual(fused, "AXR0")
+        # extended-ARPABET AXR normalizes to CMUdict's ER0 spelling
+        self.assertEqual(
+            ipa_to_arpa(arpa_to_ipa("AXR", stress=True), stress=True), "ER0")
         # affricate fusion exists in default mode too (contiguous IPA)
         self.assertEqual(ipa_to_arpa(arpa_to_ipa("T SH")), "CH")
-        self.assertEqual(arpa_to_ipa(fused, stress=True),
-                         arpa_to_ipa("AH0 R", stress=True))
         # schwa + UH is contiguous əʊ, the British GOAT alias for OW. This
         # residue is lossy: OW writes back as oʊ, not əʊ.
         goat = ipa_to_arpa(arpa_to_ipa("AH0 UH0", stress=True), stress=True)

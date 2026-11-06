@@ -4,7 +4,11 @@ IPA ↔ Lexique, IPA ↔ Kirshenbaum, Buckwalter ↔ Arabic script.
 All tables are pure Python data; zero runtime dependencies.
 
 ARPABET table derived from chorusai/arpa2ipa
-  (https://github.com/chorusai/arpa2ipa), licensed Apache-2.0.
+  (https://github.com/chorusai/arpa2ipa), licensed Apache-2.0, with values
+  checked against the CMU Pronouncing Dictionary phone set and the ARPABET
+  table that dictionary refers to for IPA.
+X-SAMPA table from J.C. Wells, "Computer-coding the IPA: a proposed extension
+  of SAMPA" (https://www.phon.ucl.ac.uk/home/sampa/x-sampa.htm).
 Buckwalter ↔ Arabic table follows Tim Buckwalter's transliteration scheme.
 Lexique phoneme-code table from:
   New, B. & Pallier, C. — Manuel de Lexique 3, v3.11, Tableau 2 (p. 12).
@@ -73,6 +77,12 @@ class Notation(str, Enum):
 #
 # Stress digits (0/1/2) are stripped on ARPA→IPA and not re-added on
 # IPA→ARPA (lossy in that direction; they have no IPA equivalent here).
+#
+# The CMU Pronouncing Dictionary defines each phone by a keyword and points to
+# the ARPABET table on Wikipedia for IPA values, so both are the reference:
+#   http://www.speech.cs.cmu.edu/cgi-bin/cmudict
+#   https://en.wikipedia.org/wiki/ARPABET
+# tests/test_notation_sources.py quotes them row by row.
 # ---------------------------------------------------------------------------
 
 # Base ARPA→IPA (without stress digit variants; those are added below)
@@ -82,12 +92,14 @@ _ARPA_BASE: dict[str, str] = {
     "AA": "ɑ",
     "IY": "i",
     "UW": "u",
-    "EH": "e",
+    "EH": "ɛ",
     "IH": "ɪ",
     "UH": "ʊ",
     "AH": "ʌ",   # AH0 → ə handled separately
     "AE": "æ",
     "AX": "ə",
+    "IX": "ɨ",
+    "UX": "ʉ",
     # Diphthongs
     "EY": "eɪ",
     "AY": "aɪ",
@@ -95,8 +107,8 @@ _ARPA_BASE: dict[str, str] = {
     "AW": "aʊ",
     "OY": "ɔɪ",
     # R-colored vowels
-    "ER": "ɜr",
-    "AXR": "ər",
+    "ER": "ɝ",   # ER0 → ɚ handled separately
+    "AXR": "ɚ",
     # Stops
     "P": "p",
     "B": "b",
@@ -117,6 +129,7 @@ _ARPA_BASE: dict[str, str] = {
     "SH": "ʃ",
     "ZH": "ʒ",
     "HH": "h",
+    "H": "h",
     # Nasals
     "M": "m",
     "EM": "m̩",
@@ -126,26 +139,29 @@ _ARPA_BASE: dict[str, str] = {
     "ENG": "ŋ̍",
     # Liquids
     "L": "l",
-    "EL": "ɫ̩",
-    "R": "r",
+    "EL": "l̩",
+    "R": "ɹ",
     "DX": "ɾ",
     "NX": "ɾ̃",
     # Semivowels
     "W": "w",
+    "WH": "ʍ",
     "Y": "j",
     "Q": "ʔ",
 }
 
-# Build full lookup with stress variants (AH0 → ə special-cased)
+# CMUdict has no AX or AXR: it spells those two phones as unstressed AH and ER
+# (COMMA is AH0, "letter" ends in ER0).
+_CMUDICT_UNSTRESSED = {"AH0": "ə", "ER0": "ɚ"}
+_CMUDICT_SPELLING = {"AX": "AH", "AXR": "ER"}
+
+# Build full lookup with stress variants
 _ARPA_TO_IPA: dict[str, str] = {}
 for _arpa, _ipa in _ARPA_BASE.items():
     _ARPA_TO_IPA[_arpa] = _ipa
     for _stress in ("0", "1", "2"):
         _key = _arpa + _stress
-        if _key == "AH0":
-            _ARPA_TO_IPA["AH0"] = "ə"
-        else:
-            _ARPA_TO_IPA[_key] = _ipa
+        _ARPA_TO_IPA[_key] = _CMUDICT_UNSTRESSED.get(_key, _ipa)
 
 # Reverse: IPA → ARPA (base form, no stress digit).
 # Multi-char IPA values are deduplicated; keep first.
@@ -155,13 +171,16 @@ for _arpa, _ipa in _ARPA_BASE.items():
         _IPA_TO_ARPA[_ipa] = _arpa
 # Accept ASCII "g" (U+0067) as well as canonical script "ɡ" (U+0261) on input.
 _IPA_TO_ARPA.setdefault("g", "G")
+# Broader spellings of ARPABET phones, accepted on input only.
+_IPA_TO_ARPA.setdefault("e", "EH")
+_IPA_TO_ARPA.setdefault("r", "R")
+_IPA_TO_ARPA.setdefault("ɜr", "ER")
+_IPA_TO_ARPA.setdefault("ər", "AXR")
+_IPA_TO_ARPA.setdefault("ɫ̩", "EL")
 # Bare/long NURSE vowel (non-rhotic British ɜ, ɜː) has no dedicated ARPA symbol —
-# ARPABET is rhotic-only, so it collapses onto the same "ER" as the r-colored ɜr.
+# ARPABET is rhotic-only, so it collapses onto the same "ER" as the r-colored ɝ.
 _IPA_TO_ARPA.setdefault("ɜː", "ER")
 _IPA_TO_ARPA.setdefault("ɜ", "ER")
-# English rhotic approximant: ARPABET "R" canonically maps back to plain "r",
-# but real transcriptions overwhelmingly write ɹ — accept it on input.
-_IPA_TO_ARPA.setdefault("ɹ", "R")
 # British (SSB) GOAT diphthong: ARPABET is GA-based so OW round-trips as oʊ,
 # but əʊ is the same phoneme in RP/SSB transcriptions.
 _IPA_TO_ARPA.setdefault("əʊ", "OW")
@@ -174,7 +193,7 @@ _IPA_ARPA_RE = re.compile("|".join(re.escape(s) for s in _IPA_ARPA_KEYS_SORTED))
 
 # ARPABET vowel class — the symbols that carry stress digits.
 _ARPA_VOWELS = {"AO", "AA", "IY", "UW", "EH", "IH", "UH", "AH", "AE", "AX",
-                "EY", "AY", "OW", "AW", "OY", "ER", "AXR"}
+                "IX", "UX", "EY", "AY", "OW", "AW", "OY", "ER", "AXR"}
 _STRESS_MARKS = {"ˈ": "1", "ˌ": "2"}  # IPA primary/secondary stress
 
 
@@ -255,7 +274,8 @@ def ipa_to_arpa(ipa_string: str, unknown: str = "?",
     preserving the historical behavior of substituting *unknown*, ``"?"``);
     ``unknown=""`` still drops silently.  Combining marks and modifier
     letters qualify the preceding phoneme and are always dropped rather
-    than treated as unknowns.
+    than treated as unknowns.  Whitespace of every kind is dropped too:
+    ARPABET tokens are space-separated, so the output keeps no word boundary.
 
     Examples
     --------
@@ -263,6 +283,8 @@ def ipa_to_arpa(ipa_string: str, unknown: str = "?",
     'HH AX L OW'
     >>> ipa_to_arpa("ɸ")
     '?'
+    >>> ipa_to_arpa("ɛ ɛ")
+    'EH EH'
     """
     tokens = []
     pending_stress = ""
@@ -276,12 +298,10 @@ def ipa_to_arpa(ipa_string: str, unknown: str = "?",
         if m:
             tok = _IPA_TO_ARPA[m.group(0)]
             if stress and tok in _ARPA_VOWELS:
-                # CMUdict spells schwa as AH0 (it has no AX), so stress-aware
-                # output uses AH for exact round-trips; extended-ARPABET AX
-                # input still normalizes to AH0 (documented residue).
-                if m.group(0) == "ə":
-                    tok = "AH"
-                tok += pending_stress or "0"
+                # Stress-aware output follows CMUdict spelling for exact
+                # round-trips; extended-ARPABET AX and AXR input normalizes
+                # to AH0 and ER0 (documented residue).
+                tok = _CMUDICT_SPELLING.get(tok, tok) + (pending_stress or "0")
             pending_stress = ""
             tokens.append(tok)
             pos = m.end()
@@ -290,8 +310,9 @@ def ipa_to_arpa(ipa_string: str, unknown: str = "?",
             # Diacritics and suprasegmentals (combining marks, length/stress
             # modifier letters) have no ARPABET equivalent; they qualify the
             # preceding phoneme rather than standing alone, so drop them
-            # instead of emitting a spurious *unknown* token.
-            if unicodedata.category(ch) not in ("Mn", "Mc", "Me", "Lm", "Sk"):
+            # instead of emitting a spurious *unknown* token.  Whitespace has
+            # no token either.
+            if not ch.isspace() and unicodedata.category(ch) not in ("Mn", "Mc", "Me", "Lm", "Sk"):
                 effective = "ignore" if (errors == "replace" and not unknown) else errors
                 out = _unknown(ch, pos, "arpa", effective, replacement=unknown)
                 if out:
@@ -303,127 +324,223 @@ def ipa_to_arpa(ipa_string: str, unknown: str = "?",
 # ---------------------------------------------------------------------------
 # X-SAMPA ↔ IPA
 #
-# Standard X-SAMPA mapping.  Multi-character X-SAMPA symbols are matched
-# longest-first at both conversion directions.
+# Reference: J.C. Wells, "Computer-coding the IPA: a proposed extension of
+# SAMPA", https://www.phon.ucl.ac.uk/home/sampa/x-sampa.htm and its full
+# article ipasam-x.pdf.  The Wikipedia table supplies the code points for the
+# tone letters.  tests/test_notation_sources.py quotes them row by row.
 #
-# References: https://en.wikipedia.org/wiki/X-SAMPA
+# Multi-character symbols are matched longest-first in both directions.  Where
+# Wells allows two spellings, the first key below is his main spelling and the
+# reverse table emits it.
 # ---------------------------------------------------------------------------
 
 _XSAMPA_TO_IPA: dict[str, str] = {
-    # Consonants (multi-char first for longest-match ordering)
-    "ts`": "ʈ͡ʂ",
-    "dz`": "ɖ͡ʐ",
-    "tS": "tʃ",
-    "dZ": "dʒ",
-    "ts": "ts",
-    "dz": "dz",
-    "p\\": "ɸ",
+    # Letters that keep their IPA value
+    "a": "a", "b": "b", "c": "c", "d": "d", "e": "e", "f": "f", "g": "ɡ",
+    "h": "h", "i": "i", "j": "j", "k": "k", "l": "l", "m": "m", "n": "n",
+    "o": "o", "p": "p", "q": "q", "r": "r", "s": "s", "t": "t", "u": "u",
+    "v": "v", "w": "w", "x": "x", "y": "y", "z": "z",
+    # Pulmonic consonants
+    "t`": "ʈ",
+    "d`": "ɖ",
+    "G\\": "ɢ",
+    "?": "ʔ",
+    "F": "ɱ",
+    "n`": "ɳ",
+    "J": "ɲ",
+    "N": "ŋ",
+    "N\\": "ɴ",
     "B\\": "ʙ",
-    "r\\": "ɹ",
-    "r": "r",     # plain r = alveolar TRILL in canonical X-SAMPA (tap is "4")
-    "r`": "ɽ",    # retroflex FLAP (not approximant)
     "R\\": "ʀ",
-    "l`": "ɭ",
-    "L\\": "ʎ",
-    "f\\": "ɸ",   # alias for p\
-    "v\\": "ʋ",
-    "r\\`": "ɻ",  # retroflex APPROXIMANT
-    "s`": "ʂ",
-    "z`": "ʐ",
+    "4": "ɾ",
+    "r`": "ɽ",
+    "p\\": "ɸ",
+    "B": "β",
+    "T": "θ",
+    "D": "ð",
     "S": "ʃ",
     "Z": "ʒ",
+    "s`": "ʂ",
+    "z`": "ʐ",
     "C": "ç",
     "j\\": "ʝ",
     "G": "ɣ",
     "X": "χ",
     "R": "ʁ",
-    "H\\": "ʜ",
+    "X\\": "ħ",
     "?\\": "ʕ",
-    "h": "h",     # plain h = voiceless glottal fricative in canonical X-SAMPA
     "h\\": "ɦ",
-    "?": "ʔ",
-    "H": "ɥ",
-    # Retroflex plosives
-    "t`": "ʈ",
-    "d`": "ɖ",
-    # Palatal plosives
-    "c": "c",
-    "J\\`": "ɟ",
-    # Uvular plosive
-    "q": "q",
-    # Alveolo-palatal fricatives
-    "s\\`": "ɕ",
-    "z\\`": "ʑ",
-    # Retroflex nasal
-    "n\\`": "ɳ",
-    # Pharyngeal fricative
-    "X\\`": "ħ",
-    # Lateral flap
-    "l\\`": "ɺ",
-    # Nasals
-    "F": "ɱ",
-    "J": "ɲ",
-    "N\\": "ɴ",
-    "N": "ŋ",
-    # Laterals
     "K": "ɬ",
     "K\\": "ɮ",
-    "L": "ʟ",
-    # Basic consonants (must come after multi-char)
-    "p": "p", "b": "b", "t": "t", "d": "d", "k": "k", "g": "ɡ",
-    "m": "m", "n": "n", "f": "f", "v": "v", "s": "s", "z": "z",
-    "l": "l", "w": "w", "j": "j", "x": "x", "B": "β", "D": "ð",
-    "T": "θ", "V": "ʌ", "G\\": "ɢ",
+    "P": "ʋ",
+    "v\\": "ʋ",
+    "r\\": "ɹ",
+    "r\\`": "ɻ",
+    "J\\": "ɟ",
+    "M\\": "ɰ",
+    "l`": "ɭ",
+    "L": "ʎ",
+    "L\\": "ʟ",
+    # Clicks
+    "O\\": "ʘ",
+    "|\\": "ǀ",
+    "!\\": "ǃ",
+    "=\\": "ǂ",
+    "|\\|\\": "ǁ",
+    # Implosives
+    "b_<": "ɓ",
+    "d_<": "ɗ",
+    "J\\_<": "ʄ",
+    "g_<": "ɠ",
+    "G\\_<": "ʛ",
     # Vowels
-    "@\\": "ɘ",
-    "@`": "ɚ",
-    "@": "ə",
-    "{": "æ",
-    "}": "ʉ",
+    "M": "ɯ",
     "1": "ɨ",
+    "}": "ʉ",
+    "I": "ɪ",
+    "Y": "ʏ",
+    "U": "ʊ",
+    "I\\": "ᵻ",
+    "U\\": "ᵿ",
     "2": "ø",
-    "3\\": "ɞ",
-    "3": "ɜ",
-    "4": "ɾ",
-    "5": "ɫ",
-    "6": "ɐ",
-    "7": "ɤ",
+    "@\\": "ɘ",
     "8": "ɵ",
+    "7": "ɤ",
+    "@": "ə",
+    "@`": "ɚ",
+    "E": "ɛ",
     "9": "œ",
-    "&": "æ",  # alias
+    "3": "ɜ",
+    "3`": "ɝ",
+    "3\\": "ɞ",
+    "V": "ʌ",
+    "O": "ɔ",
+    "{": "æ",
+    "6": "ɐ",
+    "&": "ɶ",
     "A": "ɑ",
     "Q": "ɒ",
-    "E": "ɛ",
-    "I\\": "ᵻ",
-    "I": "ɪ",
-    "O": "ɔ",
-    "M\\": "ɰ",
-    "M": "ɯ",
-    "U\\": "ᵿ",
-    "U": "ʊ",
+    # Other symbols
     "W": "ʍ",
-    "Y": "ʏ",
-    "a": "a", "e": "e", "i": "i", "o": "o", "u": "u", "y": "y",
+    "H": "ɥ",
+    "H\\": "ʜ",
+    "<\\": "ʢ",
+    ">\\": "ʡ",
+    "s\\": "ɕ",
+    "z\\": "ʑ",
+    "l\\": "ɺ",
+    "x\\": "ɧ",
+    "5": "ɫ",
+    "_": "\u0361",      # tie bar
     # Suprasegmentals
     '"': "ˈ",
     "%": "ˌ",
     ":": "ː",
-    "-.": ".",   # syllable boundary
-    "-\\": "\u203F",  # undertie (U+203F)
+    ":\\": "ˑ",
+    "_X": "\u0306",     # extra-short
+    ".": ".",           # syllable break
+    "-\\": "‿",    # linking mark
+    "|": "|",           # minor group
+    "||": "‖",          # major group
+    # Tones and word accents
+    "_T": "\u030B",
+    "_H": "\u0301",
+    "_M": "\u0304",
+    "_L": "\u0300",
+    "_B": "\u030F",
+    "_R": "\u030C",
+    "_/": "\u030C",
+    "_F": "\u0302",
+    "_\\": "\u0302",
+    "_H_T": "\u1DC4",
+    "_B_L": "\u1DC5",
+    "_R_F": "\u1DC8",
+    "_L_H": "\u030C",
+    "_H_L": "\u0302",
+    "_M_H_L": "\u1DC8",
+    "_/_\\": "\u1DC8",
+    "<T>": "˥",
+    "<H>": "˦",
+    "<M>": "˧",
+    "<L>": "˨",
+    "<B>": "˩",
+    "<BT>": "˩˥",
+    "<TB>": "˥˩",
+    "<HT>": "˧˥",
+    "<BL>": "˩˧",
+    "<HTH>": "˧˥˧",
+    "!": "ꜜ",
+    "<!>": "ꜜ",
+    "^": "ꜛ",
+    "<^>": "ꜛ",
+    "<R>": "↗",
+    "</>": "↗",
+    "<F>": "↘",
+    "<\\>": "↘",
+    # Diacritics
+    "_0": "\u0325",     # voiceless
+    "_v": "\u032C",     # voiced
+    "_h": "ʰ",
+    "_O": "\u0339",     # more rounded
+    "_c": "\u031C",     # less rounded
+    "_+": "\u031F",     # advanced
+    "_-": "\u0320",     # retracted
+    '_"': "\u0308",     # centralized
+    "_x": "\u033D",     # mid-centralized
+    "=": "\u0329",      # syllabic
+    "_=": "\u0329",
+    "_^": "\u032F",     # non-syllabic
+    "`": "˞",      # rhoticity
+    "_t": "\u0324",     # breathy voiced
+    "_k": "\u0330",     # creaky voiced
+    "_N": "\u033C",     # linguolabial
+    "_w": "ʷ",
+    "'": "ʲ",
+    "_j": "ʲ",
+    "_G": "ˠ",
+    "_?\\": "ˤ",
+    "_d": "\u032A",     # dental
+    "_a": "\u033A",     # apical
+    "_m": "\u033B",     # laminal
+    "~": "\u0303",      # nasalized
+    "_~": "\u0303",
+    "_n": "ⁿ",
+    "_l": "ˡ",
+    "_}": "\u031A",     # no audible release
+    "_e": "\u0334",     # velarized or pharyngealized
+    "_r": "\u031D",     # raised
+    "_o": "\u031E",     # lowered
+    "_A": "\u0318",     # advanced tongue root
+    "_q": "\u0319",     # retracted tongue root
+    "_>": "ʼ",          # ejective
+    "_?": "ʼ",
 }
 
-# Reverse: IPA → X-SAMPA (first occurrence wins)
+# Reverse: IPA → X-SAMPA (first occurrence wins).  Keys are NFD, because
+# ipa_to_xsampa() decomposes its input so that ã reaches the table as a + ◌\u0303.
 _IPA_TO_XSAMPA: dict[str, str] = {}
 for _xs, _ip in _XSAMPA_TO_IPA.items():
-    if _ip not in _IPA_TO_XSAMPA:
-        _IPA_TO_XSAMPA[_ip] = _xs
+    _IPA_TO_XSAMPA.setdefault(unicodedata.normalize("NFD", _ip), _xs)
+_IPA_TO_XSAMPA["\u035C"] = "_"  # the tie bar may be written below as well
+# The syllabic mark above a letter, and the voiceless ring above ŋ only: the
+# ring above a alone is å, which is not IPA.
+_IPA_TO_XSAMPA["\u030D"] = "="
+_IPA_TO_XSAMPA["ŋ\u030A"] = "N_0"
 
 # Longest-first sorted keys for pattern matching
 _XS_KEYS_SORTED = sorted(_XSAMPA_TO_IPA.keys(), key=len, reverse=True)
 _IPA_KEYS_SORTED = sorted(_IPA_TO_XSAMPA.keys(), key=len, reverse=True)
 
 # Precompiled regexes
-_XS_RE = re.compile("|".join(re.escape(k) for k in _XS_KEYS_SORTED))
+# Wells: "we must let \ take priority", so _j\ is the tie bar and j\, not _j
+# and a stray backslash.  The lookahead yields to the longer keys such as _?\.
+# Wells's "language-specific tone number" (_1 to _6) matches as one symbol with
+# no IPA value, so that it stays unknown and does not read as the tie bar and a
+# digit.  _7 to _9 are the tie bar and a vowel.
+_XS_RE = re.compile("|".join(
+    [re.escape(k) for k in _XS_KEYS_SORTED if len(k) > 2]
+    + [r"_(?=[^\\]\\)", "_[1-6]"]
+    + [re.escape(k) for k in _XS_KEYS_SORTED if len(k) <= 2]))
 _IPA_XS_RE = re.compile("|".join(re.escape(k) for k in _IPA_KEYS_SORTED))
 
 
@@ -431,7 +548,8 @@ def xsampa_to_ipa(xsampa: str, errors: str = "pass") -> str:
     """Convert an X-SAMPA string to IPA.
 
     Multi-character symbols are matched longest-first.  Unknown characters
-    are passed through.
+    are passed through.  A tone number such as ``_1`` has no IPA value, so it
+    counts as one unknown symbol.
 
     Examples
     --------
@@ -444,14 +562,14 @@ def xsampa_to_ipa(xsampa: str, errors: str = "pass") -> str:
     pos = 0
     while pos < len(xsampa):
         m = _XS_RE.match(xsampa, pos)
-        if m:
-            result.append(_XSAMPA_TO_IPA[m.group(0)])
-            pos = m.end()
+        symbol = m.group(0) if m else xsampa[pos]
+        if symbol in _XSAMPA_TO_IPA:
+            result.append(_XSAMPA_TO_IPA[symbol])
         else:
-            out = _unknown(xsampa[pos], pos, "x-sampa", errors)
+            out = _unknown(symbol, pos, "x-sampa", errors)
             if out:
                 result.append(out)
-            pos += 1
+        pos += len(symbol)
     return "".join(result)
 
 
@@ -459,7 +577,12 @@ def ipa_to_xsampa(ipa: str, errors: str = "pass") -> str:
     """Convert an IPA string to X-SAMPA.
 
     Multi-character IPA symbols are matched longest-first.  Unknown
-    characters are passed through.
+    characters are passed through.  The input is decomposed first, so a
+    precomposed ``ã`` gives the same result as ``a`` plus a combining tilde.
+
+    A tie bar is the underscore, which also opens a diacritic.  Where the next
+    symbol would read as one, the tie is dropped: Wells calls it "more
+    satisfactory to assume affricate status" than to write it.
 
     Examples
     --------
@@ -467,13 +590,23 @@ def ipa_to_xsampa(ipa: str, errors: str = "pass") -> str:
     'S'
     >>> ipa_to_xsampa("ə")
     '@'
+    >>> ipa_to_xsampa("kʰã")
+    'k_ha~'
+    >>> ipa_to_xsampa("t\u0361s")
+    't_s'
+    >>> ipa_to_xsampa("t\u0361θ")
+    'tT'
     """
+    ipa = unicodedata.normalize("NFD", ipa)
     result = []
     pos = 0
     while pos < len(ipa):
         m = _IPA_XS_RE.match(ipa, pos)
         if m:
-            result.append(_IPA_TO_XSAMPA[m.group(0)])
+            symbol = _IPA_TO_XSAMPA[m.group(0)]
+            if result and result[-1] == "_" and _XS_RE.match("_" + symbol).group(0) != "_":
+                result.pop()
+            result.append(symbol)
             pos = m.end()
         else:
             out = _unknown(ipa[pos], pos, "x-sampa", errors)
@@ -1354,17 +1487,29 @@ def can_convert(src: str | Notation, dst: str | Notation) -> bool:
 class NotationInfo:
     """Fidelity metadata for a phoneme notation, relative to the IPA hub.
 
+    A conversion is **lossless** when it passes this test for every symbol of
+    its source inventory, with ``errors="strict"`` in both directions:
+
+    1. The symbol converts, and every output symbol is in the target
+       inventory.  An unmapped symbol passed through does not count.
+    2. The reverse conversion returns the input.  Where the notation's
+       reference gives two spellings of one symbol, the first spelling counts
+       as the input.
+
+    The source inventory of ``lossless_to_ipa`` is the notation's own symbol
+    set.  The source inventory of ``lossless_from_ipa`` is the 1993 IPA Chart
+    as X-SAMPA lists it, each symbol taken alone, so a flag makes no claim about
+    a sequence of symbols.  A notation with no converter in the direction under
+    test is not lossless in that direction.
+
     Attributes
     ----------
     notation:
         The :class:`Notation` this describes.
     lossless_to_ipa:
-        ``True`` if ``<notation> → IPA → <notation>`` reproduces every input
-        symbol exactly (round-trip safe from the notation's side).
+        ``<notation> → IPA`` is lossless.
     lossless_from_ipa:
-        ``True`` if ``IPA → <notation> → IPA`` reproduces every IPA symbol —
-        i.e. the notation's inventory covers IPA. ``False`` for
-        restricted-inventory notations such as ARPABET.
+        ``IPA → <notation>`` is lossless.
     token_separated:
         ``True`` when symbols are whitespace-separated tokens (ARPABET) rather
         than a contiguous string (IPA, X-SAMPA, Kirshenbaum, Lexique).
@@ -1383,20 +1528,22 @@ NOTATION_INFO: dict[Notation, NotationInfo] = {
     Notation.ARPA: NotationInfo(
         Notation.ARPA, lossless_to_ipa=False, lossless_from_ipa=False,
         token_separated=True,
-        reference="https://github.com/chorusai/arpa2ipa",
+        reference="http://www.speech.cs.cmu.edu/cgi-bin/cmudict; "
+                  "https://en.wikipedia.org/wiki/ARPABET",
     ),
     Notation.XSAMPA: NotationInfo(
-        Notation.XSAMPA, lossless_to_ipa=False, lossless_from_ipa=True,
+        Notation.XSAMPA, lossless_to_ipa=True, lossless_from_ipa=True,
         token_separated=False,
-        reference="https://en.wikipedia.org/wiki/X-SAMPA",
+        reference="Wells, Computer-coding the IPA: a proposed extension of "
+                  "SAMPA, https://www.phon.ucl.ac.uk/home/sampa/x-sampa.htm",
     ),
     Notation.LEXIQUE: NotationInfo(
-        Notation.LEXIQUE, lossless_to_ipa=False, lossless_from_ipa=True,
+        Notation.LEXIQUE, lossless_to_ipa=False, lossless_from_ipa=False,
         token_separated=False,
         reference="New & Pallier, Manuel de Lexique 3 v3.11, Tableau 2 (CC BY-SA 4.0)",
     ),
     Notation.KIRSHENBAUM: NotationInfo(
-        Notation.KIRSHENBAUM, lossless_to_ipa=True, lossless_from_ipa=False,
+        Notation.KIRSHENBAUM, lossless_to_ipa=False, lossless_from_ipa=False,
         token_separated=False,
         reference="Kirshenbaum 1993 ASCII-IPA standard (comp.speech)",
     ),
@@ -1417,7 +1564,7 @@ NOTATION_INFO: dict[Notation, NotationInfo] = {
                   "(mantoq G2P inventory); one-directional to IPA",
     ),
     Notation.BUCKWALTER: NotationInfo(
-        Notation.BUCKWALTER, lossless_to_ipa=True, lossless_from_ipa=False,
+        Notation.BUCKWALTER, lossless_to_ipa=False, lossless_from_ipa=False,
         token_separated=False,
         reference="Tim Buckwalter Arabic transliteration scheme",
     ),
