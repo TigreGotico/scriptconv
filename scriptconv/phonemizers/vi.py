@@ -5,7 +5,14 @@ from scriptconv.phonemizers.enums import Alphabet
 class VIPhonemePhonemizer(BasePhonemizer):
     """https://github.com/v-nhandt21/Viphoneme"""
     def __init__(self):
-        from viphoneme import vi2IPA
+        try:
+            from viphoneme import vi2IPA
+        except ImportError as e:
+            raise ImportError(
+                "viphoneme is required for the VIPhoneme phonemizer. "
+                "Install it with 'pip install viphoneme' "
+                "(or 'pip install scriptconv[vi]')."
+            ) from e
         self.g2p = vi2IPA
         super().__init__(Alphabet.IPA)
 

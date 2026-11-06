@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import gzip
 from importlib.resources import files
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 __all__ = ["cangjie_code", "to_cangjie"]
 
@@ -49,15 +49,16 @@ def to_cangjie(text: str, sep: str = " ") -> str:
     """
     table = _table()
     tokens = []
-    last_raw = False
+    raw_run: List[str] = []
     for ch in text:
         code = table.get(ch)
         if code is not None:
+            if raw_run:
+                tokens.append("".join(raw_run))
+                raw_run = []
             tokens.append(code)
-            last_raw = False
-        elif last_raw:
-            tokens[-1] += ch
         else:
-            tokens.append(ch)
-            last_raw = True
+            raw_run.append(ch)
+    if raw_run:
+        tokens.append("".join(raw_run))
     return sep.join(tokens)

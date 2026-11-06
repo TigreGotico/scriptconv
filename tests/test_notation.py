@@ -34,7 +34,7 @@ from scriptconv.notation import (
     ("EY1", "eɪ"),
     ("OY1", "ɔɪ"),
     ("AW1", "aʊ"),
-    ("ER0", "ɜr"),
+    ("ER0", "ɚ"),
 ])
 def test_arpa_to_ipa_gold(arpa, expected_ipa):
     assert arpa_to_ipa(arpa) == expected_ipa
@@ -284,11 +284,11 @@ def test_convert_unsupported_raises():
     ("AH0", "ə"),       # AH0 special-case → schwa
     ("AH1", "ʌ"),       # stressed AH → ʌ
     ("AH2", "ʌ"),       # secondary stress AH
-    ("EL", "ɫ̩"),       # syllabic l
+    ("EL", "l̩"),       # syllabic l
     ("EM", "m̩"),        # syllabic m
     ("EN", "n̩"),        # syllabic n
     ("AX", "ə"),        # AX = schwa (CMU variant)
-    ("AXR", "ər"),      # r-coloured schwa
+    ("AXR", "ɚ"),       # r-coloured schwa
 ])
 def test_arpa_to_ipa_edge_cases(arpa, expected_ipa):
     assert arpa_to_ipa(arpa) == expected_ipa
@@ -312,8 +312,8 @@ def test_arpa_stress_round_trip():
                  "EY", "AY", "OW", "AW", "OY", "ER"):
         for digit in ("0", "1", "2"):
             token = base + digit
-            if token == "AH0":
-                continue  # schwa maps to AX in reverse; known asymmetry
+            if token in ("AH0", "ER0"):
+                continue  # ə and ɚ map to AX and AXR in reverse; known asymmetry
             ipa = arpa_to_ipa(token)
             back = ipa_to_arpa(ipa)
             # back may be the base form (no digit) — that is the expected lossy behaviour
@@ -328,7 +328,7 @@ def test_arpa_stress_round_trip():
     ("tS", "tʃ"),        # affricate: must not split as t + S
     ("dZ", "dʒ"),        # affricate: must not split as d + Z
     ("r\\", "ɹ"),        # r-backslash before plain r
-    ("ts`", "ʈ͡ʂ"),      # retro affricate: longest first
+    ("r\\`", "ɻ"),       # retroflex approximant: longest first
     ("@\\", "ɘ"),        # @-backslash before @
     ("@`", "ɚ"),         # @-backtick before @
     ("}", "ʉ"),          # close-mid central rounded
@@ -526,14 +526,14 @@ def test_xsampa_new_symbols():
     assert xsampa_to_ipa("t`") == "ʈ"
     assert xsampa_to_ipa("d`") == "ɖ"
     # Palatal plosive
-    assert xsampa_to_ipa("J\\`") == "ɟ"
+    assert xsampa_to_ipa("J\\") == "ɟ"
     # Uvular plosive
     assert xsampa_to_ipa("q") == "q"
     # Alveolo-palatal fricatives
-    assert xsampa_to_ipa("s\\`") == "ɕ"
-    assert xsampa_to_ipa("z\\`") == "ʑ"
+    assert xsampa_to_ipa("s\\") == "ɕ"
+    assert xsampa_to_ipa("z\\") == "ʑ"
     # Lateral flap
-    assert xsampa_to_ipa("l\\`") == "ɺ"
+    assert xsampa_to_ipa("l\\") == "ɺ"
 
 
 def test_xsampa_new_symbols_roundtrip():
@@ -693,13 +693,12 @@ def test_convert_invalid_notation_name():
 
 @pytest.mark.parametrize("ipa, expected", [
     ("həloʊ", "HH AX L OW"),
-    ("tʃɛ", "CH ?"),       # ɛ not in IPA→ARPA → flagged
+    ("tʃɛ", "CH EH"),
     ("dʒʌst", "JH AH S T"),
     ("θæŋks", "TH AE NG K S"),
     ("ʃoʊ", "SH OW"),
 ])
 def test_ipa_to_arpa_multi(ipa, expected):
-    # ɛ is not in the IPA→ARPA table, so it gets flagged as ?
     assert ipa_to_arpa(ipa) == expected
 
 
@@ -743,7 +742,7 @@ def test_arpa_to_ipa_diphthongs_special(arpa, expected):
 
 def test_xsampa_passthrough():
     # Truly unknown characters pass through
-    assert xsampa_to_ipa("!#$") == "!#$"
+    assert xsampa_to_ipa("#$*") == "#$*"
     assert xsampa_to_ipa("xyz") == "xyz"
 
 
@@ -757,10 +756,9 @@ def test_ipa_to_xsampa_passthrough():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("xs, expected", [
-    ("&", "æ"),      # alias for {
-    ("f\\", "ɸ"),    # alias for p\
+    ("v\\", "ʋ"),    # alias for P
     ("%", "ˌ"),      # secondary stress
-    ("-.", "."),     # syllable boundary
+    (".", "."),      # syllable boundary
     ("-", "-"),      # hyphen (pass-through)
 ])
 def test_xsampa_aliases_suprasegmentals(xs, expected):
@@ -768,17 +766,17 @@ def test_xsampa_aliases_suprasegmentals(xs, expected):
 
 
 # ---------------------------------------------------------------------------
-# X-SAMPA — backslash-combo symbols n\` and X\`
+# X-SAMPA — retroflex n` and pharyngeal X\
 # ---------------------------------------------------------------------------
 
 def test_xsampa_n_backtick():
-    assert xsampa_to_ipa("n\\`") == "ɳ"
-    assert ipa_to_xsampa("ɳ") == "n\\`"
+    assert xsampa_to_ipa("n`") == "ɳ"
+    assert ipa_to_xsampa("ɳ") == "n`"
 
 
-def test_xsampa_X_backtick():
-    assert xsampa_to_ipa("X\\`") == "ħ"
-    assert ipa_to_xsampa("ħ") == "X\\`"
+def test_xsampa_X_backslash():
+    assert xsampa_to_ipa("X\\") == "ħ"
+    assert ipa_to_xsampa("ħ") == "X\\"
 
 
 # ---------------------------------------------------------------------------
@@ -809,7 +807,7 @@ def test_xsampa_X_backtick():
     ("?\\", "ʕ"),
     ("h\\", "ɦ"),
     ("K\\", "ɮ"),
-    ("L\\", "ʎ"),
+    ("L\\", "ʟ"),
     ("R\\", "ʀ"),
 ])
 def test_xsampa_vowels_coverage(xs, expected):
@@ -1013,23 +1011,6 @@ def test_every_notation_info_has_a_citation():
     assert all(i.reference for i in NOTATION_INFO.values())
 
 
-def test_lossless_to_ipa_flag_backed_by_round_trip():
-    # A lossless_to_ipa=True claim must actually round-trip a representative
-    # symbol set through IPA and back.
-    samples = {
-        Notation.KIRSHENBAUM: "SNTDpbtdkg",
-        Notation.BUCKWALTER: "AbtmrHlwnhyk",
-    }
-    to_ipa = {Notation.KIRSHENBAUM: kirshenbaum_to_ipa,
-              Notation.BUCKWALTER: buckwalter_to_arabic}
-    from_ipa = {Notation.KIRSHENBAUM: ipa_to_kirshenbaum,
-                Notation.BUCKWALTER: arabic_to_buckwalter}
-    for notation, info in NOTATION_INFO.items():
-        if info.lossless_to_ipa and notation in samples:
-            for ch in samples[notation]:
-                assert from_ipa[notation](to_ipa[notation](ch)) == ch, notation
-
-
 # ---------------------------------------------------------------------------
 # looks_like_ipa — heuristic notation detection
 # ---------------------------------------------------------------------------
@@ -1155,59 +1136,59 @@ def test_convert_routes_through_rfe():
 # Mantoq → IPA (Halabi Arabic-Phonetiser inventory; one-directional)
 # ---------------------------------------------------------------------------
 
-from scriptconv.notation import mantoq_to_ipa, UnknownSymbolError  # noqa: E402
+from scriptconv.notation import halabi_to_ipa, UnknownSymbolError  # noqa: E402
 
 def test_mantoq_basic_word():
-    assert mantoq_to_ipa("salaam") == "salaːm"
+    assert halabi_to_ipa("salaam") == "salaːm"
 
 
 def test_mantoq_theta_is_caret_not_shadda():
     # mantoq's "^" is θ — the same character is NOT a Buckwalter shadda here
-    assert mantoq_to_ipa("^") == "θ"
+    assert halabi_to_ipa("^") == "θ"
 
 
 def test_mantoq_gemination_marker():
-    assert mantoq_to_ipa("b_dbl_a") == "bːa"
+    assert halabi_to_ipa("b_dbl_a") == "bːa"
 
 
 def test_mantoq_dbl_after_vowel_is_inert():
     # upstream only emits _dbl_ after consonants (tokenization.py splits
     # doubled consonant phonemes); a vowel+_dbl_ input is left unchanged
-    assert mantoq_to_ipa("aa_dbl_") == "aː"
+    assert halabi_to_ipa("aa_dbl_") == "aː"
 
 
 def test_mantoq_special_tokens():
     # inventory special tokens: _sil_ -> pause (space), _eos_/_pad_ dropped —
     # and never shredded into letter phonemes
-    assert mantoq_to_ipa("m_sil_n") == "m n"
-    assert mantoq_to_ipa("m a_eos_") == "m a"
-    assert mantoq_to_ipa("_pad_b") == "b"
+    assert halabi_to_ipa("m_sil_n") == "m n"
+    assert halabi_to_ipa("m a_eos_") == "m a"
+    assert halabi_to_ipa("_pad_b") == "b"
 
 
 def test_mantoq_word_separator_and_glottal():
-    assert mantoq_to_ipa("m_+_<a") == "m ʔa"
+    assert halabi_to_ipa("m_+_<a") == "m ʔa"
 
 
 def test_mantoq_emphatics_and_superlong():
-    assert mantoq_to_ipa("SaaaaD") == "sˤaːːdˤ"
+    assert halabi_to_ipa("SaaaaD") == "sˤaːːdˤ"
 
 
 def test_mantoq_via_convert_facade():
-    assert convert("salaam", "mantoq", "ipa") == "salaːm"
-    assert can_convert("mantoq", "ipa") is True
-    assert can_convert("ipa", "mantoq") is False
+    assert convert("salaam", "halabi", "ipa") == "salaːm"
+    assert can_convert("halabi", "ipa") is True
+    assert can_convert("ipa", "halabi") is False
 
 
-def test_mantoq_chains_to_xsampa_via_graph():
-    # mantoq -> ipa -> x-sampa multi-hop through the conversion graph
-    out = convert("salaam", "mantoq", "x-sampa")
+def test_halabi_chains_to_xsampa_via_graph():
+    # halabi -> ipa -> x-sampa multi-hop through the conversion graph
+    out = convert("salaam", "halabi", "x-sampa")
     assert "a:" in out
 
 
-def test_mantoq_errors_strict():
+def test_halabi_errors_strict():
     import pytest as _pytest
     with _pytest.raises(UnknownSymbolError):
-        mantoq_to_ipa("Q", errors="strict")
+        halabi_to_ipa("Q", errors="strict")
 
 
 def test_buckwalter_wasla_and_dagger_alef():

@@ -11,7 +11,7 @@ and Katakana U+30A0 blocks); swapping between them is pure orthography.
 
 This module deliberately contains no phonology: mapping scripts to
 SOUNDS (grapheme-to-phoneme with contextual rules) is phonemization
-and lives outside scriptconv's scope.
+and belongs to a phonemizer backend, not to this module.
 """
 from __future__ import annotations
 

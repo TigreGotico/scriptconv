@@ -2,6 +2,7 @@
 
 import json
 import os
+import shutil
 import subprocess
 from typing import List, Dict, Optional, Sequence, TYPE_CHECKING
 
@@ -9,7 +10,7 @@ if TYPE_CHECKING:
     import numpy as np
 
 from scriptconv.phonemizers.enums import Alphabet
-from scriptconv.phonemizers.base import BasePhonemizer
+from scriptconv.phonemizers.base import BasePhonemizer, _check_alphabet
 # minimal ONNX session construction — scriptconv has no provider
 # machinery; consumers wanting CUDA/etc. pass providers= explicitly
 ProviderSpec = str
@@ -21,6 +22,20 @@ def make_session(model_path, providers=None, use_cuda=False):
         providers = ["CUDAExecutionProvider", "CPUExecutionProvider"] if use_cuda \
             else ["CPUExecutionProvider"]
     return onnxruntime.InferenceSession(model_path, providers=list(providers))
+
+
+# Hong Kong and Macau Cantonese. A bare "yue" means mainland Cantonese in
+# Simplified script, so these tags are far from it by language distance. The
+# Cantonese resources of Charsiu, Goruut and Transphone carry no region and are
+# written in Traditional script, so these tags resolve to them directly.
+_HK_CANTONESE = frozenset({
+    "yue-hk", "yue-mo", "yue-hant", "yue-hant-hk", "yue-hant-mo",
+    "zh-hk", "zh-mo", "zh-hant-hk", "zh-hant-mo",
+})
+
+
+def _is_hk_cantonese(lang: str) -> bool:
+    return lang.lower().replace("_", "-") in _HK_CANTONESE
 
 
 class EspeakError(Exception):
@@ -258,7 +273,8 @@ class CharsiuPhonemizer(ByT5Phonemizer):
         Raises:
             ValueError: If the language code is unsupported.
         """
-        # Find the closest match
+        if _is_hk_cantonese(target_lang):
+            return "yue"
         return cls.match_lang(target_lang, cls.BYT5_LANGS)
 
     def phonemize_string(self, text: str, lang: str) -> str:
@@ -325,11 +341,30 @@ class EspeakPhonemizer(BasePhonemizer):
         """
         if target_lang.lower() == "en-gb":
             return "en-gb-x-rp"
-        if target_lang in cls.ESPEAK_LANGS:
-            return target_lang
-        if target_lang.lower().split("-")[0] in cls.ESPEAK_LANGS:
-            return target_lang.lower().split("-")[0]
-        return cls.match_lang(target_lang, cls.ESPEAK_LANGS)
+        # espeak-ng has no bare "zh"/region-tagged Chinese codes, only "cmn" (Mandarin,
+        # any script) and "yue" (Cantonese); map BCP-47 Chinese tags onto those voices
+        # directly instead of falling through to lang_distance, which scores them below
+        # the match threshold and raises. Hong Kong/Macau are the only regions where
+        # Cantonese, not Mandarin, is the spoken vernacular.
+        ZH_ALIASES = {
+            "zh": "cmn", "zh-cn": "cmn", "zh-sg": "cmn",
+            "zh-hans": "cmn", "zh-hans-cn": "cmn", "zh-hans-sg": "cmn",
+            "zh-tw": "cmn", "zh-hant": "cmn", "zh-hant-tw": "cmn",
+            "zh-hk": "yue", "zh-mo": "yue", "zh-hant-hk": "yue", "zh-hant-mo": "yue",
+        }
+        # ESPEAK_LANGS is all lowercase, so the tag is lowercased once and
+        # matched as a whole BEFORE the primary subtag. A BCP-47 tag such as
+        # pt-BR or fr-BE used to miss the exact check on case and fall to the
+        # bare pt or fr, which are European Portuguese and metropolitan
+        # French: a Brazilian voice phonemized as European.
+        tag = target_lang.lower().replace("_", "-")
+        if tag in ZH_ALIASES:
+            return ZH_ALIASES[tag]
+        if tag in cls.ESPEAK_LANGS:
+            return tag
+        if tag.split("-")[0] in cls.ESPEAK_LANGS:
+            return tag.split("-")[0]
+        return cls.match_lang(tag, cls.ESPEAK_LANGS)
 
     @staticmethod
     def _run_espeak_command(args: List[str], input_text: str = None, check: bool = True) -> str:
@@ -435,7 +470,14 @@ class GruutPhonemizer(BasePhonemizer):
         Yields lists of word phonemes for each sentence.
         """
         lang = self.get_lang(lang)
-        import gruut
+        try:
+            import gruut
+        except ImportError as e:
+            raise ImportError(
+                "gruut is required for the Gruut phonemizer. "
+                "Install it with 'pip install gruut' "
+                "(or 'pip install scriptconv[gruut]')."
+            ) from e
         for sentence in gruut.sentences(text, lang=lang):
             sent_phonemes = [w.phonemes for w in sentence if w.phonemes]
             if sentence and not sent_phonemes:
@@ -601,8 +643,15 @@ class GoruutPhonemizer(BasePhonemizer):
 
     def __init__(self, remote_url=None):
         super().__init__(Alphabet.IPA)
-        from pygoruut.pygoruut import Pygoruut
-        from pygoruut.pygoruut_languages import PygoruutLanguages
+        try:
+            from pygoruut.pygoruut import Pygoruut
+            from pygoruut.pygoruut_languages import PygoruutLanguages
+        except ImportError as e:
+            raise ImportError(
+                "pygoruut is required for the Goruut phonemizer. "
+                "Install it with 'pip install pygoruut' "
+                "(or 'pip install scriptconv[goruut]')."
+            ) from e
 
         self.pygoruut_langs = PygoruutLanguages()
         if remote_url is not None:
@@ -631,6 +680,8 @@ class GoruutPhonemizer(BasePhonemizer):
             return 'EnglishAmerican'
         if target_lang.lower() == "en-gb" or target_lang.lower() == "en-uk":
             return 'EnglishBritish'
+        if _is_hk_cantonese(target_lang):
+            return cls.ISO639["yue"]
         lang = cls.match_lang(target_lang, list(cls.ISO639))
         return cls.ISO639[lang]
 
@@ -642,30 +693,37 @@ class GoruutPhonemizer(BasePhonemizer):
 class EpitranPhonemizer(BasePhonemizer):
     """
     """
-    EPITRAN_LANGS = ['hsn-Latn', 'ful-Latn', 'jpn-Ktkn-red', 'tel-Telu', 'nld-Latn', 'aze-Latn', 'amh-Ethi-pp',
+    EPITRAN_LANGS = ['hsn-Latn', 'ful-Latn', 'jpn-Kana', 'tel-Telu', 'nld-Latn', 'aze-Latn', 'amh-Ethi-pp',
                      'msa-Latn', 'spa-Latn-eu', 'ori-Orya', 'bxk-Latn', 'spa-Latn', 'kir-Cyrl', 'lij-Latn', 'kin-Latn',
                      'ces-Latn', 'sin-Sinh', 'urd-Arab', 'vie-Latn', 'gan-Latn', 'fra-Latn', 'nan-Latn', 'kaz-Latn',
-                     'swe-Latn', 'jpn-Ktkn', 'tam-Taml', 'sag-Latn', 'csb-Latn', 'pii-latn_Holopainen2019', 'yue-Latn',
+                     'swe-Latn', 'jpn-Kana-red', 'tam-Taml', 'sag-Latn', 'csb-Latn', 'pii-latn_Holopainen2019', 'yue-Latn',
                      'got-Latn', 'tur-Latn', 'aar-Latn', 'jav-Latn', 'ita-Latn', 'sna-Latn', 'ilo-Latn', 'tam-Taml-red',
-                     'kmr-Latn-red', 'uzb-Cyrl', 'amh-Ethi', 'mya-Mymr', 'aii-Syrc', 'lit-Latn', 'kmr-Latn',
-                     'hat-Latn-bab', 'ltc-Latn-bax', 'Goth2Latn', 'quy-Latn', 'hau-Latn', 'ood-Latn-alv', 'vie-Latn-so',
-                     'run-Latn', 'orm-Latn', 'ind-Latn', 'kir-Latn', 'mal-Mlym', 'ben-Beng-red', 'hun-Latn', 'uew',
-                     'sqi-Latn', 'jpn-Hrgn', 'deu-Latn-np', 'xho-Latn', 'fra-Latn-rev', 'fra-Latn-np', 'kaz-Cyrl-bab',
-                     'jpn-Hrgn-red', 'Latn2Goth', 'glg-Latn', 'uig-Arab', 'amh-Ethi-red', 'zul-Latn', 'hin-Deva',
-                     'uzb-Latn', 'tir-Ethi-red', 'kaz-Cyrl', 'mlt-Latn', 'deu-Latn-nar', 'est-Latn', 'eng-Latn',
+                     'kmr-Latn', 'uzb-Cyrl', 'amh-Ethi', 'mya-Mymr', 'aii-Syrc', 'lit-Latn', 'kmr-Latn-red',
+                     'hat-Latn-bab', 'ltc-Latn-bax', 'quy-Latn', 'hau-Latn', 'ood-Latn-alv',
+                     'run-Latn', 'orm-Latn', 'ind-Latn', 'kir-Latn', 'mal-Mlym', 'ben-Beng', 'hun-Latn', 'uew',
+                     'sqi-Latn', 'jpn-Hira', 'deu-Latn-np', 'xho-Latn', 'fra-Latn-rev', 'fra-Latn-np', 'kaz-Cyrl-bab',
+                     'jpn-Hira-red', 'glg-Latn', 'uig-Arab', 'amh-Ethi-red', 'zul-Latn', 'hin-Deva',
+                     'uzb-Latn', 'tir-Ethi', 'kaz-Cyrl', 'mlt-Latn', 'deu-Latn-nar', 'est-Latn', 'eng-Latn',
                      'pii-latn_Wiktionary', 'ckb-Arab', 'nya-Latn', 'mon-Cyrl-bab', 'fra-Latn-p', 'ood-Latn-sax',
-                     'ukr-Cyrl', 'tgl-Latn-red', 'lsm-Latn', 'kor-Hang', 'lav-Latn', 'generic-Latn', 'tur-Latn-red',
-                     'srp-Latn', 'tir-Ethi', 'kbd-Cyrl', 'hrv-Latn', 'srp-Cyrl', 'tpi-Latn', 'khm-Khmr', 'jam-Latn',
-                     'ben-Beng-east', 'por-Latn', 'cmn-Latn', 'cat-Latn', 'tha-Thai', 'ara-Arab', 'ben-Beng',
+                     'ukr-Cyrl', 'tgl-Latn', 'lsm-Latn', 'kor-Hang', 'lav-Latn', 'generic-Latn', 'tur-Latn-red',
+                     'srp-Latn', 'tir-Ethi-red', 'kbd-Cyrl', 'hrv-Latn', 'srp-Cyrl', 'tpi-Latn', 'khm-Khmr', 'jam-Latn',
+                     'ben-Beng-east', 'por-Latn', 'cmn-Latn', 'cat-Latn', 'tha-Thai', 'ara-Arab', 'ben-Beng-red',
                      'fin-Latn', 'hmn-Latn', 'lez-Cyrl', 'fas-Arab', 'lao-Laoo-prereform', 'mar-Deva', 'yor-Latn',
-                     'ron-Latn', 'tgl-Latn', 'lao-Laoo', 'deu-Latn', 'pan-Guru', 'tuk-Latn', 'tir-Ethi-pp', 'rus-Cyrl',
-                     'swa-Latn-red', 'ceb-Latn', 'wuu-Latn', 'hak-Latn', 'mri-Latn', 'epo-Latn', 'pol-Latn',
-                     'tur-Latn-bab', 'kat-Geor', 'tgk-Cyrl', 'aze-Cyrl', 'vie-Latn-ce', 'swa-Latn', 'tuk-Cyrl',
-                     'vie-Latn-no', 'nan-Latn-tl', 'zha-Latn', 'cjy-Latn', 'ava-Cyrl', 'som-Latn', 'kir-Arab']
+                     'ron-Latn', 'tgl-Latn-red', 'lao-Laoo', 'deu-Latn', 'pan-Guru', 'tuk-Latn', 'tir-Ethi-pp', 'rus-Cyrl',
+                     'swa-Latn', 'ceb-Latn', 'wuu-Latn', 'hak-Latn', 'mri-Latn', 'epo-Latn', 'pol-Latn',
+                     'tur-Latn-bab', 'kat-Geor', 'tgk-Cyrl', 'aze-Cyrl', 'swa-Latn-red', 'tuk-Cyrl',
+                     'nan-Latn-tl', 'zha-Latn', 'cjy-Latn', 'ava-Cyrl', 'som-Latn', 'kir-Arab']
 
     def __init__(self):
         super().__init__(Alphabet.IPA)
-        import epitran
+        try:
+            import epitran
+        except ImportError as e:
+            raise ImportError(
+                "epitran is required for the Epitran phonemizer. "
+                "Install it with 'pip install epitran' "
+                "(or 'pip install scriptconv[epitran]')."
+            ) from e
         self.epitran = epitran
         self._epis: Dict[str, epitran.Epitran] = {}
 
@@ -681,12 +739,25 @@ class EpitranPhonemizer(BasePhonemizer):
             str: The validated language code.
 
         Raises:
-            ValueError: If the language code is unsupported.
+            ValueError: If the language code is unsupported, or if it is
+                Japanese without a Kana or Hira script subtag.
         """
+        # Each epitran Japanese map converts one kana script. Kanji and the
+        # other kana script pass through unchanged, so a request for Jpan or
+        # Hrkt text would come back half converted.
+        subtags = (target_lang or "").replace("_", "-").lower().split("-")
+        if subtags[0] in ("ja", "jpn") and not {"kana", "hira"} & set(subtags[1:]):
+            raise ValueError(f"unsupported language code: {target_lang} "
+                             "(epitran reads Japanese kana only; use ja-Kana or ja-Hira)")
         return cls.match_lang(target_lang, cls.EPITRAN_LANGS)
 
     def phonemize_string(self, text: str, lang: str) -> str:
         lang = self.get_lang(lang)
+        # epitran reads English through Flite's lex_lookup; without it, epitran
+        # logs a warning and fails with KeyError('') on an empty ARPAbet string
+        if lang == "eng-Latn" and shutil.which("lex_lookup") is None:
+            raise RuntimeError("epitran English (eng-Latn) needs lex_lookup "
+                               "from Flite, and lex_lookup is not on PATH")
         epi = self._epis.get(lang)
         if epi is None:
             epi = self.epitran.Epitran(lang)
@@ -706,6 +777,7 @@ class MisakiPhonemizer(BasePhonemizer):
         # sensible default for all of them.
         super().__init__(alphabet)
         self.g2p_en = self.g2p_zh = self.g2p_ko = self.g2p_vi = self.g2p_ja = None
+        self.g2p_en_gb = None
 
     @property
     def zh_version(self) -> str:
@@ -735,35 +807,45 @@ class MisakiPhonemizer(BasePhonemizer):
         """
         lang = self.get_lang(lang)
 
-        if lang == "zh":
-            if self.g2p_zh is None:
-                from misaki.zh import ZHG2P
-                self.g2p_zh = ZHG2P(version=self.zh_version)
-            return self.g2p_zh
-        elif lang == "ko":
-            if self.g2p_ko is None:
-                from misaki.ko import KOG2P
-                self.g2p_ko = KOG2P()
-            return self.g2p_ko
-        elif lang == "vi":
-            if self.g2p_vi is None:
-                from misaki.vi import VIG2P
-                self.g2p_vi = VIG2P()
-            return self.g2p_vi
-        elif lang == "ja":
-            if self.g2p_ja is None:
-                from misaki.ja import JAG2P
-                self.g2p_ja = JAG2P()
-            return self.g2p_ja
-        else:
-            if self.g2p_en is None:
-                from misaki import en
-                self.g2p_en = en.G2P()
-            if lang == "en-GB":
-                self.g2p_en.british = True
-            elif lang == "en-US":
-                self.g2p_en.british = False
-            return self.g2p_en
+        try:
+            if lang == "zh":
+                if self.g2p_zh is None:
+                    from misaki.zh import ZHG2P
+                    self.g2p_zh = ZHG2P(version=self.zh_version)
+                return self.g2p_zh
+            elif lang == "ko":
+                if self.g2p_ko is None:
+                    from misaki.ko import KOG2P
+                    self.g2p_ko = KOG2P()
+                return self.g2p_ko
+            elif lang == "vi":
+                if self.g2p_vi is None:
+                    from misaki.vi import VIG2P
+                    self.g2p_vi = VIG2P()
+                return self.g2p_vi
+            elif lang == "ja":
+                if self.g2p_ja is None:
+                    from misaki.ja import JAG2P
+                    self.g2p_ja = JAG2P()
+                return self.g2p_ja
+            elif lang == "en-GB":
+                # misaki loads the British or American lexicon when the G2P is
+                # built, so the variety is a constructor argument.
+                if self.g2p_en_gb is None:
+                    from misaki import en
+                    self.g2p_en_gb = en.G2P(british=True)
+                return self.g2p_en_gb
+            else:
+                if self.g2p_en is None:
+                    from misaki import en
+                    self.g2p_en = en.G2P(british=False)
+                return self.g2p_en
+        except ImportError as e:
+            raise ImportError(
+                "misaki is required for the Misaki phonemizer. "
+                "Install it with 'pip install misaki' "
+                "(or 'pip install scriptconv[misaki]')."
+            ) from e
 
     def phonemize_string(self, text: str, lang: str) -> str:
         pho = self._get_phonemizer(lang)
@@ -1386,7 +1468,14 @@ class TransphonePhonemizer(BasePhonemizer):
 
     def __init__(self):
         super().__init__(Alphabet.IPA)
-        from transphone import read_tokenizer
+        try:
+            from transphone import read_tokenizer
+        except ImportError as e:
+            raise ImportError(
+                "transphone is required for the Transphone phonemizer. "
+                "Install it with 'pip install transphone' "
+                "(or 'pip install scriptconv[transphone]')."
+            ) from e
         self.read_tokenizer = read_tokenizer
         self._models = {}
 
@@ -1406,6 +1495,8 @@ class TransphonePhonemizer(BasePhonemizer):
         """
         if target_lang.lower() in cls.TRANSPHONE_LANGS:
             return target_lang
+        if _is_hk_cantonese(target_lang):
+            return "yue"
         return cls.match_lang(target_lang, cls.TRANSPHONE_LANGS)
 
     def phonemize_string(self, text: str, lang: str) -> str:
@@ -1417,3 +1508,105 @@ class TransphonePhonemizer(BasePhonemizer):
             [p if p != "<SPACE>" else " "
              for p in pho.tokenize(text, use_space=True)]
         ).strip()
+
+
+class PhonetisaurusPhonemizer(BasePhonemizer):
+    """WFST grapheme-to-phoneme, through the ``phonetisaurus`` bindings.
+
+    https://github.com/AdolfVonKleist/Phonetisaurus
+
+    Phonetisaurus has no rules and no language list of its own: all of its
+    knowledge is in one trained FST, so the language and the symbol set are
+    properties of the MODEL, not of this wrapper. That has three consequences,
+    and each one is a design decision rather than a limitation to work around:
+
+    * ``model`` is required. scriptconv never downloads a model (the same rule
+      :class:`ByT5Phonemizer` follows). ``MODEL_SOURCES`` names where published
+      models live; a caller resolves one and passes the path.
+    * ``alphabet`` is declared by the caller, because only the caller knows
+      what the model was trained to emit. A CMUdict-trained model emits ARPA,
+      an o2i-trained or espeak-trained one emits IPA. The wrapper cannot read
+      it off the FST, so it does not guess.
+    * There is no language check and no ``LANG_DEFAULTS`` entry. A wrapper that
+      cannot know its own model's language must not be any language's default.
+
+    ``phonetisaurus`` ships the binaries it drives and the shared objects they
+    link against, and ``predict`` runs them under the ``PATH`` and
+    ``LD_LIBRARY_PATH`` from ``phonetisaurus.guess_environment()``. The apply
+    path needs no system package. Training is the exception: ``estimate-ngram``
+    also needs ``libquadmath.so.0`` from the host GCC runtime (``libquadmath0``
+    on Debian and Ubuntu). Training is not exercised here: this wrapper only
+    applies a model.
+    """
+
+    #: Where published FSTs come from. Documentation, never a download.
+    MODEL_SOURCES = {
+        "rhasspy": "https://github.com/rhasspy/*-g2p (one g2p.fst per language)",
+        "cmudict": "trained from CMUdict with 'phonetisaurus train' (ARPA symbols)",
+    }
+
+    #: Symbol sets a Phonetisaurus model is known to be trained on. The wrapper
+    #: passes the model's symbols through untouched, so this list says which
+    #: declarations are meaningful, not which conversions happen.
+    SUPPORTED_ALPHABETS = [Alphabet.IPA, Alphabet.ARPA, Alphabet.SAMPA,
+                           Alphabet.XSAMPA, Alphabet.GRAPHEMES]
+
+    def __init__(self, model: Optional[str] = None,
+                 alphabet: Alphabet = Alphabet.IPA,
+                 nbest: int = 1,
+                 separator: str = " ",
+                 normalizer=None):
+        """
+        Args:
+            model: path to a trained Phonetisaurus FST. Required.
+            alphabet: the symbol set the model emits. The caller states it.
+            nbest: how many pronunciations the engine ranks per word. The
+                BEST one is returned whatever this is, so a higher value
+                changes the search, not the output shape. ``predict`` prints
+                one line per ranked pronunciation, best first, and yields one
+                pair per line, so the wrapper keeps the FIRST pair it sees for
+                a word and drops the rest.
+            separator: joins the symbols of one word. Models are trained on
+                symbol sequences, so the parts need a separator to stay
+                readable; pass "" for a bare string.
+            normalizer: see :class:`BasePhonemizer`.
+        """
+        _check_alphabet(self, alphabet, self.SUPPORTED_ALPHABETS)
+        super().__init__(alphabet, normalizer=normalizer)
+        try:
+            import phonetisaurus
+        except ImportError as e:
+            raise ImportError(
+                "phonetisaurus is required for the Phonetisaurus phonemizer. "
+                "Install it with 'pip install phonetisaurus' "
+                "(or 'pip install scriptconv[phonetisaurus]')."
+            ) from e
+        if not model or not os.path.isfile(model):
+            raise ValueError(
+                "Phonetisaurus phonemization needs a local trained FST: pass "
+                "model=<path> (scriptconv never downloads — see "
+                "MODEL_SOURCES for where published models live)")
+        self.phonetisaurus = phonetisaurus
+        self.model = model
+        self.nbest = nbest
+        self.separator = separator
+
+    def phonemize_string(self, text: str, lang: str) -> str:
+        """Phonemize ``text``. ``lang`` is accepted and not used: the model
+        decides the language, so a language argument here would claim a
+        routing this wrapper does not do."""
+        words = text.split()
+        if not words:
+            return ""
+        # predict() yields (word, symbols) and may reorder or drop a word it
+        # cannot read, so the result is indexed by word rather than zipped.
+        #
+        # With nbest > 1 it yields one pair PER RANKED PRONUNCIATION, best
+        # first, so a word appears more than once. dict() would keep the last
+        # pair, which is the WORST-ranked reading. Keep the first instead.
+        guesses: Dict[str, List[str]] = {}
+        for word, symbols in self.phonetisaurus.predict(
+                words, self.model, nbest=self.nbest):
+            guesses.setdefault(word, symbols)
+        return " ".join(self.separator.join(guesses[w])
+                        for w in words if w in guesses)
