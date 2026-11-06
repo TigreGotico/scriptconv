@@ -5,6 +5,8 @@ from scriptconv.phonemizers.enums import Alphabet
 
 
 class TugaphonePhonemizer(BasePhonemizer):
+    owned_stages = frozenset({"diacritize"})
+    engine_distribution = "tugaphone"
 
     def __init__(self):
         try:
@@ -64,6 +66,8 @@ class BarranquenhoPhonemizer(BasePhonemizer):
     ``g2p_barranquenho`` is imported lazily so importing ``scriptconv`` does not
     hard-require it.
     """
+
+    engine_distribution = "g2p_barranquenho"
 
     _LANGS = ["ext-PT-x-barrancos"]
 

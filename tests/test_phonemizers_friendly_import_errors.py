@@ -120,7 +120,9 @@ class TestLazyBackendImportsAreFriendly(unittest.TestCase):
         self._assert_friendly(Phonemizer.PYKAKASI)
 
     def test_viphoneme(self):
-        self._assert_friendly(Phonemizer.VIPHONEME)
+        # Python 3.12 and later gives the reason instead of an install command.
+        with patch("sys.version_info", (3, 11, 9)):
+            self._assert_friendly(Phonemizer.VIPHONEME)
 
     def test_g2pk(self):
         self._assert_friendly(Phonemizer.G2PK)
