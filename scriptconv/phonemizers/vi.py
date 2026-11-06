@@ -1,13 +1,24 @@
+import sys
+
 from scriptconv.phonemizers.base import BasePhonemizer
 from scriptconv.phonemizers.enums import Alphabet
 
 
 class VIPhonemePhonemizer(BasePhonemizer):
     """https://github.com/v-nhandt21/Viphoneme"""
+
+    engine_distribution = "viphoneme"
+
     def __init__(self):
         try:
             from viphoneme import vi2IPA
         except ImportError as e:
+            if sys.version_info >= (3, 12):
+                raise ImportError(
+                    "The VIPhoneme phonemizer needs Python below 3.12, because "
+                    "viphoneme depends on vinorm, and vinorm imports the 'imp' "
+                    "module that Python 3.12 removed."
+                ) from e
             raise ImportError(
                 "viphoneme is required for the VIPhoneme phonemizer. "
                 "Install it with 'pip install viphoneme' "

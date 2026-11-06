@@ -7,6 +7,8 @@ class DeepPhonemizer(BasePhonemizer):
     """
     https://github.com/spring-media/DeepPhonemizer
     """
+
+    engine_distribution = "deep-phonemizer"
     MODELS = {
         "latin_ipa_forward.pt": "https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/DeepPhonemizer/latin_ipa_forward.pt",
         "en_us_cmudict_ipa_forward.pt": "https://public-asai-dl-models.s3.eu-central-1.amazonaws.com/DeepPhonemizer/en_us_cmudict_ipa_forward.pt",
@@ -96,6 +98,8 @@ class OpenPhonemizer(BasePhonemizer):
     https://github.com/NeuralVox/OpenPhonemizer
     """
 
+    engine_distribution = "openphonemizer"
+
     def __init__(self):
         try:
             from openphonemizer import OpenPhonemizer
@@ -153,6 +157,8 @@ class G2PEnPhonemizer(BasePhonemizer):
     """
     https://github.com/Kyubyong/g2p
     """
+
+    engine_distribution = "g2p_en"
 
     def __init__(self, alphabet=Alphabet.IPA):
         assert alphabet in [Alphabet.IPA, Alphabet.ARPA]

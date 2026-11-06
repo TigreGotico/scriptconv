@@ -13,6 +13,8 @@ class JiebaPhonemizer(BasePhonemizer):
     A non-phonemizing class that simply uses Jieba to segment Chinese text
     into words with spaces for token separation.
     """
+
+    engine_distribution = "jieba"
     def __init__(self):
         super().__init__(Alphabet.HANZI)
 
@@ -198,6 +200,8 @@ class G2pCPhonemizer(BaseChinesePinyinPhonemizer):
     https://github.com/Kyubyong/g2pC
     """
 
+    engine_distribution = "g2pc"
+
     def __init__(self, alphabet=Alphabet.PINYIN, jieba: bool = True):
         try:
             from g2pc import G2pC
@@ -227,6 +231,8 @@ class G2pMPhonemizer(BaseChinesePinyinPhonemizer):
     Phonemizer using g2pM - A Neural Grapheme-to-Phoneme Conversion Package for Mandarin Chinese
     https://github.com/kakaobrain/g2pm
     """
+
+    engine_distribution = "g2pM"
 
     def __init__(self, alphabet=Alphabet.PINYIN, tone: bool = True, char_split: bool = False, jieba: bool = True):
         try:
@@ -259,6 +265,8 @@ class XpinyinPhonemizer(BaseChinesePinyinPhonemizer):
     Phonemizer using xpinyin (basic pinyin generator with optional tone marks).
     """
 
+    engine_distribution = "xpinyin"
+
     def __init__(self, alphabet=Alphabet.PINYIN, tone_marks: str = "numbers", jieba: bool = True):
         try:
             from xpinyin import Pinyin
@@ -288,6 +296,8 @@ class PypinyinPhonemizer(BaseChinesePinyinPhonemizer):
     """
     Phonemizer using pypinyin (comprehensive and accurate pinyin library).
     """
+
+    engine_distribution = "pypinyin"
 
     def __init__(self, alphabet=Alphabet.PINYIN, jieba: bool = True):
         try:

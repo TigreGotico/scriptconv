@@ -4,13 +4,14 @@ import json
 import os
 import shutil
 import subprocess
-from typing import List, Dict, Optional, Sequence, TYPE_CHECKING
+from importlib import metadata
+from typing import List, Dict, Optional, Sequence, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     import numpy as np
 
 from scriptconv.phonemizers.enums import Alphabet
-from scriptconv.phonemizers.base import BasePhonemizer, _check_alphabet
+from scriptconv.phonemizers.base import BasePhonemizer, UnsupportedLanguageError, _check_alphabet
 # minimal ONNX session construction — scriptconv has no provider
 # machinery; consumers wanting CUDA/etc. pass providers= explicitly
 ProviderSpec = str
@@ -287,6 +288,8 @@ class EspeakPhonemizer(BasePhonemizer):
     A phonemizer class that uses the espeak-ng command-line tool to convert text into phonemes.
     It segments the input text heuristically based on punctuation to mimic clause-by-clause processing.
     """
+
+    engine_distribution = "espeak-ng"
     ESPEAK_LANGS = ['es-419', 'ca', 'qya', 'ga', 'et', 'ky', 'io', 'fa-latn', 'en-gb', 'fo', 'haw', 'kl',
                     'ta', 'ml', 'gd', 'sd', 'es', 'hy', 'ur', 'ro', 'hi', 'or', 'ti', 'ca-va', 'om', 'tr', 'pa',
                     'smj', 'mk', 'bg', 'cv', "fr", 'fi', 'en-gb-x-rp', 'ru', 'mt', 'an', 'mr', 'pap', 'vi', 'id',
@@ -317,6 +320,14 @@ class EspeakPhonemizer(BasePhonemizer):
         if lang not in self._espyak_g2p:
             self._espyak_g2p[lang] = G2P(lang)
         return self._espyak_g2p[lang].phonemize(text)
+
+    def _engine_release(self) -> Tuple[str, str]:
+        """The engine that runs here: the espeak-ng binary, or the espyak port."""
+        if self.prefer_espyak or not self._has_binary():
+            return "espyak", metadata.version("espyak")
+        # eSpeak NG text-to-speech: 1.52.0  Data at: ...
+        banner = self._run_espeak_command(["--version"])
+        return self.engine_distribution, banner.split(":")[1].split()[0]
 
     @classmethod
     def _has_binary(cls) -> bool:
@@ -442,6 +453,8 @@ class GruutPhonemizer(BasePhonemizer):
     A phonemizer class that uses the Gruut library to convert text into phonemes.
     Note: Gruut's internal segmentation is sentence-based
     """
+
+    engine_distribution = "gruut"
     GRUUT_LANGS = ["en", "ar", "ca", "cs", "de", "es", "fa", "fr", "it",
                    "lb", "nl", "pt", "ru", "sv", "sw"]
 
@@ -505,6 +518,8 @@ class GoruutPhonemizer(BasePhonemizer):
     A phonemizer class that uses the pygoruut library to convert text into phonemes.
     https://github.com/neurlang/pygoruut/
     """
+
+    engine_distribution = "pygoruut"
     GORUUT_LANGS_NON_STD = [
         'BengaliDhaka', 'BengaliRahr', 'MalayArab', 'VietnameseCentral', 'VietnameseSouthern',
         'EnglishAmerican', 'EnglishBritish', 'NahuatlClassical', 'Hebrew2', 'Hebrew3',
@@ -693,6 +708,8 @@ class GoruutPhonemizer(BasePhonemizer):
 class EpitranPhonemizer(BasePhonemizer):
     """
     """
+
+    engine_distribution = "epitran"
     EPITRAN_LANGS = ['hsn-Latn', 'ful-Latn', 'jpn-Kana', 'tel-Telu', 'nld-Latn', 'aze-Latn', 'amh-Ethi-pp',
                      'msa-Latn', 'spa-Latn-eu', 'ori-Orya', 'bxk-Latn', 'spa-Latn', 'kir-Cyrl', 'lij-Latn', 'kin-Latn',
                      'ces-Latn', 'sin-Sinh', 'urd-Arab', 'vie-Latn', 'gan-Latn', 'fra-Latn', 'nan-Latn', 'kaz-Latn',
@@ -747,7 +764,7 @@ class EpitranPhonemizer(BasePhonemizer):
         # Hrkt text would come back half converted.
         subtags = (target_lang or "").replace("_", "-").lower().split("-")
         if subtags[0] in ("ja", "jpn") and not {"kana", "hira"} & set(subtags[1:]):
-            raise ValueError(f"unsupported language code: {target_lang} "
+            raise UnsupportedLanguageError(f"unsupported language code: {target_lang} "
                              "(epitran reads Japanese kana only; use ja-Kana or ja-Hira)")
         return cls.match_lang(target_lang, cls.EPITRAN_LANGS)
 
@@ -769,6 +786,8 @@ class MisakiPhonemizer(BasePhonemizer):
     """
     https://github.com/hexgrad/misaki
     """
+
+    engine_distribution = "misaki"
     MISAKI_LANGS = ['en-US', 'en-GB', 'ko', 'ja', 'vi', 'zh']
 
     def __init__(self, alphabet: Alphabet = Alphabet.IPA):
@@ -893,6 +912,8 @@ class TransphonePhonemizer(BasePhonemizer):
     """
     It provides approximiated phoneme tokenizers and G2P model for 7546 languages registered in the Glottolog database.
     """
+
+    engine_distribution = "transphone"
     TRANSPHONE_LANGS = ['aaa', 'aab', 'aac', 'aad', 'aae', 'aaf', 'aag', 'aah', 'aai', 'aak', 'aal', 'aan', 'aao',
                         'aap', 'aaq', 'aar', 'aas', 'aat', 'aau', 'aaw', 'aax', 'aaz', 'aba', 'abb', 'abc', 'abd',
                         'abe', 'abf', 'abg', 'abh', 'abi', 'abj', 'abk', 'abl', 'abm', 'abn', 'abo', 'abp', 'abq',
@@ -1538,6 +1559,8 @@ class PhonetisaurusPhonemizer(BasePhonemizer):
     on Debian and Ubuntu). Training is not exercised here: this wrapper only
     applies a model.
     """
+
+    engine_distribution = "phonetisaurus"
 
     #: Where published FSTs come from. Documentation, never a download.
     MODEL_SOURCES = {

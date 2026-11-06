@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+from importlib import metadata
+from typing import Optional, Tuple
 
 from scriptconv.phonemizers.enums import Alphabet
 from scriptconv.phonemizers.base import BasePhonemizer, _check_alphabet
@@ -182,6 +183,12 @@ class MantoqPhonemizer(BasePhonemizer):
         if mantoq is None:
             mantoq = _load_mantoq_g2p()
 
+    def _engine_release(self) -> Tuple[str, str]:
+        """An installed ``mantoq`` runs in place of the vendored copy."""
+        if mantoq.__module__.startswith("scriptconv."):
+            return super()._engine_release()
+        return "mantoq", metadata.version("mantoq")
+
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
         return cls.match_lang(target_lang, ["ar"])
@@ -221,6 +228,9 @@ class ArbtokPhonemizer(BasePhonemizer):
 
     ``arbtok`` is imported lazily so importing ``scriptconv`` does not hard-require it.
     """
+
+    owned_stages = frozenset({"diacritize"})
+    engine_distribution = "arbtok"
 
     def __init__(self, register: Optional[str] = None,
                  alphabet: Alphabet = Alphabet.IPA):

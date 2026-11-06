@@ -34,6 +34,27 @@ inside `phonemize_lazy`, without it, the raw text is phonemized as-is. A
 pipeline that injects its own normalizer and one that doesn't will therefore
 legitimately differ on text containing digits.
 
+**A backend can own a stage.** The class attribute `owned_stages` names the
+stages that a backend always runs itself, so a frontend skips them. `diacritize`
+is the only name: Tugaphone and Arbtok own it. A stage that a backend runs only
+with an optional dependency is not owned.
+
+**A backend reports what produced its output.** `identity(lang)` returns a
+frozen `PhonemizerIdentity` with the backend, the engine distribution, its
+installed version and the resolved language. `differs_from(other)` names the
+fields that changed, so a cached result can be checked against the engine
+installed on the machine. `revision` comes first in the result. When both sides
+hold the same `revision`, a `version` difference is not reported, because the
+spec that gives the phonemes did not change. The class attribute
+`engine_distribution` names the package that supplies the engine, and `None`
+means the code is in this repository.
+
+**Failures have types.** Each error below is a `FrontendError`, which is a
+`ValueError`. `UnsupportedLanguageError` means the backend has no reading for
+the language. `StageError` means a stage failed. `UnreadTextError` means text
+stayed unread, and its `unread` attribute lists that text.
+`ModelUnavailableError` means a model cannot load.
+
 **Punctuation is opt-in.** By default no punctuation reaches the phonemes,
 which is what every voice trained on scriptconv's output so far has learned.
 Set `keep_punctuation = True` on the instance (or pass `keep_punctuation=True`
@@ -243,7 +264,7 @@ epitran, transphone, ByT5/Charsiu (ONNX), the misaki family (en/ja/zh/ko/vi).
 Per-language: English (DeepPhonemizer, OpenPhonemizer, g2p_en), Japanese
 (OpenJTalk, cutlet, pykakasi), Korean (g2pk, KoG2P), Chinese (jieba, g2pM,
 xpinyin, pypinyin), Arabic (arbtok, mantoq), Hebrew (phonikud), Persian,
-Vietnamese (viphoneme), Portuguese (tugaphone, barranquenho), Galician
+Vietnamese (viphoneme, Python below 3.12 only), Portuguese (tugaphone, barranquenho), Galician
 (Cotovía), Russian (vosk, the vosk-tts inventory, `Alphabet.VOSK`, with the
 voice's pronunciation dictionary passed as `phonemizer_model`), Basque
 (AhoTTS, euskaphone), Mirandese, Levantine Arabic/English

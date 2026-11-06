@@ -4,6 +4,8 @@ from scriptconv.phonemizers.enums import Alphabet
 
 class PersianPhonemizer(BasePhonemizer):
     """https://github.com/de-mh/persian_phonemizer"""
+
+    engine_distribution = "persian_phonemizer"
     def __init__(self, alphabet=Alphabet.IPA):
         try:
             from persian_phonemizer import Phonemizer

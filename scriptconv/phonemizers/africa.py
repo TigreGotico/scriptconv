@@ -28,7 +28,8 @@ attribution requirements). It is always available, no extra to install.
 """
 from typing import Dict, List
 
-from scriptconv.phonemizers.base import BasePhonemizer, _check_alphabet, _primary_subtag
+from scriptconv.phonemizers.base import (
+    BasePhonemizer, UnsupportedLanguageError, _check_alphabet, _primary_subtag)
 from scriptconv.phonemizers.enums import Alphabet
 
 __all__ = ["AfricaG2PPhonemizer"]
@@ -126,7 +127,7 @@ class AfricaG2PPhonemizer(BasePhonemizer):
         key = _primary_subtag(target_lang)
         if key in langs:
             return key
-        raise ValueError(f"africa-g2p: unsupported language {target_lang!r}")
+        raise UnsupportedLanguageError(f"africa-g2p: unsupported language {target_lang!r}")
 
     def phonemize_string(self, text: str, lang: str) -> str:
         resolved = self.get_lang(lang)

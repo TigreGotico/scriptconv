@@ -2,6 +2,7 @@ from scriptconv.phonemizers.base import BasePhonemizer, _check_alphabet
 from scriptconv.phonemizers.enums import Alphabet
 
 class OpenJTaklPhonemizer(BasePhonemizer):
+    engine_distribution = "pyopenjtalk"
 
     def __init__(self, alphabet=Alphabet.HEPBURN):
         _check_alphabet(self, alphabet, [Alphabet.HEPBURN, Alphabet.KANA])
@@ -34,6 +35,7 @@ class OpenJTaklPhonemizer(BasePhonemizer):
 
 
 class CutletPhonemizer(BasePhonemizer):
+    engine_distribution = "cutlet"
 
     def __init__(self, alphabet=Alphabet.HEPBURN, use_foreign_spelling = False):
         _check_alphabet(self, alphabet,
@@ -77,6 +79,7 @@ class CutletPhonemizer(BasePhonemizer):
         return self.g2p.romaji(text)
 
 class PyKakasiPhonemizer(BasePhonemizer):
+    engine_distribution = "pykakasi"
 
     def __init__(self, alphabet=Alphabet.HEPBURN):
         _check_alphabet(self, alphabet,

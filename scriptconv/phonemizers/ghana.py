@@ -21,7 +21,8 @@ Optional extra: ``pip install scriptconv[ghana]``.
 """
 from typing import Dict, List
 
-from scriptconv.phonemizers.base import BasePhonemizer, _check_alphabet, _primary_subtag
+from scriptconv.phonemizers.base import (
+    BasePhonemizer, UnsupportedLanguageError, _check_alphabet, _primary_subtag)
 from scriptconv.phonemizers.enums import Alphabet
 
 __all__ = ["GhanaG2PPhonemizer"]
@@ -47,6 +48,8 @@ class GhanaG2PPhonemizer(BasePhonemizer):
     ``gaa``, ``hau``, ...), read at runtime from ``ghana_g2p.languages()``.
     One engine per language is created on first use and cached.
     """
+
+    engine_distribution = "ghana-g2p"
 
     def __init__(self, alphabet: Alphabet = Alphabet.IPA):
         _check_alphabet(self, alphabet, [Alphabet.IPA, Alphabet.AFRICA_G2P])
@@ -78,7 +81,7 @@ class GhanaG2PPhonemizer(BasePhonemizer):
         key = _primary_subtag(target_lang)
         if key in cls.supported_langs():
             return key
-        raise ValueError(f"ghana-g2p: unsupported language {target_lang!r}")
+        raise UnsupportedLanguageError(f"ghana-g2p: unsupported language {target_lang!r}")
 
     def phonemize_string(self, text: str, lang: str) -> str:
         engine = self._engine(self.get_lang(lang))
