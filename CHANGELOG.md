@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a45](https://github.com/TigreGotico/scriptconv/tree/0.0.4a45) (2026-11-06)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a44...0.0.4a45)
+
+**Merged pull requests:**
+
+- fix: correct ARPABET and X-SAMPA tables against their sources [\#157](https://github.com/TigreGotico/scriptconv/pull/157) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a44](https://github.com/TigreGotico/scriptconv/tree/0.0.4a44) (2026-11-05)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a43...0.0.4a44)
@@ -406,15 +414,10 @@
 **Merged pull requests:**
 
 - Release 0.0.3a18 [\#53](https://github.com/TigreGotico/scriptconv/pull/53) ([github-actions[bot]](https://github.com/apps/github-actions))
-- feat: mantoq phonetic notation with IPA conversion; complete Buckwalter table [\#52](https://github.com/TigreGotico/scriptconv/pull/52) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.3a17](https://github.com/TigreGotico/scriptconv/tree/0.0.3a17) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a16...0.0.3a17)
-
-**Merged pull requests:**
-
-- Release 0.0.3a17 [\#51](https://github.com/TigreGotico/scriptconv/pull/51) ([github-actions[bot]](https://github.com/apps/github-actions))
 
 ## [0.0.3a16](https://github.com/TigreGotico/scriptconv/tree/0.0.3a16) (2026-07-21)
 
