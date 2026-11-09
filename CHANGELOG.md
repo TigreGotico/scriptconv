@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a47](https://github.com/TigreGotico/scriptconv/tree/0.0.4a47) (2026-11-09)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a46...0.0.4a47)
+
+**Merged pull requests:**
+
+- test\(ghana\): read the Dagbani expectation from the engine [\#163](https://github.com/TigreGotico/scriptconv/pull/163) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a46](https://github.com/TigreGotico/scriptconv/tree/0.0.4a46) (2026-11-09)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a45...0.0.4a46)
@@ -401,11 +409,6 @@
 ## [0.0.3a20](https://github.com/TigreGotico/scriptconv/tree/0.0.3a20) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a19...0.0.3a20)
-
-**Merged pull requests:**
-
-- Release 0.0.3a20 [\#57](https://github.com/TigreGotico/scriptconv/pull/57) ([github-actions[bot]](https://github.com/apps/github-actions))
-- feat: wrap license-encumbered backends as external runtime dependencies [\#56](https://github.com/TigreGotico/scriptconv/pull/56) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.3a19](https://github.com/TigreGotico/scriptconv/tree/0.0.3a19) (2026-07-21)
 
