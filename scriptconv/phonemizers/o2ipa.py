@@ -13,12 +13,12 @@ diacritizer on top of this same lattice); for dialect-aware Basque use
 ``orthography2ipa`` is imported lazily so importing ``scriptconv`` never requires
 it; install with ``pip install orthography2ipa`` (or ``pip install scriptconv[o2i]``).
 
-With ``packaged_lexicons=True`` (the default) the phonemizer enables the
-installed packaged lexicon (``o2i-lexicons``) for each language it transcribes,
-when a package serves that language. orthography2ipa keeps its lexicons
-process-wide, so an enabled lexicon serves every orthography2ipa caller in the
-process, and ``packaged_lexicons=False`` does not disable one that another
-caller enabled.
+With ``packaged_lexicons=True`` (the default) the engine of each language
+holds the installed packaged lexicon (``o2i-lexicons``) for that language, when
+a package serves it: the exceptions, and the patches when the package ships
+them. The lexicon belongs to that engine, so no other orthography2ipa engine in
+the process sees it. With ``packaged_lexicons=False`` the engine holds an empty
+lexicon and runs on the rules alone.
 """
 from typing import Dict, List
 
@@ -45,10 +45,13 @@ class Orthography2IPAPhonemizer(BasePhonemizer):
         """Return, lazily creating and caching, the G2P engine for *resolved_lang*."""
         if resolved_lang not in self._cache:
             import orthography2ipa
+            lexicon = {}
             if (self.packaged_lexicons and resolved_lang
                     in orthography2ipa.packaged_lexicon_sources()):
-                orthography2ipa.use_packaged_lexicons([resolved_lang])
-            self._cache[resolved_lang] = orthography2ipa.G2P(resolved_lang)
+                patches = resolved_lang in orthography2ipa.packaged_lexicon_sources(patches=True)
+                lexicon = orthography2ipa.packaged_lexicon(resolved_lang, patches=patches)
+            self._cache[resolved_lang] = orthography2ipa.G2P(
+                resolved_lang, pipeline=orthography2ipa.Pipeline(lexicon=lexicon))
         return self._cache[resolved_lang]
 
     @classmethod
