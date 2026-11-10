@@ -259,7 +259,7 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
             return target_lang, 0
         best_lang, best_distance = "und", 10000000
         for l in valid_langs:
-            distance = lang_distance(l, target_lang)
+            distance = lang_distance(target_lang, l)
             if distance < best_distance:
                 best_lang, best_distance = l, distance
         if best_distance <= 10:
