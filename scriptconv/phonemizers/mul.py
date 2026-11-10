@@ -763,9 +763,9 @@ class EpitranPhonemizer(BasePhonemizer):
             str: The validated language code.
 
         Raises:
-            ValueError: If the language code is unsupported, if it is
-                Japanese without a Kana or Hira script subtag, or if it is
-                Korean without a Hang script subtag.
+            ValueError: If the language code is unsupported, or if it is
+                Japanese without a Kana or Hira script subtag. A refused
+                Korean tag gets a hint to use ko-Hang or kor-Hang.
         """
         # Each epitran Japanese map converts one kana script. Kanji and the
         # other kana script pass through unchanged, so a request for Jpan or
@@ -774,12 +774,16 @@ class EpitranPhonemizer(BasePhonemizer):
         if subtags[0] in ("ja", "jpn") and not {"kana", "hira"} & set(subtags[1:]):
             raise ValueError(f"unsupported language code: {target_lang} "
                              "(epitran reads Japanese kana only; use ja-Kana or ja-Hira)")
-        # The epitran Korean map converts Hangul only. A bare Korean tag means
-        # the Kore script, Hangul plus Hanja, and Hanja passes through unchanged.
-        if subtags[0] in ("ko", "kor") and "hang" not in subtags[1:]:
-            raise ValueError(f"unsupported language code: {target_lang} "
-                             "(epitran reads Korean Hangul only; use ko-Hang or kor-Hang)")
-        return cls.match_lang(target_lang, cls.EPITRAN_LANGS)
+        try:
+            return cls.match_lang(target_lang, cls.EPITRAN_LANGS)
+        except ValueError as err:
+            # The epitran Korean map converts Hangul only. A bare Korean tag
+            # means the Kore script, Hangul plus Hanja, and Hanja passes
+            # through unchanged, so the match refuses it.
+            if subtags[0] in ("ko", "kor"):
+                raise ValueError(f"{err} (epitran reads Korean in Hangul; "
+                                 "use ko-Hang or kor-Hang)") from err
+            raise
 
     def phonemize_string(self, text: str, lang: str) -> str:
         lang = self.get_lang(lang)
