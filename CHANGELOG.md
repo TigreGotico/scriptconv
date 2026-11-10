@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a49](https://github.com/TigreGotico/scriptconv/tree/0.0.4a49) (2026-11-10)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a48...0.0.4a49)
+
+**Merged pull requests:**
+
+- fix: measure language distance from the requested tag in match\_lang [\#168](https://github.com/TigreGotico/scriptconv/pull/168) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a48](https://github.com/TigreGotico/scriptconv/tree/0.0.4a48) (2026-11-10)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a47...0.0.4a48)
@@ -399,11 +407,6 @@
 ## [0.0.3a22](https://github.com/TigreGotico/scriptconv/tree/0.0.3a22) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a21...0.0.3a22)
-
-**Merged pull requests:**
-
-- Release 0.0.3a22 [\#61](https://github.com/TigreGotico/scriptconv/pull/61) ([github-actions[bot]](https://github.com/apps/github-actions))
-- fix: restore mantoq phonemizer historical contract [\#60](https://github.com/TigreGotico/scriptconv/pull/60) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.3a21](https://github.com/TigreGotico/scriptconv/tree/0.0.3a21) (2026-07-21)
 
