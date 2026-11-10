@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a48](https://github.com/TigreGotico/scriptconv/tree/0.0.4a48) (2026-11-10)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a47...0.0.4a48)
+
+**Merged pull requests:**
+
+- fix: route European Portuguese lects to bifonia through linguatag [\#165](https://github.com/TigreGotico/scriptconv/pull/165) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a47](https://github.com/TigreGotico/scriptconv/tree/0.0.4a47) (2026-11-09)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a46...0.0.4a47)
@@ -400,11 +408,6 @@
 ## [0.0.3a21](https://github.com/TigreGotico/scriptconv/tree/0.0.3a21) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a20...0.0.3a21)
-
-**Merged pull requests:**
-
-- Release 0.0.3a21 [\#59](https://github.com/TigreGotico/scriptconv/pull/59) ([github-actions[bot]](https://github.com/apps/github-actions))
-- feat: vendor unpublished licensed backends in a quarantined subpackage [\#58](https://github.com/TigreGotico/scriptconv/pull/58) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.3a20](https://github.com/TigreGotico/scriptconv/tree/0.0.3a20) (2026-07-21)
 
