@@ -22,6 +22,14 @@ from scriptconv.phonemizers.mul import EspeakPhonemizer, _respell_for_espeak
     ("grand'mere", "grand-mere"),
     ("prud'homme", "prud-homme"),
     ("Prud'hommes", "Prud-hommes"),
+    # All capitals and mixed case (CodeRabbit on scriptconv#160): the case is kept.
+    ("D'AUJOURD'HUI", "DE AUJOURD'HUI"),
+    ("D\u2019AUJOURD\u2019HUI", "DE AUJOURD'HUI"),
+    ("GRAND'MÈRE", "GRAND-MÈRE"),
+    ("GRAND'MÈRES", "GRAND-MÈRES"),
+    ("Grand'Mère", "Grand-Mère"),
+    ("PRUD'HOMMES", "PRUD-HOMMES"),
+    ("LE JOUR D'AUJOURD'HUI", "LE JOUR DE AUJOURD'HUI"),
 ])
 def test_the_words_espeak_mistakes_for_english_are_respelled_in_french(text, expected):
     assert _respell_for_espeak(text, "fr") == expected
@@ -45,7 +53,8 @@ needs_espeak = pytest.mark.skipif(shutil.which("espeak-ng") is None, reason="nee
 
 
 @needs_espeak
-@pytest.mark.parametrize("text", ["d'aujourd'hui", "Le jour d'aujourd'hui", "grand'mère", "les prud'hommes"])
+@pytest.mark.parametrize("text", ["d'aujourd'hui", "Le jour d'aujourd'hui", "grand'mère", "les prud'hommes",
+                                  "D'AUJOURD'HUI", "GRAND'MÈRE", "PRUD'HOMMES"])
 def test_a_french_voice_gets_no_english_phones(text):
     phonemes = EspeakPhonemizer().phonemize_string(text, "fr-FR")
     # the English voice's vowels and affricate, which French never produces here
