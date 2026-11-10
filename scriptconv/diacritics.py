@@ -90,7 +90,12 @@ def _is_european_portuguese(lang: str) -> bool:
     ``por``, and the European Portuguese lects (``pt-PT-x-porto``,
     ``pt-PT-x-lisbon``). ``pt-BR``, ``pt-AO``, ``pt-MZ`` and every other
     language are at a larger distance and return False.
+
+    Only a ``pt`` or ``por`` primary subtag reaches linguatag, so a caller
+    that never asks for Portuguese does not need the ``phonemizers`` extra.
     """
+    if _primary_subtag(lang) not in ("pt", "por"):
+        return False
     try:
         from linguatag import lang_distance
     except ImportError as e:

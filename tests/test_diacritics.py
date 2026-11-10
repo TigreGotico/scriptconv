@@ -286,6 +286,17 @@ class TestEuropeanPortugueseRoutingFollowsLinguatag:
             diacritize("Tenho muita sede hoje.", tag)
         assert received == ["pt-PT", "pt-PT-x-porto", "pt_PT"]
 
+    def test_non_portuguese_tags_need_no_linguatag(self, monkeypatch):
+        import sys
+        from scriptconv.diacritics import diacritize
+        monkeypatch.setitem(sys.modules, "linguatag", None)
+        text = "hello"
+        assert diacritize(text, "en") == text
+        with pytest.raises(ValueError):
+            strip_diacritics("café", "en")
+        with pytest.raises(ImportError, match=r"scriptconv\[phonemizers\]"):
+            diacritize("Tenho muita sede hoje.", "pt-PT-x-porto")
+
 
 class TestEastSlavicStressRouting:
     """stressonnx is not yet on PyPI — routing is verified against a stub."""
