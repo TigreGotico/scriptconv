@@ -243,6 +243,61 @@ class TestEuropeanPortugueseSenseDiacritics:
         assert diacritize(text, "pt-BR") == text
 
 
+PORTUGUESE_ROUTING_TAGS = [
+    "pt", "pt-PT", "pt_PT", "PT-pt", "pt-PT-x-porto", "pt-PT-x-lisbon",
+    "pt-Latn-PT", "por", "pt-BR", "pt-AO", "pt-MZ", "gl", "es", "und", "",
+]
+
+
+class TestEuropeanPortugueseRoutingFollowsLinguatag:
+    """European Portuguese is every tag linguatag puts at distance 0 from
+    ``pt-PT``, and bifonia receives the caller's full tag."""
+
+    def test_routing_matches_linguatag_distance(self):
+        from linguatag import lang_distance
+        from scriptconv.diacritics import _diacritizer_family, _is_european_portuguese
+        expected = {tag: lang_distance(tag, "pt-PT") == 0
+                    for tag in PORTUGUESE_ROUTING_TAGS}
+        assert {tag: _is_european_portuguese(tag)
+                for tag in PORTUGUESE_ROUTING_TAGS} == expected
+        assert {tag: _diacritizer_family(tag) for tag in PORTUGUESE_ROUTING_TAGS} == {
+            tag: "pt" if is_european else None for tag, is_european in expected.items()}
+
+    def test_lect_tags_get_bifonia_marks(self):
+        from bifonia import add_extra_diacritics
+        from scriptconv.diacritics import diacritize
+        text = "Ele soma os números."
+        for tag in ("pt-PT-x-porto", "pt-PT-x-lisbon", "pt-Latn-PT", "por"):
+            marked = add_extra_diacritics(text, tag)
+            assert marked != text
+            assert diacritize(text, tag) == marked
+
+    def test_bifonia_receives_the_full_tag(self, monkeypatch):
+        import bifonia
+        from scriptconv.diacritics import diacritize
+        received = []
+
+        def record(sentence, lang=None):
+            received.append(lang)
+            return sentence
+
+        monkeypatch.setattr(bifonia, "add_extra_diacritics", record)
+        for tag in ("pt-PT", "pt-PT-x-porto", "pt_PT"):
+            diacritize("Tenho muita sede hoje.", tag)
+        assert received == ["pt-PT", "pt-PT-x-porto", "pt_PT"]
+
+    def test_non_portuguese_tags_need_no_linguatag(self, monkeypatch):
+        import sys
+        from scriptconv.diacritics import diacritize
+        monkeypatch.setitem(sys.modules, "linguatag", None)
+        text = "hello"
+        assert diacritize(text, "en") == text
+        with pytest.raises(ValueError):
+            strip_diacritics("café", "en")
+        with pytest.raises(ImportError, match=r"scriptconv\[phonemizers\]"):
+            diacritize("Tenho muita sede hoje.", "pt-PT-x-porto")
+
+
 class TestEastSlavicStressRouting:
     """stressonnx is not yet on PyPI — routing is verified against a stub."""
 
