@@ -289,15 +289,30 @@ class CharsiuPhonemizer(ByT5Phonemizer):
 # sentence, so a French voice reads "d'aujourd'hui" as English. Respell each of
 # them as French text espeak-ng reads correctly (checked against espeak-ng 1.52.0):
 # "de aujourd'hui" -> də oʒuʁdyˈi, "grand-mère" -> ɡʁˈɑ̃mˈɛʁ, "prud-homme" -> pʁˈydˈɔm.
+def _elide_d(match: "re.Match[str]") -> str:
+    """"d'aujourd'hui" -> "de aujourd'hui", keeping the case the text was written in."""
+    word = match.group(0)
+    return ("DE " if word.isupper() else word[0] + "e ") + word[2:].replace("\u2019", "'")
+
+
+def _hyphenate(match: "re.Match[str]") -> str:
+    """"grand'mère" -> "grand-mère" (the apostrophe becomes a hyphen; the letters keep their case)."""
+    return match.group(1) + "-" + match.group(2)
+
+
 _FRENCH_ENGLISH_SWITCH_FIXES = (
-    (re.compile(r"\b([Dd])['\u2019]aujourd['\u2019]hui\b"), r"\1e aujourd'hui"),
-    (re.compile(r"\b([Gg])rand['\u2019](m[\u00e8e]res?)\b"), r"\1rand-\2"),
-    (re.compile(r"\b([Pp])rud['\u2019](hommes?)\b"), r"\1rud-\2"),
+    (re.compile(r"\bd['\u2019]aujourd['\u2019]hui\b", re.IGNORECASE), _elide_d),
+    (re.compile(r"\b(grand)['\u2019](m[\u00e8e]res?)\b", re.IGNORECASE), _hyphenate),
+    (re.compile(r"\b(prud)['\u2019](hommes?)\b", re.IGNORECASE), _hyphenate),
 )
 
 
 def _respell_for_espeak(text: str, lang: str) -> str:
-    """Respell the few words espeak-ng mistakes for English in a French text."""
+    """Respell the few words espeak-ng mistakes for English in a French text.
+
+    The match ignores case, so a heading in capitals ("D'AUJOURD'HUI", "GRAND'MÈRE") gets
+    the same treatment; the replacement keeps whatever case each letter had.
+    """
     if lang.split("-")[0].lower() != "fr":
         return text
     for pattern, replacement in _FRENCH_ENGLISH_SWITCH_FIXES:
