@@ -123,7 +123,7 @@ four such backends, each lazy-imported and each raising a named
 | `he` | phonikud (`phonikud_model=`) | `he` | niqqud |
 | `ar` | text2tashkeel | `tashkeel` | tashkeel (+ hamza, dagger alef) |
 | 26 stressonnx tags (`STRESS_LANGS`): East Slavic (`ru`, `uk`, `be`), Bulgarian/Macedonian/Slovene (`bg`, `mk`, `sl`), Latvian (`lv`), Armenian (`hy`), Georgian (`ka`), Turkic/Caucasian (`az`, `ba`, `cv`, `kbd`, `kjh`, `kk`, `ky`, `mdf`, `myv`, `sah`, `tg`, `tt`, `udm`, `uz`, `xal`) | stressonnx | `stress` | word stress |
-| `pt` / `pt-PT` (not `pt-BR`) | bifonia | `pt` | heterophonic-homograph sense diacritics |
+| Tags at linguatag distance 0 from `pt-PT`: `pt`, `pt-PT`, `pt-Latn-PT`, `por`, and lects such as `pt-PT-x-porto` (not `pt-BR`, `pt-AO`, `pt-MZ`) | bifonia, which receives the full tag | `pt` | heterophonic-homograph sense diacritics |
 
 Stress is free and either unwritten or under-marked in all of these
 languages. East Slavic is the clearest case: stress is also mobile (it

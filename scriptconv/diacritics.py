@@ -84,14 +84,25 @@ STRESS_LANGS = {
 
 
 def _is_european_portuguese(lang: str) -> bool:
-    """True for European Portuguese (``pt`` or a ``pt-PT`` region tag).
+    """True for a tag that linguatag measures at distance 0 from ``pt-PT``.
 
-    False for Brazilian Portuguese (``pt-BR``) and everything else — the two
-    varieties' vowel systems differ, and bifonia's open/closed diacritics are
-    only valid for European Portuguese phonology.
+    That is ``pt``, ``pt-PT`` in any case or separator, ``pt-Latn-PT``,
+    ``por``, and the European Portuguese lects (``pt-PT-x-porto``,
+    ``pt-PT-x-lisbon``). ``pt-BR``, ``pt-AO``, ``pt-MZ`` and every other
+    language are at a larger distance and return False.
+
+    Only a ``pt`` or ``por`` primary subtag reaches linguatag, so a caller
+    that never asks for Portuguese does not need the ``phonemizers`` extra.
     """
-    norm = lang.lower().replace("_", "-")
-    return norm == "pt" or norm == "pt-pt"
+    if _primary_subtag(lang) not in ("pt", "por"):
+        return False
+    try:
+        from linguatag import lang_distance
+    except ImportError as e:
+        raise ImportError(
+            "diacritization language routing requires the linguatag package: "
+            "pip install scriptconv[phonemizers]") from e
+    return lang_distance(lang, "pt-PT") == 0
 
 
 #: Primary subtags whose STRESS_LANGS membership does not by itself mean the
@@ -295,15 +306,16 @@ def _stress(text: str, lang: str, model: Optional[str] = None) -> str:
     return stress(text, lang, model=model)
 
 
-def _sense_diacritics_pt(text: str) -> str:
+def _sense_diacritics_pt(text: str, lang: str) -> str:
     """European-Portuguese heterophonic-homograph sense diacritics via bifonia.
 
     Rewrites homographs whose pronunciation depends on meaning (e.g.
     "sede" thirst/closed vs. seat/open) with an explicit open/closed
     vowel diacritic. These are ordinary Portuguese orthographic marks,
     chosen so any downstream G2P — rule-based, neural, or espeak —
-    reads them correctly. Install with ``pip install scriptconv[pt]``
-    (or ``pip install bifonia``)."""
+    reads them correctly. *lang* goes to bifonia unchanged, so a lect tag
+    such as ``pt-PT-x-porto`` reaches bifonia's per-lect rows. Install with
+    ``pip install scriptconv[pt]`` (or ``pip install bifonia``)."""
     try:
         from bifonia import add_extra_diacritics
     except ImportError as e:
@@ -311,7 +323,7 @@ def _sense_diacritics_pt(text: str) -> str:
             "European-Portuguese sense diacritics require the bifonia package: "
             "pip install scriptconv[pt]  (or pip install bifonia)"
         ) from e
-    return add_extra_diacritics(text)
+    return add_extra_diacritics(text, lang)
 
 
 def diacritize(text: str, lang: str = "und", diacritizer_model=None,
@@ -335,7 +347,7 @@ def diacritize(text: str, lang: str = "und", diacritizer_model=None,
       stressonnx model. Stress is unwritten or under-marked in these languages,
       and in East Slavic unstressed vowels also reduce, so a missing mark can
       corrupt more than prosody.
-    - European Portuguese (``pt``/``pt-PT``, never ``pt-BR``) —
+    - European Portuguese (``pt``, ``pt-PT`` and its lects, never ``pt-BR``) —
       heterophonic-homograph sense diacritics via bifonia (``[pt]``);
       ordinary Portuguese orthographic marks that any downstream G2P reads
       correctly.
@@ -363,7 +375,7 @@ def diacritize(text: str, lang: str = "und", diacritizer_model=None,
             return _stress(text, lang, diacritizer_model)
         return text
     if family == "pt":
-        return _sense_diacritics_pt(text)
+        return _sense_diacritics_pt(text, lang)
     return text
 
 

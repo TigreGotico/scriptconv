@@ -273,13 +273,13 @@ Three design points worth knowing:
 - **The orthography2ipa phonemizer uses the packaged lexicons.** The `o2i`
   extra installs [o2i-lexicons](https://github.com/TigreGotico/o2i-lexicons),
   which holds the words that the orthography2ipa rules get wrong, such as
-  en-GB ⟨yacht⟩. The key `packaged_lexicons` (default `True`) enables the
-  packaged lexicon for each language that the phonemizer transcribes, when a
-  package serves that language. Set it to `False` to use the rules only:
+  en-GB ⟨yacht⟩. The key `packaged_lexicons` (default `True`) gives the
+  engine of each language its packaged lexicon, when a package serves that
+  language: the exceptions, and the patches when the package ships them. Set
+  it to `False` to use the rules only:
   `get_phonemizer(Phonemizer.ORTHOGRAPHY2IPA, packaged_lexicons=False)`.
-  orthography2ipa keeps its lexicons for the whole process. After one caller
-  enables a lexicon, every orthography2ipa caller in the process uses it, and
-  `packaged_lexicons=False` does not disable it again.
+  The lexicon belongs to the phonemizer's own engine. Another
+  orthography2ipa engine in the process does not see it.
 
 **Pre-G2P disambiguation.** `add_diacritics(text, lang, model=None)`
 restores information ordinary orthography omits but a G2P needs, before

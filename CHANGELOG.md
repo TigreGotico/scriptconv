@@ -1,5 +1,46 @@
 # Changelog
 
+## [0.0.4a50](https://github.com/TigreGotico/scriptconv/tree/0.0.4a50) (2026-11-10)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a49...0.0.4a50)
+
+**Merged pull requests:**
+
+- fix: hint at ko-Hang when epitran refuses a Korean tag [\#170](https://github.com/TigreGotico/scriptconv/pull/170) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.0.4a49](https://github.com/TigreGotico/scriptconv/tree/0.0.4a49) (2026-11-10)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a48...0.0.4a49)
+
+**Merged pull requests:**
+
+- fix: measure language distance from the requested tag in match\_lang [\#168](https://github.com/TigreGotico/scriptconv/pull/168) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.0.4a48](https://github.com/TigreGotico/scriptconv/tree/0.0.4a48) (2026-11-10)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a47...0.0.4a48)
+
+**Merged pull requests:**
+
+- fix: route European Portuguese lects to bifonia through linguatag [\#165](https://github.com/TigreGotico/scriptconv/pull/165) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.0.4a47](https://github.com/TigreGotico/scriptconv/tree/0.0.4a47) (2026-11-09)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a46...0.0.4a47)
+
+**Merged pull requests:**
+
+- test\(ghana\): read the Dagbani expectation from the engine [\#163](https://github.com/TigreGotico/scriptconv/pull/163) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.0.4a46](https://github.com/TigreGotico/scriptconv/tree/0.0.4a46) (2026-11-09)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a45...0.0.4a46)
+
+**Merged pull requests:**
+
+- fix\(o2i\): give the phonemizer's own engine the packaged lexicon [\#161](https://github.com/TigreGotico/scriptconv/pull/161) ([JarbasAl](https://github.com/JarbasAl))
+- fix\(espeak\): respell the French words espeak-ng reads as English [\#160](https://github.com/TigreGotico/scriptconv/pull/160) ([goldyfruit](https://github.com/goldyfruit))
+
 ## [0.0.4a45](https://github.com/TigreGotico/scriptconv/tree/0.0.4a45) (2026-11-06)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a44...0.0.4a45)
@@ -367,53 +408,25 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a22...0.0.3a23)
 
-**Merged pull requests:**
-
-- docs: full documentation pass — narrative README and per-module guide [\#62](https://github.com/TigreGotico/scriptconv/pull/62) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [0.0.3a22](https://github.com/TigreGotico/scriptconv/tree/0.0.3a22) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a21...0.0.3a22)
-
-**Merged pull requests:**
-
-- Release 0.0.3a22 [\#61](https://github.com/TigreGotico/scriptconv/pull/61) ([github-actions[bot]](https://github.com/apps/github-actions))
-- fix: restore mantoq phonemizer historical contract [\#60](https://github.com/TigreGotico/scriptconv/pull/60) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.3a21](https://github.com/TigreGotico/scriptconv/tree/0.0.3a21) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a20...0.0.3a21)
 
-**Merged pull requests:**
-
-- Release 0.0.3a21 [\#59](https://github.com/TigreGotico/scriptconv/pull/59) ([github-actions[bot]](https://github.com/apps/github-actions))
-- feat: vendor unpublished licensed backends in a quarantined subpackage [\#58](https://github.com/TigreGotico/scriptconv/pull/58) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [0.0.3a20](https://github.com/TigreGotico/scriptconv/tree/0.0.3a20) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a19...0.0.3a20)
-
-**Merged pull requests:**
-
-- Release 0.0.3a20 [\#57](https://github.com/TigreGotico/scriptconv/pull/57) ([github-actions[bot]](https://github.com/apps/github-actions))
-- feat: wrap license-encumbered backends as external runtime dependencies [\#56](https://github.com/TigreGotico/scriptconv/pull/56) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.3a19](https://github.com/TigreGotico/scriptconv/tree/0.0.3a19) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a18...0.0.3a19)
 
-**Merged pull requests:**
-
-- Release 0.0.3a19 [\#55](https://github.com/TigreGotico/scriptconv/pull/55) ([github-actions[bot]](https://github.com/apps/github-actions))
-- fix: align mantoq conversion with upstream token semantics [\#54](https://github.com/TigreGotico/scriptconv/pull/54) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [0.0.3a18](https://github.com/TigreGotico/scriptconv/tree/0.0.3a18) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3a17...0.0.3a18)
-
-**Merged pull requests:**
-
-- Release 0.0.3a18 [\#53](https://github.com/TigreGotico/scriptconv/pull/53) ([github-actions[bot]](https://github.com/apps/github-actions))
 
 ## [0.0.3a17](https://github.com/TigreGotico/scriptconv/tree/0.0.3a17) (2026-07-21)
 

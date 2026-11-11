@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import shutil
 import subprocess
 from importlib import metadata
@@ -283,6 +284,28 @@ class CharsiuPhonemizer(ByT5Phonemizer):
         return " ".join([self._infer_onnx(w, lang) for w in text.split()])
 
 
+# espeak-ng 1.52 hands a few French words that carry an apostrophe to its English
+# voice: "d'aujourd'hui" comes back as "(en)dˈɔːdʒədhjˌuːi(fr)". The language-switch
+# tags are stripped further on, which leaves English phones inside a French
+# sentence, so a French voice reads "d'aujourd'hui" as English. Respell each of
+# them as French text espeak-ng reads correctly (checked against espeak-ng 1.52.0):
+# "de aujourd'hui" -> də oʒuʁdyˈi, "grand-mère" -> ɡʁˈɑ̃mˈɛʁ, "prud-homme" -> pʁˈydˈɔm.
+_FRENCH_ENGLISH_SWITCH_FIXES = (
+    (re.compile(r"\b([Dd])['\u2019]aujourd['\u2019]hui\b"), r"\1e aujourd'hui"),
+    (re.compile(r"\b([Gg])rand['\u2019](m[\u00e8e]res?)\b"), r"\1rand-\2"),
+    (re.compile(r"\b([Pp])rud['\u2019](hommes?)\b"), r"\1rud-\2"),
+)
+
+
+def _respell_for_espeak(text: str, lang: str) -> str:
+    """Respell the few words espeak-ng mistakes for English in a French text."""
+    if lang.split("-")[0].lower() != "fr":
+        return text
+    for pattern, replacement in _FRENCH_ENGLISH_SWITCH_FIXES:
+        text = pattern.sub(replacement, text)
+    return text
+
+
 class EspeakPhonemizer(BasePhonemizer):
     """
     A phonemizer class that uses the espeak-ng command-line tool to convert text into phonemes.
@@ -433,6 +456,7 @@ class EspeakPhonemizer(BasePhonemizer):
 
     def phonemize_string(self, text: str, lang: str) -> str:
         lang = self.get_lang(lang)
+        text = _respell_for_espeak(text, lang)
         if self.prefer_espyak or not self._has_binary():
             try:
                 return self._espyak_phonemize(text, lang)
@@ -757,7 +781,8 @@ class EpitranPhonemizer(BasePhonemizer):
 
         Raises:
             ValueError: If the language code is unsupported, or if it is
-                Japanese without a Kana or Hira script subtag.
+                Japanese without a Kana or Hira script subtag. A refused
+                Korean tag gets a hint to use ko-Hang or kor-Hang.
         """
         # Each epitran Japanese map converts one kana script. Kanji and the
         # other kana script pass through unchanged, so a request for Jpan or
@@ -766,7 +791,16 @@ class EpitranPhonemizer(BasePhonemizer):
         if subtags[0] in ("ja", "jpn") and not {"kana", "hira"} & set(subtags[1:]):
             raise UnsupportedLanguageError(f"unsupported language code: {target_lang} "
                              "(epitran reads Japanese kana only; use ja-Kana or ja-Hira)")
-        return cls.match_lang(target_lang, cls.EPITRAN_LANGS)
+        try:
+            return cls.match_lang(target_lang, cls.EPITRAN_LANGS)
+        except ValueError as err:
+            # The epitran Korean map converts Hangul only. A bare Korean tag
+            # means the Kore script, Hangul plus Hanja, and Hanja passes
+            # through unchanged, so the match refuses it.
+            if subtags[0] in ("ko", "kor"):
+                raise ValueError(f"{err} (epitran reads Korean in Hangul; "
+                                 "use ko-Hang or kor-Hang)") from err
+            raise
 
     def phonemize_string(self, text: str, lang: str) -> str:
         lang = self.get_lang(lang)
