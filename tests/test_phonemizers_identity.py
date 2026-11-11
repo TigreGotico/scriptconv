@@ -185,6 +185,15 @@ class TestIdentity:
             identity = EspeakPhonemizer().identity("pt")
         assert (identity.distribution, identity.version) == ("espyak", espyak.version.VERSION_STR)
 
+    def test_a_preferred_port_that_is_missing_reports_the_binary(self):
+        banner = "eSpeak NG text-to-speech: 1.52.0  Data at: /usr/share/espeak-ng-data"
+        missing = metadata.PackageNotFoundError("espyak")
+        with mock.patch.object(EspeakPhonemizer, "_has_binary", return_value=True), \
+                mock.patch.object(EspeakPhonemizer, "_run_espeak_command", return_value=banner), \
+                mock.patch("scriptconv.phonemizers.mul.metadata.version", side_effect=missing):
+            identity = EspeakPhonemizer(prefer_espyak=True).identity("pt")
+        assert (identity.distribution, identity.version) == ("espeak-ng", "1.52.0")
+
     def test_the_espyak_port_reports_itself(self):
         identity = EspeakPhonemizer(prefer_espyak=True).identity("pt")
         assert (identity.backend, identity.distribution, identity.version) == \

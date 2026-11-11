@@ -347,7 +347,12 @@ class EspeakPhonemizer(BasePhonemizer):
     def _engine_release(self) -> Tuple[str, str]:
         """The engine that runs here: the espeak-ng binary, or the espyak port."""
         if self.prefer_espyak or not self._has_binary():
-            return "espyak", metadata.version("espyak")
+            try:
+                return "espyak", metadata.version("espyak")
+            except metadata.PackageNotFoundError:
+                # phonemize_string falls back to the binary in this case
+                if not self._has_binary():
+                    raise
         # eSpeak NG text-to-speech: 1.52.0  Data at: ...
         banner = self._run_espeak_command(["--version"])
         return self.engine_distribution, banner.split(":")[1].split()[0]
