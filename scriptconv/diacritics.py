@@ -198,6 +198,14 @@ def _diacritizer_family(lang: str) -> Optional[str]:
     return None
 
 
+#: The package each diacritizer family imports, and the extra that installs it.
+_DIACRITIZER_PACKAGES = {
+    "he": ("phonikud_onnx", "he"),
+    "ar": ("text2tashkeel", "tashkeel"),
+    "stress": ("stressonnx", "stress"),
+    "pt": ("bifonia", "pt"),
+}
+
 _DEFAULT_DIACRITIZER_MODEL = "rawi-ensemble"
 
 _PHONIKUD_CACHE: dict = {}   # resolved model path/string -> Phonikud instance
