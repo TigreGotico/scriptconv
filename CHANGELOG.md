@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a51](https://github.com/TigreGotico/scriptconv/tree/0.0.4a51) (2026-11-11)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a50...0.0.4a51)
+
+**Merged pull requests:**
+
+- feat\(phonemizers\): report the engine identity and declare owned stages [\#158](https://github.com/TigreGotico/scriptconv/pull/158) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a50](https://github.com/TigreGotico/scriptconv/tree/0.0.4a50) (2026-11-10)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a49...0.0.4a50)
@@ -395,10 +403,6 @@
 ## [0.0.4a1](https://github.com/TigreGotico/scriptconv/tree/0.0.4a1) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3...0.0.4a1)
-
-**Merged pull requests:**
-
-- docs: related projects section [\#64](https://github.com/TigreGotico/scriptconv/pull/64) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.3](https://github.com/TigreGotico/scriptconv/tree/0.0.3) (2026-07-21)
 
