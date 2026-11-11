@@ -1,11 +1,15 @@
 
 
+from importlib import metadata
+from typing import Tuple
+
 from scriptconv.phonemizers.base import BasePhonemizer, _check_alphabet
 from scriptconv.phonemizers._thirdparty.hangul2ipa import hangul2ipa
 from scriptconv.phonemizers.enums import Alphabet
 
 
 class G2PKPhonemizer(BasePhonemizer):
+    engine_distribution = "g2pk"
 
     def __init__(self, descriptive=True, group_vowels=True, to_syl=True,
                  alphabet=Alphabet.IPA):
@@ -73,6 +77,12 @@ class KoG2PPhonemizer(BasePhonemizer):
             # requesting this phonemizer
             from scriptconv.phonemizers._vendored.kog2p import runKoG2P
         self.g2p = runKoG2P
+
+    def _engine_release(self) -> Tuple[str, str]:
+        """An installed ``kog2p`` runs in place of the vendored copy."""
+        if self.g2p.__module__.startswith("scriptconv."):
+            return super()._engine_release()
+        return "kog2p", metadata.version("kog2p")
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:

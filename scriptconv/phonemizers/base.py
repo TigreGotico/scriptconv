@@ -20,12 +20,15 @@ calling a wrapper through scriptconv directly and through a TTS stack can
 legitimately differ on text containing digits.
 """
 import abc
+import dataclasses
 import re
 import string
 import unicodedata
-from typing import Callable, Iterator, List, Optional, Tuple, Literal, Union
+from importlib import metadata
+from typing import Callable, ClassVar, Iterator, List, Optional, Tuple, Literal, Union
 
 from scriptconv.phonemizers.enums import Alphabet
+from scriptconv.version import VERSION_STR
 
 # list of (substring, terminator, end_of_sentence) tuples.
 TextChunks = List[Tuple[str, str, bool]]
@@ -81,6 +84,62 @@ def split_clauses(sentence: str) -> List[Tuple[str, Optional[str]]]:
     return clauses
 
 
+class FrontendError(ValueError):
+    """Text could not become phonemes."""
+
+
+class UnsupportedLanguageError(FrontendError):
+    """A backend has no support for the language it was given."""
+
+
+class StageError(FrontendError):
+    """A text stage failed in strict mode."""
+
+
+class UnreadTextError(FrontendError):
+    """Text reached no phoneme in strict mode.
+
+    ``unread`` holds the pieces of text that gave no phonemes.
+    """
+
+    def __init__(self, message: str, unread: Tuple[str, ...] = ()):
+        super().__init__(message)
+        self.unread = tuple(unread)
+
+
+class ModelUnavailableError(FrontendError):
+    """A model is not cached and cannot be fetched offline."""
+
+
+@dataclasses.dataclass(frozen=True)
+class PhonemizerIdentity:
+    """What produced a phoneme sequence, for a voice to record and compare."""
+
+    backend: str
+    """The registry name, ``"tugaphone"``."""
+    distribution: str
+    """The distribution that holds the engine, ``"tugaphone"``."""
+    version: str
+    """The engine's version. For espeak-ng, the version of the binary."""
+    lang: str
+    """The resolved lect, ``"pt-PT-x-porto"``."""
+    revision: Optional[str] = None
+    """The orthography2ipa spec revision, when the backend has one."""
+
+    def differs_from(self, other: "PhonemizerIdentity") -> Tuple[str, ...]:
+        """Names of the fields that differ from *other*, ``revision`` first.
+
+        ``revision`` outranks ``version``: when both sides hold the same
+        revision, the spec that gives the phonemes did not change, so a
+        ``version`` difference is not reported.
+        """
+        same_spec = self.revision is not None and self.revision == other.revision
+        names = [field.name for field in dataclasses.fields(self)
+                 if getattr(self, field.name) != getattr(other, field.name)
+                 and not (same_spec and field.name == "version")]
+        return tuple(sorted(names, key=lambda name: name != "revision"))
+
+
 class MissingLanguageError(ValueError):
     """No language reached :meth:`BasePhonemizer.match_lang` at all.
 
@@ -132,6 +191,17 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
     ignores this flag, since honouring it on one side only would make training
     and synthesis disagree.
     """
+
+    owned_stages: ClassVar[frozenset[str]] = frozenset()
+    """Stages this backend always runs itself. ``"diacritize"`` is the only name.
+
+    A stage that runs only with an optional dependency is not owned.
+    """
+
+    engine_distribution: ClassVar[Optional[str]] = None
+    """The distribution that holds the engine. ``None`` means code inside
+    scriptconv. It is declared, because the module of a wrapper class names
+    scriptconv and not the engine that produced the phonemes."""
 
     def __init__(self, alphabet: Alphabet = Alphabet.UNICODE,
                  normalizer: Optional[Callable[[str, str], str]] = None):
@@ -280,7 +350,7 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         Raises:
             MissingLanguageError: If no language reached the matcher at all
                 (``None``/``""``/``"und"``).
-            ValueError: If the language code is unsupported.
+            UnsupportedLanguageError: If the language code is unsupported.
         """
         if target_lang in (None, "", "und"):
             raise MissingLanguageError(
@@ -288,8 +358,31 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         lang, score = BasePhonemizer._match_lang(target_lang, valid_langs)
         if score > 10:
             # raise an error for unsupported language
-            raise ValueError(f"unsupported language code: {target_lang}")
+            raise UnsupportedLanguageError(f"unsupported language code: {target_lang}")
         return lang
+
+    def _engine_release(self) -> Tuple[str, str]:
+        """The distribution that produced the phonemes, and its version."""
+        if self.engine_distribution is None:
+            return "scriptconv", VERSION_STR
+        return self.engine_distribution, metadata.version(self.engine_distribution)
+
+    def identity(self, lang: str) -> PhonemizerIdentity:
+        """What phonemizes *lang* here: the engine, its version and the lect.
+
+        Raises:
+            ImportError: If the engine is not installed.
+            UnsupportedLanguageError: If the backend does not support *lang*.
+        """
+        from scriptconv.phonemizers.registry import PHONEMIZER_REGISTRY
+        names = {cls_name: member.value
+                 for member, (_, cls_name, _) in PHONEMIZER_REGISTRY.items()}
+        backend = next((names[cls.__name__] for cls in type(self).__mro__
+                        if cls.__name__ in names), type(self).__name__)
+        distribution, version = self._engine_release()
+        # Grapheme, Unicode and Phonetisaurus backends take any language.
+        resolved = self.get_lang(lang) if hasattr(self, "get_lang") else lang
+        return PhonemizerIdentity(backend, distribution, version, resolved)
 
     @staticmethod
     def remove_punctuation(text):

@@ -22,7 +22,7 @@ lexicon and runs on the rules alone.
 """
 from typing import Dict, List
 
-from scriptconv.phonemizers.base import BasePhonemizer
+from scriptconv.phonemizers.base import BasePhonemizer, UnsupportedLanguageError
 from scriptconv.phonemizers.enums import Alphabet
 
 
@@ -35,6 +35,8 @@ class Orthography2IPAPhonemizer(BasePhonemizer):
     so it is not reinvented here).  The per-language G2P engine is created
     lazily on first use and cached for the lifetime of the instance.
     """
+
+    engine_distribution = "orthography2ipa"
 
     def __init__(self, packaged_lexicons: bool = True):
         super().__init__(alphabet=Alphabet.IPA)
@@ -84,7 +86,7 @@ class Orthography2IPAPhonemizer(BasePhonemizer):
         try:
             orthography2ipa.G2P(resolved)
         except Exception as exc:
-            raise ValueError(
+            raise UnsupportedLanguageError(
                 f"orthography2ipa: unsupported language {target_lang!r}"
             ) from exc
         return resolved

@@ -3,6 +3,7 @@ from scriptconv.phonemizers.base import BasePhonemizer
 
 
 class PhonikudPhonemizer(BasePhonemizer):
+    engine_distribution = "phonikud"
 
     def __init__(self):
         try:
