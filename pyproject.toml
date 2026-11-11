@@ -86,3 +86,5 @@ scriptconv = ["py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# A test that hangs fails after this many seconds, about ten times the slowest test.
+timeout = 150

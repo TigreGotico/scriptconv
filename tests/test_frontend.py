@@ -8,7 +8,6 @@ import itertools
 import logging
 import re
 import sys
-import time
 
 import pytest
 
@@ -79,13 +78,19 @@ def build(backend, lang="xx", **config):
     return TextFrontend(FrontendConfig(lang, **config), backend)
 
 
-def best_time(function, text):
-    times = []
-    for _ in range(3):
-        start = time.perf_counter()
-        function(text)
-        times.append(time.perf_counter() - start)
-    return min(times)
+class Scanned(str):
+    """A text that counts the characters its ``find`` calls read."""
+
+    def __new__(cls, text):
+        scanned = super().__new__(cls, text)
+        scanned.read = 0
+        return scanned
+
+    def find(self, sub, start=0, end=None):
+        end = len(self) if end is None else min(end, len(self))
+        found = super().find(sub, start, end)
+        self.read += max(0, (end if found == -1 else found + len(sub)) - start)
+        return found
 
 
 class TestStageOrder:
@@ -166,23 +171,35 @@ class TestInlineBlocks:
                 checked += 1
         assert checked == sum(5 ** size for size in range(8))
 
-    # Four times the text: a linear scan takes about four times as long, and a
-    # quadratic one sixteen times. The constant term absorbs timer noise.
+    # The cost of a split is the number of characters its find calls read.
+    # A linear scan reads each character a fixed number of times, at most
+    # twice here. A quadratic one reads the rest of the line again at each [[,
+    # thousands of times on these texts. A scan that reads the text without
+    # find is not counted, so it reads less than the text and fails too.
 
     @pytest.mark.parametrize("path", ["phonemize_lazy", "phonemize", "phonemize_flat", "prepare"])
-    def test_unclosed_blocks_cost_linear_time(self, path):
-        frontend = build(Echo(), stages=Stages(diacritize=False))
-        run = getattr(frontend, path)
-        consume = (lambda text: list(run(text))) if path == "phonemize_lazy" else run
-        small = best_time(consume, "a [[ " * 2500)
-        large = best_time(consume, "a [[ " * 10000)
-        assert large < 8 * small + 0.05, (small, large)
+    def test_unclosed_blocks_cost_linear_time(self, path, monkeypatch):
+        split = frontend_module._split_blocks
+        costs = []
 
-    @pytest.mark.parametrize("unit", ["a [[ ", "[[a]] b "])
+        def counted_split(text):
+            scanned = Scanned(text)
+            parts = split(scanned)
+            costs.append((len(scanned), scanned.read))
+            return parts
+
+        monkeypatch.setattr(frontend_module, "_split_blocks", counted_split)
+        run = getattr(build(Echo(), stages=Stages(diacritize=False)), path)
+        list(run("a [[ " * 10000))
+        assert len(costs) == 1, costs
+        size, read = costs[0]
+        assert size <= read <= 3 * size, (size, read)
+
+    @pytest.mark.parametrize("unit", ["a [[ ", "[[a]] b ", "a [[ \n", "[[a\n]] "])
     def test_the_split_costs_linear_time(self, unit):
-        small = best_time(frontend_module._split_blocks, unit * 10000)
-        large = best_time(frontend_module._split_blocks, unit * 40000)
-        assert large < 8 * small + 0.01, (small, large)
+        text = Scanned(unit * 10000)
+        frontend_module._split_blocks(text)
+        assert len(text) <= text.read <= 3 * len(text), text.read
 
     def test_prepare_keeps_the_block_as_written(self, monkeypatch):
         Recorder(monkeypatch)

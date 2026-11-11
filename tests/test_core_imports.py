@@ -10,6 +10,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parent.parent
 
 CORE = ["scriptconv", "scriptconv.scripts", "scriptconv.notation", "scriptconv.translit",
@@ -19,21 +21,36 @@ CORE = ["scriptconv", "scriptconv.scripts", "scriptconv.notation", "scriptconv.t
         "scriptconv.phonemizers.enums", "scriptconv.phonemizers.registry"]
 
 CHILD = """
+import builtins
 import sys
 
 own = {module.split(".")[0] for module in sys.argv[2:]}
-# copy tries the Jython module org.python.core inside try, on Python 3.11.
-allowed = set(sys.stdlib_module_names) | own | {"org", "__main__"}
+allowed = set(sys.stdlib_module_names) | own | {"__main__"}
 tried = set()
+# The name in each import statement that is running. A finder sees only
+# "org" for "import org.x", so the full name comes from here.
+statements = []
+import_statement = builtins.__import__
+
+def record(name, *args, **kwargs):
+    statements.append(name)
+    try:
+        return import_statement(name, *args, **kwargs)
+    finally:
+        statements.pop()
 
 class Refuse:
     def find_spec(self, name, path=None, target=None):
         root = name.split(".")[0]
         if root in allowed:
             return None
+        # copy tries the Jython module org.python.core inside try, on Python 3.11.
+        if statements and statements[-1] == "org.python.core":
+            return None
         tried.add(root)
         raise ImportError(f"third-party import: {name}")
 
+builtins.__import__ = record
 sys.meta_path.insert(0, Refuse())
 sys.path.insert(0, sys.argv[1])
 for module in sys.argv[2:]:
@@ -62,8 +79,14 @@ def test_the_refusal_catches_a_third_party_import():
     assert "third-party import: quebra_frases" in result.stderr
 
 
-def test_the_guard_sees_an_import_that_catches_the_refusal(tmp_path):
-    (tmp_path / "guarded.py").write_text("try:\n    import langcodes\nexcept ImportError:\n    pass\n")
+@pytest.mark.parametrize("statement, seen", [
+    ("import langcodes", "['langcodes']"),
+    ("import org.example", "['org']"),
+    ("from org.python import core", "['org']"),
+    ("from org.python.core import PyStringMap", "[]"),
+])
+def test_the_guard_sees_an_import_that_catches_the_refusal(tmp_path, statement, seen):
+    (tmp_path / "guarded.py").write_text(f"try:\n    {statement}\nexcept ImportError:\n    pass\n")
     result = run_child("guarded", root=tmp_path)
     assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == "['langcodes']"
+    assert result.stdout.strip() == seen
