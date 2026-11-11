@@ -4,9 +4,11 @@ Each expected value is worked out by hand from the rule it tests. The fake
 backends return the characters of the text they receive, so the text that
 reached a backend is the expected phonemes.
 """
+import itertools
 import logging
+import re
 import sys
-import unicodedata
+import time
 
 import pytest
 
@@ -21,6 +23,7 @@ from scriptconv.phonemizers import (
     StageError,
     UnreadTextError,
     UnsupportedLanguageError,
+    get_phonemizer,
     phonemize,
 )
 from scriptconv.phonemizers.mul import EspeakPhonemizer
@@ -74,6 +77,15 @@ class Recorder:
 
 def build(backend, lang="xx", **config):
     return TextFrontend(FrontendConfig(lang, **config), backend)
+
+
+def best_time(function, text):
+    times = []
+    for _ in range(3):
+        start = time.perf_counter()
+        function(text)
+        times.append(time.perf_counter() - start)
+    return min(times)
 
 
 class TestStageOrder:
@@ -143,6 +155,35 @@ class TestInlineBlocks:
             list("nab ") + [" ", "x", "y", " "] + list("n cd"))
         assert [entry[1] for entry in stages.log] == ["ab ", " cd"]
 
+    def test_the_split_matches_the_block_pattern(self):
+        # Every string of up to 7 characters over the symbols that matter.
+        pattern = re.compile(r"(\[\[.*?\]\])")
+        checked = 0
+        for size in range(8):
+            for characters in itertools.product("[]a \n", repeat=size):
+                text = "".join(characters)
+                assert frontend_module._split_blocks(text) == pattern.split(text), text
+                checked += 1
+        assert checked == sum(5 ** size for size in range(8))
+
+    # Four times the text: a linear scan takes about four times as long, and a
+    # quadratic one sixteen times. The constant term absorbs timer noise.
+
+    @pytest.mark.parametrize("path", ["phonemize_lazy", "phonemize", "phonemize_flat", "prepare"])
+    def test_unclosed_blocks_cost_linear_time(self, path):
+        frontend = build(Echo(), stages=Stages(diacritize=False))
+        run = getattr(frontend, path)
+        consume = (lambda text: list(run(text))) if path == "phonemize_lazy" else run
+        small = best_time(consume, "a [[ " * 2500)
+        large = best_time(consume, "a [[ " * 10000)
+        assert large < 8 * small + 0.05, (small, large)
+
+    @pytest.mark.parametrize("unit", ["a [[ ", "[[a]] b "])
+    def test_the_split_costs_linear_time(self, unit):
+        small = best_time(frontend_module._split_blocks, unit * 10000)
+        large = best_time(frontend_module._split_blocks, unit * 40000)
+        assert large < 8 * small + 0.01, (small, large)
+
     def test_prepare_keeps_the_block_as_written(self, monkeypatch):
         Recorder(monkeypatch)
         frontend = build(Echo(), stages=Stages(diacritize=True))
@@ -195,6 +236,33 @@ class TestPerCallStages:
         frontend.phonemize("ab", Stages(lang="es-ES"))
         assert stages.log == [("normalize", "ab", "es-ES"), ("diacritize", "nab", "es-ES", None)]
         assert backend.read == [("dnab", "es-ES")]
+
+    def test_the_call_language_wins_then_the_frontend_language(self):
+        backend = Echo()
+        frontend = build(backend, "pt-PT", stages=Stages(diacritize=False, lang="es-ES"))
+        frontend.phonemize("ab", Stages(lang="fr-FR"))
+        frontend.phonemize("ab", Stages())
+        assert backend.read == [("ab", "fr-FR"), ("ab", "es-ES")]
+
+    def test_the_call_casing_wins_over_the_frontend_casing(self, monkeypatch):
+        stages = Recorder(monkeypatch)
+        frontend = build(Echo(), stages=Stages(diacritize=False, casing=stages.casing))
+        assert frontend.phonemize("aB", Stages(casing=str.lower)) == [list("ab")]
+
+    def test_the_frontend_normalize_holds_when_the_call_leaves_it_unset(self, monkeypatch):
+        stages = Recorder(monkeypatch)
+        frontend = build(Echo(), normalizer=stages.normalize,
+                         stages=Stages(normalize=False, diacritize=False))
+        assert frontend.phonemize("ab", Stages(diacritize=False)) == [list("ab")]
+        assert frontend.phonemize("ab", Stages(lang="es-ES")) == [list("ab")]
+        assert frontend.phonemize("ab", Stages(normalize=True)) == [list("nab")]
+        assert stages.stage_names() == ["normalize"]
+
+    def test_the_hook_runs_when_neither_sets_normalize(self, monkeypatch):
+        stages = Recorder(monkeypatch)
+        frontend = build(Echo(), normalizer=stages.normalize, stages=Stages(diacritize=False))
+        assert frontend.phonemize("ab", Stages(lang="es-ES")) == [list("nab")]
+        assert frontend.phonemize("ab", Stages(normalize=False)) == [list("ab")]
 
     def test_the_frontend_casing_holds_when_the_call_sets_none(self, monkeypatch):
         stages = Recorder(monkeypatch)
@@ -310,6 +378,17 @@ class TestBackends:
         plain = TextFrontend(FrontendConfig("xx", Phonemizer.UNICODE))
         assert plain.phonemize("ab, cd.", Stages(diacritize=False)) == [list("ab cd")]
 
+    def test_a_given_backend_is_not_changed(self):
+        given = get_phonemizer(Phonemizer.UNICODE)
+        frontend = TextFrontend(FrontendConfig("xx", keep_punctuation=True,
+                                               stages=Stages(diacritize=False)), given)
+        assert given.keep_punctuation is False
+        assert frontend.backend.keep_punctuation is True
+        assert frontend.phonemize("ab, cd.") == [["a", "b", ",", " ", "c", "d", "."]]
+        assert given.phonemize("ab, cd.", "xx") == [list("ab cd")]
+        same = TextFrontend(FrontendConfig("xx", stages=Stages(diacritize=False)), given)
+        assert same.backend is given
+
     def test_backend_overrides_keep_working(self):
         class Lists(Echo):
             def phonemize_to_list(self, text, lang):
@@ -370,23 +449,17 @@ class TestSpokenNormalizer:
 
 
 class TestModulePhonemize:
-    def test_the_module_function_goes_through_the_frontend(self, monkeypatch):
-        prepared = []
-        prepare = TextFrontend.prepare
+    """The module function calls the backend directly, so it reads what the backend reads."""
 
-        def recording(self, text, stages=Stages(normalize=False)):
-            prepared.append((text, stages))
-            return prepare(self, text, stages)
+    @pytest.mark.parametrize("override, text, lang", [
+        (Phonemizer.SHAMI, "hello world", "pt-PT"),
+        (Phonemizer("kog2p"), "안녕하세요", "en"),
+    ])
+    def test_a_backend_that_refuses_the_tag_in_get_lang_still_reads_the_text(self, override, text, lang):
+        backend = get_phonemizer(override)
+        assert phonemize(text, lang, override=override) == backend.phonemize_string(text, lang)
 
-        monkeypatch.setattr(TextFrontend, "prepare", recording)
-        text = "Olá, [[x]] mundo."
-        assert phonemize(text, "pt-PT", override=Phonemizer.UNICODE) == unicodedata.normalize("NFD", text)
-        assert prepared == [(text, Stages(normalize=False, diacritize=False))]
-
-    def test_the_module_function_adds_no_diacritizer(self, monkeypatch):
-        def refuse(text, lang, diacritizer_model=None):
-            raise AssertionError("diacritize ran")
-        monkeypatch.setattr(frontend_module, "diacritize", refuse)
+    def test_the_module_function_adds_no_diacritizer(self):
         text = "الطقس جميل جدا اليوم."
         assert phonemize(text, "ar", override=Phonemizer.ESPEAK) == (
             EspeakPhonemizer().phonemize_string(text, "ar"))

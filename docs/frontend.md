@@ -1,9 +1,9 @@
 # From text to phonemes, `scriptconv.frontend`
 
 `TextFrontend` takes text to phonemes for a voice. It joins the text stages and
-a phonemizer backend in one fixed order, so training, synthesis and a direct
-call give the same phonemes for the same text. A TTS stack builds one frontend
-when it loads a voice, and calls it for each text.
+a phonemizer backend in one fixed order, and every method runs that order. A
+TTS stack builds one frontend when it loads a voice, and calls it for each
+text.
 
 ```python
 from scriptconv.frontend import FrontendConfig, Stages, TextFrontend
@@ -50,8 +50,10 @@ caller chooses it.
 | `strict` | `False` | Raise on a failure, instead of a warning |
 
 `TextFrontend(config, backend=None)` builds the backend from the
-configuration. Give `backend=` an instance to use that instance. The frontend
-sets the `keep_punctuation` of the backend from the configuration.
+configuration. Give `backend=` an instance to use that instance. The backend
+reads with the `keep_punctuation` of the configuration. When the instance has
+another value, the frontend uses a shallow copy with the configured value, and
+the instance that you gave does not change.
 
 When the backend has a `get_lang` method, the frontend calls it once, so an
 unsupported language fails when the frontend is built. The Grapheme and
@@ -64,7 +66,7 @@ frontend, and each call can give its own:
 
 | Field | Default | Meaning |
 | --- | --- | --- |
-| `normalize` | `True` | `False` skips the normalisation hook for this call |
+| `normalize` | `None` | `False` skips the normalisation hook. `None` runs it, unless the frontend sets `False` |
 | `diacritize` | `None` | `True` or `False` adds or skips the diacritizer |
 | `diacritizer_model` | `None` | The model of the diacritizer |
 | `lang` | `None` | The language of the text, for example a cloning reference |
@@ -154,13 +156,16 @@ the `tashkeel` extra warns and reads the text without diacritics.
 
 ## The module function
 
-`scriptconv.phonemizers.phonemize(text, lang)` goes through a `TextFrontend`
-with no stage. The backend then reads the whole text with `phonemize_string`
-and returns one string.
+`scriptconv.phonemizers.phonemize(text, lang)` does not use `TextFrontend`. The
+backend reads the whole text with `phonemize_string` and returns one string. No
+stage runs, the text is not split into sentences, and an inline block reaches
+the backend as text.
 
-The text is not split into sentences, and an inline block reaches the backend
-as text. Build a `TextFrontend` to run the stages, or to get the phonemes of
-each sentence.
+The result can differ from the phonemes of a frontend for the same text: the
+frontend splits sentences and blocks, and it can diacritize and normalise.
+Training uses `phonemize_flat`, which does not split sentences, so its result
+can also differ from `phonemize`. Build a `TextFrontend` to get the phonemes
+that a voice reads.
 
 ---
 [← phonemizers](phonemizers.md) · [Home](../README.md) · [ovos →](ovos.md)

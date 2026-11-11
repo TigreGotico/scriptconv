@@ -218,18 +218,12 @@ def phonemize(text: str, lang: str, alphabet: Alphabet = Alphabet.IPA,
               model: Optional[str] = None, **kwargs) -> str:
     """One-call facade: phonemize *text* with the language's default backend.
 
-    The text goes through :class:`~scriptconv.frontend.TextFrontend` with no
-    stage, and the backend reads it whole, so the result is
-    ``phonemizer_for_lang(...).phonemize_string(text, lang)``.
-    Build a ``TextFrontend`` to run the text stages, and keep it when
-    phonemizing repeatedly — backends cache models/dictionaries per instance.
+    Equivalent to ``phonemizer_for_lang(...).phonemize_string(text, lang)``.
+    Construct the phonemizer yourself when phonemizing repeatedly — backends
+    cache models/dictionaries per instance.
     """
-    from scriptconv.frontend import FrontendConfig, Stages, TextFrontend
-    no_stage = Stages(normalize=False, diacritize=False)
-    backend = phonemizer_for_lang(lang, alphabet, override, model, **kwargs)
-    frontend = TextFrontend(FrontendConfig(lang, alphabet=alphabet, model=model,
-                                           stages=no_stage), backend)
-    return backend.phonemize_string(frontend.prepare(text, no_stage), lang)
+    return phonemizer_for_lang(lang, alphabet, override, model,
+                               **kwargs).phonemize_string(text, lang)
 
 
 def register(graph) -> None:

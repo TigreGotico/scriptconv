@@ -1,9 +1,10 @@
 """The scriptconv core imports no third-party module.
 
-A child interpreter refuses every import outside the standard library and this
-package, then imports the core modules, the phonemizer contract and the
-frontend. A refusal surfaces as a failed import, and the module table is read
-afterwards too, so a lazy import that a module runs at import time is seen.
+A child interpreter records and refuses every import outside the standard
+library and this package, then imports the core modules, the phonemizer
+contract and the frontend. It prints each third-party name that was tried, so
+an import inside ``try`` that catches the refusal is seen too. The module
+table is read afterwards as well.
 """
 import subprocess
 import sys
@@ -20,26 +21,31 @@ CORE = ["scriptconv", "scriptconv.scripts", "scriptconv.notation", "scriptconv.t
 CHILD = """
 import sys
 
+own = {module.split(".")[0] for module in sys.argv[2:]}
+# copy tries the Jython module org.python.core inside try, on Python 3.11.
+allowed = set(sys.stdlib_module_names) | own | {"org", "__main__"}
+tried = set()
+
 class Refuse:
     def find_spec(self, name, path=None, target=None):
         root = name.split(".")[0]
-        if root in sys.stdlib_module_names or root == "scriptconv":
+        if root in allowed:
             return None
+        tried.add(root)
         raise ImportError(f"third-party import: {name}")
 
 sys.meta_path.insert(0, Refuse())
 sys.path.insert(0, sys.argv[1])
 for module in sys.argv[2:]:
     __import__(module)
-roots = {name.split(".")[0] for name in sys.modules}
-print(sorted(r for r in roots
-             if r not in sys.stdlib_module_names and r not in ("scriptconv", "__main__")))
+roots = {name.split(".")[0] for name in sys.modules} | tried
+print(sorted(roots - allowed))
 """
 
 
-def run_child(*modules):
-    return subprocess.run([sys.executable, "-I", "-S", "-c", CHILD, str(ROOT), *modules],
-                          capture_output=True, text=True, cwd=ROOT)
+def run_child(*modules, root=ROOT):
+    return subprocess.run([sys.executable, "-I", "-S", "-c", CHILD, str(root), *modules],
+                          capture_output=True, text=True, cwd=root)
 
 
 def test_the_core_imports_only_the_standard_library():
@@ -54,3 +60,10 @@ def test_the_refusal_catches_a_third_party_import():
     result = run_child("scriptconv.phonemizers.ru")
     assert result.returncode != 0
     assert "third-party import: quebra_frases" in result.stderr
+
+
+def test_the_guard_sees_an_import_that_catches_the_refusal(tmp_path):
+    (tmp_path / "guarded.py").write_text("try:\n    import langcodes\nexcept ImportError:\n    pass\n")
+    result = run_child("guarded", root=tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "['langcodes']"

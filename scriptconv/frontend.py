@@ -19,10 +19,10 @@ for it.
 With ``strict=False`` a failed stage logs a warning and the text continues
 without that stage. With ``strict=True`` it raises :class:`StageError`.
 """
+import copy
 import dataclasses
 import importlib.util
 import logging
-import re
 from typing import Callable, Iterator, List, Optional
 
 from scriptconv.diacritics import _DIACRITIZER_PACKAGES, _diacritizer_family, diacritize
@@ -39,8 +39,6 @@ from scriptconv.phonemizers.registry import get_phonemizer, phonemizer_for_lang
 __all__ = ["Stages", "FrontendConfig", "TextFrontend", "spoken_normalizer"]
 
 LOG = logging.getLogger(__name__)
-
-_PHONEME_BLOCK = re.compile(r"(\[\[.*?\]\])")
 
 # linguatag puts "ar" with any region, and each individual Arabic language in
 # Arabic script, at 5 or less from "ar". Those languages diacritize by default.
@@ -69,8 +67,9 @@ class Stages:
     A value of ``None`` takes the frontend's own value.
     """
 
-    normalize: bool = True
-    """``False`` skips the normalisation hook for this call."""
+    normalize: Optional[bool] = None
+    """``False`` skips the normalisation hook. ``None`` takes the frontend's
+    value, and when that is ``None`` too, the hook runs."""
     diacritize: Optional[bool] = None
     """``None`` takes the frontend's value. When that is ``None`` too, Arabic
     diacritizes and every other language does not."""
@@ -97,6 +96,32 @@ class FrontendConfig:
     strict: bool = False
 
 
+def _split_blocks(text: str) -> List[str]:
+    r"""*text* split around its inline blocks, with text at even indices and blocks at odd ones.
+
+    The result is that of ``re.split(r"(\[\[.*?\]\])", text)``: a block is the
+    shortest ``[[...]]`` on one line. The scan is linear. An ``[[`` with no
+    ``]]`` after it on its line opens no block, and no later ``[[`` on that
+    line can either, so the scan goes on at the next line.
+    """
+    parts = []
+    start = search = 0
+    line_end = -1
+    while (opening := text.find("[[", search)) != -1:
+        if opening > line_end:
+            line_end = text.find("\n", opening)
+            if line_end == -1:
+                line_end = len(text)
+        closing = text.find("]]", opening + 2, line_end)
+        if closing == -1:
+            search = line_end
+            continue
+        parts += [text[start:opening], text[opening:closing + 2]]
+        start = search = closing + 2
+    parts.append(text[start:])
+    return parts
+
+
 def _block_phonemes(parts: List[str], index: int) -> List[str]:
     """The symbols of the inline block at *index* of a split text.
 
@@ -113,7 +138,10 @@ class TextFrontend:
     """Text to phonemes through the fixed stage order.
 
     ``backend`` takes a phonemizer instance. ``None`` builds the one that
-    ``config`` names.
+    ``config`` names. The frontend reads the backend with
+    ``config.keep_punctuation``. When an instance holds another value, the
+    frontend reads a shallow copy with the configured value, so the caller's
+    instance does not change.
 
     Raises:
         UnsupportedLanguageError: If the backend does not support the language.
@@ -127,7 +155,9 @@ class TextFrontend:
                 backend = phonemizer_for_lang(config.lang, config.alphabet, model=config.model)
             else:
                 backend = get_phonemizer(config.phonemizer, config.alphabet, config.model)
-        backend.keep_punctuation = config.keep_punctuation
+        if backend.keep_punctuation != config.keep_punctuation:
+            backend = copy.copy(backend)
+            backend.keep_punctuation = config.keep_punctuation
         self.config = config
         self.backend = backend
         stages = self._resolve(None)
@@ -154,7 +184,7 @@ class TextFrontend:
         is not yielded.
         """
         stages = self._resolve(stages)
-        parts = _PHONEME_BLOCK.split(text)
+        parts = _split_blocks(text)
         if len(parts) == 1:
             yield from self._sentences(text, stages)
             return
@@ -183,7 +213,7 @@ class TextFrontend:
         ``phonemize_to_list`` reads each piece of text between blocks.
         """
         stages = self._resolve(stages)
-        parts = _PHONEME_BLOCK.split(text)
+        parts = _split_blocks(text)
         phonemes: List[str] = []
         for index, part in enumerate(parts):
             if index % 2:
@@ -201,7 +231,7 @@ class TextFrontend:
         The text is not split into sentences, and blocks stay as written.
         """
         stages = self._resolve(stages)
-        parts = _PHONEME_BLOCK.split(text)
+        parts = _split_blocks(text)
         return "".join(part if index % 2 or not part else self._run_stages(part, stages)
                        for index, part in enumerate(parts))
 
@@ -228,12 +258,13 @@ class TextFrontend:
         if stages is None:
             stages = own
         lang = stages.lang or own.lang or self.config.lang
+        normalize = stages.normalize if stages.normalize is not None else own.normalize
         enabled = stages.diacritize if stages.diacritize is not None else own.diacritize
         if enabled is None:
             from linguatag import lang_distance
             enabled = lang_distance(lang, "ar") <= _ARABIC_DISTANCE
         return Stages(
-            normalize=stages.normalize,
+            normalize=normalize is not False,
             diacritize=enabled and "diacritize" not in self.backend.owned_stages,
             diacritizer_model=stages.diacritizer_model or own.diacritizer_model,
             lang=lang,
