@@ -27,15 +27,21 @@ def _noop(ipa):
     return ipa
 
 
+# The sentence that each text made by _rows spells.
+SPELLED = {}
+
+
 class Table:
-    """A backend that reads a text through a fixed table, then runs its stages in order."""
+    """A backend that reads a text through a fixed table, then runs its stages in order.
+    A text made by _rows reads as the sentence it spells."""
 
     def __init__(self, table, stages=None):
         self.table = table
         self.stages = dict(stages or {})
 
     def phonemize(self, text, lang):
-        ipa = self.table.get(text, text)
+        sentence = SPELLED.get(text, text)
+        ipa = self.table.get(sentence, sentence)
         for stage in self.stages.values():
             ipa = stage(ipa)
         return [list(ipa)]
@@ -61,10 +67,13 @@ def make_rigid_backend():
 
 
 def _rows(spec, tier="gold"):
-    """Rows from (category, text, expected_ipa, count) tuples."""
+    """Rows from (category, sentence, expected_ipa, count) tuples. A sentence set
+    never repeats a text, so each row has a text of its own that spells *sentence*."""
     rows = []
-    for category, text, expected, count in spec:
+    for category, sentence, expected, count in spec:
         for _ in range(count):
+            text = "frase" + "".join("abcdefghij"[int(d)] for d in str(len(SPELLED)))
+            SPELLED[text] = sentence
             rows.append(Row(f"{tier}{len(rows)}", "pt-PT", category, text, expected, "test", tier))
     return rows
 
@@ -446,6 +455,8 @@ def test_cli_reads_a_file_with_a_byte_order_mark(tmp_path, capsys):
     (("x", "pt-PT", "plain", "", PLAIN, "t", "gold"), "empty text or expected_ipa 1"),
     (("x", "pt-PT", "plain", PLAIN, ".", "t", "gold"), "empty text or expected_ipa 1"),
     (("gold0", "pt-PT", "plain", PLAIN, PLAIN, "t", "gold"), "duplicate id 1"),
+    (("x", "pt-PT", "plain", GOLD[0].text, PLAIN, "t", "gold"), "duplicate text 1"),
+    (("x", "pt-PT", "plain", GOLD[0].text, PLAIN, "t", "silver"), "duplicate text 1"),
 ])
 def test_cli_fails_on_a_row_with_a_defect_unless_skips_are_allowed(tmp_path, capsys, bad_row, reason):
     rows = _fields(GOLD) + [bad_row]
@@ -545,13 +556,28 @@ def test_cli_fails_when_the_backend_is_one_segment_worse_than_orthography2ipa(tm
 
 def test_cli_negative_silver_full_vs_o2i_does_not_fail_the_gate(tmp_path, capsys, o2i_reads):
     o2i_reads({"pa tax": PLAIN, HOMOGRAPH: HOMOGRAPH})
-    rows = GOLD + [Row(f"s{i}", "pt-PT", "plain", "pa tax", PLAIN, "t", "silver") for i in range(2)]
+    rows = GOLD + _rows([("plain", "pa tax", PLAIN, 2)], tier="silver")
     code = _run(tmp_path, _fields(rows), "--stages", "homographs:homograph")
     out = capsys.readouterr().out.splitlines()
     # silver: the backend inserts 1 segment in each of 2 rows of 4 segments: -2/8
     assert "silver: full_vs_o2i  plain -0.2500" in out
     assert out[-1] == "gate: PASS"
     assert code == 0
+
+
+def test_cli_fails_on_ten_copies_of_one_row(tmp_path, capsys):
+    rows = [(f"h{i}", "pt-PT", "homograph", HOMOGRAPH, HOMOGRAPH, "t", "gold") for i in range(1, 11)]
+    assert _run(tmp_path, rows, "--stages", "homographs:homograph") == 1
+    assert capsys.readouterr().out.splitlines() == [
+        "rows: read 10, scored 1, skipped 9 (duplicate text 9)",
+        "gate: FAIL  9 skipped for a defect; fix the rows or pass --allow-skips"]
+    scored, _ = read_tsv(str(tmp_path / "pt-PT.tsv"), "pt-PT")
+    assert [row.id for row in scored] == ["h1"]
+    # The first row alone: 1 substitution removed in 4 segments, all of it in one row
+    assert _run(tmp_path, rows, "--stages", "homographs:homograph", "--allow-skips") == 1
+    out = capsys.readouterr().out.splitlines()
+    assert "gold: homographs  FAIL  own homograph +0.2500 (noise 0.2500)  homograph +0.2500" in out
+    assert out[-1] == "gate: FAIL  homographs FAIL"
 
 
 def test_cli_with_no_scored_row_exits_1(tmp_path, capsys):

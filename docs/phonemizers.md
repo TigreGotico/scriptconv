@@ -323,7 +323,8 @@ and the gate fails:
 
 - A row with a wrong column count, an unknown category or an unknown tier.
 - A row with an empty `text`, or an `expected_ipa` with no segments.
-- A row with the `id` of an earlier row.
+- A row with the `id` or the `text` of an earlier row. A repeated sentence
+  would count as many sentences and loosen the noise of its category.
 
 Give `--allow-skips` to score the other rows.
 

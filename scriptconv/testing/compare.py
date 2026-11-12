@@ -58,7 +58,8 @@ COLUMNS = ("id", "lang", "category", "text", "expected_ipa", "source", "tier")
 # bars above (U+0361) and below (U+035C).
 _NOT_SEGMENTS = str.maketrans("", "", ".‿|‖\u0361\u035c")
 # Skip reasons that are defects in the sentence set, not filters.
-DEFECTS = ("column count", "unknown category", "unknown tier", "empty text or expected_ipa", "duplicate id")
+DEFECTS = ("column count", "unknown category", "unknown tier", "empty text or expected_ipa", "duplicate id",
+           "duplicate text")
 _STRESS = re.compile("([ˈˌ])")
 
 
@@ -107,10 +108,15 @@ Report = dict[str, Optional[Comparison]]
 
 
 def read_tsv(path: str, lang: str) -> tuple[list[Row], Counter]:
-    """The rows of *path* for *lang*, and the count of skipped rows by reason."""
+    """The rows of *path* for *lang*, and the count of skipped rows by reason.
+
+    A row with the id or the text of an earlier row is a duplicate. A repeated
+    sentence would count as many sentences and loosen the noise of its category.
+    """
     rows: list[Row] = []
     skipped: Counter = Counter()
     ids: set[str] = set()
+    texts: set[str] = set()
     with open(path, encoding="utf-8-sig", newline="") as f:
         reader = csv.reader(f, delimiter="\t", quoting=csv.QUOTE_NONE)
         header = tuple(next(reader, ()))
@@ -131,8 +137,11 @@ def read_tsv(path: str, lang: str) -> tuple[list[Row], Counter]:
                 skipped["empty text or expected_ipa"] += 1
             elif row.id in ids:
                 skipped["duplicate id"] += 1
+            elif row.text in texts:
+                skipped["duplicate text"] += 1
             else:
                 ids.add(row.id)
+                texts.add(row.text)
                 rows.append(row)
     return rows, skipped
 
