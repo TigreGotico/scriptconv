@@ -21,8 +21,9 @@ says. A row whose ``expected_ipa`` has no segments is skipped with a warning.
 
 The gain of one system over another is the error it removes in a category,
 divided by the segment count of the category. The noise is the largest error
-change in one row of the category, divided by the same count. A gain counts
-only when it is larger than the noise, so more than one sentence carries it.
+change in one row of the category, divided by the same count. A stage passes
+when its gain in its own category is larger than the noise, so more than one
+sentence carries it. In every other category it may lose one segment at most.
 
 A backend is any object with ``phonemize(text, lang) -> list[list[str]]``, as
 every scriptconv phonemizer has. A backend that can switch a stage off also has
@@ -57,7 +58,7 @@ COLUMNS = ("id", "lang", "category", "text", "expected_ipa", "source", "tier")
 # bars above (U+0361) and below (U+035C).
 _NOT_SEGMENTS = str.maketrans("", "", ".‿|‖\u0361\u035c")
 # Skip reasons that are defects in the sentence set, not filters.
-DEFECTS = ("column count", "unknown category", "unknown tier")
+DEFECTS = ("column count", "unknown category", "unknown tier", "empty text or expected_ipa", "duplicate id")
 _STRESS = re.compile("([ˈˌ])")
 
 
@@ -93,9 +94,11 @@ class Comparison:
     ``gain`` is the error that the second system removes, divided by the
     reference segment count of the category. A positive gain is good.
     ``noise`` is the largest error change in one row, divided by the same count.
+    ``segments`` is that reference segment count.
     """
     gain: dict[str, float]
     noise: dict[str, float]
+    segments: dict[str, int]
 
 
 # A comparison for each key: "full_vs_o2i" and one key per stage.
@@ -107,6 +110,7 @@ def read_tsv(path: str, lang: str) -> tuple[list[Row], Counter]:
     """The rows of *path* for *lang*, and the count of skipped rows by reason."""
     rows: list[Row] = []
     skipped: Counter = Counter()
+    ids: set[str] = set()
     with open(path, encoding="utf-8-sig", newline="") as f:
         reader = csv.reader(f, delimiter="\t", quoting=csv.QUOTE_NONE)
         header = tuple(next(reader, ()))
@@ -125,7 +129,10 @@ def read_tsv(path: str, lang: str) -> tuple[list[Row], Counter]:
                 skipped["unknown tier"] += 1
             elif not row.text or not segments(row.expected_ipa):
                 skipped["empty text or expected_ipa"] += 1
+            elif row.id in ids:
+                skipped["duplicate id"] += 1
             else:
+                ids.add(row.id)
                 rows.append(row)
     return rows, skipped
 
@@ -204,7 +211,8 @@ def _compare(references: Sequence[tuple[Row, list[str]]],
         removed[row.category] += b - a
         largest[row.category] = max(largest[row.category], abs(b - a))
     return Comparison(gain={c: removed[c] / n for c, n in length.items()},
-                      noise={c: largest[c] / n for c, n in length.items()})
+                      noise={c: largest[c] / n for c, n in length.items()},
+                      segments=dict(length))
 
 
 def compare_backends(rows: Iterable[Row], before: Backend, after: Backend) -> Comparison:
@@ -238,14 +246,18 @@ def stage_gain(rows: Sequence[Row], backend: Backend, stages: Iterable[str],
 
 def verdict(report: Report, stage: str, own_category: str) -> Optional[bool]:
     """True when *stage* gains more than its noise in its own category and
-    loses no more than its noise in any other. ``None`` when the stage is not
-    ablatable. A gain that one row carries equals the noise, so it does not pass.
+    loses no more than one segment in any other. ``None`` when the stage is
+    not ablatable.
+
+    A gain that one row carries equals the noise, so it does not pass. An
+    ablation is deterministic, so a loss of more than one segment in another
+    category is real harm, however the loss is spread over the rows.
     """
     comparison = report[stage]
     if comparison is None:
         return None
     return comparison.gain[own_category] > comparison.noise[own_category] and all(
-        gain >= -comparison.noise[category]
+        gain >= -1 / comparison.segments[category]
         for category, gain in comparison.gain.items() if category != own_category)
 
 

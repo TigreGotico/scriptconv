@@ -65,7 +65,7 @@ def _rows(spec, tier="gold"):
     rows = []
     for category, text, expected, count in spec:
         for _ in range(count):
-            rows.append(Row(str(len(rows)), "pt-PT", category, text, expected, "test", tier))
+            rows.append(Row(f"{tier}{len(rows)}", "pt-PT", category, text, expected, "test", tier))
     return rows
 
 
@@ -154,6 +154,7 @@ def test_noise_is_the_largest_change_in_one_row():
     # 6 segments: the gain is (1 - 0) + (0 - 2) = -1, the largest row change is 2
     assert comparison.gain == {"plain": -1 / 6}
     assert comparison.noise == {"plain": 2 / 6}
+    assert comparison.segments == {"plain": 6}
 
 
 def _sentence(first, words):
@@ -223,6 +224,71 @@ def test_stage_that_only_breaks_one_row_is_no_gain():
     assert verdict(report, "bad", "homograph") is False
 
 
+CATEGORY_ROWS = 30
+SENTENCE = "pa" * 10    # 20 segments
+
+
+class Ablation:
+    """Reads each text from *full*, or from *off[stage]* when that stage is switched off."""
+
+    def __init__(self, full, off):
+        self.full = full
+        self.off = off
+
+    def phonemize(self, text, lang):
+        return [list(self.full[text])]
+
+    def without(self, stage):
+        if stage not in self.off:
+            raise ValueError(f"no stage {stage!r}")
+        return Table(self.full | self.off[stage])
+
+
+S5_ROWS = [Row(f"{c}{k}", "pt-PT", c, f"{c}{k}", SENTENCE, "t", "gold")
+           for c in gate.CATEGORIES for k in range(CATEGORY_ROWS)]
+
+
+def make_s5_backend():
+    """The numbers stage fixes 1 segment in each of 2 number rows. It deletes the whole
+    sentence of row 0 in each of the 5 other categories."""
+    others = [c for c in gate.CATEGORIES if c != "number"]
+    full = {row.text: SENTENCE for row in S5_ROWS} | {f"{c}0": "" for c in others}
+    off = {"number0": "b" + SENTENCE[1:], "number1": "b" + SENTENCE[1:]} | {f"{c}0": SENTENCE for c in others}
+    return Ablation(full, {"numbers": off})
+
+
+def test_stage_that_deletes_a_sentence_in_other_categories_fails(tmp_path, capsys, o2i_reads):
+    report = stage_gain(S5_ROWS, make_s5_backend(), ["numbers"], baseline=Table({}))
+    comparison = report["numbers"]
+    # number: 2 substitutions removed in 30 * 20 = 600 segments, at most 1 in one row
+    assert comparison.gain["number"] == 2 / 600
+    assert comparison.noise["number"] == 1 / 600
+    # each other category: one sentence of 20 segments deleted, 20/600 lost, against 1/600
+    assert {c: g for c, g in comparison.gain.items() if c != "number"} == {
+        c: -20 / 600 for c in gate.CATEGORIES if c != "number"}
+    assert verdict(report, "numbers", "number") is False
+    o2i_reads({row.text: SENTENCE for row in S5_ROWS})
+    assert _run(tmp_path, _fields(S5_ROWS), "--stages", "numbers:number",
+                backend=f"{__name__}:make_s5_backend") == 1
+    out = capsys.readouterr().out
+    assert "gold: numbers  FAIL  own number +0.0033 (noise 0.0017)" in out
+    assert "numbers FAIL" in out.splitlines()[-1]
+
+
+@pytest.mark.parametrize("damaged, expected", [("ka t", True), ("k t", False)])
+def test_stage_may_lose_one_segment_in_another_category(damaged, expected):
+    rows = GOLD + [Row("k", "pt-PT", "plain", "kata", "ka ta", "t", "gold")]
+
+    def fix_and_damage(ipa):
+        return damaged if ipa == "ka ta" else _fix_homograph(ipa)
+
+    backend = AblatableTable(BASE | {"kata": "ka ta"}, {"homographs": fix_and_damage})
+    report = stage_gain(rows, backend, ["homographs"], baseline=O2I)
+    # plain holds 6 rows of 4 segments: "ka t" loses 1 of 24, "k t" loses 2 of 24
+    assert report["homographs"].gain["plain"] == (-1 / 24 if expected else -2 / 24)
+    assert verdict(report, "homographs", "homograph") is expected
+
+
 # --- planted stages ---
 
 def test_planted_good_stage_passes():
@@ -267,15 +333,19 @@ def test_backend_without_ablation_is_not_ablatable():
     assert verdict(report, "homographs", "homograph") is None
 
 
-@pytest.mark.parametrize("gains, noise, expected", [
-    ({"own": 0.25, "other": 0.0}, {"own": 0.25, "other": 0.0}, False),    # a gain equal to noise is noise
-    ({"own": 0.5, "other": -0.25}, {"own": 0.25, "other": 0.25}, True),   # a loss equal to noise is noise
-    ({"own": 0.5, "other": -0.5}, {"own": 0.25, "other": 0.25}, False),
-    ({"own": 0.5, "other": -0.5}, {"own": 0.25, "other": 0.5}, True),     # noise per category
-    ({"own": 0.5, "other": -0.5}, {"own": 0.75, "other": 0.5}, False),
+@pytest.mark.parametrize("gains, noise, segment_counts, expected", [
+    # a gain equal to the noise is noise
+    ({"own": 0.25, "other": 0.0}, {"own": 0.25, "other": 0.0}, {"own": 4, "other": 4}, False),
+    # another category may lose one segment: 1 of 4
+    ({"own": 0.5, "other": -0.25}, {"own": 0.25, "other": 0.25}, {"own": 4, "other": 4}, True),
+    # two segments lost in one row of another category fail, though that row is the noise
+    ({"own": 0.5, "other": -0.5}, {"own": 0.25, "other": 0.5}, {"own": 4, "other": 4}, False),
+    # one segment is one segment of that category: 1 of 10
+    ({"own": 0.5, "other": -0.1}, {"own": 0.25, "other": 0.1}, {"own": 4, "other": 10}, True),
+    ({"own": 0.5, "other": -0.2}, {"own": 0.25, "other": 0.2}, {"own": 4, "other": 10}, False),
 ])
-def test_verdict_boundaries(gains, noise, expected):
-    assert verdict({"s": gate.Comparison(gains, noise)}, "s", "own") is expected
+def test_verdict_boundaries(gains, noise, segment_counts, expected):
+    assert verdict({"s": gate.Comparison(gains, noise, segment_counts)}, "s", "own") is expected
 
 
 # --- tiers ---
@@ -347,7 +417,7 @@ def test_cli_counts_rows_in_and_out(tmp_path, capsys):
         ("f", "pt-PT", "plain", PLAIN, ".", "t", "gold"),
     ])
     rows, skipped = read_tsv(str(tsv), "pt-PT")
-    assert [r.id for r in rows] == ["0", "1"]
+    assert [r.id for r in rows] == ["gold0", "gold1"]
     assert main(["--lang", "pt-PT", "--tsv", str(tsv), "--backend", "orthography2ipa",
                  "--allow-skips"]) == 1
     assert capsys.readouterr().out.splitlines()[0] == (
@@ -373,6 +443,9 @@ def test_cli_reads_a_file_with_a_byte_order_mark(tmp_path, capsys):
     (("x", "pt-PT", "plian", PLAIN, PLAIN, "t", "gold"), "unknown category 1"),
     (("x", "pt-PT", "plain", PLAIN, PLAIN, "t", "Gold"), "unknown tier 1"),
     (("x", "pt-PT", "plain", PLAIN, PLAIN, "t"), "column count 1"),
+    (("x", "pt-PT", "plain", "", PLAIN, "t", "gold"), "empty text or expected_ipa 1"),
+    (("x", "pt-PT", "plain", PLAIN, ".", "t", "gold"), "empty text or expected_ipa 1"),
+    (("gold0", "pt-PT", "plain", PLAIN, PLAIN, "t", "gold"), "duplicate id 1"),
 ])
 def test_cli_fails_on_a_row_with_a_defect_unless_skips_are_allowed(tmp_path, capsys, bad_row, reason):
     rows = _fields(GOLD) + [bad_row]
@@ -421,26 +494,64 @@ def test_cli_fails_when_the_set_has_no_gold_rows(tmp_path, capsys):
     assert out[-1] == "gate: FAIL  no gold rows"
 
 
+@pytest.fixture
+def o2i_reads(monkeypatch):
+    """Replace standalone orthography2ipa, the default baseline, with a fixed table."""
+    def install(table):
+        monkeypatch.setattr("scriptconv.phonemizers.o2ipa.Orthography2IPAPhonemizer", lambda: Table(table))
+    return install
+
+
 def make_worse_than_o2i_backend():
     """Reads plain text as nothing, and fixes the homograph in its stage."""
     return AblatableTable({PLAIN: "", HOMOGRAPH: "su lo"}, {"homographs": _fix_homograph})
 
 
-def test_cli_fails_when_the_backend_is_worse_than_orthography2ipa(tmp_path, capsys):
+def test_cli_fails_when_the_backend_is_worse_than_orthography2ipa(tmp_path, capsys, o2i_reads):
+    o2i_reads({PLAIN: "ˈpɐ ˈtɐ", HOMOGRAPH: "su lo"})
     rows = _fields(_rows([("plain", PLAIN, "ˈpɐ ˈtɐ", 2), ("homograph", HOMOGRAPH, HOMOGRAPH, 2)]))
     code = _run(tmp_path, rows, "--stages", "homographs:homograph",
                 backend=f"{__name__}:make_worse_than_o2i_backend")
     out = capsys.readouterr().out.splitlines()
-    # orthography2ipa reads "pa ta" as ˈpɐ ˈtɐ: 0 edits on 6 segments, and the backend
-    # reads it as nothing: 6 deletions. orthography2ipa reads "so lo" as ˈsu lu: 1 insertion
-    # and 2 substitutions on 4 segments, and the backend reads it right.
+    # The baseline reads "pa ta" right, 0 edits on 6 segments, and the backend reads it as
+    # nothing, 6 deletions: 12/12 lost. The baseline reads "so lo" as "su lo", 1 substitution
+    # on 4 segments, and the backend reads it right: 2/8 gained.
     assert out[2:] == [
-        "gold: full_vs_o2i  plain -1.0000  homograph +0.7500",
+        "gold: full_vs_o2i  plain -1.0000  homograph +0.2500",
         "gold: homographs  PASS  own homograph +0.2500 (noise 0.1250)  plain +0.0000  homograph +0.2500",
         "silver: no rows, no verdict",
         "gate: FAIL  full_vs_o2i plain -1.0000, the backend is worse than orthography2ipa",
     ]
     assert code == 1
+
+
+def make_one_segment_worse_backend():
+    """Reads "pa tax" with one extra segment, and fixes the homograph in its stage."""
+    return AblatableTable(BASE, {"homographs": _fix_homograph})
+
+
+def test_cli_fails_when_the_backend_is_one_segment_worse_than_orthography2ipa(tmp_path, capsys, o2i_reads):
+    o2i_reads({"pa tax": PLAIN, HOMOGRAPH: HOMOGRAPH})
+    rows = _rows([("plain", PLAIN, PLAIN, 24), ("homograph", HOMOGRAPH, HOMOGRAPH, 5)])
+    rows.append(Row("long", "pt-PT", "plain", "pa tax", PLAIN, "t", "gold"))
+    code = _run(tmp_path, _fields(rows), "--stages", "homographs:homograph",
+                backend=f"{__name__}:make_one_segment_worse_backend")
+    out = capsys.readouterr().out.splitlines()
+    # 25 plain rows of 4 segments; the backend inserts 1 segment in one of them: -1/100
+    assert "gold: full_vs_o2i  plain -0.0100  homograph +0.0000" in out
+    assert out[-1] == "gate: FAIL  full_vs_o2i plain -0.0100, the backend is worse than orthography2ipa"
+    assert code == 1
+
+
+def test_cli_negative_silver_full_vs_o2i_does_not_fail_the_gate(tmp_path, capsys, o2i_reads):
+    o2i_reads({"pa tax": PLAIN, HOMOGRAPH: HOMOGRAPH})
+    rows = GOLD + [Row(f"s{i}", "pt-PT", "plain", "pa tax", PLAIN, "t", "silver") for i in range(2)]
+    code = _run(tmp_path, _fields(rows), "--stages", "homographs:homograph")
+    out = capsys.readouterr().out.splitlines()
+    # silver: the backend inserts 1 segment in each of 2 rows of 4 segments: -2/8
+    assert "silver: full_vs_o2i  plain -0.2500" in out
+    assert out[-1] == "gate: PASS"
+    assert code == 0
 
 
 def test_cli_with_no_scored_row_exits_1(tmp_path, capsys):
@@ -454,6 +565,8 @@ def test_cli_with_no_scored_row_exits_1(tmp_path, capsys):
     (["--backend", "no-such-backend"], "'no-such-backend' is not a valid Phonemizer"),
     (["--backend", "os:no_such_attribute"], "module 'os' has no attribute 'no_such_attribute'"),
     (["--backend", f"{__name__}:make_good_backend", "--stages", "nosuch:plain"], "no stage 'nosuch'"),
+    (["--backend", f"{__name__}:make_good_backend", "--stages", "homographs:homograph,nosuch:plain"],
+     "no stage 'nosuch'"),
 ])
 def test_cli_usage_errors_exit_2_with_a_message(tmp_path, capsys, args, message):
     tsv = tmp_path / "pt-PT.tsv"
@@ -461,7 +574,9 @@ def test_cli_usage_errors_exit_2_with_a_message(tmp_path, capsys, args, message)
     with pytest.raises(SystemExit) as exit_info:
         main(["--lang", "pt-PT", "--tsv", str(tsv), *args])
     assert exit_info.value.code == 2
-    assert message in capsys.readouterr().err
+    captured = capsys.readouterr()
+    assert message in captured.err
+    assert captured.out == ""
 
 
 def test_cli_rejects_a_missing_file(tmp_path, capsys):

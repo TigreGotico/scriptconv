@@ -290,27 +290,38 @@ segment count of `expected_ipa`.
 
 A stress mark is one segment, because stress changes what a voice says.
 Spaces, syllable marks and tie bars are not segments, so `t͡s` and `ts` are
-the same. A row whose `expected_ipa` has no segments is skipped.
+the same. This is a known limit: the PER cannot tell an affricate from a stop
+followed by a fricative, such as Polish `czy` [t͡ʂɨ] and `trzy` [tʂɨ].
 
 The gain of a stage is the PER without the stage minus the PER with it. A
 positive gain is good.
 
-The noise of a category is the largest error change in one row, between the
-backend with the stage and the backend without it, divided by the segment
-count of the category. A stage passes when its gain in its own category is
-more than the noise, and no other category loses more than the noise. So a
-gain passes only when more than one sentence carries it. A homograph stage
-that fixes one vowel in each of 30 sentences passes. A stage that fixes five
-segments in one sentence does not pass.
+A stage passes when both of these are true:
+
+- In its own category, the gain is more than the noise. The noise is the
+  largest error change in one row, between the backend with the stage and
+  the backend without it, divided by the segment count of the category. So a
+  gain passes only when more than one sentence carries it. A homograph stage
+  that fixes one vowel in each of 30 sentences passes. A stage that fixes
+  five segments in one sentence does not pass.
+- In each other category, the loss is one segment at most: the gain is at
+  least minus 1 divided by the segment count of that category. An ablation
+  is deterministic, so a larger loss is real harm. A stage that deletes one
+  sentence in another category fails.
 
 To switch a stage off, the gate calls `backend.without(stage)`. This method
 returns the same backend without that stage. When a backend has no `without`
 method, the gate prints `not ablatable` for each stage.
 
 The output gives the rows read, scored and skipped, with the reason for
-each skip. A row of another language is a filter. A row with a wrong column
-count, an unknown category or an unknown tier is a defect, and the gate
-fails. Give `--allow-skips` to score the other rows.
+each skip. A row of another language is a filter. These rows are defects,
+and the gate fails:
+
+- A row with a wrong column count, an unknown category or an unknown tier.
+- A row with an empty `text`, or an `expected_ipa` with no segments.
+- A row with the `id` of an earlier row.
+
+Give `--allow-skips` to score the other rows.
 
 The gate scores gold rows and silver rows apart, and puts the tier at the
 start of each line. Only gold rows decide the exit status. The last line is
