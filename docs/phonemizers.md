@@ -123,7 +123,7 @@ four such backends, each lazy-imported and each raising a named
 | Language(s) | Backend | Extra | What it restores |
 |---|---|---|---|
 | `he` | phonikud (`phonikud_model=`) | `he` | niqqud |
-| `ar` | text2tashkeel | `tashkeel` | tashkeel (+ hamza, dagger alef) |
+| Arabic in Arabic script, as linguatag reads the tag: `ar` with any region, the individual Arabic languages such as `arz`, `apc` and `ary`, and Hassaniyya `mey` (not `ar-Latn`, nor `acy` and `pga`, which CLDR writes in Latin script) | text2tashkeel; `waqf=True` gives the pausal form | `tashkeel` | tashkeel (+ hamza, dagger alef) |
 | 26 stressonnx tags (`STRESS_LANGS`): East Slavic (`ru`, `uk`, `be`), Bulgarian/Macedonian/Slovene (`bg`, `mk`, `sl`), Latvian (`lv`), Armenian (`hy`), Georgian (`ka`), Turkic/Caucasian (`az`, `ba`, `cv`, `kbd`, `kjh`, `kk`, `ky`, `mdf`, `myv`, `sah`, `tg`, `tt`, `udm`, `uz`, `xal`) | stressonnx | `stress` | word stress |
 | Tags at linguatag distance 0 from `pt-PT`: `pt`, `pt-PT`, `pt-Latn-PT`, `por`, and lects such as `pt-PT-x-porto` (not `pt-BR`, `pt-AO`, `pt-MZ`) | bifonia, which receives the full tag | `pt` | heterophonic-homograph sense diacritics |
 
@@ -145,9 +145,11 @@ These are ordinary Portuguese orthographic marks, chosen so any downstream
 G2P, rule-based, neural, or espeak, reads them correctly. It is
 deliberately scoped to European Portuguese, Brazilian Portuguese's vowel
 system differs, and `add_diacritics`
-routes `pt-BR` straight through unchanged. Language routing for the two new
-backends matches on the primary subtag exactly (not a prefix check), so e.g.
-Berber (`ber`) never false-matches Belarusian (`be`).
+routes `pt-BR` straight through unchanged. Hebrew and stress routing
+matches on the primary subtag exactly (not a prefix check), so e.g.
+Berber (`ber`) never false-matches Belarusian (`be`). Arabic and European
+Portuguese routing asks linguatag, so Aragonese (`arg`) and Mapudungun
+(`arn`) never route to tashkeel.
 
 Diacritization is also exposed as a graph transform, via
 `scriptconv.diacritics.register`, parallel to the phonemization edge above,
@@ -258,6 +260,59 @@ Arabic-Phonetiser (2016, CC BY-NC 4.0), vendored/externally-installed as the
 
 None of the three is selected automatically for any language;
 `ArbtokPhonemizer` is the Arabic default (`LANG_DEFAULTS["ar"]`).
+
+## The sentence gate
+
+A frontend stage stays only when it makes the output better than
+orthography2ipa alone. The module `scriptconv.testing.compare` measures this
+for each stage. Install it with the `test` extra.
+
+The input is a TSV sentence set with this header row:
+
+```
+id	lang	category	text	expected_ipa	source	tier
+```
+
+The category is `plain`, `number`, `date`, `abbreviation`, `homograph` or
+`contact`. The tier is `gold` or `silver`.
+
+Run the gate on one language:
+
+```bash
+python -m scriptconv.testing.compare --lang pt-PT \
+    --tsv tests/data/sentences/pt-PT.tsv --backend tugaphone \
+    --stages homographs:homograph
+```
+
+`--backend` takes a scriptconv phonemizer name, or `module:attribute` for
+your own backend. Each item of `--stages` is a stage name and the category
+that the stage must improve.
+
+The gate counts the phoneme error rate (PER) for each category. The PER is
+the edit distance from the backend output to `expected_ipa`, divided by the
+segment count of `expected_ipa`.
+
+A stress mark is one segment, because stress changes what a voice says.
+Spaces and syllable marks are not segments.
+
+The gain of a stage is the PER without the stage minus the PER with it. A
+positive gain is good.
+
+The noise of a category is the PER that one sentence can add, which is 1
+divided by the row count of the category. A stage passes when its gain in its
+own category is more than the noise, and no other category loses more than
+the noise.
+
+To switch a stage off, the gate calls `backend.without(stage)`. This method
+returns the same backend without that stage. When a backend has no `without`
+method, the gate prints `not ablatable` for each stage and gives no verdict.
+
+The output gives the rows read, scored and skipped, with the reason for
+each skip.
+
+The gate scores gold rows and silver rows apart, and puts the tier at the
+start of each line. Only a gold verdict decides the exit status. The exit
+status is 1 when a gold verdict fails, or when no row is scored.
 
 ## The backend catalog
 

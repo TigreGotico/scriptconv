@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.0.4a53](https://github.com/TigreGotico/scriptconv/tree/0.0.4a53) (2026-11-12)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a52...0.0.4a53)
+
+**Merged pull requests:**
+
+- fix\(diacritics\): route every Arabic lect to tashkeel and pass waqf [\#175](https://github.com/TigreGotico/scriptconv/pull/175) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.0.4a52](https://github.com/TigreGotico/scriptconv/tree/0.0.4a52) (2026-11-12)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a51...0.0.4a52)
+
+**Merged pull requests:**
+
+- feat\(testing\): sentence gate that scores each stage against orthography2ipa [\#174](https://github.com/TigreGotico/scriptconv/pull/174) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.0.4a51](https://github.com/TigreGotico/scriptconv/tree/0.0.4a51) (2026-11-11)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a50...0.0.4a51)
+
+**Merged pull requests:**
+
+- feat\(phonemizers\): report the engine identity and declare owned stages [\#158](https://github.com/TigreGotico/scriptconv/pull/158) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a50](https://github.com/TigreGotico/scriptconv/tree/0.0.4a50) (2026-11-10)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a49...0.0.4a50)
@@ -380,25 +404,13 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a2...0.0.4a3)
 
-**Merged pull requests:**
-
-- feat: East-Slavic stress and European-Portuguese sense diacritics [\#68](https://github.com/TigreGotico/scriptconv/pull/68) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [0.0.4a2](https://github.com/TigreGotico/scriptconv/tree/0.0.4a2) (2026-07-22)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a1...0.0.4a2)
 
-**Merged pull requests:**
-
-- fix: publicly re-export the shami frontend symbols [\#66](https://github.com/TigreGotico/scriptconv/pull/66) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [0.0.4a1](https://github.com/TigreGotico/scriptconv/tree/0.0.4a1) (2026-07-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.3...0.0.4a1)
-
-**Merged pull requests:**
-
-- docs: related projects section [\#64](https://github.com/TigreGotico/scriptconv/pull/64) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.3](https://github.com/TigreGotico/scriptconv/tree/0.0.3) (2026-07-21)
 
