@@ -121,7 +121,7 @@ four such backends, each lazy-imported and each raising a named
 | Language(s) | Backend | Extra | What it restores |
 |---|---|---|---|
 | `he` | phonikud (`phonikud_model=`) | `he` | niqqud |
-| `ar` | text2tashkeel | `tashkeel` | tashkeel (+ hamza, dagger alef) |
+| Arabic in Arabic script, as linguatag reads the tag: `ar` with any region, the individual Arabic languages such as `arz`, `apc` and `ary`, and Hassaniyya `mey` (not `ar-Latn`, nor `acy` and `pga`, which CLDR writes in Latin script) | text2tashkeel; `waqf=True` gives the pausal form | `tashkeel` | tashkeel (+ hamza, dagger alef) |
 | 26 stressonnx tags (`STRESS_LANGS`): East Slavic (`ru`, `uk`, `be`), Bulgarian/Macedonian/Slovene (`bg`, `mk`, `sl`), Latvian (`lv`), Armenian (`hy`), Georgian (`ka`), Turkic/Caucasian (`az`, `ba`, `cv`, `kbd`, `kjh`, `kk`, `ky`, `mdf`, `myv`, `sah`, `tg`, `tt`, `udm`, `uz`, `xal`) | stressonnx | `stress` | word stress |
 | Tags at linguatag distance 0 from `pt-PT`: `pt`, `pt-PT`, `pt-Latn-PT`, `por`, and lects such as `pt-PT-x-porto` (not `pt-BR`, `pt-AO`, `pt-MZ`) | bifonia, which receives the full tag | `pt` | heterophonic-homograph sense diacritics |
 
@@ -143,9 +143,11 @@ These are ordinary Portuguese orthographic marks, chosen so any downstream
 G2P, rule-based, neural, or espeak, reads them correctly. It is
 deliberately scoped to European Portuguese, Brazilian Portuguese's vowel
 system differs, and `add_diacritics`
-routes `pt-BR` straight through unchanged. Language routing for the two new
-backends matches on the primary subtag exactly (not a prefix check), so e.g.
-Berber (`ber`) never false-matches Belarusian (`be`).
+routes `pt-BR` straight through unchanged. Hebrew and stress routing
+matches on the primary subtag exactly (not a prefix check), so e.g.
+Berber (`ber`) never false-matches Belarusian (`be`). Arabic and European
+Portuguese routing asks linguatag, so Aragonese (`arg`) and Mapudungun
+(`arn`) never route to tashkeel.
 
 Diacritization is also exposed as a graph transform, via
 `scriptconv.diacritics.register`, parallel to the phonemization edge above,
