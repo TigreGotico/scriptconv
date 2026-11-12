@@ -8,6 +8,7 @@ import itertools
 import logging
 import re
 import sys
+import time
 
 import pytest
 
@@ -200,6 +201,19 @@ class TestInlineBlocks:
         text = Scanned(unit * 10000)
         frontend_module._split_blocks(text)
         assert len(text) <= text.read <= 3 * len(text), text.read
+
+    # The counter sees only find. Time sees every way to read the text. The
+    # real scan of a million characters takes about a millisecond, and a
+    # quadratic one takes minutes, so the bound and the timeout leave a wide
+    # margin on both sides.
+
+    @pytest.mark.timeout(20)
+    @pytest.mark.parametrize("unit", ["a [[ ", "[[a] "])
+    def test_a_long_unclosed_text_splits_in_well_under_two_seconds(self, unit):
+        text = unit * 200000
+        start = time.perf_counter()
+        frontend_module._split_blocks(text)
+        assert time.perf_counter() - start < 2
 
     def test_prepare_keeps_the_block_as_written(self, monkeypatch):
         Recorder(monkeypatch)
