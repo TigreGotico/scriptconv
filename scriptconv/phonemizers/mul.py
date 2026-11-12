@@ -306,6 +306,48 @@ def _respell_for_espeak(text: str, lang: str) -> str:
     return text
 
 
+# A combining acute (U+0301) after a vowel marks the stressed syllable of a
+# Russian or Ukrainian word. espeak-ng keeps it inside the word, because
+# IsAlpha() in src/libespeak-ng/common.c counts U+0300-U+036F as letters. The
+# word then misses its ru_list entry ("тысяча $1"), no letter rule reads the
+# acute, and the default stress rule places the stress: "ты́сяча" gives
+# tysʲˈɑtʃʲʌ. espeak-ng takes a stress position from text as phoneme input,
+# "[[...]]" with "'" before the stressed syllable (docs/dictionary.md, "Phoneme
+# names").
+_ACUTE = "\u0301"
+_ACUTE_STRESS_LANGS = frozenset({"ru", "uk"})
+_CYRILLIC_VOWELS = frozenset("аеёиоуыэюяіїєАЕЁИОУЫЭЮЯІЇЄ")
+_IPA_VOWELS = frozenset("iyɨʉɯuɪʏʊeøɘɵɤoəɛœɜɞʌɔæɐaɶɑɒ")
+_MARKED_WORD = re.compile(r"[^\W\d_](?:[^\W\d_]|[\u0300-\u036f]|['ʼ’](?=[^\W\d_]))*")
+# espeak-ng prints this between phonemes for --sep=z
+_PHONEME_SEPARATOR = "\u200c"
+
+
+def _is_stress_marked(word: str) -> bool:
+    """True when *word* has an acute, and each acute follows a Cyrillic vowel."""
+    marks = [i for i, c in enumerate(word) if c == _ACUTE]
+    return bool(marks) and all(i and word[i - 1] in _CYRILLIC_VOWELS for i in marks)
+
+
+def _marked_syllable(word: str) -> Optional[int]:
+    """The 1-based syllable that the acute in a stress-marked *word* marks.
+
+    ``None`` when the word has more than one acute, or has one syllable, so
+    the mark gives no position.
+    """
+    if word.count(_ACUTE) != 1 or sum(c in _CYRILLIC_VOWELS for c in word) < 2:
+        return None
+    return sum(c in _CYRILLIC_VOWELS for c in word[:word.index(_ACUTE)])
+
+
+def _ipa_stress(ipa: str) -> Optional[Tuple[int, int]]:
+    """The 1-based syllable with the primary stress, and the syllable count."""
+    if ipa.count("ˈ") != 1:
+        return None
+    head = ipa.split("ˈ")[0]
+    return sum(c in _IPA_VOWELS for c in head) + 1, sum(c in _IPA_VOWELS for c in ipa)
+
+
 class EspeakPhonemizer(BasePhonemizer):
     """
     A phonemizer class that uses the espeak-ng command-line tool to convert text into phonemes.
@@ -459,6 +501,49 @@ class EspeakPhonemizer(BasePhonemizer):
         except Exception as e:
             raise EspeakError(f"An unexpected error occurred while running espeak-ng: {e}")
 
+    def _clause_lines(self, args: List[str], lines: List[str], lang: str) -> Optional[List[str]]:
+        """espeak-ng's output for each line, read as a clause of its own.
+
+        ``None`` when the output lines do not pair up with the input lines.
+        """
+        if not lines:
+            return []
+        # a comma ends a clause, and espeak-ng prints each clause on its own line
+        output = self._run_espeak_command(['-q', '-x', *args, '-v', lang], input_text=",\n".join(lines))
+        output = [line.strip() for line in output.split("\n")]
+        return output if len(output) == len(lines) else None
+
+    def _read_acute_stress(self, text: str, lang: str) -> str:
+        """Respell each stress-marked word so that espeak-ng stresses the marked syllable.
+
+        A word that espeak-ng already stresses on the marked syllable loses the
+        acute, so espeak-ng reads it from its dictionary. Any other polysyllable
+        becomes espeak-ng's own phonemes for it, with the primary stress moved
+        to the marked syllable. Every other word loses the acute only.
+        """
+        respelled = {w: w.replace(_ACUTE, "") for w in _MARKED_WORD.findall(text) if _is_stress_marked(w)}
+        targets = {w: (_marked_syllable(w), sum(c in _CYRILLIC_VOWELS for c in w)) for w in respelled}
+        words = sorted(w for w, (syllable, _) in targets.items() if syllable)
+        readings = self._clause_lines(['--ipa'], [respelled[w] for w in words], lang) or []
+        moved = [w for w, ipa in zip(words, readings) if _ipa_stress(ipa) != targets[w]]
+        phonemes = self._clause_lines(['--sep=z'], [respelled[w] for w in moved], lang) or []
+        candidates = []
+        for word, reading in zip(moved, phonemes):
+            if " " in reading:
+                continue
+            tokens = [p.lstrip("'") for p in reading.split(_PHONEME_SEPARATOR)]
+            for stressed in range(len(tokens)):
+                marked = tokens[:stressed] + ["'" + tokens[stressed].lstrip(",%")] + tokens[stressed + 1:]
+                # "|" keeps two adjacent phonemes apart (docs/dictionary.md)
+                candidates.append((word, "[[" + "|".join(marked) + "]]"))
+        ipa = self._clause_lines(['--ipa'], [option for _, option in candidates], lang) or []
+        chosen = {}
+        for (word, option), line in zip(candidates, ipa):
+            if _ipa_stress(line) == targets[word]:
+                chosen.setdefault(word, option)
+        respelled.update(chosen)
+        return _MARKED_WORD.sub(lambda m: respelled.get(m.group(), m.group()), text)
+
     def phonemize_string(self, text: str, lang: str) -> str:
         lang = self.get_lang(lang)
         text = _respell_for_espeak(text, lang)
@@ -472,6 +557,8 @@ class EspeakPhonemizer(BasePhonemizer):
                         "Install espeak-ng or `pip install espyak` for the "
                         "pure-Python fallback."
                     )
+        if _ACUTE in text and lang.split("-")[0] in _ACUTE_STRESS_LANGS:
+            text = self._read_acute_stress(text, lang)
         return self._run_espeak_command(
             ['-q', '-x', '--ipa', '-v', lang],
             input_text=text
