@@ -42,8 +42,9 @@ removes only the specific overlay codepoints each backend adds (combining
 acute/grave for stress, tashkeel for Arabic, niqqud for Hebrew) — never a
 blanket combining-mark filter — so precomposed native letters survive
 (Cyrillic й/ё, Latvian macrons, Azerbaijani ç/ö, Arabic hamza carriers أ إ آ ؤ
-ئ). The gate uses exact primary-subtag matching, so Aragonese (``arg``),
-Herero (``her``), Mapudungun (``arn``) etc. are never misread as Arabic/Hebrew.
+ئ). The gate asks linguatag which tags name Arabic in Arabic script, and
+matches the other primary subtags exactly, so Aragonese (``arg``), Herero
+(``her``), Mapudungun (``arn``) etc. are never misread as Arabic/Hebrew.
 Languages whose diacritics are native orthography (European Portuguese, via
 bifonia) refuse the strip with :class:`ValueError` instead of silently
 corrupting the spelling (``café`` must never become ``cafe``). This split
@@ -103,6 +104,41 @@ def _is_european_portuguese(lang: str) -> bool:
             "diacritization language routing requires the linguatag package: "
             "pip install scriptconv[phonemizers]") from e
     return lang_distance(lang, "pt-PT") == 0
+
+
+# linguatag measures ``ar`` with any region, Hassaniyya (``mey``) and each
+# individual Arabic language (``arz``, ``apc``, ...) in Arabic script at 5 or
+# less from ``ar``. The same language in another script is further away.
+_ARABIC_SCRIPT_DISTANCE = 5
+
+
+def _is_arabic_script_arabic(lang: str) -> bool:
+    """True for a tag that names Arabic, or a variety of Arabic, in Arabic script.
+
+    linguatag decides both halves. ``is_arabic_variety`` names the language:
+    ``ar``, the members of the ISO 639-3 ``ara`` macrolanguage and Hassaniyya
+    (``mey``), with any script or region. ``lang_distance`` to ``ar`` adds the
+    script, because tashkeel marks only Arabic script: ``ar-Latn``, ``arz-Latn``,
+    and ``acy`` and ``pga``, which CLDR writes in Latin script, return False.
+    Persian, Urdu and ``und-Arab`` are Arabic script but not Arabic, and return
+    False too.
+
+    ISO 639-1 gives Arabic one two-letter code, ``ar``, and every individual
+    Arabic language has a three-letter code. So any other two-letter primary
+    subtag returns False before linguatag loads, and a caller that asks for
+    ``en`` or ``he`` does not need the ``phonemizers`` extra.
+    """
+    p = _primary_subtag(lang)
+    if len(p) == 2 and p != "ar":
+        return False
+    try:
+        from linguatag import is_arabic_variety, lang_distance
+    except ImportError as e:
+        raise ImportError(
+            "diacritization language routing requires the linguatag package: "
+            "pip install scriptconv[phonemizers]") from e
+    return (is_arabic_variety(lang)
+            and lang_distance(lang, "ar") <= _ARABIC_SCRIPT_DISTANCE)
 
 
 #: Primary subtags whose STRESS_LANGS membership does not by itself mean the
@@ -182,26 +218,36 @@ def _diacritizer_family(lang: str) -> Optional[str]:
     result further through :func:`_is_stress_lang` before actually calling
     stressonnx, since only that path needs the real resolution. Returns one
     of ``"he"`` (niqqud), ``"ar"`` (tashkeel), ``"stress"`` (stressonnx),
-    ``"pt"`` (bifonia sense diacritics), or ``None``. Uses exact primary-
-    subtag matching (never ``startswith``), so Aragonese (``arg``), Herero
-    (``her``) and Mapudungun (``arn``) are never misread as Arabic/Hebrew.
+    ``"pt"`` (bifonia sense diacritics), or ``None``. Hebrew and stress use
+    exact primary-subtag matching (never ``startswith``), so Herero (``her``)
+    is never misread as Hebrew. Arabic is decided by linguatag (see
+    :func:`_is_arabic_script_arabic`), so Aragonese (``arg``) and Mapudungun
+    (``arn``) are never misread as Arabic.
     """
     p = _primary_subtag(lang)
     if p == "he":
         return "he"
-    if p == "ar":
-        return "ar"
     if p in STRESS_LANGS:
         return "stress"
     if _is_european_portuguese(lang):
         return "pt"
+    if _is_arabic_script_arabic(lang):
+        return "ar"
     return None
 
+
+#: The package each diacritizer family imports, and the extra that installs it.
+_DIACRITIZER_PACKAGES = {
+    "he": ("phonikud_onnx", "he"),
+    "ar": ("text2tashkeel", "tashkeel"),
+    "stress": ("stressonnx", "stress"),
+    "pt": ("bifonia", "pt"),
+}
 
 _DEFAULT_DIACRITIZER_MODEL = "rawi-ensemble"
 
 _PHONIKUD_CACHE: dict = {}   # resolved model path/string -> Phonikud instance
-_TASHKEEL_CACHE: dict = {}  # model name -> text2tashkeel Diacritizer
+_TASHKEEL_CACHE: dict = {}  # (model name, waqf) -> text2tashkeel Diacritizer
 
 # phonikud is a small (~100MB), public, unlicensed-restriction ONNX model, so
 # — unlike the large/licensed models behind mul.py's ByT5/Charsiu backends —
@@ -269,14 +315,17 @@ def _phonikud(phonikud_model=None):
     return _PHONIKUD_CACHE[model]
 
 
-def _tashkeel(model: Optional[str] = None):
+def _tashkeel(model: Optional[str] = None, waqf: bool = False):
     """Lazily build (and cache) the text2tashkeel Diacritizer used for Arabic.
 
     text2tashkeel is a dependency of the ``[ar]`` extra; it restores hamza and the
-    dagger alef in addition to the standard marks. Install with
-    ``pip install scriptconv[tashkeel]`` (or ``pip install text2tashkeel``)."""
+    dagger alef in addition to the standard marks. With ``waqf=True`` the
+    Diacritizer drops the case and mood endings and gives the pausal form.
+    Install with ``pip install scriptconv[tashkeel]`` (or ``pip install
+    text2tashkeel``)."""
     model = model or _DEFAULT_DIACRITIZER_MODEL
-    if model not in _TASHKEEL_CACHE:
+    key = (model, waqf)
+    if key not in _TASHKEEL_CACHE:
         try:
             from text2tashkeel import Diacritizer
         except ImportError as e:
@@ -284,8 +333,8 @@ def _tashkeel(model: Optional[str] = None):
                 "Arabic diacritization requires the text2tashkeel package: "
                 "pip install scriptconv[tashkeel]  (or pip install text2tashkeel)"
             ) from e
-        _TASHKEEL_CACHE[model] = Diacritizer(model)
-    return _TASHKEEL_CACHE[model]
+        _TASHKEEL_CACHE[key] = Diacritizer(model, waqf=waqf)
+    return _TASHKEEL_CACHE[key]
 
 
 def _stress(text: str, lang: str, model: Optional[str] = None) -> str:
@@ -327,7 +376,7 @@ def _sense_diacritics_pt(text: str, lang: str) -> str:
 
 
 def diacritize(text: str, lang: str = "und", diacritizer_model=None,
-               **kwargs) -> str:
+               waqf: Optional[bool] = None, **kwargs) -> str:
     """Add pronunciation-disambiguating diacritics to *text* for *lang*.
 
     ``diacritizer_model=`` is the one model knob for the diacritizer edge — the
@@ -338,9 +387,12 @@ def diacritize(text: str, lang: str = "und", diacritizer_model=None,
       phonikud ONNX path (or a zero-arg callable). Optional: when omitted the
       small public phonikud model is auto-downloaded and cached
       (``$SCRIPTCONV_CACHE``/``$XDG_CACHE_HOME``).
-    - Arabic (``ar``) — tashkeel via text2tashkeel (``[tashkeel]``);
-      ``diacritizer_model`` is the text2tashkeel model name (defaults to
-      ``rawi-ensemble``).
+    - Arabic (``ar``, every individual Arabic language such as ``arz`` or
+      ``apc``, and Hassaniyya ``mey``, in Arabic script) — tashkeel via
+      text2tashkeel (``[tashkeel]``); ``diacritizer_model`` is the
+      text2tashkeel model name (defaults to ``rawi-ensemble``). ``waqf=True``
+      gives the pausal form, without the case and mood endings; ``None`` and
+      ``False`` keep the full endings. Other backends ignore ``waqf``.
     - East Slavic, Bulgarian/Macedonian/Slovene, Latvian, Armenian, Georgian,
       and Turkic/Caucasian languages (``STRESS_LANGS``, 26 stressonnx tags) —
       word stress via stressonnx (``[stress]``); ``diacritizer_model`` is the
@@ -364,7 +416,7 @@ def diacritize(text: str, lang: str = "und", diacritizer_model=None,
     if family == "he":
         return _phonikud(diacritizer_model).add_diacritics(text)
     if family == "ar":
-        return _tashkeel(diacritizer_model).diacritize(text)
+        return _tashkeel(diacritizer_model, waqf=bool(waqf)).diacritize(text)
     if family == "stress":
         # _diacritizer_family's "stress" match is the broad STRESS_LANGS
         # primary-subtag test (also used for stripping); generation needs
