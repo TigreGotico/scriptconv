@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a65](https://github.com/TigreGotico/scriptconv/tree/0.0.4a65) (2026-11-12)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a64...0.0.4a65)
+
+**Merged pull requests:**
+
+- fix\(phonemizers\): run Mirandese and Barranquenho on the orthography2ipa specs [\#199](https://github.com/TigreGotico/scriptconv/pull/199) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a64](https://github.com/TigreGotico/scriptconv/tree/0.0.4a64) (2026-11-12)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a63...0.0.4a64)
@@ -381,7 +389,6 @@
 **Merged pull requests:**
 
 - fix: plain r \(alveolar trill\) missing from the X-SAMPA table [\#95](https://github.com/TigreGotico/scriptconv/pull/95) ([JarbasAl](https://github.com/JarbasAl))
-- fix: map bare/long NURSE vowel to ARPA ER [\#93](https://github.com/TigreGotico/scriptconv/pull/93) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a15](https://github.com/TigreGotico/scriptconv/tree/0.0.4a15) (2026-08-02)
 
