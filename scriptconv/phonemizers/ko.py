@@ -1,5 +1,6 @@
 
 
+import sys
 from importlib import metadata
 from typing import Tuple
 
@@ -17,6 +18,11 @@ class G2PKPhonemizer(BasePhonemizer):
         try:
             from g2pk import G2p
         except ImportError as e:
+            if sys.version_info >= (3, 13):
+                raise ImportError(
+                    "g2pk needs Python 3.12 or older, because its dependency "
+                    "python-mecab-ko has wheels up to CPython 3.12 only."
+                ) from e
             raise ImportError(
                 "g2pk is required for the G2PK phonemizer. "
                 "Install it with 'pip install g2pk' "
