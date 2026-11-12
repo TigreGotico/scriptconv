@@ -32,7 +32,9 @@ not phonemize a digit), that requires language resources scriptconv does not
 ship. Pass `normalizer=`, any `(text, lang) -> str` callable, and it runs
 inside `phonemize_lazy`, without it, the raw text is phonemized as-is. A
 pipeline that injects its own normalizer and one that doesn't will therefore
-legitimately differ on text containing digits.
+legitimately differ on text containing digits. `TextFrontend` takes the same
+callable as its `normalizer` hook and runs it in a fixed stage order, see
+[frontend.md](frontend.md).
 
 **A backend can own a stage.** The class attribute `owned_stages` names the
 stages that a backend always runs itself, so a frontend skips them. `diacritize`
@@ -333,4 +335,4 @@ See [ovos.md](ovos.md) for using this layer from OVOS through
 `ovos-scriptconv-g2p-plugin`.
 
 ---
-[← graph](graph.md) · [ovos →](ovos.md) · [Home](../README.md)
+[← graph](graph.md) · [frontend →](frontend.md) · [Home](../README.md)

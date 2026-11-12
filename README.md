@@ -308,6 +308,20 @@ g.convert("Tenho muita sede hoje.", "text", "text-diacritized", lang="pt")
 # 'Tenho muita sêde hoje.'
 ```
 
+A voice reads text through `scriptconv.frontend.TextFrontend`. It runs
+inline `[[phoneme]]` blocks, sentences, an optional normalisation hook,
+diacritics and the backend in one fixed order, and a backend that diacritizes
+by itself is not diacritized twice:
+
+```python
+from scriptconv.frontend import FrontendConfig, Stages, TextFrontend
+
+frontend = TextFrontend(FrontendConfig("pt-PT", Phonemizer.ESPEAK))
+frontend.phonemize("Tenho sede [[ˈsedɨ]]. Olá!", Stages(diacritize=True))
+```
+
+Details: [docs/frontend.md](docs/frontend.md).
+
 Stress is unwritten or under-marked in all 26 covered languages. East
 Slavic is the clearest case, where unstressed vowels also reduce (for
 example, Russian о becomes [ɐ] or [ə]), so a missing mark corrupts more
