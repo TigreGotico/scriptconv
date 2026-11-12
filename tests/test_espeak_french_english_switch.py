@@ -5,7 +5,6 @@ English voice. The ``(en)``/``(fr)`` tags are stripped afterwards, so the Englis
 phones stay in the French sentence and a French voice reads them as English.
 The respelling tests need no espeak binary; the phoneme tests do.
 """
-import shutil
 
 import pytest
 
@@ -41,10 +40,6 @@ def test_other_languages_are_left_alone():
     assert _respell_for_espeak("d'aujourd'hui", "it") == "d'aujourd'hui"
 
 
-needs_espeak = pytest.mark.skipif(shutil.which("espeak-ng") is None, reason="needs the espeak-ng binary")
-
-
-@needs_espeak
 @pytest.mark.parametrize("text", ["d'aujourd'hui", "Le jour d'aujourd'hui", "grand'mère", "les prud'hommes"])
 def test_a_french_voice_gets_no_english_phones(text):
     phonemes = EspeakPhonemizer().phonemize_string(text, "fr-FR")

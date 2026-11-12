@@ -348,6 +348,64 @@ def _ipa_stress(ipa: str) -> Optional[Tuple[int, int]]:
     return sum(c in _IPA_VOWELS for c in head) + 1, sum(c in _IPA_VOWELS for c in ipa)
 
 
+# Vowel phonemes of espeak-ng's Russian table, the "vwl" phonemes of
+# phsource/ph_russian without the non-syllabic I^.
+_RU_VOWEL_PHONEMES = frozenset({
+    "i", "I#", "y", "I", "I2", "I3", "E", "E#", "E2", "E3", "E%", "o", "O", "u", "u#", 'u"',
+    "8", "e", "ju", "ja", "ja#", "V#", "Y", "A", "a", "V", "a#",
+})
+# The phoneme of each Cyrillic vowel letter under stress, as espeak-ng reads it.
+_RU_STRESSED_PHONEMES = {"а": "A", "я": "A", "о": "o", "ё": "8", "е": "e", "э": "E",
+                         "и": "i", "ы": "y", "у": "u", "ю": 'u"'}
+
+
+def _ru_stressed_phoneme(letter: str, phoneme: str, previous: str) -> str:
+    if letter in "яю" and phoneme.startswith("j"):
+        return {"я": "ja", "ю": "ju"}[letter]
+    if letter == "ё" and previous in ("Z", "S"):
+        return "o"
+    if letter == "и" and phoneme == "y":
+        return "y"
+    return _RU_STRESSED_PHONEMES[letter]
+
+
+def _ru_unstressed_phoneme(phoneme: str, previous: str) -> str:
+    # ph_russian reduces o and 8 to V, and e to i (y after Z, S and ts), with
+    # ChangeIfNotStressed, which espeak-ng runs for text but not for phoneme
+    # input. Phoneme input reads V before the stressed vowel as [a], so the
+    # reduced vowel is written V#, which espeak-ng reads as [ʌ], as V reads in text.
+    if phoneme in ("V", "o", "8", "A", "O"):
+        return "V#"
+    if phoneme == "e":
+        return "y" if previous in ("Z", "S", "ts") else "i"
+    return phoneme
+
+
+def _ru_phoneme_input(phonemes: List[str], word: str) -> Optional[str]:
+    """Phoneme input for a Russian *word* with the stress on the marked syllable.
+
+    *phonemes* is espeak-ng's reading of the bare word, without primary stress marks.
+    The marked vowel takes the stressed value of its letter, and every other
+    vowel takes its unstressed value. ``None`` when the vowel phonemes do not
+    pair up with the vowel letters.
+    """
+    phonemes = [p.lstrip(",%") for p in phonemes]
+    vowels = [i for i, p in enumerate(phonemes) if p in _RU_VOWEL_PHONEMES]
+    letters = [c for c in word.lower() if c in _CYRILLIC_VOWELS]
+    if len(vowels) != len(letters):
+        return None
+    marked = _marked_syllable(word) - 1
+    respelled = []
+    for i, phoneme in enumerate(phonemes):
+        previous = phonemes[i - 1] if i else ""
+        if i == vowels[marked]:
+            respelled.append("'" + _ru_stressed_phoneme(letters[marked], phoneme, previous))
+        else:
+            respelled.append(_ru_unstressed_phoneme(phoneme, previous))
+    # "|" keeps two adjacent phonemes apart (docs/dictionary.md)
+    return "[[" + "|".join(respelled) + "]]"
+
+
 class EspeakPhonemizer(BasePhonemizer):
     """
     A phonemizer class that uses the espeak-ng command-line tool to convert text into phonemes.
@@ -514,14 +572,18 @@ class EspeakPhonemizer(BasePhonemizer):
         return output if len(output) == len(lines) else None
 
     def _read_acute_stress(self, text: str, lang: str) -> str:
-        """Respell each stress-marked word so that espeak-ng stresses the marked syllable.
+        """Respell each stress-marked polysyllable so that espeak-ng stresses the marked syllable.
 
         A word that espeak-ng already stresses on the marked syllable loses the
-        acute, so espeak-ng reads it from its dictionary. Any other polysyllable
-        becomes espeak-ng's own phonemes for it, with the primary stress moved
-        to the marked syllable. Every other word loses the acute only.
+        acute, so espeak-ng reads it from its dictionary. Any other word becomes
+        espeak-ng's own phonemes for it as phoneme input, with the primary
+        stress on the marked syllable. For Russian, the vowels also take their
+        stressed and unstressed values for that stress. A word that no phoneme
+        input matches loses the acute only. A stress-marked monosyllable keeps
+        its acute, which espeak-ng reads as a stressed word.
         """
-        respelled = {w: w.replace(_ACUTE, "") for w in _MARKED_WORD.findall(text) if _is_stress_marked(w)}
+        respelled = {w: w.replace(_ACUTE, "") for w in _MARKED_WORD.findall(text)
+                     if _is_stress_marked(w) and sum(c in _CYRILLIC_VOWELS for c in w) > 1}
         targets = {w: (_marked_syllable(w), sum(c in _CYRILLIC_VOWELS for c in w)) for w in respelled}
         words = sorted(w for w, (syllable, _) in targets.items() if syllable)
         readings = self._clause_lines(['--ipa'], [respelled[w] for w in words], lang) or []
@@ -532,15 +594,19 @@ class EspeakPhonemizer(BasePhonemizer):
             if " " in reading:
                 continue
             tokens = [p.lstrip("'") for p in reading.split(_PHONEME_SEPARATOR)]
+            russian = _ru_phoneme_input(tokens, word) if lang.startswith("ru") else None
+            if russian:
+                candidates.append((word, russian))
+                continue
             for stressed in range(len(tokens)):
                 marked = tokens[:stressed] + ["'" + tokens[stressed].lstrip(",%")] + tokens[stressed + 1:]
-                # "|" keeps two adjacent phonemes apart (docs/dictionary.md)
                 candidates.append((word, "[[" + "|".join(marked) + "]]"))
         ipa = self._clause_lines(['--ipa'], [option for _, option in candidates], lang) or []
         chosen = {}
         for (word, option), line in zip(candidates, ipa):
             if _ipa_stress(line) == targets[word]:
-                chosen.setdefault(word, option)
+                # espeak-ng drops phoneme input that touches a quote, bracket or symbol
+                chosen.setdefault(word, f" {option} ")
         respelled.update(chosen)
         return _MARKED_WORD.sub(lambda m: respelled.get(m.group(), m.group()), text)
 
