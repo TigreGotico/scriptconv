@@ -116,7 +116,7 @@ class TestEdgeModelKeys(unittest.TestCase):
         seen = {}
         backend = types.SimpleNamespace(diacritize=lambda t: t)
 
-        def _spy(m=None):
+        def _spy(m=None, waqf=False):
             seen["m"] = m
             return backend
 
