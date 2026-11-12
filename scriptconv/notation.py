@@ -678,11 +678,13 @@ _BW_TO_ARABIC: dict[str, str] = {
 }
 
 _ARABIC_TO_BW: dict[str, str] = {v: k for k, v in _BW_TO_ARABIC.items()}
-# Pre-composed lam-alef ligatures (single codepoints) → Buckwalter
-_ARABIC_TO_BW["\uFEFB"] = "lA"   # لا  lam + alef ligature
-_ARABIC_TO_BW["\uFEF9"] = "l<"   # لإ  lam + alef hamza below
-_ARABIC_TO_BW["\uFEF7"] = "l>"   # لأ  lam + alef hamza above
-_ARABIC_TO_BW["\uFEF8"] = "l|"   # لآ  lam + alef madda
+# Arabic Presentation Forms-A and -B are compatibility characters: one letter,
+# or a ligature such as lam-alef, in a contextual shape.  NFKC gives the
+# letters, so a presentation form takes their spelling and returns as them.
+for _cp in (*range(0xFB50, 0xFE00), *range(0xFE70, 0xFF00)):
+    _letters = unicodedata.normalize("NFKC", chr(_cp))
+    if _letters != chr(_cp) and all(c in _ARABIC_TO_BW for c in _letters):
+        _ARABIC_TO_BW[chr(_cp)] = "".join(_ARABIC_TO_BW[c] for c in _letters)
 
 
 def buckwalter_to_arabic(bw: str, errors: str = "pass") -> str:
@@ -1488,10 +1490,12 @@ class NotationInfo:
     """Fidelity metadata for a phoneme notation, relative to the IPA hub.
 
     A conversion is **lossless** when it passes this test for every symbol of
-    its source inventory, with ``errors="strict"`` in both directions:
+    its source inventory.  Both converters run with ``errors="strict"`` and
+    with their other options at the defaults:
 
     1. The symbol converts, and every output symbol is in the target
-       inventory.  An unmapped symbol passed through does not count.
+       inventory.  An unmapped symbol passed through does not count, and
+       neither does a table row whose output is not in that inventory.
     2. The reverse conversion returns the input.  Where the notation's
        reference gives two spellings of one symbol, the first spelling counts
        as the input.
@@ -1501,6 +1505,11 @@ class NotationInfo:
     as X-SAMPA lists it, each symbol taken alone, so a flag makes no claim about
     a sequence of symbols.  A notation with no converter in the direction under
     test is not lossless in that direction.
+
+    The conversion graph gives each IPA edge the flag of its direction.  The
+    Buckwalter and Arabic-script edges pass the same test, so they are
+    lossless too.  For them, an Arabic presentation form is a second spelling
+    of the letters that NFKC gives.
 
     Attributes
     ----------
