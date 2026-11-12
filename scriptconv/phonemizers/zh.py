@@ -139,12 +139,16 @@ class BaseChinesePinyinPhonemizer(BasePhonemizer):
             pho_str = ""
             for sp in p.split():  # G2P might return phrases with multiple syllables
                 try:
-                    pho = self.pinyin_to_ipa(sp.strip())[0][0]
-                    if self.retone:
-                        pho = self._retone(pho)
-                    pho_str += pho
-                except Exception:
-                    pass
+                    # pinyin_to_ipa returns the readings of the syllable, and
+                    # each reading is a tuple of phonemes: keep all phonemes
+                    # of the first reading
+                    pho = "".join(self.pinyin_to_ipa(sp.strip())[0])
+                except ValueError:
+                    pho_str += sp
+                    continue
+                if self.retone:
+                    pho = self._retone(pho)
+                pho_str += pho
             ipa_phones.append(pho_str)
         return ipa_phones
 
