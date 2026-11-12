@@ -1,6 +1,9 @@
+import sys
+import unicodedata
 import unittest
 
 from scriptconv.phonemizers import Phonemizer, get_phonemizer_class
+from scriptconv.phonemizers.enums import Alphabet
 from scriptconv.phonemizers.registry import get_phonemizer
 
 
@@ -15,6 +18,50 @@ class TestVendoredKorean(unittest.TestCase):
         from scriptconv.phonemizers import _thirdparty
         tables = os.path.join(os.path.dirname(_thirdparty.__file__), "ko_tables")
         self.assertTrue(os.path.isfile(os.path.join(tables, "ipa.csv")))
+
+
+class TestG2PKOnPython313(unittest.TestCase):
+    """scriptconv[ko] installs g2pk only below Python 3.13, because
+    python-mecab-ko has wheels up to CPython 3.12 only."""
+
+    def _message(self, version_info):
+        from unittest.mock import patch
+        from scriptconv.phonemizers.ko import G2PKPhonemizer
+        with patch.dict(sys.modules, {"g2pk": None}), \
+                patch.object(sys, "version_info", version_info):
+            with self.assertRaises(ImportError) as ctx:
+                G2PKPhonemizer()
+        return str(ctx.exception)
+
+    def test_313_names_the_python_version_not_the_extra(self):
+        message = self._message((3, 13, 0, "final", 0))
+        self.assertIn("Python 3.12 or older", message)
+        self.assertNotIn("scriptconv[ko]", message)
+
+    def test_312_names_the_extra(self):
+        self.assertIn("scriptconv[ko]", self._message((3, 12, 0, "final", 0)))
+
+
+class TestMisakiKoreanAlphabet(unittest.TestCase):
+    """misaki's KOG2P writes the pronunciation in Hangul, not IPA.
+
+    Wikipedia, "Korean phonology", revision 1374882945, section "Consonant
+    assimilation": a velar stop becomes [ŋ] before a nasal stop, and
+    한국말 is pronounced 한궁말. KOG2P writes conjoining jamo, which is the
+    NFD form of the Hangul syllables.
+    """
+
+    def test_ipa_is_refused(self):
+        with self.assertRaises(ValueError):
+            get_phonemizer(Phonemizer.MISAKI_KO, Alphabet.IPA)
+
+    @unittest.skipIf(sys.version_info >= (3, 13), "misaki declares Requires-Python <3.13")
+    def test_output_is_the_pronunciation_in_hangul(self):
+        from scriptconv.phonemizers.mul import MisakiKoPhonemizer
+        p = MisakiKoPhonemizer()
+        self.assertEqual(p.alphabet, Alphabet.HANGUL)
+        self.assertEqual(p.phonemize_string("한국말", "ko"),
+                         unicodedata.normalize("NFD", "한궁말"))
 
 
 class TestVendoredChinese(unittest.TestCase):

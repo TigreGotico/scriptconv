@@ -938,8 +938,17 @@ class MisakiZhPhonemizer(MisakiPhonemizer):
 
 
 class MisakiKoPhonemizer(MisakiPhonemizer):
-    """misaki Korean (KOG2P)."""
+    """misaki Korean (KOG2P).
+
+    KOG2P writes the pronunciation in Hangul conjoining jamo (NFD), with
+    sound changes applied: 한국말 gives 한궁말. So the output alphabet is
+    Hangul, not IPA.
+    """
     MISAKI_LANGS = ['ko']
+
+    def __init__(self, alphabet: Alphabet = Alphabet.HANGUL):
+        _check_alphabet(self, alphabet, [Alphabet.HANGUL])
+        super().__init__(alphabet)
 
 
 class MisakiViPhonemizer(MisakiPhonemizer):
