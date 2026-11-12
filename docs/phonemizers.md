@@ -289,26 +289,43 @@ the edit distance from the backend output to `expected_ipa`, divided by the
 segment count of `expected_ipa`.
 
 A stress mark is one segment, because stress changes what a voice says.
-Spaces and syllable marks are not segments.
+Spaces, syllable marks and tie bars are not segments, so `t͡s` and `ts` are
+the same. A row whose `expected_ipa` has no segments is skipped.
 
 The gain of a stage is the PER without the stage minus the PER with it. A
 positive gain is good.
 
-The noise of a category is the PER that one sentence can add, which is 1
-divided by the row count of the category. A stage passes when its gain in its
-own category is more than the noise, and no other category loses more than
-the noise.
+The noise of a category is the largest error change in one row, between the
+backend with the stage and the backend without it, divided by the segment
+count of the category. A stage passes when its gain in its own category is
+more than the noise, and no other category loses more than the noise. So a
+gain passes only when more than one sentence carries it. A homograph stage
+that fixes one vowel in each of 30 sentences passes. A stage that fixes five
+segments in one sentence does not pass.
 
 To switch a stage off, the gate calls `backend.without(stage)`. This method
 returns the same backend without that stage. When a backend has no `without`
-method, the gate prints `not ablatable` for each stage and gives no verdict.
+method, the gate prints `not ablatable` for each stage.
 
 The output gives the rows read, scored and skipped, with the reason for
-each skip.
+each skip. A row of another language is a filter. A row with a wrong column
+count, an unknown category or an unknown tier is a defect, and the gate
+fails. Give `--allow-skips` to score the other rows.
 
 The gate scores gold rows and silver rows apart, and puts the tier at the
-start of each line. Only a gold verdict decides the exit status. The exit
-status is 1 when a gold verdict fails, or when no row is scored.
+start of each line. Only gold rows decide the exit status. The last line is
+`gate: PASS` or `gate: FAIL` with the reasons. The exit status is 1 when one
+of these is true:
+
+- A gold verdict fails.
+- A gold stage is not ablatable, or has no gold rows in its own category.
+- `--stages` is empty, or the set has no gold rows.
+- The gold `full_vs_o2i` of a category is negative, so the backend is worse
+  than orthography2ipa alone.
+- A row has a defect and `--allow-skips` is not given, or no row is scored.
+
+The exit status is 2 for a usage error, such as a missing file, a wrong
+header, an unknown backend or an unknown stage.
 
 ## The backend catalog
 

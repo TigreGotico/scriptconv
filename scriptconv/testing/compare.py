@@ -14,14 +14,21 @@ refuses rows from more than one tier.
 The phoneme error rate (PER) of a category is the edit distance between the
 backend output and ``expected_ipa``, summed over the rows of the category,
 divided by the summed segment count of ``expected_ipa``. Segments come from
-``orthography2ipa.allophony.segment_ipa``. Whitespace, syllable marks and
-prosodic boundaries are not segments. A stress mark is one segment, because
-stress placement changes what a voice says.
+``orthography2ipa.allophony.segment_ipa``. Whitespace, syllable marks,
+prosodic boundaries and tie bars are not segments, so ``t͡s`` scores as ``ts``.
+A stress mark is one segment, because stress placement changes what a voice
+says. A row whose ``expected_ipa`` has no segments is skipped with a warning.
+
+The gain of one system over another is the error it removes in a category,
+divided by the segment count of the category. The noise is the largest error
+change in one row of the category, divided by the same count. A gain counts
+only when it is larger than the noise, so more than one sentence carries it.
 
 A backend is any object with ``phonemize(text, lang) -> list[list[str]]``, as
 every scriptconv phonemizer has. A backend that can switch a stage off also has
 ``without(stage)``, see :class:`Ablatable`. For a backend without it, the gate
-reports the stage as not ablatable and gives no verdict.
+reports the stage as not ablatable. The gate fails when a gold stage has no
+verdict.
 
 Command line::
 
@@ -37,6 +44,7 @@ import importlib
 import re
 import sys
 import unicodedata
+import warnings
 from collections import Counter
 from dataclasses import dataclass
 from typing import Iterable, Mapping, Optional, Protocol, Sequence, runtime_checkable
@@ -45,8 +53,11 @@ CATEGORIES = ("plain", "number", "date", "abbreviation", "homograph", "contact")
 TIERS = ("gold", "silver")
 COLUMNS = ("id", "lang", "category", "text", "expected_ipa", "source", "tier")
 
-# Syllable boundaries, linking marks and prosodic group boundaries.
-_NOT_SEGMENTS = str.maketrans("", "", ".‿|‖")
+# Syllable boundaries, linking marks, prosodic group boundaries and the tie
+# bars above (U+0361) and below (U+035C).
+_NOT_SEGMENTS = str.maketrans("", "", ".‿|‖\u0361\u035c")
+# Skip reasons that are defects in the sentence set, not filters.
+DEFECTS = ("column count", "unknown category", "unknown tier")
 _STRESS = re.compile("([ˈˌ])")
 
 
@@ -75,16 +86,28 @@ class Ablatable(Backend, Protocol):
         """
 
 
-# Gain per category for each key: "full_vs_o2i" and one key per stage.
+@dataclass(frozen=True)
+class Comparison:
+    """Two systems on the same rows, per category.
+
+    ``gain`` is the error that the second system removes, divided by the
+    reference segment count of the category. A positive gain is good.
+    ``noise`` is the largest error change in one row, divided by the same count.
+    """
+    gain: dict[str, float]
+    noise: dict[str, float]
+
+
+# A comparison for each key: "full_vs_o2i" and one key per stage.
 # A stage of a backend that is not ablatable maps to None.
-Report = dict[str, Optional[dict[str, float]]]
+Report = dict[str, Optional[Comparison]]
 
 
 def read_tsv(path: str, lang: str) -> tuple[list[Row], Counter]:
     """The rows of *path* for *lang*, and the count of skipped rows by reason."""
     rows: list[Row] = []
     skipped: Counter = Counter()
-    with open(path, encoding="utf-8", newline="") as f:
+    with open(path, encoding="utf-8-sig", newline="") as f:
         reader = csv.reader(f, delimiter="\t", quoting=csv.QUOTE_NONE)
         header = tuple(next(reader, ()))
         if header != COLUMNS:
@@ -137,74 +160,93 @@ def phonemes(backend: Backend, text: str, lang: str) -> str:
     return " ".join("".join(sentence) for sentence in backend.phonemize(text, lang))
 
 
-def per_by_category(rows: Iterable[Row], backend: Backend) -> dict[str, float]:
-    """PER of *backend* on *rows*, per category. The rows must share one tier."""
+def _references(rows: Iterable[Row]) -> list[tuple[Row, list[str]]]:
+    """Each row with the segments of its reference. The rows must share one
+    tier. A row whose reference has no segments is skipped with a warning."""
     rows = list(rows)
     tiers = {row.tier for row in rows}
     if len(tiers) > 1:
         raise ValueError(f"rows mix tiers {sorted(tiers)}; score each tier apart")
-    errors: Counter = Counter()
-    length: Counter = Counter()
+    references = []
     for row in rows:
         ref = segments(row.expected_ipa)
-        errors[row.category] += edit_distance(ref, segments(phonemes(backend, row.text, row.lang)))
+        if ref:
+            references.append((row, ref))
+        else:
+            warnings.warn(f"row {row.id}: expected_ipa {row.expected_ipa!r} has no segments, skipped",
+                          stacklevel=3)
+    return references
+
+
+def _errors(references: Sequence[tuple[Row, list[str]]], backend: Backend) -> list[int]:
+    return [edit_distance(ref, segments(phonemes(backend, row.text, row.lang)))
+            for row, ref in references]
+
+
+def per_by_category(rows: Iterable[Row], backend: Backend) -> dict[str, float]:
+    """PER of *backend* on *rows*, per category. The rows must share one tier."""
+    references = _references(rows)
+    errors: Counter = Counter()
+    length: Counter = Counter()
+    for (row, ref), row_errors in zip(references, _errors(references, backend)):
+        errors[row.category] += row_errors
         length[row.category] += len(ref)
     return {category: errors[category] / length[category] for category in length}
 
 
-def noise_by_category(rows: Iterable[Row]) -> dict[str, float]:
-    """One sentence's worth of PER per category.
+def _compare(references: Sequence[tuple[Row, list[str]]],
+             before: Sequence[int], after: Sequence[int]) -> Comparison:
+    length: Counter = Counter()
+    removed: Counter = Counter()
+    largest: Counter = Counter()
+    for (row, ref), b, a in zip(references, before, after):
+        length[row.category] += len(ref)
+        removed[row.category] += b - a
+        largest[row.category] = max(largest[row.category], abs(b - a))
+    return Comparison(gain={c: removed[c] / n for c, n in length.items()},
+                      noise={c: largest[c] / n for c, n in length.items()})
 
-    When every segment of an average sentence is wrong, the PER of its
-    category rises by its share of the segments, which is 1 / row count.
-    """
-    counts = Counter(row.category for row in rows)
-    return {category: 1 / n for category, n in counts.items()}
 
-
-def _gain(before: dict[str, float], after: dict[str, float]) -> dict[str, float]:
-    return {category: before[category] - after[category] for category in after}
+def compare_backends(rows: Iterable[Row], before: Backend, after: Backend) -> Comparison:
+    """The gain of *after* over *before* on *rows*, and its noise, per category."""
+    references = _references(rows)
+    return _compare(references, _errors(references, before), _errors(references, after))
 
 
 def stage_gain(rows: Sequence[Row], backend: Backend, stages: Iterable[str],
                baseline: Optional[Backend] = None) -> Report:
     """Gain is error removed, so a positive number is good. PER falls as quality rises.
 
-    ``full_vs_o2i`` is the gain of *backend* over *baseline*, which is
-    standalone orthography2ipa unless given. Each stage maps to the gain of
-    *backend* over the same backend without that stage, or to ``None`` when
-    *backend* is not :class:`Ablatable`.
+    ``full_vs_o2i`` compares *baseline*, which is standalone orthography2ipa
+    unless given, with *backend*. Each stage compares the backend without that
+    stage with *backend*, or maps to ``None`` when *backend* is not
+    :class:`Ablatable`.
     """
     if baseline is None:
         from scriptconv.phonemizers.o2ipa import Orthography2IPAPhonemizer
         baseline = Orthography2IPAPhonemizer()
-    full = per_by_category(rows, backend)
-    report: Report = {"full_vs_o2i": _gain(per_by_category(rows, baseline), full)}
+    references = _references(rows)
+    full = _errors(references, backend)
+    report: Report = {"full_vs_o2i": _compare(references, _errors(references, baseline), full)}
     for stage in stages:
         if isinstance(backend, Ablatable):
-            report[stage] = _gain(per_by_category(rows, backend.without(stage)), full)
+            report[stage] = _compare(references, _errors(references, backend.without(stage)), full)
         else:
             report[stage] = None
     return report
 
 
-def verdict(report: Report, stage: str, own_category: str,
-            noise: float | Mapping[str, float]) -> Optional[bool]:
-    """True when *stage* gains more than noise in its own category and loses
-    no more than noise in any other. ``None`` when the stage is not ablatable.
-
-    *noise* is one value for every category, or one value per category.
+def verdict(report: Report, stage: str, own_category: str) -> Optional[bool]:
+    """True when *stage* gains more than its noise in its own category and
+    loses no more than its noise in any other. ``None`` when the stage is not
+    ablatable. A gain that one row carries equals the noise, so it does not pass.
     """
-    gains = report[stage]
-    if gains is None:
+    comparison = report[stage]
+    if comparison is None:
         return None
-
-    def tolerance(category: str) -> float:
-        return noise[category] if isinstance(noise, Mapping) else noise
-
-    return gains[own_category] > tolerance(own_category) and all(
-        gain >= -tolerance(category)
-        for category, gain in gains.items() if category != own_category)
+    return comparison.gain[own_category] > comparison.noise[own_category] and all(
+        gain >= -comparison.noise[category]
+        for category, gain in comparison.gain.items() if category != own_category)
 
 
 def _load_backend(name: str) -> Backend:
@@ -212,7 +254,10 @@ def _load_backend(name: str) -> Backend:
     a backend class or a factory that takes no arguments."""
     if ":" in name:
         module, attribute = name.split(":", 1)
-        obj = getattr(importlib.import_module(module), attribute)
+        try:
+            obj = getattr(importlib.import_module(module), attribute)
+        except AttributeError:
+            raise ImportError(f"backend {name!r}: module {module!r} has no attribute {attribute!r}") from None
         return obj() if isinstance(obj, type) or not isinstance(obj, Backend) else obj
     from scriptconv.phonemizers import Phonemizer, get_phonemizer
     return get_phonemizer(Phonemizer(name))
@@ -243,44 +288,64 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--backend", required=True,
                         help="scriptconv phonemizer name, or module:attribute")
     parser.add_argument("--stages", default="", help="comma list of stage[:own category]")
+    parser.add_argument("--allow-skips", action="store_true",
+                        help=f"score the set when rows are skipped for: {', '.join(DEFECTS)}")
     args = parser.parse_args(argv)
     try:
         stages = _parse_stages(args.stages)
         rows, skipped = read_tsv(args.tsv, args.lang)
         backend = _load_backend(args.backend)
-    except (ValueError, ImportError) as e:
+        if isinstance(backend, Ablatable):
+            for name, _ in stages:
+                backend.without(name)
+    except (OSError, ValueError, ImportError) as e:
         parser.error(str(e))
 
     reasons = ", ".join(f"{reason} {n}" for reason, n in sorted(skipped.items()))
     print(f"rows: read {len(rows) + sum(skipped.values())}, scored {len(rows)}, "
           f"skipped {sum(skipped.values())}" + (f" ({reasons})" if reasons else ""))
+    defects = sum(skipped[reason] for reason in DEFECTS)
+    if defects and not args.allow_skips:
+        print(f"gate: FAIL  {defects} skipped for a defect; fix the rows or pass --allow-skips")
+        return 1
     if not rows:
+        print("gate: FAIL  no row is scored")
         return 1
 
-    failed = False
+    failures = [] if stages else ["no stage given, use --stages"]
     for tier in TIERS:
         tier_rows = [row for row in rows if row.tier == tier]
         if not tier_rows:
             print(f"{tier}: no rows, no verdict")
+            if tier == "gold":
+                failures.append("no gold rows")
             continue
         counts = Counter(row.category for row in tier_rows)
-        noise = noise_by_category(tier_rows)
         print(f"{tier}: rows " + "  ".join(f"{c} {n}" for c, n in counts.items()))
         report = stage_gain(tier_rows, backend, [name for name, _ in stages])
-        print(f"{tier}: full_vs_o2i  {_signed(report['full_vs_o2i'])}")
+        full_vs_o2i = report["full_vs_o2i"].gain
+        print(f"{tier}: full_vs_o2i  {_signed(full_vs_o2i)}")
+        if tier == "gold":
+            failures += [f"full_vs_o2i {c} {gain:+.4f}, the backend is worse than orthography2ipa"
+                         for c, gain in full_vs_o2i.items() if gain < 0]
         for name, own in stages:
-            gains = report[name]
-            if gains is None:
+            comparison = report[name]
+            if comparison is None:
                 print(f"{tier}: {name}  not ablatable")
-                continue
-            if own not in gains:
+                failure = f"{name} not ablatable"
+            elif own not in comparison.gain:
                 print(f"{tier}: {name}  no {own} rows, no verdict")
-                continue
-            passed = verdict(report, name, own, noise)
-            failed = failed or (tier == "gold" and not passed)
-            print(f"{tier}: {name}  {'PASS' if passed else 'FAIL'}  own {own} "
-                  f"{gains[own]:+.4f} (noise {noise[own]:.4f})  {_signed(gains)}")
-    return 1 if failed else 0
+                failure = f"{name} has no {own} rows"
+            else:
+                passed = verdict(report, name, own)
+                print(f"{tier}: {name}  {'PASS' if passed else 'FAIL'}  own {own} "
+                      f"{comparison.gain[own]:+.4f} (noise {comparison.noise[own]:.4f})  "
+                      f"{_signed(comparison.gain)}")
+                failure = None if passed else f"{name} FAIL"
+            if tier == "gold" and failure:
+                failures.append(failure)
+    print(f"gate: FAIL  {'; '.join(failures)}" if failures else "gate: PASS")
+    return 1 if failures else 0
 
 
 if __name__ == "__main__":
