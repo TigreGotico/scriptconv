@@ -53,7 +53,7 @@ class Phonemizer(str, Enum):
     CHARSIU = "charsiu"  # technically same as byt5, but needs special handling for whitespace
     TRANSPHONE = "transphone"
     PHONETISAURUS = "phonetisaurus"  # WFST g2p; language and symbols come from the model
-    MIRANDESE = "mwl_phonemizer"
+    MIRANDESE = "mwl_phonemizer"  # mirandese (o2i specs); voice configs store this value
 
     DEEPPHONEMIZER = "deepphonemizer" # en
     OPENPHONEMIZER = "openphonemizer" # en
@@ -82,7 +82,7 @@ class Phonemizer(str, Enum):
     SHAMI = "shami"  # Levantine Arabic / English code-switching (ShamiVITS)
     ARBTOK = "arbtok"  # arabic (dialect-aware, undiacritized text; o2i lattice)
     EUSKAPHONE = "euskaphone"  # basque (dialect-aware; o2i lattice)
-    BARRANQUENHO = "barranquenho"  # barranquenho (pt/es contact variety; o2i lattice)
+    BARRANQUENHO = "barranquenho"  # barranquenho (pt/es contact variety; o2i spec)
     ORTHOGRAPHY2IPA = "orthography2ipa"  # multilingual data-driven IPA (o2i lattice)
     AFRICA_G2P = "africa_g2p"  # rule-based G2P for 400+ African languages (native units or IPA)
     GHANA_G2P = "ghana_g2p"  # africa-g2p rules patched for 42 Ghanaian languages (native units or IPA)

@@ -1,7 +1,8 @@
-import re
+import dataclasses
 
-from scriptconv.phonemizers.base import BasePhonemizer
+from scriptconv.phonemizers.base import BasePhonemizer, PhonemizerIdentity, _check_alphabet
 from scriptconv.phonemizers.enums import Alphabet
+from scriptconv.phonemizers.o2ipa import Orthography2IPAPhonemizer
 
 
 class TugaphonePhonemizer(BasePhonemizer):
@@ -56,41 +57,25 @@ class TugaphonePhonemizer(BasePhonemizer):
 
 class BarranquenhoPhonemizer(BasePhonemizer):
     """
-    Barranquenho phonemizer backed by ``g2p_barranquenho``, a rule-based
-    engine built on the orthography2ipa lattice for the Portuguese/Spanish
-    contact variety spoken in Barrancos.  Output is always IPA.
+    Barranquenho phonemizer on the orthography2ipa spec ``ext-PT-x-barranco``,
+    for the Portuguese/Spanish contact variety spoken in Barrancos.  Output is
+    always IPA.
 
-    ``g2p_barranquenho.phonemize`` is word-level (a single word -> a list of IPA
-    phoneme strings), so the input is lowercased, split into words, each word is
-    phonemized and its phonemes joined, and the words are rejoined with spaces.
-    ``g2p_barranquenho`` is imported lazily so importing ``scriptconv`` does not
-    hard-require it.
+    The phonemes come from
+    :class:`~scriptconv.phonemizers.o2ipa.Orthography2IPAPhonemizer` on that
+    spec, which transcribes the whole text, so cross-word sandhi applies.  This
+    backend needs the ``o2i`` extra.
     """
 
-    engine_distribution = "g2p_barranquenho"
+    engine_distribution = Orthography2IPAPhonemizer.engine_distribution
 
     _LANGS = ["ext-PT-x-barrancos"]
+    _SPEC = "ext-PT-x-barranco"
 
     def __init__(self, alphabet: Alphabet = Alphabet.IPA):
-        if alphabet != Alphabet.IPA:
-            raise ValueError("g2p_barranquenho only outputs IPA")
-        self._phonemize = None
+        _check_alphabet(self, alphabet, [Alphabet.IPA])
         super().__init__(alphabet)
-
-    @property
-    def phonemize_fn(self):
-        """Lazily import and cache ``g2p_barranquenho.phonemize``."""
-        if self._phonemize is None:
-            try:
-                from g2p_barranquenho import phonemize
-            except ImportError as e:
-                raise ImportError(
-                    "g2p_barranquenho is required for the Barranquenho phonemizer. "
-                    "Install it with 'pip install g2p_barranquenho' "
-                    "(or 'pip install scriptconv[pt]')."
-                ) from e
-            self._phonemize = phonemize
-        return self._phonemize
+        self._o2i = Orthography2IPAPhonemizer()
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
@@ -102,7 +87,11 @@ class BarranquenhoPhonemizer(BasePhonemizer):
         """
         return cls.match_lang(target_lang, cls._LANGS)
 
+    def identity(self, lang: str) -> PhonemizerIdentity:
+        engine = self._o2i.identity(self._SPEC)
+        return dataclasses.replace(super().identity(lang), distribution=engine.distribution,
+                                   version=engine.version, revision=engine.revision)
+
     def phonemize_string(self, text: str, lang: str = "ext-PT-x-barrancos") -> str:
         self.get_lang(lang)
-        words = re.findall(r"\w+", text.lower(), flags=re.UNICODE)
-        return " ".join("".join(self.phonemize_fn(w)) for w in words if w)
+        return self._o2i.phonemize_string(text, self._SPEC)
