@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a63](https://github.com/TigreGotico/scriptconv/tree/0.0.4a63) (2026-11-12)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a62...0.0.4a63)
+
+**Merged pull requests:**
+
+- fix\(phonemizers\): fill the o2i identity revision [\#201](https://github.com/TigreGotico/scriptconv/pull/201) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a62](https://github.com/TigreGotico/scriptconv/tree/0.0.4a62) (2026-11-12)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a61...0.0.4a62)
@@ -382,10 +390,6 @@
 ## [0.0.4a13](https://github.com/TigreGotico/scriptconv/tree/0.0.4a13) (2026-07-30)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a12...0.0.4a13)
-
-**Merged pull requests:**
-
-- docs: rewrite README in Simplified Technical English [\#89](https://github.com/TigreGotico/scriptconv/pull/89) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a12](https://github.com/TigreGotico/scriptconv/tree/0.0.4a12) (2026-07-24)
 
