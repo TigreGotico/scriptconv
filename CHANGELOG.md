@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a53](https://github.com/TigreGotico/scriptconv/tree/0.0.4a53) (2026-11-12)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a52...0.0.4a53)
+
+**Merged pull requests:**
+
+- fix\(diacritics\): route every Arabic lect to tashkeel and pass waqf [\#175](https://github.com/TigreGotico/scriptconv/pull/175) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a52](https://github.com/TigreGotico/scriptconv/tree/0.0.4a52) (2026-11-12)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a51...0.0.4a52)
@@ -395,10 +403,6 @@
 ## [0.0.4a3](https://github.com/TigreGotico/scriptconv/tree/0.0.4a3) (2026-07-22)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a2...0.0.4a3)
-
-**Merged pull requests:**
-
-- feat: East-Slavic stress and European-Portuguese sense diacritics [\#68](https://github.com/TigreGotico/scriptconv/pull/68) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a2](https://github.com/TigreGotico/scriptconv/tree/0.0.4a2) (2026-07-22)
 
