@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a64](https://github.com/TigreGotico/scriptconv/tree/0.0.4a64) (2026-11-12)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a63...0.0.4a64)
+
+**Merged pull requests:**
+
+- fix\(testing\): a repeated sentence is a sentence set defect [\#197](https://github.com/TigreGotico/scriptconv/pull/197) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a63](https://github.com/TigreGotico/scriptconv/tree/0.0.4a63) (2026-11-12)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a62...0.0.4a63)
@@ -382,10 +390,6 @@
 ## [0.0.4a14](https://github.com/TigreGotico/scriptconv/tree/0.0.4a14) (2026-08-02)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a13...0.0.4a14)
-
-**Merged pull requests:**
-
-- feat: africa-g2p phonemizer backend [\#91](https://github.com/TigreGotico/scriptconv/pull/91) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a13](https://github.com/TigreGotico/scriptconv/tree/0.0.4a13) (2026-07-30)
 
