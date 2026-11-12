@@ -1,12 +1,19 @@
 # Changelog
 
-## [0.0.4a57](https://github.com/TigreGotico/scriptconv/tree/0.0.4a57) (2026-11-12)
+## [0.0.4a56](https://github.com/TigreGotico/scriptconv/tree/0.0.4a56) (2026-11-12)
 
-[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a54...0.0.4a57)
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a55...0.0.4a56)
 
 **Merged pull requests:**
 
 - fix\(misaki\): install what misaki\_en, \_ja, \_ko and \_zh need [\#185](https://github.com/TigreGotico/scriptconv/pull/185) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.0.4a55](https://github.com/TigreGotico/scriptconv/tree/0.0.4a55) (2026-11-12)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a54...0.0.4a55)
+
+**Merged pull requests:**
+
 - fix\(fa\): set floors that let the fa extra resolve to a working set [\#183](https://github.com/TigreGotico/scriptconv/pull/183) ([JarbasAl](https://github.com/JarbasAl))
 - fix\(transphone\): install pip with the transphone extra [\#182](https://github.com/TigreGotico/scriptconv/pull/182) ([JarbasAl](https://github.com/JarbasAl))
 - fix\(ja\): install a MeCab dictionary with the ja-phonemizers extra [\#180](https://github.com/TigreGotico/scriptconv/pull/180) ([JarbasAl](https://github.com/JarbasAl))
