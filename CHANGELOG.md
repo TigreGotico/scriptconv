@@ -380,25 +380,13 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a6...0.0.4a7)
 
-**Merged pull requests:**
-
-- feat: auto-provision the Hebrew phonikud model [\#76](https://github.com/TigreGotico/scriptconv/pull/76) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [0.0.4a6](https://github.com/TigreGotico/scriptconv/tree/0.0.4a6) (2026-07-23)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a5...0.0.4a6)
 
-**Merged pull requests:**
-
-- refactor: move diacritization mechanism out of BasePhonemizer into diacritics [\#74](https://github.com/TigreGotico/scriptconv/pull/74) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [0.0.4a5](https://github.com/TigreGotico/scriptconv/tree/0.0.4a5) (2026-07-23)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a4...0.0.4a5)
-
-**Merged pull requests:**
-
-- fix: import hygiene \(requests/he/fa\) + mantoq export + strip\_diacritics tests [\#72](https://github.com/TigreGotico/scriptconv/pull/72) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a4](https://github.com/TigreGotico/scriptconv/tree/0.0.4a4) (2026-07-23)
 
