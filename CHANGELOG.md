@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.0.4a59](https://github.com/TigreGotico/scriptconv/tree/0.0.4a59) (2026-11-12)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a58...0.0.4a59)
+
+**Merged pull requests:**
+
+- fix\(ko\): install g2pk only below Python 3.13 [\#184](https://github.com/TigreGotico/scriptconv/pull/184) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.0.4a58](https://github.com/TigreGotico/scriptconv/tree/0.0.4a58) (2026-11-12)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a57...0.0.4a58)
+
+## [0.0.4a57](https://github.com/TigreGotico/scriptconv/tree/0.0.4a57) (2026-11-12)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a56...0.0.4a57)
+
 ## [0.0.4a56](https://github.com/TigreGotico/scriptconv/tree/0.0.4a56) (2026-11-12)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a55...0.0.4a56)
@@ -382,17 +398,9 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a8...0.0.4a9)
 
-**Merged pull requests:**
-
-- fix: name the install extra when an optional phonemizer backend is missing [\#80](https://github.com/TigreGotico/scriptconv/pull/80) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [0.0.4a8](https://github.com/TigreGotico/scriptconv/tree/0.0.4a8) (2026-07-23)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a7...0.0.4a8)
-
-**Merged pull requests:**
-
-- refactor: one model knob per graph edge \(phonemizer\_model / diacritizer\_model\) [\#78](https://github.com/TigreGotico/scriptconv/pull/78) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a7](https://github.com/TigreGotico/scriptconv/tree/0.0.4a7) (2026-07-23)
 
