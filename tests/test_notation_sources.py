@@ -732,6 +732,108 @@ def test_graph_edges_read_the_same_flags():
 
 
 # ---------------------------------------------------------------------------
+# Buckwalter and Arabic script: the direct edges take the same test
+# ---------------------------------------------------------------------------
+
+# Wikipedia, "Buckwalter transliteration": the scheme represents "Arabic
+# orthography strictly one-to-one". Its letter table and the list below it
+# give these spellings, for example "hamza on alif: >" and "alif maqsura: Y".
+# Each letter is named by its Unicode character name.
+BUCKWALTER_ROWS = [
+    ("'", "ARABIC LETTER HAMZA"), ("|", "ARABIC LETTER ALEF WITH MADDA ABOVE"),
+    (">", "ARABIC LETTER ALEF WITH HAMZA ABOVE"),
+    ("&", "ARABIC LETTER WAW WITH HAMZA ABOVE"),
+    ("<", "ARABIC LETTER ALEF WITH HAMZA BELOW"),
+    ("}", "ARABIC LETTER YEH WITH HAMZA ABOVE"), ("A", "ARABIC LETTER ALEF"),
+    ("b", "ARABIC LETTER BEH"), ("p", "ARABIC LETTER TEH MARBUTA"),
+    ("t", "ARABIC LETTER TEH"), ("v", "ARABIC LETTER THEH"),
+    ("j", "ARABIC LETTER JEEM"), ("H", "ARABIC LETTER HAH"),
+    ("x", "ARABIC LETTER KHAH"), ("d", "ARABIC LETTER DAL"),
+    ("*", "ARABIC LETTER THAL"), ("r", "ARABIC LETTER REH"),
+    ("z", "ARABIC LETTER ZAIN"), ("s", "ARABIC LETTER SEEN"),
+    ("$", "ARABIC LETTER SHEEN"), ("S", "ARABIC LETTER SAD"),
+    ("D", "ARABIC LETTER DAD"), ("T", "ARABIC LETTER TAH"),
+    ("Z", "ARABIC LETTER ZAH"), ("E", "ARABIC LETTER AIN"),
+    ("g", "ARABIC LETTER GHAIN"), ("f", "ARABIC LETTER FEH"),
+    ("q", "ARABIC LETTER QAF"), ("k", "ARABIC LETTER KAF"),
+    ("l", "ARABIC LETTER LAM"), ("m", "ARABIC LETTER MEEM"),
+    ("n", "ARABIC LETTER NOON"), ("h", "ARABIC LETTER HEH"),
+    ("w", "ARABIC LETTER WAW"), ("Y", "ARABIC LETTER ALEF MAKSURA"),
+    ("y", "ARABIC LETTER YEH"), ("F", "ARABIC FATHATAN"),
+    ("N", "ARABIC DAMMATAN"), ("K", "ARABIC KASRATAN"), ("a", "ARABIC FATHA"),
+    ("u", "ARABIC DAMMA"), ("i", "ARABIC KASRA"), ("~", "ARABIC SHADDA"),
+    ("o", "ARABIC SUKUN"), ("_", "ARABIC TATWEEL"),
+    ("{", "ARABIC LETTER ALEF WASLA"), ("`", "ARABIC LETTER SUPERSCRIPT ALEF"),
+]
+BUCKWALTER_LETTER = {code: unicodedata.lookup(name) for code, name in BUCKWALTER_ROWS}
+ARABIC_LETTERS = set(BUCKWALTER_LETTER.values())
+
+# Arabic Presentation Forms-A and -B whose compatibility decomposition is
+# made of the letters above. Each is a second spelling of those letters.
+PRESENTATION_FORMS = {
+    chr(cp): unicodedata.normalize("NFKC", chr(cp))
+    for cp in (*range(0xFB50, 0xFE00), *range(0xFE70, 0xFF00))
+    if unicodedata.normalize("NFKC", chr(cp)) != chr(cp)
+    and set(unicodedata.normalize("NFKC", chr(cp))) <= ARABIC_LETTERS
+}
+
+
+def direct_failures(forward, back, inventory, target):
+    """The symbols of *inventory* that fail the ``NotationInfo`` test."""
+    failures = []
+    for symbol, expected in inventory.items():
+        try:
+            out = forward(symbol, errors="strict")
+            if not set(out) <= target or back(out, errors="strict") != expected:
+                failures.append(symbol)
+        except UnknownSymbolError:
+            failures.append(symbol)
+    return failures
+
+
+def direct_edge(src, dst):
+    from scriptconv.graph import DEFAULT_GRAPH
+    return next(e for e in DEFAULT_GRAPH._edges[src] if e.dst == dst)
+
+
+@pytest.mark.parametrize("code, name", BUCKWALTER_ROWS)
+def test_buckwalter_value_matches_the_cited_scheme(code, name):
+    assert notation.buckwalter_to_arabic(code, errors="strict") == unicodedata.lookup(name)
+
+
+def test_buckwalter_to_arabic_edge_is_the_measured_round_trip():
+    inventory = {code: code for code in BUCKWALTER_LETTER}
+    target = ARABIC_LETTERS
+    failures = direct_failures(notation.buckwalter_to_arabic,
+                               notation.arabic_to_buckwalter, inventory, target)
+    assert direct_edge("buckwalter", "arabic").lossless is (not failures)
+
+
+def test_arabic_to_buckwalter_edge_is_the_measured_round_trip():
+    inventory = {letter: letter for letter in ARABIC_LETTERS} | PRESENTATION_FORMS
+    target = set("".join(BUCKWALTER_LETTER))
+    failures = direct_failures(notation.arabic_to_buckwalter,
+                               notation.buckwalter_to_arabic, inventory, target)
+    assert failures == []
+    assert direct_edge("arabic", "buckwalter").lossless is True
+
+
+@pytest.mark.parametrize("form, name, spelling", [
+    ("ﻵ", "LAM WITH ALEF WITH MADDA ABOVE ISOLATED", "l|"),
+    ("ﻶ", "LAM WITH ALEF WITH MADDA ABOVE FINAL", "l|"),
+    ("ﻷ", "LAM WITH ALEF WITH HAMZA ABOVE ISOLATED", "l>"),
+    ("ﻸ", "LAM WITH ALEF WITH HAMZA ABOVE FINAL", "l>"),
+    ("ﻹ", "LAM WITH ALEF WITH HAMZA BELOW ISOLATED", "l<"),
+    ("ﻺ", "LAM WITH ALEF WITH HAMZA BELOW FINAL", "l<"),
+    ("ﻻ", "LAM WITH ALEF ISOLATED", "lA"),
+    ("ﻼ", "LAM WITH ALEF FINAL", "lA"),
+])
+def test_lam_alef_ligature_takes_the_spelling_of_its_letters(form, name, spelling):
+    assert unicodedata.name(form) == f"ARABIC LIGATURE {name} FORM"
+    assert notation.arabic_to_buckwalter(form, errors="strict") == spelling
+
+
+# ---------------------------------------------------------------------------
 # Whitespace in ipa_to_arpa
 # ---------------------------------------------------------------------------
 

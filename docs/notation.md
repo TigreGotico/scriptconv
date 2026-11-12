@@ -140,7 +140,7 @@ known asymmetry: `arpa_to_ipa("AH0") == "ə"` but `ipa_to_arpa("ə") == "AX"`.
 
 ### Round-trip guarantees
 
-ARPA → IPA → ARPA is lossless for consonants and for vowels that have a unique IPA
+ARPA → IPA → ARPA is exact for consonants and for vowels that have a unique IPA
 symbol:
 
 ```
@@ -331,12 +331,12 @@ arabic_to_buckwalter("ا")       # "A"
 | `N` | ٌ | tanwin damm |
 | `K` | ٍ | tanwin kasr |
 | `_` | ـ | tatweel |
-| `^` | ّ | shadda (alias for `~`) |
+| `{` | ٱ | alef wasla |
+| `` ` `` | ٰ | dagger alef |
 
-**Shadda alias note**: both `~` and `^` map to the shadda character (U+0651) in the
-forward direction. In the reverse direction, shadda maps to the canonical `~`, so
-standard Buckwalter round-trips (`~` → ّ → `~`) are exact, the `^` alias is accepted on
-input but not emitted.
+**Presentation forms**: `arabic_to_buckwalter` also reads the Arabic Presentation
+Forms-A and -B. Each takes the spelling of the letters that its NFKC decomposition
+gives, so the lam-alef ligature `ﻸ` (U+FEF8) gives `l>`, and returns as `لأ`.
 
 ---
 
@@ -436,7 +436,7 @@ Verified against *Manuel de Lexique 3* v3.11, Tableau 2.
 
 ### Round-trip guarantees
 
-Lexique → IPA → Lexique is lossless except for the `°`/`3` schwa pair (both map to `ə`
+Lexique → IPA → Lexique is exact except for the `°`/`3` schwa pair (both map to `ə`
 in IPA, reverse always produces `°`). All other phonemes round-trip exactly.
 
 ---
@@ -510,8 +510,8 @@ Each `NotationInfo` carries `lossless_to_ipa`, `lossless_from_ipa`,
 `token_separated`, and `reference`.
 
 The two flags share one definition. A conversion is lossless when it passes this
-test for every symbol of its source inventory, with `errors="strict"` in both
-directions:
+test for every symbol of its source inventory. Both converters run with
+`errors="strict"` and with their other options at the defaults:
 
 1. The symbol converts, and every output symbol is in the target inventory. An
    unmapped symbol passed through does not count, and neither does a table row
@@ -526,7 +526,15 @@ notation with no converter in the direction under test is not lossless in that
 direction, so Buckwalter, which converts to Arabic script and not to IPA, has both
 flags `False`.
 
-`tests/test_notation_sources.py` measures each flag against both clauses. Towards
+The conversion graph gives each IPA edge the flag of its direction. The Buckwalter
+and Arabic-script edges pass the same test, so they are lossless too. For them, an
+Arabic presentation form is a second spelling of the letters that NFKC gives.
+
+The defaults matter for ARPABET. With `stress=True`, `AH1` returns as `AH1`, but the
+graph and the flags use the default `stress=False`, so `lossless_to_ipa` is `False`.
+
+`tests/test_notation_sources.py` measures each flag and both Buckwalter edges against
+both clauses. Towards
 IPA, the target inventory is the set of IPA symbols in the Wells rows of that file.
 ARPABET and X-SAMPA inventories come from their sources. The Lexique, Kirshenbaum,
 Cotovía and RFE inventories are the code's own keys, because no source for them is
