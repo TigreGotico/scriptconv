@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.0.4a61](https://github.com/TigreGotico/scriptconv/tree/0.0.4a61) (2026-11-12)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a59...0.0.4a61)
+
+**Merged pull requests:**
+
+- fix\(notation\): strict drops no mark and accepts spaces [\#177](https://github.com/TigreGotico/scriptconv/pull/177) ([JarbasAl](https://github.com/JarbasAl))
+- fix\(notation\): one definition of lossless, measured on every notation edge [\#176](https://github.com/TigreGotico/scriptconv/pull/176) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a59](https://github.com/TigreGotico/scriptconv/tree/0.0.4a59) (2026-11-12)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a58...0.0.4a59)
@@ -382,17 +391,9 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a10...0.0.4a11)
 
-**Merged pull requests:**
-
-- fix\(ru\): keep vosk phoneme tokens whole on the lazy path [\#84](https://github.com/TigreGotico/scriptconv/pull/84) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [0.0.4a10](https://github.com/TigreGotico/scriptconv/tree/0.0.4a10) (2026-07-23)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a9...0.0.4a10)
-
-**Merged pull requests:**
-
-- feat: Russian vosk-tts phonemizer [\#82](https://github.com/TigreGotico/scriptconv/pull/82) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a9](https://github.com/TigreGotico/scriptconv/tree/0.0.4a9) (2026-07-23)
 
