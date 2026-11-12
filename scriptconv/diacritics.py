@@ -500,9 +500,10 @@ def register(graph) -> None:
     :func:`scriptconv.phonemizers.register` to make
     ``"text-diacritized" -> "ipa"`` reachable.
 
-    ``text-diacritized -> text`` (:func:`strip_diacritics`) is lossless and
-    cheap, but gated: it raises for languages whose diacritics are native
-    orthography rather than removable overlays.
+    ``text-diacritized -> text`` (:func:`strip_diacritics`) is cheap but not
+    lossless: a letter with a mark and the bare letter strip to one string, so
+    no reverse returns both.  It is gated: it raises for languages whose
+    diacritics are native orthography rather than removable overlays.
     """
     graph.register(
         Edge("text", DIACRITIZED,
@@ -512,4 +513,4 @@ def register(graph) -> None:
     graph.register(
         Edge(DIACRITIZED, "text",
              lambda text, lang="und", **_: strip_diacritics(text, lang),
-             lossless=True))
+             lossless=False))

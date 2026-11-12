@@ -112,6 +112,25 @@ def test_halabi_keeps_a_space(space):
     assert notation.halabi_to_ipa("b" + space + "b", errors="strict") == "b" + space + "b"
 
 
+def test_halabi_refuses_a_control_that_is_not_white_space():
+    with pytest.raises(UnknownSymbolError) as caught:
+        notation.halabi_to_ipa("b\x1cb", errors="strict")
+    assert (caught.value.symbol, caught.value.position) == ("\x1c", 1)
+
+
+def test_iqra_does_not_split_on_a_control():
+    assert notation.iqra_halabi_to_ipa("b\x1cb") == "b\x1cb"
+    with pytest.raises(UnknownSymbolError) as caught:
+        notation.iqra_halabi_to_ipa("b\x1cb", errors="strict")
+    assert caught.value.symbol == "b\x1cb"
+
+
+@pytest.mark.parametrize("space", WHITE_SPACE)
+def test_iqra_space_separates_two_phones(space):
+    # phoneme_ref has no word boundary, so the space leaves no trace.
+    assert notation.iqra_halabi_to_ipa("b a" + space + "b a", errors="strict") == "baba"
+
+
 @pytest.mark.parametrize("ipa, mark, position", [
     ("kʰæt", "ʰ", 1),          # aspiration
     ("kæ̃t", "̃", 2),  # nasalization
@@ -174,3 +193,22 @@ def test_strict_refuses_a_stress_mark_that_no_vowel_follows():
 
 def test_stress_false_drops_the_stress_mark_on_request():
     assert ipa_to_arpa("ˈkæt", errors="strict") == "K AE T"
+
+
+# A syllabic consonant is the nucleus of its syllable, and ARPABET gives EL, EM,
+# EN and ENG no stress digit.
+@pytest.mark.parametrize("ipa", ["ˈl̩ə", "ˈbl̩ə", "ˈm̩ə", "ˈn̩ə", "ˈŋ̍ə", "ˌl̩ə"])
+def test_strict_refuses_a_stress_mark_on_a_syllabic_consonant(ipa):
+    with pytest.raises(UnknownSymbolError) as caught:
+        ipa_to_arpa(ipa, stress=True, errors="strict")
+    assert (caught.value.symbol, caught.value.position) == (ipa[0], 0)
+
+
+@pytest.mark.parametrize("errors", ["replace", "pass", "ignore"])
+def test_other_policies_give_the_digit_to_the_next_vowel(errors):
+    assert ipa_to_arpa("ˈl̩ə", stress=True, errors=errors) == "EL AH1"
+
+
+def test_strict_stresses_the_vowel_before_a_syllabic_consonant():
+    # The vowel takes the digit first, so no stress is pending at the n.
+    assert ipa_to_arpa("ˈbʌtn̩", stress=True, errors="strict") == "B AH1 T EN"
