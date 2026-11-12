@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a52](https://github.com/TigreGotico/scriptconv/tree/0.0.4a52) (2026-11-12)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a51...0.0.4a52)
+
+**Merged pull requests:**
+
+- feat\(testing\): sentence gate that scores each stage against orthography2ipa [\#174](https://github.com/TigreGotico/scriptconv/pull/174) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a51](https://github.com/TigreGotico/scriptconv/tree/0.0.4a51) (2026-11-11)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a50...0.0.4a51)
@@ -395,10 +403,6 @@
 ## [0.0.4a2](https://github.com/TigreGotico/scriptconv/tree/0.0.4a2) (2026-07-22)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a1...0.0.4a2)
-
-**Merged pull requests:**
-
-- fix: publicly re-export the shami frontend symbols [\#66](https://github.com/TigreGotico/scriptconv/pull/66) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a1](https://github.com/TigreGotico/scriptconv/tree/0.0.4a1) (2026-07-21)
 
