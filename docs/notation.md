@@ -82,6 +82,27 @@ convert("Sa", "lexique", "x-sampa")  # "Sa"  (ʃ→S, a→a)
 
 ---
 
+## Unknown symbols, `errors=`
+
+Every converter takes `errors="pass" | "replace" | "strict" | "ignore"` for a symbol
+that its table does not map. `"strict"` raises `UnknownSymbolError` with the symbol,
+its position and the notation. Strict follows three rules:
+
+1. Strict drops no mark. A diacritic or a modifier letter with no value in the target
+   raises. `ipa_to_arpa("kʰæt", errors="strict")` raises on `ʰ`, and the default gives
+   `K AE T`.
+2. Strict raises on any other symbol that the table does not map.
+3. Strict accepts spaces. A space is a character with the Unicode White_Space
+   property, 25 code points. Each converter keeps a space under every policy, because a
+   space is not an unknown symbol. ARPABET has no word boundary, so `ipa_to_arpa`
+   drops the space and `arpa_to_ipa` splits its tokens on it. U+001C to U+001F and
+   U+200B are not White_Space, so strict raises on them.
+
+With `stress=False`, `ipa_to_arpa` drops a stress mark under every policy, because
+the caller asked for ARPABET with no stress digits.
+
+---
+
 ## ARPABET ↔ IPA
 
 Table derived from [chorusai/arpa2ipa](https://github.com/chorusai/arpa2ipa) (Apache-2.0).
@@ -121,9 +142,14 @@ def ipa_to_arpa(ipa_string: str, unknown: str = "?") -> str
 
 Converts an IPA string to a space-separated ARPABET sequence. Matches the longest IPA
 symbol at each position. Characters not in the ARPABET table are replaced by `unknown`
-(default `"?"`), pass `unknown=""` to drop them silently. Whitespace of every kind has
-no token and is dropped, so the output keeps no word boundary: `"ɛ ɛ"` and `"ɛɛ"` both
-give `EH EH`.
+(default `"?"`), pass `unknown=""` to drop them silently. A space has no token and is
+dropped, so the output keeps no word boundary: `"ɛ ɛ"` and `"ɛɛ"` both give `EH EH`.
+The tied affricates `t͡ʃ` and `d͡ʒ` give `CH` and `JH`, with the tie above or below.
+
+With `stress=True`, a stress mark gives its digit to the next vowel. The IPA puts the
+mark before the stressed syllable, so `bəˈnænə` gives `B AH0 N AE1 N AH0`, as in the
+CMU Pronouncing Dictionary. A mark before the vowel gives the same result. A stress
+mark does not cross a space.
 
 ```python
 ipa_to_arpa("həloʊ")   # "HH AX L OW"
@@ -217,13 +243,18 @@ including diacritics and tones. A sequence of symbols can differ, as the tie bar
 below shows. `ipa_to_xsampa` decomposes its input first, so precomposed `ã` gives
 `a~`. The labiodental flap `ⱱ` joined the IPA later and has no spelling. The syllabic mark
 above a letter gives `=`, so `ŋ̍` gives `N=`. The voiceless ring above `ŋ` gives `_0`,
-so `ŋ̊` gives `N_0`. Both return with the diacritic below the letter. The ring above any
-other letter stays unknown, because `å` decomposes to `a` plus the same mark.
+so `ŋ̊` gives `N_0`. Both return with the diacritic below the letter. The IPA moves a
+mark above a letter "to avoid a descender or another diacritic". So the ring above
+reads as voiceless after a letter with a descender, such as `ɡ̊`, and after a mark below,
+such as `ç̊`. A letter has a descender when its glyph reaches more than 0.1 em below the
+baseline in both DejaVu Sans and DejaVu Serif. The ring above any other letter stays
+unknown, because `å` is a letter of Nordic orthography and not IPA.
 The tie bar is `_`, which also opens a diacritic, so `t͡s` gives `t_s` and `t͡θ` gives
 `tT`: Wells assumes affricate status where no tie is written, and the tie itself does
 not come back. `a͡ɨ` gives `a1` for the same reason, because `_1` is a tone number.
 A tone number has no IPA value, so `xsampa_to_ipa` treats each of `_1` to `_6` as one
-unknown symbol. `a_7`, `a_8` and `a_9` are the tie and a vowel, because the tone numbers
+unknown symbol. The falling tone ``_` `` of Wells's section 24 is one unknown symbol for
+the same reason, and not a tie before the rhoticity mark. `a_7`, `a_8` and `a_9` are the tie and a vowel, because the tone numbers
 stop at 6.
 X-SAMPA → IPA → X-SAMPA is lossless for every spelling Wells lists. A second spelling
 returns as the first.

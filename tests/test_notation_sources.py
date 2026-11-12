@@ -417,6 +417,11 @@ LEFT_OUT = {
     "_1": "Wells: \"a language-specific tone number\", with six for Cantonese. "
           "Wikipedia: \"The numbers _1 to _6 are reserved diacritics\". It has "
           "no IPA value, so it stays unknown and does not read as a tie",
+    "_`": "Wells, section 24: tone 4 of Mandarin as ma_`, among other tone "
+          "spellings that he calls \"an embarras de richesses\" and votes "
+          "against. It has no IPA value, so it stays unknown and does not read "
+          "as a tie before the rhoticity mark. ma_- from the same list keeps "
+          "the table value of _-, the retracted mark",
 }
 
 # Spellings no source has.
@@ -572,6 +577,13 @@ def test_tie_before_a_digit_past_the_tone_numbers_stays(xsampa, ipa):
     assert ipa_to_xsampa(ipa, errors="strict") == xsampa
 
 
+def test_section_24_falling_tone_is_unknown_and_not_a_tie():
+    with pytest.raises(UnknownSymbolError) as caught:
+        xsampa_to_ipa("ma_`", errors="strict")
+    assert (caught.value.symbol, caught.value.position) == ("_`", 2)
+    assert xsampa_to_ipa("ma_`") == "ma_`"
+
+
 def test_tie_before_the_letter_f_stays():
     assert xsampa_to_ipa("p_f") == "p\u0361f"
 
@@ -593,11 +605,31 @@ def test_diacritic_moved_above_a_descender_keeps_its_spelling(ipa, xsampa):
     assert ipa_to_xsampa(ipa, errors="strict") == xsampa
 
 
-@pytest.mark.parametrize("ipa", ["å", "ɡ\u030A"])
-def test_ring_above_stays_unknown_on_other_letters(ipa):
+# The letters of the Wells rows whose glyph reaches more than 0.1 em below the
+# baseline in both DejaVu Sans and DejaVu Serif, measured by
+# notation-3.6-3.8-evidence/descenders.py in the workspace audits.
+DESCENDERS = "jpqyŋɖɟɠɡɣɥɧɭɮɰɱɲɳɸɻɽʂʃʄʈʐʒʝβχ"
+LETTER_SPELLING = {nfd(ipa): spelling for spelling, ipa, _ in reversed(ROWS)}
+
+
+@pytest.mark.parametrize("letter", DESCENDERS)
+def test_ring_above_a_descender_is_the_voiceless_ring(letter):
+    spelling = LETTER_SPELLING.get(letter, letter)
+    assert ipa_to_xsampa(letter + "\u030A", errors="strict") == spelling + "_0"
+
+
+@pytest.mark.parametrize("ipa, xsampa", [
+    ("n\u032A\u030A", "n_d_0"),  # dental mark below
+    ("ç\u030A", "C_0"),          # cedilla
+])
+def test_ring_above_another_diacritic_below_is_the_voiceless_ring(ipa, xsampa):
+    assert ipa_to_xsampa(ipa, errors="strict") == xsampa
+
+
+def test_ring_above_stays_unknown_on_a_letter_with_no_descender():
     # å decomposes to a plus the ring above, and it is not an IPA symbol.
     with pytest.raises(UnknownSymbolError):
-        ipa_to_xsampa(ipa, errors="strict")
+        ipa_to_xsampa("å", errors="strict")
 
 
 def test_syllabic_eng_reaches_xsampa_from_arpabet():
