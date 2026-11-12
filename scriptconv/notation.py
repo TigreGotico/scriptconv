@@ -177,6 +177,10 @@ _IPA_TO_ARPA.setdefault("r", "R")
 _IPA_TO_ARPA.setdefault("ɜr", "ER")
 _IPA_TO_ARPA.setdefault("ər", "AXR")
 _IPA_TO_ARPA.setdefault("ɫ̩", "EL")
+# The tie bar joins the two symbols of an affricate, above or below the letters.
+for _tie in ("\u0361", "\u035C"):
+    _IPA_TO_ARPA.setdefault("t" + _tie + "ʃ", "CH")
+    _IPA_TO_ARPA.setdefault("d" + _tie + "ʒ", "JH")
 # Bare/long NURSE vowel (non-rhotic British ɜ, ɜː) has no dedicated ARPA symbol —
 # ARPABET is rhotic-only, so it collapses onto the same "ER" as the r-colored ɝ.
 _IPA_TO_ARPA.setdefault("ɜː", "ER")
@@ -211,10 +215,20 @@ class UnknownSymbolError(ValueError):
 
 _ERROR_POLICIES = ("pass", "replace", "strict", "ignore")
 
+# The characters with the Unicode White_Space property (PropList.txt).  A space
+# separates words in every notation, so each converter keeps it under every
+# policy.  str.isspace() is wider: it also holds U+001C to U+001F.
+_WHITE_SPACE = frozenset(
+    "\t\n\v\f\r \x85\xa0\u1680" + "".join(map(chr, range(0x2000, 0x200B)))
+    + "\u2028\u2029\u202f\u205f\u3000")
+_WHITE_SPACE_RE = re.compile("[" + "".join(sorted(_WHITE_SPACE)) + "]+")
+
 
 def _unknown(symbol: str, position: int, notation: str, errors: str,
              replacement: str = "?") -> str:
     """Resolve one unmapped symbol according to the codecs-style policy."""
+    if symbol in _WHITE_SPACE:
+        return symbol
     if errors == "pass":
         return symbol
     if errors == "replace":
@@ -244,7 +258,7 @@ def arpa_to_ipa(arpa_sequence: str, errors: str = "pass",
     >>> arpa_to_ipa("HH AH0 L OW1")
     'həloʊ'
     """
-    tokens = arpa_sequence.strip().split()
+    tokens = [tok for tok in _WHITE_SPACE_RE.split(arpa_sequence) if tok]
     result = []
     for i, tok in enumerate(tokens):
         mark = ""
@@ -270,12 +284,18 @@ def ipa_to_arpa(ipa_string: str, unknown: str = "?",
     marks (``ˈ``/``ˌ``) preceding a vowel-class symbol are emitted as that
     vowel's stress digit (``1``/``2``) and unmarked vowels receive ``0`` —
     the reverse of :func:`arpa_to_ipa`'s ``stress=True`` convention.
+    A stress mark stands before the stressed syllable, so with
+    ``stress=True`` its digit goes to the next vowel, after any onset.
     ``errors`` selects the unknown-symbol policy (default ``"replace"``,
     preserving the historical behavior of substituting *unknown*, ``"?"``);
-    ``unknown=""`` still drops silently.  Combining marks and modifier
-    letters qualify the preceding phoneme and are always dropped rather
-    than treated as unknowns.  Whitespace of every kind is dropped too:
-    ARPABET tokens are space-separated, so the output keeps no word boundary.
+    ``unknown=""`` still drops silently.  Under the other policies, combining
+    marks and modifier letters qualify the preceding phoneme and are dropped
+    rather than treated as unknowns.  ``"strict"`` drops no mark: it raises
+    on a mark with no ARPABET value, and on a stress mark that no vowel
+    follows.  With ``stress=False`` a stress mark is dropped under every
+    policy, because the caller asked for no stress digits.  Spaces, the
+    characters with the Unicode White_Space property, are dropped too: ARPABET
+    tokens are space-separated, so the output keeps no word boundary.
 
     Examples
     --------
@@ -288,10 +308,13 @@ def ipa_to_arpa(ipa_string: str, unknown: str = "?",
     """
     tokens = []
     pending_stress = ""
+    stress_pos = 0
     pos = 0
     while pos < len(ipa_string):
-        if stress and ipa_string[pos] in _STRESS_MARKS:
-            pending_stress = _STRESS_MARKS[ipa_string[pos]]
+        if ipa_string[pos] in _STRESS_MARKS:
+            if stress:
+                pending_stress = _STRESS_MARKS[ipa_string[pos]]
+                stress_pos = pos
             pos += 1
             continue
         m = _IPA_ARPA_RE.match(ipa_string, pos)
@@ -302,22 +325,28 @@ def ipa_to_arpa(ipa_string: str, unknown: str = "?",
                 # round-trips; extended-ARPABET AX and AXR input normalizes
                 # to AH0 and ER0 (documented residue).
                 tok = _CMUDICT_SPELLING.get(tok, tok) + (pending_stress or "0")
-            pending_stress = ""
+                pending_stress = ""
             tokens.append(tok)
             pos = m.end()
         else:
             ch = ipa_string[pos]
-            # Diacritics and suprasegmentals (combining marks, length/stress
-            # modifier letters) have no ARPABET equivalent; they qualify the
-            # preceding phoneme rather than standing alone, so drop them
-            # instead of emitting a spurious *unknown* token.  Whitespace has
-            # no token either.
-            if not ch.isspace() and unicodedata.category(ch) not in ("Mn", "Mc", "Me", "Lm", "Sk"):
+            if ch in _WHITE_SPACE:
+                # A stress mark does not cross into the next word.
+                if pending_stress and errors == "strict":
+                    raise UnknownSymbolError(ipa_string[stress_pos], stress_pos, "arpa")
+                pending_stress = ""
+            elif errors != "strict" and unicodedata.category(ch) in ("Mn", "Mc", "Me", "Lm", "Sk"):
+                # A diacritic or suprasegmental qualifies the phoneme before
+                # it and has no ARPABET token of its own.
+                pass
+            else:
                 effective = "ignore" if (errors == "replace" and not unknown) else errors
                 out = _unknown(ch, pos, "arpa", effective, replacement=unknown)
                 if out:
                     tokens.append(out)
             pos += 1
+    if pending_stress and errors == "strict":
+        raise UnknownSymbolError(ipa_string[stress_pos], stress_pos, "arpa")
     return " ".join(tokens)
 
 
@@ -522,10 +551,16 @@ _IPA_TO_XSAMPA: dict[str, str] = {}
 for _xs, _ip in _XSAMPA_TO_IPA.items():
     _IPA_TO_XSAMPA.setdefault(unicodedata.normalize("NFD", _ip), _xs)
 _IPA_TO_XSAMPA["\u035C"] = "_"  # the tie bar may be written below as well
-# The syllabic mark above a letter, and the voiceless ring above ŋ only: the
-# ring above a alone is å, which is not IPA.
+# A mark below may move above a letter "to avoid a descender or another
+# diacritic" (Wikipedia, International Phonetic Alphabet).  The syllabic mark
+# above always reads as syllabic.  The voiceless ring above reads as voiceless
+# after a letter in _DESCENDERS or after a mark below, and stays unknown
+# elsewhere: å is a letter of Nordic orthography, not IPA.  _DESCENDERS holds
+# the letters of this table whose glyph reaches more than 0.1 em below the
+# baseline in both DejaVu Sans and DejaVu Serif.
 _IPA_TO_XSAMPA["\u030D"] = "="
-_IPA_TO_XSAMPA["ŋ\u030A"] = "N_0"
+_DESCENDERS = frozenset("jpqyŋɖɟɠɡɣɥɧɭɮɰɱɲɳɸɻɽʂʃʄʈʐʒʝβχ")
+_BELOW = (202, 220)  # canonical combining classes: attached below, below
 
 # Longest-first sorted keys for pattern matching
 _XS_KEYS_SORTED = sorted(_XSAMPA_TO_IPA.keys(), key=len, reverse=True)
@@ -536,10 +571,12 @@ _IPA_KEYS_SORTED = sorted(_IPA_TO_XSAMPA.keys(), key=len, reverse=True)
 # and a stray backslash.  The lookahead yields to the longer keys such as _?\.
 # Wells's "language-specific tone number" (_1 to _6) matches as one symbol with
 # no IPA value, so that it stays unknown and does not read as the tie bar and a
-# digit.  _7 to _9 are the tie bar and a vowel.
+# digit.  _7 to _9 are the tie bar and a vowel.  Wells's section 24 also writes
+# a falling tone as _`, and calls that set "an embarras de richesses".  It too
+# has no IPA value, and a tie before the rhoticity mark would mean nothing.
 _XS_RE = re.compile("|".join(
     [re.escape(k) for k in _XS_KEYS_SORTED if len(k) > 2]
-    + [r"_(?=[^\\]\\)", "_[1-6]"]
+    + [r"_(?=[^\\]\\)", "_[1-6]", "_`"]
     + [re.escape(k) for k in _XS_KEYS_SORTED if len(k) <= 2]))
 _IPA_XS_RE = re.compile("|".join(re.escape(k) for k in _IPA_KEYS_SORTED))
 
@@ -608,6 +645,11 @@ def ipa_to_xsampa(ipa: str, errors: str = "pass") -> str:
                 result.pop()
             result.append(symbol)
             pos = m.end()
+        elif ipa[pos] == "\u030A" and pos and (
+                ipa[pos - 1] in _DESCENDERS
+                or unicodedata.combining(ipa[pos - 1]) in _BELOW):
+            result.append("_0")
+            pos += 1
         else:
             out = _unknown(ipa[pos], pos, "x-sampa", errors)
             if out:
@@ -1276,7 +1318,7 @@ def halabi_to_ipa(halabi: str | list[str], errors: str = "pass") -> str:
             out.append(_HALABI_VOWELS[tok])
         elif tok in _HALABI_CONSONANTS:
             out.append(_HALABI_CONSONANTS[tok])
-        elif tok.isspace() or tok in ".,;:!?()[]{}\"'":
+        elif tok in _WHITE_SPACE or tok in ".,;:!?()[]{}\"'":
             out.append(tok)
             last_tok = None
             continue
@@ -1340,7 +1382,7 @@ def iqra_halabi_to_ipa(tokens: str, errors: str = "pass") -> str:
     'fiːhixɑjraːtun'
     """
     out = []
-    for pos, tok in enumerate(tokens.split()):
+    for pos, tok in enumerate(t for t in _WHITE_SPACE_RE.split(tokens) if t):
         ipa = _IQRA_NOTATION.get(tok)
         if ipa is not None:
             out.append(ipa)

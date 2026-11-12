@@ -116,7 +116,8 @@ Two contracts make this trustworthy:
 - **`errors=`, codecs-style.** Every converter takes
   `errors="pass" | "replace" | "strict" | "ignore"` for symbols outside its
   table. `"strict"` raises `UnknownSymbolError(symbol, position, notation)`.
-  The defaults preserve each converter's long-standing behavior.
+  Strict drops no mark and accepts spaces, the Unicode White_Space
+  characters. The defaults preserve each converter's long-standing behavior.
 
 - **Stress is preserved, not discarded.** With `stress=True`, ARPABET stress
   digits become IPA `ˈ`/`ˌ` placed before the stressed vowel. This is
