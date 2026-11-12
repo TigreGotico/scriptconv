@@ -1,8 +1,8 @@
 # Changelog
 
-## [0.0.4a61](https://github.com/TigreGotico/scriptconv/tree/0.0.4a61) (2026-11-12)
+## [0.0.4a60](https://github.com/TigreGotico/scriptconv/tree/0.0.4a60) (2026-11-12)
 
-[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a59...0.0.4a61)
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a59...0.0.4a60)
 
 **Merged pull requests:**
 
