@@ -1,5 +1,63 @@
 # Changelog
 
+## [0.0.4a59](https://github.com/TigreGotico/scriptconv/tree/0.0.4a59) (2026-11-12)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a58...0.0.4a59)
+
+**Merged pull requests:**
+
+- fix\(ko\): install g2pk only below Python 3.13 [\#184](https://github.com/TigreGotico/scriptconv/pull/184) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.0.4a58](https://github.com/TigreGotico/scriptconv/tree/0.0.4a58) (2026-11-12)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a57...0.0.4a58)
+
+## [0.0.4a57](https://github.com/TigreGotico/scriptconv/tree/0.0.4a57) (2026-11-12)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a56...0.0.4a57)
+
+## [0.0.4a56](https://github.com/TigreGotico/scriptconv/tree/0.0.4a56) (2026-11-12)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a55...0.0.4a56)
+
+**Merged pull requests:**
+
+- fix\(misaki\): install what misaki\_en, \_ja, \_ko and \_zh need [\#185](https://github.com/TigreGotico/scriptconv/pull/185) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.0.4a55](https://github.com/TigreGotico/scriptconv/tree/0.0.4a55) (2026-11-12)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a54...0.0.4a55)
+
+**Merged pull requests:**
+
+- fix\(fa\): set floors that let the fa extra resolve to a working set [\#183](https://github.com/TigreGotico/scriptconv/pull/183) ([JarbasAl](https://github.com/JarbasAl))
+- fix\(transphone\): install pip with the transphone extra [\#182](https://github.com/TigreGotico/scriptconv/pull/182) ([JarbasAl](https://github.com/JarbasAl))
+- fix\(ja\): install a MeCab dictionary with the ja-phonemizers extra [\#180](https://github.com/TigreGotico/scriptconv/pull/180) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.0.4a54](https://github.com/TigreGotico/scriptconv/tree/0.0.4a54) (2026-11-12)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a53...0.0.4a54)
+
+**Merged pull requests:**
+
+- feat: add TextFrontend, the text frontend a voice runs [\#173](https://github.com/TigreGotico/scriptconv/pull/173) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.0.4a53](https://github.com/TigreGotico/scriptconv/tree/0.0.4a53) (2026-11-12)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a52...0.0.4a53)
+
+**Merged pull requests:**
+
+- fix\(diacritics\): route every Arabic lect to tashkeel and pass waqf [\#175](https://github.com/TigreGotico/scriptconv/pull/175) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.0.4a52](https://github.com/TigreGotico/scriptconv/tree/0.0.4a52) (2026-11-12)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a51...0.0.4a52)
+
+**Merged pull requests:**
+
+- feat\(testing\): sentence gate that scores each stage against orthography2ipa [\#174](https://github.com/TigreGotico/scriptconv/pull/174) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a51](https://github.com/TigreGotico/scriptconv/tree/0.0.4a51) (2026-11-11)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a50...0.0.4a51)
@@ -340,65 +398,33 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a8...0.0.4a9)
 
-**Merged pull requests:**
-
-- fix: name the install extra when an optional phonemizer backend is missing [\#80](https://github.com/TigreGotico/scriptconv/pull/80) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [0.0.4a8](https://github.com/TigreGotico/scriptconv/tree/0.0.4a8) (2026-07-23)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a7...0.0.4a8)
-
-**Merged pull requests:**
-
-- refactor: one model knob per graph edge \(phonemizer\_model / diacritizer\_model\) [\#78](https://github.com/TigreGotico/scriptconv/pull/78) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a7](https://github.com/TigreGotico/scriptconv/tree/0.0.4a7) (2026-07-23)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a6...0.0.4a7)
 
-**Merged pull requests:**
-
-- feat: auto-provision the Hebrew phonikud model [\#76](https://github.com/TigreGotico/scriptconv/pull/76) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [0.0.4a6](https://github.com/TigreGotico/scriptconv/tree/0.0.4a6) (2026-07-23)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a5...0.0.4a6)
-
-**Merged pull requests:**
-
-- refactor: move diacritization mechanism out of BasePhonemizer into diacritics [\#74](https://github.com/TigreGotico/scriptconv/pull/74) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a5](https://github.com/TigreGotico/scriptconv/tree/0.0.4a5) (2026-07-23)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a4...0.0.4a5)
 
-**Merged pull requests:**
-
-- fix: import hygiene \(requests/he/fa\) + mantoq export + strip\_diacritics tests [\#72](https://github.com/TigreGotico/scriptconv/pull/72) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [0.0.4a4](https://github.com/TigreGotico/scriptconv/tree/0.0.4a4) (2026-07-23)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a3...0.0.4a4)
-
-**Merged pull requests:**
-
-- feat: model diacritization as a graph extension parallel to phonemizers [\#70](https://github.com/TigreGotico/scriptconv/pull/70) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a3](https://github.com/TigreGotico/scriptconv/tree/0.0.4a3) (2026-07-22)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a2...0.0.4a3)
 
-**Merged pull requests:**
-
-- feat: East-Slavic stress and European-Portuguese sense diacritics [\#68](https://github.com/TigreGotico/scriptconv/pull/68) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [0.0.4a2](https://github.com/TigreGotico/scriptconv/tree/0.0.4a2) (2026-07-22)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a1...0.0.4a2)
-
-**Merged pull requests:**
-
-- fix: publicly re-export the shami frontend symbols [\#66](https://github.com/TigreGotico/scriptconv/pull/66) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a1](https://github.com/TigreGotico/scriptconv/tree/0.0.4a1) (2026-07-21)
 
