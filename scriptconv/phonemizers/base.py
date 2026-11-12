@@ -192,6 +192,14 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
     and synthesis disagree.
     """
 
+    strict: bool = False
+    """Raise :class:`UnreadTextError` for a token that the backend cannot read.
+
+    Off by default: the backend logs a warning and drops the token.
+    :class:`~scriptconv.frontend.TextFrontend` sets it from
+    ``FrontendConfig.strict``.
+    """
+
     owned_stages: ClassVar[frozenset[str]] = frozenset()
     """Stages this backend always runs itself. ``"diacritize"`` is the only name.
 

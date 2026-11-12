@@ -1,11 +1,27 @@
 import abc
+import logging
+import re
 import unicodedata
 from typing import List
 
 
-from scriptconv.phonemizers.base import BasePhonemizer, _check_alphabet
+from scriptconv.phonemizers.base import BasePhonemizer, UnreadTextError, _check_alphabet
 from scriptconv.phonemizers._thirdparty.zh_num import num2str
 from scriptconv.phonemizers.enums import Alphabet
+
+LOG = logging.getLogger(__name__)
+
+# Pinyin writes ü with its dots only after n and l, and nüe and lüe keep them
+# too (Wikipedia, "Pinyin", revision 1384755350, section "The ⟨ü⟩ sound").
+# g2pc and g2pM write ü as "u:", as CC-CEDICT does, and xpinyin writes "nue".
+# pinyin_to_ipa reads "ü" and "v", and rejects "u:" and "nue".
+_NUE_LUE = re.compile(r"^([nl])u(?=[eēéěè])")
+
+
+def _standard_pinyin(syllable: str) -> str:
+    """*syllable* with ü spelled as the pinyin standard spells it."""
+    return _NUE_LUE.sub(r"\1ü", syllable.replace("u:", "ü"))
+
 
 
 class JiebaPhonemizer(BasePhonemizer):
@@ -123,13 +139,17 @@ class BaseChinesePinyinPhonemizer(BasePhonemizer):
 
     def to_ipa(self, phones: List[str]) -> List[str]:
         """
-        Converts a list of pinyin syllables to IPA. Falls back to the original syllable if conversion fails.
+        Converts a list of pinyin syllables to IPA.
+
+        A token with no letters or digits, such as punctuation, is kept as it
+        is. A syllable that is not pinyin gives no IPA: it logs a warning, or
+        raises :class:`UnreadTextError` when :attr:`strict` is set.
 
         Args:
             phones (List[str]): List of pinyin syllables or phrases.
 
         Returns:
-            List[str]: Corresponding IPA or original syllables.
+            List[str]: Corresponding IPA.
         """
         ipa_phones: List[str] = []
         for p in phones:
@@ -138,14 +158,24 @@ class BaseChinesePinyinPhonemizer(BasePhonemizer):
                 continue
             pho_str = ""
             for sp in p.split():  # G2P might return phrases with multiple syllables
-                try:
-                    # pinyin_to_ipa returns the readings of the syllable, and
-                    # each reading is a tuple of phonemes: keep all phonemes
-                    # of the first reading
-                    pho = "".join(self.pinyin_to_ipa(sp.strip())[0])
-                except ValueError:
+                if not any(c.isalnum() for c in sp):
                     pho_str += sp
                     continue
+                try:
+                    readings = self.pinyin_to_ipa(_standard_pinyin(sp))
+                except ValueError:
+                    message = f"no IPA for {sp!r}, which is not pinyin"
+                    if self.strict:
+                        raise UnreadTextError(message, (sp,)) from None
+                    LOG.warning(message)
+                    continue
+                # pinyin_to_ipa gives the Taiwan reading [ɚ] of er first, and
+                # the mainland reading [aɚ̯] second (Wikipedia, "Standard
+                # Chinese phonology", revision 1384691172, section "Rhotic
+                # coda"). The language code holds no region here, so every
+                # er takes the mainland reading.
+                reading = next((r for r in readings if r[0].startswith("aɚ̯")), readings[0])
+                pho = "".join(reading)
                 if self.retone:
                     pho = self._retone(pho)
                 pho_str += pho

@@ -139,9 +139,9 @@ class TextFrontend:
 
     ``backend`` takes a phonemizer instance. ``None`` builds the one that
     ``config`` names. The frontend reads the backend with
-    ``config.keep_punctuation``. When an instance holds another value, the
-    frontend reads a shallow copy with the configured value, so the caller's
-    instance does not change.
+    ``config.keep_punctuation`` and ``config.strict``. When an instance holds
+    other values, the frontend reads a shallow copy with the configured values,
+    so the caller's instance does not change.
 
     Raises:
         UnsupportedLanguageError: If the backend does not support the language.
@@ -155,9 +155,10 @@ class TextFrontend:
                 backend = phonemizer_for_lang(config.lang, config.alphabet, model=config.model)
             else:
                 backend = get_phonemizer(config.phonemizer, config.alphabet, config.model)
-        if backend.keep_punctuation != config.keep_punctuation:
+        if (backend.keep_punctuation, backend.strict) != (config.keep_punctuation, config.strict):
             backend = copy.copy(backend)
             backend.keep_punctuation = config.keep_punctuation
+            backend.strict = config.strict
         self.config = config
         self.backend = backend
         stages = self._resolve(None)

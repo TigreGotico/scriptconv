@@ -87,6 +87,98 @@ class TestPinyinToIpa(unittest.TestCase):
         self.assertEqual(out, "pa˥，pa˥˩")
 
 
+class TestPinyinUmlaut(unittest.TestCase):
+    """ü after n and l, through each pinyin backend.
+
+    Pinyin keeps the dots of ü only after n and l: 女 nǚ, 旅 lǚ, 略 lüè and
+    虐 nüè (Wikipedia, "Pinyin", revision 1384755350, section "The ⟨ü⟩ sound").
+    The backends spell it otherwise: g2pc and g2pM write ``u:`` as CC-CEDICT
+    does, and xpinyin writes ``v`` and ``nue``.
+
+    The expected IPA comes from Wikipedia, "Standard Chinese phonology",
+    revision 1384691172. Initials come from the consonant table, and finals
+    from the five vowel table: -ü [y], -üe [ɥe], -ou [ou̯], -ai [ai̯], -e [ɤ].
+    儿 ér in 女儿 is an independent morpheme, which the section "Rhotic coda"
+    gives as [aɚ̯] in China. Retone writes each tone of the tone table as an
+    arrow: high →, rising ↗, dipping ↓, falling ↘, and none for neutral.
+    """
+
+    SENTENCE = "女儿去旅游了，忽略了虐待。"
+    EXPECTED = "ny↓aɚ̯↗tɕʰy↘ly↓jou̯↗lɤ，xu→lɥe↘lɤnɥe↘tai̯↘。"
+
+    def test_pypinyin(self):
+        from scriptconv.phonemizers.zh import PypinyinPhonemizer
+        p = PypinyinPhonemizer(alphabet=Alphabet.IPA, jieba=False)
+        self.assertEqual(p.phonemize_string(self.SENTENCE, "zh"), self.EXPECTED)
+
+    def test_xpinyin(self):
+        from scriptconv.phonemizers.zh import XpinyinPhonemizer
+        p = XpinyinPhonemizer(alphabet=Alphabet.IPA, jieba=False)
+        self.assertEqual(p.phonemize_string(self.SENTENCE, "zh"), self.EXPECTED)
+
+    def test_g2pm(self):
+        from scriptconv.phonemizers.zh import G2pMPhonemizer
+        p = G2pMPhonemizer(alphabet=Alphabet.IPA, jieba=False)
+        self.assertEqual(p.phonemize_string(self.SENTENCE, "zh"), self.EXPECTED)
+
+    def test_g2pc(self):
+        # g2pc needs pkuseg, which builds on no supported Python, so g2pc
+        # is replaced by the output that g2pc 0.9.9.3 gave for SENTENCE.
+        # The pinyin is the fourth field of each word.
+        import sys
+        import types
+        from unittest.mock import patch
+        from scriptconv.phonemizers.zh import G2pCPhonemizer
+        words = [("女儿", "n", "nu:3 er2", "nu:3 er2"), ("去", "v", "qu4", "qu4"),
+                 ("旅游", "v", "lu:3 you2", "lu:3 you2"), ("了", "y", "le5", "le5"),
+                 ("，", "w", "，", "，"), ("忽略", "v", "hu1 lu:e4", "hu1 lu:e4"),
+                 ("了", "u", "le5", "le5"), ("虐待", "i", "nu:e4 dai4", "nu:e4 dai4"),
+                 ("。", "w", "。", "。")]
+        g2pc = types.ModuleType("g2pc")
+        g2pc.G2pC = lambda: lambda text: words
+        with patch.dict(sys.modules, {"g2pc": g2pc}):
+            p = G2pCPhonemizer(alphabet=Alphabet.IPA, jieba=False)
+        self.assertEqual(p.phonemize_string(self.SENTENCE, "zh"), self.EXPECTED)
+
+    def test_er_is_the_mainland_reading(self):
+        # 二 èr: [aɚ̯] in China, section "Rhotic coda"; falling tone ↘
+        from scriptconv.phonemizers.zh import PypinyinPhonemizer
+        p = PypinyinPhonemizer(alphabet=Alphabet.IPA, jieba=False)
+        self.assertEqual(p.phonemize_string("二", "zh"), "aɚ̯↘")
+
+
+class TestPinyinUnreadSyllable(unittest.TestCase):
+    """A syllable that is not pinyin gives no IPA. It warns, or raises in strict mode."""
+
+    def _phonemizer(self):
+        from scriptconv.phonemizers.zh import PypinyinPhonemizer
+        return PypinyinPhonemizer(alphabet=Alphabet.IPA, jieba=False)
+
+    def test_warns_and_gives_no_latin(self):
+        # 你 nǐ: n [n], -i [i]; 好 hǎo: h [x], -ao [au̯]; dipping tone ↓
+        with self.assertLogs("scriptconv.phonemizers.zh", "WARNING") as logs:
+            out = self._phonemizer().phonemize_string("你好Hello", "zh")
+        self.assertEqual(out, "ni↓xau̯↓")
+        self.assertIn("'Hello'", logs.output[0])
+
+    def test_strict_raises(self):
+        from scriptconv.phonemizers import UnreadTextError
+        p = self._phonemizer()
+        p.strict = True
+        with self.assertRaises(UnreadTextError) as ctx:
+            p.phonemize_string("你好Hello", "zh")
+        self.assertEqual(ctx.exception.unread, ("Hello",))
+
+    def test_frontend_strict_reaches_the_backend(self):
+        from scriptconv.frontend import FrontendConfig, TextFrontend
+        from scriptconv.phonemizers import UnreadTextError
+        backend = self._phonemizer()
+        frontend = TextFrontend(FrontendConfig(lang="zh", strict=True), backend)
+        with self.assertRaises(UnreadTextError):
+            frontend.phonemize("你好Hello")
+        self.assertFalse(backend.strict)
+
+
 class TestZhBackendFriendlyImportErrors(unittest.TestCase):
     def _assert_friendly(self, module_name, cls, extra):
         # sys.modules[name] = None makes the `import` statement raise
