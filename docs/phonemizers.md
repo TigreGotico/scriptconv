@@ -82,8 +82,8 @@ resolves or explains itself.
 default, resolving in-house engines first:
 
 1. the explicit per-language chain (Arabic to arbtok, Basque to euskaphone,
-   Mirandese to mwl_phonemizer, Portuguese to tugaphone, Hebrew to phonikud,
-   Galician to Cotovía, and Russian to vosk for their own notations, only
+   Mirandese to its orthography2ipa specs, Portuguese to tugaphone, Hebrew to
+   phonikud, Galician to Cotovía, and Russian to vosk for their own notations, only
    when their own notation is requested: a candidate must be able to *emit*
    the requested alphabet)
 2. orthography2ipa, wherever it has a spec for the language
@@ -350,11 +350,12 @@ epitran, transphone, ByT5/Charsiu (ONNX), the misaki family (en/ja/zh/ko/vi).
 Per-language: English (DeepPhonemizer, OpenPhonemizer, g2p_en), Japanese
 (OpenJTalk, cutlet, pykakasi), Korean (g2pk, KoG2P), Chinese (jieba, g2pM,
 xpinyin, pypinyin), Arabic (arbtok, mantoq), Hebrew (phonikud), Persian,
-Vietnamese (viphoneme, Python below 3.12 only), Portuguese (tugaphone, barranquenho), Galician
+Vietnamese (viphoneme, Python below 3.12 only), Portuguese (tugaphone), Galician
 (Cotovía), Russian (vosk, the vosk-tts inventory, `Alphabet.VOSK`, with the
 voice's pronunciation dictionary passed as `phonemizer_model`), Basque
-(AhoTTS, euskaphone), Mirandese, Levantine Arabic/English
-code-switching (shami, whose `phonemize_with_language_ids` also returns the
+(AhoTTS, euskaphone), Mirandese and Barranquenho (the orthography2ipa specs
+`mwl`, `mwl-x-sendim`, `mwl-x-ifanes` and `ext-PT-x-barranco`), Levantine
+Arabic/English code-switching (shami, whose `phonemize_with_language_ids` also returns the
 parallel per-phoneme language-ID stream), and orthography2ipa for its
 data-driven language specs. Trivial built-ins that need no extra:
 `GraphemePhonemizer` (normalized characters) and `UnicodeCodepointPhonemizer`
