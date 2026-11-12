@@ -11,6 +11,7 @@ from typing import List, Dict, Optional, Sequence, Tuple, TYPE_CHECKING
 if TYPE_CHECKING:
     import numpy as np
 
+from scriptconv.diacritics import _supports_strip, strip_diacritics
 from scriptconv.phonemizers.enums import Alphabet
 from scriptconv.phonemizers.base import BasePhonemizer, UnsupportedLanguageError, _check_alphabet
 # minimal ONNX session construction — scriptconv has no provider
@@ -730,6 +731,10 @@ class GoruutPhonemizer(BasePhonemizer):
         return cls.ISO639[lang]
 
     def phonemize_string(self, text: str, lang: str) -> str:
+        # goruut reads no tashkeel, niqqud or stress accent: a marked letter
+        # stays in the source script or moves, so the marks are removed here.
+        if _supports_strip(lang):
+            text = strip_diacritics(text, lang)
         lang = self.get_lang(lang)
         return str(self.pygoruut.phonemize(language=lang, sentence=text))
 
