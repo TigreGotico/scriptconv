@@ -338,3 +338,22 @@ class TestRemovePunctuationKeepsDigitInternal(unittest.TestCase):
         # masculine ordinal indicator), so it is not digit:digit and is
         # stripped like any other punctuation, giving "3º".
         self.assertEqual(BasePhonemizer.remove_punctuation("3.º"), "3º")
+
+
+class TestRemovePunctuationAfterStressMark(unittest.TestCase):
+    """A stress mark (U+0301) after the vowel before a hyphen or apostrophe
+    still leaves a letter on both sides, so the compound keeps its joint."""
+
+    def test_hyphen_after_stressed_vowel_kept(self):
+        self.assertEqual(BasePhonemizer.remove_punctuation("когда\u0301-нибудь"),
+                         "когда\u0301-нибудь")
+
+    def test_hyphen_in_a_sentence_kept(self):
+        self.assertEqual(BasePhonemizer.remove_punctuation("Кто\u0301-то пришёл когда\u0301-нибудь."),
+                         "Кто\u0301-то пришёл когда\u0301-нибудь")
+
+    def test_apostrophe_after_stressed_vowel_kept(self):
+        self.assertEqual(BasePhonemizer.remove_punctuation("le\u0301'ami"), "le\u0301'ami")
+
+    def test_hyphen_after_a_lone_mark_stripped(self):
+        self.assertEqual(BasePhonemizer.remove_punctuation("\u0301-нибудь"), "\u0301нибудь")
