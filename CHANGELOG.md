@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.0.4a62](https://github.com/TigreGotico/scriptconv/tree/0.0.4a62) (2026-11-12)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a61...0.0.4a62)
+
+**Merged pull requests:**
+
+- fix\(testing\): the sentence gate fails closed and measures noise per row [\#187](https://github.com/TigreGotico/scriptconv/pull/187) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.0.4a61](https://github.com/TigreGotico/scriptconv/tree/0.0.4a61) (2026-11-12)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a60...0.0.4a61)
+
 ## [0.0.4a60](https://github.com/TigreGotico/scriptconv/tree/0.0.4a60) (2026-11-12)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a59...0.0.4a60)
@@ -359,10 +371,6 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a14...0.0.4a15)
 
-**Merged pull requests:**
-
-- fix: ShamiPhonemizer.phonemize\_lazy shredded multi-character symbols [\#86](https://github.com/TigreGotico/scriptconv/pull/86) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [0.0.4a14](https://github.com/TigreGotico/scriptconv/tree/0.0.4a14) (2026-08-02)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a13...0.0.4a14)
@@ -382,10 +390,6 @@
 ## [0.0.4a12](https://github.com/TigreGotico/scriptconv/tree/0.0.4a12) (2026-07-24)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a11...0.0.4a12)
-
-**Merged pull requests:**
-
-- fix: unsupported output alphabet raised a bare AssertionError [\#87](https://github.com/TigreGotico/scriptconv/pull/87) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a11](https://github.com/TigreGotico/scriptconv/tree/0.0.4a11) (2026-07-24)
 
