@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a66](https://github.com/TigreGotico/scriptconv/tree/0.0.4a66) (2026-11-13)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a65...0.0.4a66)
+
+**Merged pull requests:**
+
+- fix\(espeak\): stress the syllable a combining acute marks in ru and uk [\#205](https://github.com/TigreGotico/scriptconv/pull/205) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a65](https://github.com/TigreGotico/scriptconv/tree/0.0.4a65) (2026-11-12)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a64...0.0.4a65)
@@ -385,10 +393,6 @@
 ## [0.0.4a16](https://github.com/TigreGotico/scriptconv/tree/0.0.4a16) (2026-08-02)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a15...0.0.4a16)
-
-**Merged pull requests:**
-
-- fix: plain r \(alveolar trill\) missing from the X-SAMPA table [\#95](https://github.com/TigreGotico/scriptconv/pull/95) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a15](https://github.com/TigreGotico/scriptconv/tree/0.0.4a15) (2026-08-02)
 
