@@ -15,10 +15,12 @@ it as stressed; without any ``+`` every vowel is emitted unstressed.
 The shipped ``dictionary`` file (word → phonemes) overrides the rules for known
 words; ``load_dictionary`` reads both the historical ``word phon…`` layout and
 the newer ``word prob phon…`` layout (keeping the highest-probability variant).
+``load_pronunciations`` also keeps every variant of a word with more than one
+entry, such as the homographs ``замок`` (``z a1 m o0 k`` / ``z a0 m o1 k``).
 The rules alone already produce usable Russian, so the dictionary is optional.
 """
 import os
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 # Cyrillic letters that soften the preceding consonant.
 softletters = set(u"яёюиье")
@@ -107,9 +109,24 @@ def load_dictionary(path: Optional[str]) -> Dict[str, List[str]]:
     Returns an empty dict when ``path`` is falsy or missing — the rule-based
     :func:`convert` fallback covers any out-of-dictionary word.
     """
+    return load_pronunciations(path)[0]
+
+
+def load_pronunciations(
+        path: Optional[str]) -> Tuple[Dict[str, List[str]], Dict[str, List[List[str]]]]:
+    """
+    Load a Vosk pronunciation dictionary with all its variants.
+
+    Returns ``(best, variants)``. ``best`` is the :func:`load_dictionary` map.
+    ``variants`` holds only the words with more than one entry, each mapped to
+    all of its pronunciations, highest probability first. Among equal
+    probabilities the file order is kept, so ``variants[word][0]`` is
+    ``best[word]``.
+    """
     dic: Dict[str, List[str]] = {}
+    variants: Dict[str, List[Tuple[float, List[str]]]] = {}
     if not path or not os.path.isfile(path):
-        return dic
+        return dic, {}
     probs: Dict[str, float] = {}
     with open(path, encoding="utf-8") as f:
         for line in f:
@@ -127,9 +144,14 @@ def load_dictionary(path: Optional[str]) -> Dict[str, List[str]]:
                 phones = rest
             if not phones:
                 continue
+            if word in dic:
+                # the first repeat records the entry seen before it
+                variants.setdefault(word, [(probs.get(word, 0.0), dic[word])])
+                variants[word].append((prob or 0.0, phones))
             if prob is None:
                 dic.setdefault(word, phones)
             elif probs.get(word, -1.0) < prob:
                 dic[word] = phones
                 probs[word] = prob
-    return dic
+    return dic, {word: [phones for _, phones in sorted(entries, key=lambda e: -e[0])]
+                 for word, entries in variants.items()}

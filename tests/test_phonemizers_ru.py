@@ -16,7 +16,11 @@ from scriptconv.phonemizers import (
     phonemizer_for_lang,
 )
 from scriptconv.frontend import FrontendConfig, Stages, TextFrontend
-from scriptconv.phonemizers._thirdparty.vosk_g2p import convert, load_dictionary
+from scriptconv.phonemizers._thirdparty.vosk_g2p import (
+    convert,
+    load_dictionary,
+    load_pronunciations,
+)
 from scriptconv.phonemizers.ru import VoskPhonemizer
 
 ACUTE = "\u0301"
@@ -98,6 +102,25 @@ class TestLoadDictionary(unittest.TestCase):
         path = self._write("\n\nдом d o1 m\nбезфонем\n   \n")
         dic = load_dictionary(path)
         self.assertEqual(list(dic), ["дом"])
+
+    def test_pronunciations_keep_every_variant_best_first(self):
+        path = self._write("что 0.2 ch t o1\nдом 1.0 d o1 m\n"
+                           "что 0.8 sh t o1\nчто 0.5 sh t o0\n")
+        best, variants = load_pronunciations(path)
+        self.assertEqual(best, load_dictionary(path))
+        # only a word with more than one entry has variants
+        self.assertEqual(list(variants), ["что"])
+        self.assertEqual(variants["что"], [["sh", "t", "o1"], ["sh", "t", "o0"],
+                                           ["ch", "t", "o1"]])
+
+    def test_pronunciations_legacy_layout_keep_file_order(self):
+        path = self._write("что ch t o1\nчто sh t o1\n")
+        best, variants = load_pronunciations(path)
+        self.assertEqual(best["что"], ["ch", "t", "o1"])
+        self.assertEqual(variants["что"], [["ch", "t", "o1"], ["sh", "t", "o1"]])
+
+    def test_pronunciations_missing_path(self):
+        self.assertEqual(load_pronunciations(None), ({}, {}))
 
 
 class TestVoskPhonemizer(unittest.TestCase):
@@ -274,6 +297,92 @@ class TestVoskAcuteStress(unittest.TestCase):
                                         Stages(diacritize=True, lang="ru-RU"))
         self.assertEqual(chunks, [["sj", "e0", "g", "o1", "d", "nj", "a0", " ",
                                    "h", "o0", "r", "o0", "sh", "o1"]])
+
+
+class TestVoskStressedDictionary(unittest.TestCase):
+    """A stress-marked word is looked up without its marks, and an entry is
+    used only when it stresses the marked vowel. The dictionary lines are
+    copied from the vosk ru voice dictionary. Each expected entry differs from
+    what the rules give, so the output shows which source produced it."""
+
+    DICTIONARY = (
+        "легкий 1 lj o1 g kj i0 j\n"
+        "дешевый 1 dj e0 sh o1 v y0 j\n"
+        "дешевый 1 dj o1 sh e0 v y0 j\n"
+        "конечно 0.00472305 k o0 nj e1 ch n o0\n"
+        "конечно 1 k o0 nj e1 sh n o0\n"
+        "донгту 1 d o1 n g e0 t e0 u1\n"
+        "бай-бай 0.499999 b a0 j b a1 j\n"
+        "бай-бай 1 b a1 j b a1 j\n"
+        "мастер-спальне 1 m a1 s tj e0 r s p a1 lj nj e0\n"
+    )
+
+    def setUp(self):
+        fd, path = tempfile.mkstemp(suffix=".dict")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(self.DICTIONARY)
+        self.addCleanup(os.remove, path)
+        self.p = VoskPhonemizer(model=path)
+
+    def test_marked_word_with_matching_stress_reads_the_dictionary(self):
+        # the rules give lj e1 g kj i0 j; the dictionary has the ё reading
+        for text in ("ле" + ACUTE + "гкий", "л+егкий"):
+            self.assertEqual(self.p.phonemize_string(text, "ru"),
+                             "lj o1 g kj i0 j")
+
+    def test_marked_word_with_other_stress_reads_the_rules(self):
+        # unmarked rules: lj e0 g kj i0 j, with the marked и's 0 changed to 1
+        self.assertEqual(self.p.phonemize_string("легки" + ACUTE + "й", "ru"),
+                         "lj e0 g kj i1 j")
+
+    def test_plus_before_a_consonant_reads_the_rules(self):
+        # the "+" marks no vowel, so nothing selects an entry
+        self.assertEqual(self.p.phonemize_string("+легкий", "ru"), "lj e0 g kj i0 j")
+
+    def test_entry_with_other_vowel_count_reads_the_rules(self):
+        # the entry has four vowel phonemes for two vowel letters, so its
+        # vowels cannot be paired with the letters; unmarked rules d o0 n g t u0
+        self.assertEqual(self.p.phonemize_string("до" + ACUTE + "нгту", "ru"),
+                         "d o1 n g t u0")
+
+    def test_entry_with_exactly_the_marked_stress_wins(self):
+        # the more probable entry also stresses the first а
+        self.assertEqual(self.p.phonemize_string("бай-ба" + ACUTE + "й", "ru"),
+                         "b a0 j b a1 j")
+        self.assertEqual(
+            self.p.phonemize_string("ба" + ACUTE + "й-ба" + ACUTE + "й", "ru"),
+            "b a1 j b a1 j")
+
+    def test_compound_entry_with_a_second_stress_still_matches(self):
+        # the rules give m a1 s tj e0 r s p a0 lj nj e0
+        self.assertEqual(self.p.phonemize_string("ма" + ACUTE + "стер-спальне", "ru"),
+                         "m a1 s tj e0 r s p a1 lj nj e0")
+
+    def test_unmarked_word_reads_the_best_entry(self):
+        self.assertEqual(self.p.phonemize_string("легкий", "ru"), "lj o1 g kj i0 j")
+        self.assertEqual(self.p.phonemize_string("дешевый", "ru"),
+                         "dj e0 sh o1 v y0 j")
+        self.assertEqual(self.p.phonemize_string("конечно", "ru"),
+                         "k o0 nj e1 sh n o0")
+        # an unmarked word with no entry still reads the rules
+        self.assertEqual(self.p.phonemize_string("щука", "ru"), "sch u0 k a0")
+
+    def test_mark_picks_the_homograph_entry(self):
+        self.assertEqual(self.p.phonemize_string("де" + ACUTE + "шевый", "ru"),
+                         "dj o1 sh e0 v y0 j")
+        self.assertEqual(self.p.phonemize_string("деше" + ACUTE + "вый", "ru"),
+                         "dj e0 sh o1 v y0 j")
+
+    def test_equal_stress_entries_prefer_the_more_probable(self):
+        # both entries stress е; the rules give the less probable ch reading
+        self.assertEqual(self.p.phonemize_string("коне" + ACUTE + "чно", "ru"),
+                         "k o0 nj e1 sh n o0")
+
+    def test_marked_words_in_a_sentence(self):
+        self.assertEqual(
+            self.p.phonemize("Ле" + ACUTE + "гкий, де" + ACUTE + "шевый.", "ru"),
+            [["lj", "o1", "g", "kj", "i0", "j", ",", " ",
+              "dj", "o1", "sh", "e0", "v", "y0", "j", "."]])
 
 
 class TestVoskRegistration(unittest.TestCase):
