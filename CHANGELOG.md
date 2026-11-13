@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a69](https://github.com/TigreGotico/scriptconv/tree/0.0.4a69) (2026-11-13)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a68...0.0.4a69)
+
+**Merged pull requests:**
+
+- fix\(vosk\): read a combining acute as stress on the vowel before it [\#213](https://github.com/TigreGotico/scriptconv/pull/213) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a68](https://github.com/TigreGotico/scriptconv/tree/0.0.4a68) (2026-11-13)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a67...0.0.4a68)
@@ -385,10 +393,6 @@
 ## [0.0.4a19](https://github.com/TigreGotico/scriptconv/tree/0.0.4a19) (2026-08-03)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a18...0.0.4a19)
-
-**Merged pull requests:**
-
-- feat: mantoq, halabi and iqra as distinct phonemizer edges with Alphabet.HALABI output [\#101](https://github.com/TigreGotico/scriptconv/pull/101) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a18](https://github.com/TigreGotico/scriptconv/tree/0.0.4a18) (2026-08-02)
 
