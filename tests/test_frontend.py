@@ -9,8 +9,12 @@ import logging
 import re
 import sys
 import time
+import tomllib
+from importlib.metadata import metadata
+from pathlib import Path
 
 import pytest
+from packaging.requirements import Requirement
 
 from scriptconv import frontend as frontend_module
 from scriptconv.frontend import FrontendConfig, Stages, TextFrontend, spoken_normalizer
@@ -544,6 +548,13 @@ class TestSpokenNormalizer:
         monkeypatch.setitem(sys.modules, "text2spoken", None)
         with pytest.raises(ImportError, match=r"scriptconv\[normalize\]"):
             spoken_normalizer()
+
+    def test_the_extra_installs_every_language_extra_of_text2spoken(self):
+        pyproject = tomllib.loads((Path(__file__).parent.parent / "pyproject.toml").read_text(encoding="utf-8"))
+        requirement, = map(Requirement, pyproject["project"]["optional-dependencies"]["normalize"])
+        languages = set(metadata("text2spoken").get_all("Provides-Extra")) - {"test"}
+        assert requirement.name == "text2spoken"
+        assert languages <= requirement.extras, f"text2spoken extras missing: {sorted(languages - requirement.extras)}"
 
 
 class TestModulePhonemize:
