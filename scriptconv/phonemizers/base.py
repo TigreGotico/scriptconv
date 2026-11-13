@@ -276,7 +276,8 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         Each clause is phonemized on its own with its punctuation removed, so
         the backend sees the same words in training and in synthesis, and the
         clause's symbol is appended after it: bare for ``. ? !``, followed by a
-        space for ``, : ;``.
+        space for ``, : ;``. A space also separates a clause from the next one
+        in the same sentence, after any symbol or none.
         """
         try:
             from quebra_frases import sentence_tokenize
@@ -294,6 +295,9 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
                 clause_phonemes = [p for p in phoneme_str if p != "\n"]
                 if not clause_phonemes:
                     continue
+                # the next clause starts a new word, as the text writes it
+                if phonemes and phonemes[-1] != " ":
+                    phonemes.append(" ")
                 phonemes.extend(clause_phonemes)
                 if mark:
                     phonemes.append(mark)

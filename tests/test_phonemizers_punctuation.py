@@ -125,7 +125,24 @@ class TestKeepPunctuation:
         phonemizer.keep_punctuation = True
         assert phonemizer.phonemize_to_list("one, two: three; four? five! six.", "en") == (
             list("ONE") + [",", " "] + list("TWO") + [":", " "] + list("THREE")
-            + [";", " "] + list("FOUR") + ["?"] + list("FIVE") + ["!"] + list("SIX") + ["."])
+            + [";", " "] + list("FOUR") + ["?"] + list("FIVE") + ["!", " "]
+            + list("SIX") + ["."])
+
+    @pytest.mark.parametrize("text, expected", [
+        # the text writes a space after the mark, and the next clause starts a
+        # new word: a grapheme voice trained on raw text learned that space
+        ("one! two?", list("ONE") + ["!", " "] + list("TWO") + ["?"]),
+        ("one?! two", list("ONE") + ["?", " "] + list("TWO")),
+        # an ellipsis ends a clause with no symbol; the words stay apart
+        ("wait… go", list("WAIT") + [" "] + list("GO")),
+        ("one | two", list("ONE") + [" "] + list("TWO")),
+        # the last clause of a sentence gets no space after its mark
+        ("one!", list("ONE") + ["!"]),
+    ])
+    def test_a_space_follows_a_clause_inside_a_sentence(self, text, expected):
+        phonemizer = CliLike()
+        phonemizer.keep_punctuation = True
+        assert phonemizer.phonemize_to_list(text, "en") == expected
 
     def test_sentences_stay_separate_for_synthesis(self):
         phonemizer = CliLike()
