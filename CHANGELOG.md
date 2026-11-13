@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a72](https://github.com/TigreGotico/scriptconv/tree/0.0.4a72) (2026-11-13)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a71...0.0.4a72)
+
+**Merged pull requests:**
+
+- fix: make the normalize extra install every text2spoken language [\#219](https://github.com/TigreGotico/scriptconv/pull/219) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a71](https://github.com/TigreGotico/scriptconv/tree/0.0.4a71) (2026-11-13)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a70...0.0.4a71)
@@ -380,10 +388,6 @@
 ## [0.0.4a22](https://github.com/TigreGotico/scriptconv/tree/0.0.4a22) (2026-08-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a21...0.0.4a22)
-
-**Merged pull requests:**
-
-- fix: he extra installs phonikud, not just phonikud-onnx [\#107](https://github.com/TigreGotico/scriptconv/pull/107) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a21](https://github.com/TigreGotico/scriptconv/tree/0.0.4a21) (2026-08-15)
 
