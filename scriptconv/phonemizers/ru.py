@@ -11,7 +11,7 @@ from quebra_frases import sentence_tokenize
 
 from scriptconv.phonemizers.base import BasePhonemizer, PhonemizedChunks
 from scriptconv.phonemizers.enums import Alphabet
-from scriptconv.phonemizers._thirdparty.vosk_g2p import convert, load_dictionary
+from scriptconv.phonemizers._thirdparty.vosk_g2p import convert, load_dictionary, vowels
 
 __all__ = ["VoskPhonemizer"]
 
@@ -47,6 +47,12 @@ class VoskPhonemizer(BasePhonemizer):
     # Matches the per-character split used by vosk_tts: spaces and punctuation
     # are captured so they survive as standalone pause tokens.
     _SPLIT = re.compile(r'([,.?!;:"() ])')
+    # The diacritize stage (stressonnx) writes a combining acute (U+0301) after
+    # the stressed vowel. The vosk rules read a "+" before it instead, so the
+    # acute becomes a "+", and a "+" already there is kept once. An acute after
+    # any other character marks no vowel and is dropped.
+    _ACUTE = "\u0301"
+    _ACUTE_STRESS = re.compile(r"\+?([" + "".join(vowels) + "])" + _ACUTE)
 
     def __init__(self, alphabet: Alphabet = Alphabet.VOSK,
                  model: Optional[str] = None):
@@ -73,8 +79,9 @@ class VoskPhonemizer(BasePhonemizer):
         """Word/punctuation stream -> Vosk phoneme tokens (no BOS/EOS/blanks)."""
         tokens: List[str] = []
         # the em dash is a pause, and vosk only knows the ASCII hyphen
-        text = text.replace("—", "-")
-        for word in self._SPLIT.split(text.lower()):
+        text = text.replace("—", "-").lower()
+        text = self._ACUTE_STRESS.sub(r"+\1", text).replace(self._ACUTE, "")
+        for word in self._SPLIT.split(text):
             if word == "":
                 continue
             if self._SPLIT.match(word) or word == "-":
