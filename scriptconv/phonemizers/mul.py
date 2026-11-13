@@ -319,6 +319,8 @@ _ACUTE_STRESS_LANGS = frozenset({"ru", "uk"})
 _CYRILLIC_VOWELS = frozenset("аеёиоуыэюяіїєАЕЁИОУЫЭЮЯІЇЄ")
 _IPA_VOWELS = frozenset("iyɨʉɯuɪʏʊeøɘɵɤoəɛœɜɞʌɔæɐaɶɑɒ")
 _MARKED_WORD = re.compile(r"[^\W\d_](?:[^\W\d_]|[\u0300-\u036f]|['ʼ’](?=[^\W\d_]))*")
+# a word that a hyphen joins to the next word, as "кто" in "кто-то"
+_HYPHENED_WORD = re.compile(_MARKED_WORD.pattern + r"(?=-[^\W\d_])")
 # espeak-ng prints this between phonemes for --sep=z
 _PHONEME_SEPARATOR = "\u200c"
 
@@ -369,15 +371,28 @@ def _ru_stressed_phoneme(letter: str, phoneme: str, previous: str) -> str:
     return _RU_STRESSED_PHONEMES[letter]
 
 
-def _ru_unstressed_phoneme(phoneme: str, previous: str) -> str:
-    # ph_russian reduces o and 8 to V, and e to i (y after Z, S and ts), with
-    # ChangeIfNotStressed, which espeak-ng runs for text but not for phoneme
-    # input. Phoneme input reads V before the stressed vowel as [a], so the
+def _ru_unstressed_phoneme(phoneme: str, previous: str, final: bool) -> str:
+    # Russian reduces an unstressed vowel. After a palatalised consonant every
+    # non-high vowel neutralises to [i] (ikanye). Elsewhere /e/ raises to [i],
+    # and /a/ and /o/ reduce to [ɐ] before the stress and to [ə] in other
+    # syllables (akanye). Padgett and Tabain (2005), "Adaptive Dispersion Theory
+    # and Phonological Vowel Reduction in Russian", Phonetica 62, section 2.1,
+    # p. 2 of the authors' preprint. espeak-ng's phsource/ph_russian writes these
+    # as phonemes: ChangeIfNotStressed turns o and 8 into V, e into i, and e
+    # after Z, S and ts into y (a stressed e there becomes E), and an unstressed
+    # a after a palatal phoneme becomes I. espeak-ng runs ChangeIfNotStressed for
+    # text but not for phoneme input, so this function writes the reduced
+    # phoneme. A final а or я keeps V, as espeak-ng reads it in text ("няня"
+    # nʲˈɑnʲʌ). Phoneme input reads V before the stressed vowel as [a], so the
     # reduced vowel is written V#, which espeak-ng reads as [ʌ], as V reads in text.
+    if phoneme in ("e", "E") and previous in ("Z", "S", "ts"):
+        return "y"
+    if phoneme == "A" and not final and (previous.endswith(";") or previous == "j"):
+        return "I"
     if phoneme in ("V", "o", "8", "A", "O"):
         return "V#"
     if phoneme == "e":
-        return "y" if previous in ("Z", "S", "ts") else "i"
+        return "i"
     return phoneme
 
 
@@ -401,7 +416,7 @@ def _ru_phoneme_input(phonemes: List[str], word: str) -> Optional[str]:
         if i == vowels[marked]:
             respelled.append("'" + _ru_stressed_phoneme(letters[marked], phoneme, previous))
         else:
-            respelled.append(_ru_unstressed_phoneme(phoneme, previous))
+            respelled.append(_ru_unstressed_phoneme(phoneme, previous, i == len(phonemes) - 1))
     # "|" keeps two adjacent phonemes apart (docs/dictionary.md)
     return "[[" + "|".join(respelled) + "]]"
 
@@ -580,8 +595,14 @@ class EspeakPhonemizer(BasePhonemizer):
         stress on the marked syllable. For Russian, the vowels also take their
         stressed and unstressed values for that stress. A word that no phoneme
         input matches loses the acute only. A stress-marked monosyllable keeps
-        its acute, which espeak-ng reads as a stressed word.
+        its acute, which espeak-ng reads as a stressed word. When a hyphen joins
+        the monosyllable to the next word, it loses the acute, and espeak-ng
+        reads the compound from its dictionary entry ("кто то" kt'otV).
         """
+        text = _HYPHENED_WORD.sub(
+            lambda m: m.group().replace(_ACUTE, "")
+            if _is_stress_marked(m.group()) and sum(c in _CYRILLIC_VOWELS for c in m.group()) == 1
+            else m.group(), text)
         respelled = {w: w.replace(_ACUTE, "") for w in _MARKED_WORD.findall(text)
                      if _is_stress_marked(w) and sum(c in _CYRILLIC_VOWELS for c in w) > 1}
         targets = {w: (_marked_syllable(w), sum(c in _CYRILLIC_VOWELS for c in w)) for w in respelled}

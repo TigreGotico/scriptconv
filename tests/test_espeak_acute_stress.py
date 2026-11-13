@@ -45,6 +45,7 @@ UK_WORDS = [
 RU_MOVED_WORDS = [
     "со́рок", "за́мок", "мука́", "самого́", "жилконто́ра", "по́вестей", "пе́редо", "колоне́ль",
     "го́рода", "сто́ит", "сто́роны", "бе́рега", "вести́", "ноги́", "дома́", "воды́", "орга́н", "тыся́ча",
+    "цены́", "жены́", "Фра́нцевна", "часа́", "пятни́ца", "чаща́",
 ]
 # The IPA that each stressed Russian vowel letter gives. espeak-ng writes ы as
 # [y], stressed а and я as [ɑ], and ё after a soft consonant as [ɵ].
@@ -103,6 +104,35 @@ def test_an_unstressed_o_is_reduced(word):
     head, tail = ipa.split("ˈ")
     stressed = next(i for i, c in enumerate(tail) if c in IPA_VOWELS)
     assert "o" not in head + tail[:stressed] + tail[stressed + 1:], ipa
+
+
+@pytest.mark.parametrize("word, consonant", [("цены́", "ts"), ("жены́", "ʒ"), ("Фра́нцевна", "ts")])
+def test_an_unstressed_e_after_zh_sh_or_ts_is_hard(word, consonant):
+    # е after ж, ш and ц reduces to [ɨ], which espeak-ng writes as y
+    ipa = EspeakPhonemizer().phonemize_string(word, "ru-RU")
+    assert ipa.split(consonant, 1)[1][0] in "ɨy", ipa
+
+
+@pytest.mark.parametrize("text, word", [("часа́", "часа́"), ("пятни́ца", "пятни́ца"), ("чаща́", "чаща́"),
+                                        ("Два часа́ прошло.", "часа́")])
+def test_an_unstressed_a_after_a_soft_consonant_is_front(text, word):
+    # ikanye: after a palatalised consonant an unstressed а or я reduces to [ɪ]
+    for ipa in (EspeakPhonemizer().phonemize_string(text, "ru-RU"),
+                phonemize(text, "ru-RU", override=Phonemizer.ESPEAK)):
+        reading = ipa.split()[[w.strip(".") for w in text.split()].index(word)]
+        first = next(c for c in reading if c in IPA_VOWELS)
+        assert first == "ɪ" and reading.index(first) < reading.index("ˈ"), ipa
+
+
+@pytest.mark.parametrize("word", ["кто́-то", "где́-то", "ка́к-то"])
+def test_a_stressed_monosyllable_before_a_hyphen_reads_as_the_compound(word):
+    compound = espeak(word.replace(ACUTE, ""), "ru")
+    assert stressed_syllables(compound) == [1], compound
+    assert EspeakPhonemizer().phonemize_string(word, "ru-RU") == compound
+    text = f"Он {word} сказал."
+    assert phonemize(text, "ru-RU", override=Phonemizer.ESPEAK).split()[1] == compound
+    chunks = EspeakPhonemizer().phonemize(text, "ru-RU")
+    assert "".join(chunks[0]).split()[1] == compound
 
 
 @pytest.mark.parametrize("text", ["Он сказал «за́мок» и ушёл.", "Он ушёл (со́рок раз).", "Он сказал +за́мок и ушёл.",
