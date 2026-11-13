@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a67](https://github.com/TigreGotico/scriptconv/tree/0.0.4a67) (2026-11-13)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a66...0.0.4a67)
+
+**Merged pull requests:**
+
+- fix\(phonemizers\): keep a hyphen or apostrophe after a stress mark [\#208](https://github.com/TigreGotico/scriptconv/pull/208) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a66](https://github.com/TigreGotico/scriptconv/tree/0.0.4a66) (2026-11-13)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a65...0.0.4a66)
@@ -385,10 +393,6 @@
 ## [0.0.4a17](https://github.com/TigreGotico/scriptconv/tree/0.0.4a17) (2026-08-02)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a16...0.0.4a17)
-
-**Merged pull requests:**
-
-- fix: plain h missing from the X-SAMPA table [\#97](https://github.com/TigreGotico/scriptconv/pull/97) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a16](https://github.com/TigreGotico/scriptconv/tree/0.0.4a16) (2026-08-02)
 
