@@ -225,15 +225,22 @@ class TextFrontend:
                 phonemes.extend(read)
         return phonemes
 
-    def prepare(self, text: str, stages: Stages = Stages(normalize=False)) -> str:
+    def prepare(self, text: str, stages: Optional[Stages] = None) -> str:
         """*text* after the stages, for an engine that reads text, not phonemes.
 
-        The text is not split into sentences, and blocks stay as written.
+        The text is not split into sentences, and blocks stay as written. The
+        stages read each piece of text between blocks without the whitespace
+        at its edges, and that whitespace stays around the result.
         """
         stages = self._resolve(stages)
         parts = _split_blocks(text)
-        return "".join(part if index % 2 or not part else self._run_stages(part, stages)
-                       for index, part in enumerate(parts))
+        for index in range(0, len(parts), 2):
+            part = parts[index]
+            if core := part.strip():
+                start = len(part) - len(part.lstrip())
+                parts[index] = (part[:start] + self._run_stages(core, stages)
+                                + part[start + len(core):])
+        return "".join(parts)
 
     def identity(self) -> PhonemizerIdentity:
         """What phonemizes this frontend's language."""
@@ -252,7 +259,8 @@ class TextFrontend:
         """The stages of one call, with every value set.
 
         An explicit value of the call wins, then the frontend's own. The
-        resolved ``diacritize`` is ``False`` when the backend owns the stage.
+        resolved ``normalize`` and ``diacritize`` are ``False`` when the
+        backend owns the stage.
         """
         own = self.config.stages
         if stages is None:
@@ -264,7 +272,7 @@ class TextFrontend:
             from linguatag import lang_distance
             enabled = lang_distance(lang, "ar") <= _ARABIC_DISTANCE
         return Stages(
-            normalize=normalize is not False,
+            normalize=normalize is not False and "normalize" not in self.backend.owned_stages,
             diacritize=enabled and "diacritize" not in self.backend.owned_stages,
             diacritizer_model=stages.diacritizer_model or own.diacritizer_model,
             lang=lang,
