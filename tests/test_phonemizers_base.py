@@ -1,4 +1,6 @@
+import unicodedata
 import unittest
+from unittest import mock
 
 from scriptconv.phonemizers import (
     Alphabet,
@@ -13,6 +15,7 @@ from scriptconv.phonemizers import (
     get_phonemizer_class,
     phonemizer_for_lang,
 )
+from scriptconv.phonemizers import base
 
 
 class TestEnums(unittest.TestCase):
@@ -357,3 +360,18 @@ class TestRemovePunctuationAfterStressMark(unittest.TestCase):
 
     def test_hyphen_after_a_lone_mark_stripped(self):
         self.assertEqual(BasePhonemizer.remove_punctuation("\u0301-нибудь"), "\u0301нибудь")
+
+    def test_a_long_run_of_marks_costs_linear_work(self):
+        marks = 16000
+        text = "a" + "\u0301" * marks + "-b"
+        lookups = 0
+
+        def category(c):
+            nonlocal lookups
+            lookups += 1
+            if lookups > 3 * len(text):
+                raise AssertionError(f"over {3 * len(text)} category lookups for {len(text)} characters")
+            return unicodedata.category(c)
+
+        with mock.patch.object(base, "unicodedata", mock.Mock(category=category)):
+            self.assertEqual(BasePhonemizer.remove_punctuation(text), text)
