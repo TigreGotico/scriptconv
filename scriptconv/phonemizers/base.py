@@ -193,7 +193,7 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
     """
 
     owned_stages: ClassVar[frozenset[str]] = frozenset()
-    """Stages this backend always runs itself. ``"diacritize"`` is the only name.
+    """Stages this backend always runs itself: ``"normalize"``, ``"diacritize"`` or both.
 
     A stage that runs only with an optional dependency is not owned.
     """

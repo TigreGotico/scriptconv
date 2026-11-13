@@ -46,6 +46,10 @@ class Owner(Echo):
     owned_stages = frozenset({"diacritize"})
 
 
+class NormalizeOwner(Echo):
+    owned_stages = frozenset({"normalize"})
+
+
 class Mute(Echo):
     def phonemize_string(self, text, lang):
         self.read.append((text, lang))
@@ -122,12 +126,20 @@ class TestStageOrder:
         assert stages.stage_names() == ["normalize", "casing", "diacritize"]
         assert backend.read == [("dNAB. CD.", "xx")]
 
-    def test_prepare_runs_no_hook_by_default(self, monkeypatch):
+    def test_prepare_runs_the_same_stages_as_phonemize(self, monkeypatch):
         stages = Recorder(monkeypatch)
         frontend = build(Echo(), normalizer=stages.normalize, stages=Stages(diacritize=True))
-        assert frontend.prepare("ab. cd.") == "dab. cd."
-        assert stages.stage_names() == ["diacritize"]
-        assert frontend.prepare("ab", Stages()) == "dnab"
+        assert frontend.prepare("ab. cd.") == "dnab. cd."
+        assert stages.stage_names() == ["normalize", "diacritize"]
+        assert frontend.prepare("ab", Stages(normalize=False)) == "dab"
+
+    def test_prepare_with_no_stages_normalises(self):
+        hook = spoken_normalizer()
+        frontend = build(Echo(), "en", normalizer=hook, stages=Stages(diacritize=False))
+        text = "I have 5 cats and 20% of them sleep."
+        expected = hook(text, "en")
+        assert expected != text
+        assert frontend.prepare(text) == expected
 
     def test_a_call_can_skip_the_hook(self, monkeypatch):
         stages = Recorder(monkeypatch)
@@ -218,7 +230,30 @@ class TestInlineBlocks:
     def test_prepare_keeps_the_block_as_written(self, monkeypatch):
         Recorder(monkeypatch)
         frontend = build(Echo(), stages=Stages(diacritize=True))
-        assert frontend.prepare("ab [[xy]] cd") == "dab [[xy]]d cd"
+        assert frontend.prepare("ab [[xy]] cd") == "dab [[xy]] dcd"
+
+    # A hook that joins words with single spaces drops the space at each edge
+    # of the text it reads. The space next to a block is part of the text.
+
+    @staticmethod
+    def edge_stripping_hook(text, lang):
+        return " ".join(text.upper().split())
+
+    @pytest.mark.parametrize("text, pieces", [
+        ("  mama\t[[abc]]\nana  ", ["  ", "mama", "\t[[abc]]\n", "ana", "  "]),
+        ("[[a]] [[b]]", ["", "", "[[a]] [[b]]", "", ""]),
+        (" x  y [[a]]", [" ", "x  y", " [[a]]", "", ""]),
+    ])
+    def test_prepare_keeps_the_whitespace_at_the_edges_of_each_piece(self, text, pieces):
+        frontend = build(Echo(), normalizer=self.edge_stripping_hook, stages=Stages(diacritize=False))
+        lead, first, middle, last, trail = pieces
+        expected = (lead + self.edge_stripping_hook(first, "xx") + middle
+                    + self.edge_stripping_hook(last, "xx") + trail)
+        assert frontend.prepare(text, Stages()) == expected
+
+    def test_prepare_mama_abc_ana_keeps_both_spaces(self):
+        frontend = build(Echo(), normalizer=self.edge_stripping_hook, stages=Stages(diacritize=False))
+        assert frontend.prepare("mama [[abc]] ana", Stages()) == "MAMA [[abc]] ANA"
 
 
 class TestOwnedStages:
@@ -244,6 +279,38 @@ class TestOwnedStages:
         frontend = build(Owner(), normalizer=stages.normalize)
         assert frontend.phonemize("ab") == [list("nab")]
         assert stages.stage_names() == ["normalize"]
+
+    @pytest.mark.parametrize("path", ["phonemize_lazy", "phonemize", "phonemize_flat", "prepare"])
+    @pytest.mark.parametrize("call", [None, Stages(), Stages(normalize=True)])
+    def test_an_owner_of_normalize_never_gets_the_hook(self, monkeypatch, path, call):
+        stages = Recorder(monkeypatch)
+        backend = NormalizeOwner()
+        frontend = build(backend, normalizer=stages.normalize, stages=Stages(diacritize=False))
+        result = getattr(frontend, path)("ab. cd [[xy]] ef", call)
+        if path == "prepare":
+            assert result == "ab. cd [[xy]] ef"
+        else:
+            list(result)
+            assert backend.read and all("n" not in text for text, _ in backend.read)
+        assert stages.log == []
+
+    def test_an_owner_of_normalize_still_gets_the_diacritizer(self, monkeypatch):
+        stages = Recorder(monkeypatch)
+        frontend = build(NormalizeOwner(), normalizer=stages.normalize, stages=Stages(diacritize=True))
+        assert frontend.phonemize("ab") == [list("dab")]
+        assert frontend.prepare("ab") == "dab"
+        assert stages.stage_names() == ["diacritize", "diacritize"]
+
+    def test_an_owner_of_both_stages_reads_the_text_as_given(self, monkeypatch):
+        class BothOwner(Echo):
+            owned_stages = frozenset({"normalize", "diacritize"})
+
+        stages = Recorder(monkeypatch)
+        frontend = build(BothOwner(), normalizer=stages.normalize, stages=Stages(diacritize=True))
+        assert frontend.phonemize("ab") == [list("ab")]
+        assert frontend.phonemize_flat("ab") == list("ab")
+        assert frontend.prepare("ab") == "ab"
+        assert stages.log == []
 
     def test_a_backend_that_owns_nothing_gets_the_diacritizer(self, monkeypatch):
         stages = Recorder(monkeypatch)

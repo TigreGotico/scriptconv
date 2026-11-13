@@ -37,9 +37,9 @@ callable as its `normalizer` hook and runs it in a fixed stage order, see
 [frontend.md](frontend.md).
 
 **A backend can own a stage.** The class attribute `owned_stages` names the
-stages that a backend always runs itself, so a frontend skips them. `diacritize`
-is the only name: Tugaphone and Arbtok own it. A stage that a backend runs only
-with an optional dependency is not owned.
+stages that a backend always runs itself, so a frontend skips them. The names
+are `normalize` and `diacritize`. Tugaphone and Arbtok own `diacritize`. A
+stage that a backend runs only with an optional dependency is not owned.
 
 **A backend reports what produced its output.** `identity(lang)` returns a
 frozen `PhonemizerIdentity` with the backend, the engine distribution, its
