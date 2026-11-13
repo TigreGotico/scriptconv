@@ -401,10 +401,14 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         out = []
         chars = list(text)
         for i, c in enumerate(chars):
-            if c in ("'", "’", "-") and 0 < i < len(chars) - 1 \
-                    and chars[i - 1].isalpha() and chars[i + 1].isalpha():
-                out.append(c)
-                continue
+            if c in ("'", "’", "-") and 0 < i < len(chars) - 1 and chars[i + 1].isalpha():
+                # a letter may carry combining marks, such as a stress mark (U+0301)
+                letter = i - 1
+                while letter > 0 and unicodedata.category(chars[letter]).startswith("M"):
+                    letter -= 1
+                if chars[letter].isalpha():
+                    out.append(c)
+                    continue
             if 0 < i < len(chars) - 1 \
                     and chars[i - 1].isdigit() and chars[i + 1].isdigit():
                 out.append(c)
