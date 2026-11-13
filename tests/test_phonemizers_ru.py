@@ -1,7 +1,11 @@
 """Tests for the Russian (vosk-tts) phonemizer and its vendored G2P rules."""
 import os
+import sys
 import tempfile
+import types
+import unicodedata
 import unittest
+from unittest import mock
 
 from scriptconv.phonemizers import (
     Alphabet,
@@ -11,8 +15,11 @@ from scriptconv.phonemizers import (
     phonemize,
     phonemizer_for_lang,
 )
+from scriptconv.frontend import FrontendConfig, Stages, TextFrontend
 from scriptconv.phonemizers._thirdparty.vosk_g2p import convert, load_dictionary
 from scriptconv.phonemizers.ru import VoskPhonemizer
+
+ACUTE = "\u0301"
 
 
 class TestVoskRules(unittest.TestCase):
@@ -180,6 +187,93 @@ class TestVoskPhonemizer(unittest.TestCase):
         self.assertIsNone(p._dictionary)
         p.dictionary
         self.assertIsNotNone(p._dictionary)
+
+
+class TestVoskAcuteStress(unittest.TestCase):
+    """The diacritize stage marks stress with a combining acute (U+0301) after
+    the stressed vowel. vosk_g2p marks a vowel as stressed with a "+" before
+    it, and the stressed vowel takes the digit 1. Each expected value is the
+    unmarked reading with the marked vowel's 0 changed to 1."""
+
+    def setUp(self):
+        self.p = VoskPhonemizer()
+
+    def test_acute_stresses_the_vowel_before_it(self):
+        # сегодня unmarked: sj e0 g o0 d nj a0; the acute is on о
+        self.assertEqual(self.p.phonemize_string("сего" + ACUTE + "дня", "ru"),
+                         "sj e0 g o1 d nj a0")
+
+    def test_acute_on_each_word_of_a_sentence(self):
+        self.assertEqual(
+            self.p.phonemize_string("Сего" + ACUTE + "дня хорошо" + ACUTE + ".", "ru"),
+            "sj e0 g o1 d nj a0   h o0 r o0 sh o1 .")
+
+    def test_acute_on_an_uppercase_vowel(self):
+        self.assertEqual(self.p.phonemize_string("СЕГО" + ACUTE + "ДНЯ", "ru"),
+                         "sj e0 g o1 d nj a0")
+
+    def test_acute_reads_like_a_plus(self):
+        for marked, plus in [("молоко" + ACUTE, "молок+о"),
+                             ("мо" + ACUTE + "локо", "м+олоко"),
+                             ("прив" + "е" + ACUTE + "т", "прив+ет")]:
+            self.assertEqual(self.p.phonemize_to_list(marked, "ru"),
+                             convert(plus).split())
+
+    def test_acute_and_plus_on_one_vowel_give_one_stress(self):
+        self.assertEqual(self.p.phonemize_string("сег+о" + ACUTE + "дня", "ru"),
+                         "sj e0 g o1 d nj a0")
+
+    def test_stray_acute_is_dropped(self):
+        # after a consonant, at the start of a word, and after a space
+        for text in ["м" + ACUTE + "ама", ACUTE + "мама", "да " + ACUTE + "мама"]:
+            toks = self.p.phonemize_to_list(text, "ru")
+            self.assertNotIn(ACUTE, toks)
+            self.assertFalse(any(ACUTE in t for t in toks))
+            self.assertEqual(toks[-4:], ["m", "a0", "m", "a0"])
+
+    def test_acute_on_precomposed_yo(self):
+        # ёж unmarked: j o0 zh
+        self.assertEqual(self.p.phonemize_string("ё" + ACUTE + "ж", "ru"),
+                         "j o1 zh")
+
+    def test_precomposed_short_i_is_not_a_vowel(self):
+        # й (U+0439) stays the consonant j; the acute marks the о before it
+        self.assertEqual(self.p.phonemize_string("мо" + ACUTE + "\u0439", "ru"),
+                         "m o1 j")
+
+    def test_nfd_short_i_keeps_its_reading(self):
+        # in NFD, й is и + U+0306; the breve is not an acute, so only the о
+        # changes, exactly as with a "+"
+        nfd = unicodedata.normalize("NFD", "мой")
+        self.assertEqual(nfd, "мои\u0306")
+        self.assertEqual(self.p.phonemize_to_list("мо" + ACUTE + "и\u0306", "ru"),
+                         self.p.phonemize_to_list("м+ои\u0306", "ru"))
+
+    def test_nfc_and_nfd_input_read_the_same(self):
+        # no precomposed Cyrillic vowel with an acute exists, so both forms
+        # keep the acute as its own code point after the vowel
+        word = "сего" + ACUTE + "дня"
+        for form in ("NFC", "NFD"):
+            self.assertEqual(
+                self.p.phonemize_string(unicodedata.normalize(form, word), "ru"),
+                "sj e0 g o1 d nj a0")
+
+    def test_phonemize_chunks_keep_the_stress(self):
+        self.assertEqual(self.p.phonemize("Сего" + ACUTE + "дня. Хорошо" + ACUTE + ".", "ru"),
+                         [["sj", "e0", "g", "o1", "d", "nj", "a0", "."],
+                          ["h", "o0", "r", "o0", "sh", "o1", "."]])
+
+    def test_frontend_diacritize_stage_reaches_vosk_as_stress(self):
+        stressonnx = types.ModuleType("stressonnx")
+        stressonnx.stress = lambda text, lang, model=None: \
+            "сего" + ACUTE + "дня хорошо" + ACUTE
+        frontend = TextFrontend(FrontendConfig(lang="ru-RU", phonemizer=Phonemizer.VOSK,
+                                               alphabet=Alphabet.VOSK))
+        with mock.patch.dict(sys.modules, {"stressonnx": stressonnx}):
+            chunks = frontend.phonemize("сегодня хорошо",
+                                        Stages(diacritize=True, lang="ru-RU"))
+        self.assertEqual(chunks, [["sj", "e0", "g", "o1", "d", "nj", "a0", " ",
+                                   "h", "o0", "r", "o0", "sh", "o1"]])
 
 
 class TestVoskRegistration(unittest.TestCase):
