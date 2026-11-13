@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a70](https://github.com/TigreGotico/scriptconv/tree/0.0.4a70) (2026-11-13)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a69...0.0.4a70)
+
+**Merged pull requests:**
+
+- fix\(phonemizers\): keep the space after a clause inside a sentence [\#215](https://github.com/TigreGotico/scriptconv/pull/215) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a69](https://github.com/TigreGotico/scriptconv/tree/0.0.4a69) (2026-11-13)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a68...0.0.4a69)
@@ -385,10 +393,6 @@
 ## [0.0.4a20](https://github.com/TigreGotico/scriptconv/tree/0.0.4a20) (2026-08-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a19...0.0.4a20)
-
-**Merged pull requests:**
-
-- fix: agree diacritizer family routing with stressonnx 0.0.3a2 resolution [\#103](https://github.com/TigreGotico/scriptconv/pull/103) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a19](https://github.com/TigreGotico/scriptconv/tree/0.0.4a19) (2026-08-03)
 
