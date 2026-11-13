@@ -1,10 +1,11 @@
-from scriptconv.phonemizers.base import BasePhonemizer
+from scriptconv.phonemizers.base import BasePhonemizer, _check_alphabet
 from scriptconv.phonemizers.enums import Alphabet
 
 class OpenJTaklPhonemizer(BasePhonemizer):
+    engine_distribution = "pyopenjtalk"
 
-    def __init__(self, alphabet=Alphabet.IPA):
-        assert alphabet in [Alphabet.HEPBURN, Alphabet.KANA]
+    def __init__(self, alphabet=Alphabet.HEPBURN):
+        _check_alphabet(self, alphabet, [Alphabet.HEPBURN, Alphabet.KANA])
         import pyopenjtalk
         self.g2p = pyopenjtalk.g2p
         super().__init__(alphabet)
@@ -34,13 +35,22 @@ class OpenJTaklPhonemizer(BasePhonemizer):
 
 
 class CutletPhonemizer(BasePhonemizer):
+    engine_distribution = "cutlet"
 
     def __init__(self, alphabet=Alphabet.HEPBURN, use_foreign_spelling = False):
-        assert alphabet in [Alphabet.HEPBURN, Alphabet.KUNREI, Alphabet.NIHON]
+        _check_alphabet(self, alphabet,
+                        [Alphabet.HEPBURN, Alphabet.KUNREI, Alphabet.NIHON])
         # If `use_foreign_spelling` is true, output will use the foreign spelling
         #         provided in a UniDic lemma when available. For example, "カツ" will
         #         become "cutlet" instead of "katsu".
-        import cutlet
+        try:
+            import cutlet
+        except ImportError as e:
+            raise ImportError(
+                "cutlet is required for the Cutlet phonemizer. "
+                "Install it with 'pip install cutlet' "
+                "(or 'pip install scriptconv[ja-phonemizers]')."
+            ) from e
         self.g2p = cutlet.Cutlet(alphabet)
         self.g2p.use_foreign_spelling = use_foreign_spelling
         super().__init__(alphabet)
@@ -69,11 +79,20 @@ class CutletPhonemizer(BasePhonemizer):
         return self.g2p.romaji(text)
 
 class PyKakasiPhonemizer(BasePhonemizer):
+    engine_distribution = "pykakasi"
 
     def __init__(self, alphabet=Alphabet.HEPBURN):
-        assert alphabet in [Alphabet.HEPBURN, Alphabet.KANA, Alphabet.HIRA]
+        _check_alphabet(self, alphabet,
+                        [Alphabet.HEPBURN, Alphabet.KANA, Alphabet.HIRA])
         # kana, hira, hepburn
-        import pykakasi
+        try:
+            import pykakasi
+        except ImportError as e:
+            raise ImportError(
+                "pykakasi is required for the PyKakasi phonemizer. "
+                "Install it with 'pip install pykakasi' "
+                "(or 'pip install scriptconv[ja-phonemizers]')."
+            ) from e
         self.g2p = pykakasi.kakasi()
         super().__init__(alphabet)
 

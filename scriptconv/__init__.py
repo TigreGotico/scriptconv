@@ -1,7 +1,8 @@
-"""scriptconv — a zero-dependency core for written-script operations.
+"""scriptconv — the one stop for text conversion, on a zero-dependency core.
 
 Script identification and metadata, phoneme-notation transcoding, and
-orthographic decomposition — no phonemization.
+orthographic decomposition run on the core alone. Phonemizer integrations sit
+behind optional extras, and the core holds no grapheme-to-phoneme rules.
 
 Modules
 -------
@@ -69,6 +70,7 @@ from scriptconv.notation import (
     ipa_to_cotovia,
     rfe_to_ipa,
     ipa_to_rfe,
+    halabi_to_ipa,
     looks_like_ipa,
 )
 from scriptconv.translit import (
@@ -140,6 +142,7 @@ __all__ = [
     "ipa_to_cotovia",
     "rfe_to_ipa",
     "ipa_to_rfe",
+    "halabi_to_ipa",
     "looks_like_ipa",
     # translit
     "decompose_hangul",
