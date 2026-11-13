@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a71](https://github.com/TigreGotico/scriptconv/tree/0.0.4a71) (2026-11-13)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a70...0.0.4a71)
+
+**Merged pull requests:**
+
+- fix\(vosk\): look up a stress-marked word in the dictionary [\#217](https://github.com/TigreGotico/scriptconv/pull/217) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a70](https://github.com/TigreGotico/scriptconv/tree/0.0.4a70) (2026-11-13)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a69...0.0.4a70)
@@ -337,10 +345,6 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a26...0.0.4a27)
 
-**Merged pull requests:**
-
-- docs: add OVOS G2P plugin page [\#104](https://github.com/TigreGotico/scriptconv/pull/104) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [0.0.4a26](https://github.com/TigreGotico/scriptconv/tree/0.0.4a26) (2026-09-03)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a25...0.0.4a26)
@@ -388,7 +392,6 @@
 **Merged pull requests:**
 
 - fix: raise MissingLanguageError for None/empty/und in match\_lang [\#108](https://github.com/TigreGotico/scriptconv/pull/108) ([JarbasAl](https://github.com/JarbasAl))
-- fix: resolve BCP-47 zh region tags in EspeakPhonemizer.get\_lang [\#105](https://github.com/TigreGotico/scriptconv/pull/105) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a20](https://github.com/TigreGotico/scriptconv/tree/0.0.4a20) (2026-08-14)
 
