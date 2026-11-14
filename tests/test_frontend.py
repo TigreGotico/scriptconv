@@ -179,6 +179,105 @@ class TestInlineBlocks:
             list("nab") + [" ", "x", "y", " "] + list("n cd"))
         assert [entry[1] for entry in stages.log] == ["ab ", " cd"]
 
+    # A synthesis sentence never starts with a space. The flat stream is the
+    # sentences joined: no space after a sentence that ends in a clause symbol
+    # or a space, and one space after any other sentence.
+
+    @pytest.mark.parametrize("keep", [True, False])
+    def test_an_empty_block_leaves_one_space(self, keep):
+        frontend = TextFrontend(FrontendConfig("pt", Phonemizer.GRAPHEMES, keep_punctuation=keep,
+                                               stages=Stages(diacritize=False)))
+        assert frontend.phonemize("ab [[]] cd") == [list("ab "), list("cd")]
+        assert frontend.phonemize_flat("ab [[]] cd") == list("ab cd")
+
+    def test_a_block_after_a_pause_mark_takes_its_space(self):
+        kept = TextFrontend(FrontendConfig("pt", Phonemizer.GRAPHEMES, keep_punctuation=True,
+                                           stages=Stages(diacritize=False)))
+        assert kept.phonemize("Olá, [[ana]]") == [list("olá, ana")]
+        assert kept.phonemize_flat("Olá, [[ana]]") == list("olá, ana")
+
+    @pytest.mark.parametrize("text, sentences, flat", [
+        ("Um [[x]]. Dois; três.", ["um x.", "dois; três."], "um x.dois; três."),
+        ("Olá [[ana]], tudo bem? Sim.", ["olá ana, ", "tudo bem?", "sim."],
+         "olá ana, tudo bem?sim."),
+        ("Olá, [[ana]], tudo bem?", ["olá, ana, ", "tudo bem?"], "olá, ana, tudo bem?"),
+        ("Sim [[a:]]? Não.", ["sim a:?", "não."], "sim a:?não."),
+    ])
+    def test_a_mark_after_a_block_ends_the_block_clause(self, text, sentences, flat):
+        kept = TextFrontend(FrontendConfig("pt", Phonemizer.GRAPHEMES, keep_punctuation=True,
+                                           stages=Stages(diacritize=False)))
+        assert kept.phonemize(text) == [list(sentence) for sentence in sentences]
+        assert kept.phonemize_flat(text) == list(flat)
+
+    @pytest.mark.parametrize("keep, text, sentences, flat", [
+        # the block ends in a length symbol, and no mark follows it
+        (True, "Olá [[a:]] sim.", ["olá a: ", "sim."], "olá a: sim."),
+        # an ellipsis gives no symbol
+        (True, "Espera [[a]]... vamos.", ["espera a", "vamos."], "espera a vamos."),
+        (False, "Um [[x]]. Dois; três.", ["um x", "dois", "três"], "um x dois três"),
+        (False, "Olá, [[ana]], tudo bem?", ["olá ana", "tudo bem"], "olá ana tudo bem"),
+        # an empty block ends no clause, so it takes no mark
+        (True, "ab [[]]. cd", ["ab ", "cd"], "ab cd"),
+        # the comma ends the clause of the word after the block, so it stays with that word
+        (True, "Olá [[ˈana]]s, tudo bem?", ["olá ˈana", "s, tudo bem?"], "olá ˈana s, tudo bem?"),
+        # a mark with a block directly after it ends no clause
+        (True, "[[x]],[[y]]", ["xy"], "xy"),
+        (True, "[[x]].[[y]]", ["xy"], "xy"),
+    ])
+    def test_a_block_with_no_clause_symbol_keeps_its_space(self, keep, text, sentences, flat):
+        frontend = TextFrontend(FrontendConfig("pt", Phonemizer.GRAPHEMES, keep_punctuation=keep,
+                                               stages=Stages(diacritize=False)))
+        assert frontend.phonemize(text) == [list(sentence) for sentence in sentences]
+        assert frontend.phonemize_flat(text) == list(flat)
+
+    @pytest.mark.parametrize("text", ["[[x]],[[y]]", "[[x]].[[y]]", "[[x]]?[[y]]"])
+    def test_a_mark_before_the_next_block_gives_no_token(self, text):
+        def frontend(keep):
+            return TextFrontend(FrontendConfig("pt", Phonemizer.GRAPHEMES, keep_punctuation=keep,
+                                               stages=Stages(diacritize=False)))
+        assert frontend(True).phonemize(text) == frontend(False).phonemize(text)
+        assert frontend(True).phonemize_flat(text) == frontend(False).phonemize_flat(text)
+
+    @pytest.mark.parametrize("text, plain", [
+        ("Tu viens [[x]] ?", "Tu viens x ?"),
+        ("Tu viens [[x]] ?", "Tu viens x ?"),
+        ("[[x]] , b", "x , b"),
+        ("Um [[x]]. Dois; três.", "Um x. Dois; três."),
+        ("[[x]] ; [[y]] !", "x ; y !"),
+        ("[[x]],[[y]]", "x,y"),
+        ("[[x]].[[y]]", "x.y"),
+    ])
+    def test_a_mark_after_a_block_reads_as_after_a_plain_word(self, text, plain):
+        kept = TextFrontend(FrontendConfig("fr", Phonemizer.GRAPHEMES, keep_punctuation=True,
+                                           stages=Stages(diacritize=False)))
+        assert kept.phonemize_flat(text) == kept.phonemize_flat(plain)
+
+    def test_a_mark_after_a_space_after_a_block_stays(self):
+        kept = TextFrontend(FrontendConfig("fr", Phonemizer.GRAPHEMES, keep_punctuation=True,
+                                           stages=Stages(diacritize=False)))
+        assert kept.phonemize("Tu viens [[x]] ?") == [list("tu viens x?")]
+        assert kept.phonemize_flat("Tu viens [[x]] ?") == list("tu viens x?")
+
+    def test_the_mark_is_read_after_the_stages(self):
+        kept = TextFrontend(FrontendConfig(
+            "pt", Phonemizer.GRAPHEMES, keep_punctuation=True, stages=Stages(diacritize=False),
+            normalizer=lambda text, lang: text.replace("§", "parágrafo")))
+        # the normaliser gives the comma a word, so the comma ends that word's clause
+        assert kept.phonemize("Olá [[x]]§, sim.") == [list("olá x"), list("parágrafo, sim.")]
+        assert kept.phonemize_flat("Olá [[x]]§, sim.") == list("olá x parágrafo, sim.")
+
+    @pytest.mark.parametrize("override", ["phonemize_lazy", "phonemize_to_list"])
+    def test_a_backend_with_its_own_output_gets_no_mark(self, override):
+        def own(self, text, lang):
+            return list(text) if override == "phonemize_to_list" else iter([list(text)])
+        backend = type("Own", (Echo,), {override: own})
+
+        def frontend(keep):
+            return build(backend(), keep_punctuation=keep, stages=Stages(diacritize=False))
+        for path in ("phonemize", "phonemize_flat"):
+            text = "Um [[x]]. Dois"
+            assert getattr(frontend(True), path)(text) == getattr(frontend(False), path)(text)
+
     def test_the_split_matches_the_block_pattern(self):
         # Every string of up to 7 characters over the symbols that matter.
         pattern = re.compile(r"(\[\[.*?\]\])")

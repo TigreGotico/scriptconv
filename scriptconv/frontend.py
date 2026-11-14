@@ -28,10 +28,12 @@ from typing import Callable, Iterator, List, Optional
 from scriptconv.diacritics import _DIACRITIZER_PACKAGES, _diacritizer_family, diacritize
 from scriptconv.graph import ConversionGraph, Edge
 from scriptconv.phonemizers.base import (
+    _PAUSE_PUNCTUATION,
     BasePhonemizer,
     PhonemizerIdentity,
     StageError,
     UnreadTextError,
+    split_clauses,
 )
 from scriptconv.phonemizers.enums import Alphabet, Phonemizer
 from scriptconv.phonemizers.registry import get_phonemizer, phonemizer_for_lang
@@ -39,6 +41,9 @@ from scriptconv.phonemizers.registry import get_phonemizer, phonemizer_for_lang
 __all__ = ["Stages", "FrontendConfig", "TextFrontend", "spoken_normalizer"]
 
 LOG = logging.getLogger(__name__)
+
+# The word that stands for a block when the frontend reads the mark after it.
+_BLOCK_WORD = "a"
 
 # linguatag puts "ar" with any region, and each individual Arabic language in
 # Arabic script, at 5 or less from "ar". Those languages diacritize by default.
@@ -122,16 +127,27 @@ def _split_blocks(text: str) -> List[str]:
     return parts
 
 
-def _block_phonemes(parts: List[str], index: int) -> List[str]:
-    """The symbols of the inline block at *index* of a split text.
+def _add_block(phonemes: List[str], parts: List[str], index: int, mark: Optional[str]) -> bool:
+    """Append the symbols of the inline block at *index* of a split text to *phonemes*.
 
-    A space before or after the block in the text becomes a space symbol.
+    A space before or after the block in the text becomes a space symbol,
+    unless *phonemes* is empty or already ends in a space. *mark* is the clause
+    symbol of the punctuation directly after the block. It follows the block's
+    symbols as the backend appends it after a clause: bare for ``. ? !``,
+    followed by a space for ``, : ;``. Returns whether *mark* was appended.
     """
-    phonemes = [" "] if parts[index - 1].endswith(" ") else []
-    phonemes.extend(parts[index][2:-2].strip())
-    if parts[index + 1].startswith(" "):
+    if parts[index - 1].endswith(" ") and phonemes and phonemes[-1] != " ":
         phonemes.append(" ")
-    return phonemes
+    symbols = parts[index][2:-2].strip()
+    phonemes.extend(symbols)
+    if mark and symbols:
+        phonemes.append(mark)
+        if mark in _PAUSE_PUNCTUATION:
+            phonemes.append(" ")
+        return True
+    if parts[index + 1].startswith(" ") and phonemes and phonemes[-1] != " ":
+        phonemes.append(" ")
+    return False
 
 
 class TextFrontend:
@@ -193,7 +209,7 @@ class TextFrontend:
         held: List[str] = []
         for index, part in enumerate(parts):
             if index % 2:
-                held.extend(_block_phonemes(parts, index))
+                _add_block(held, parts, index, self._mark_after(parts, index, stages))
                 continue
             for sentence in self._sentences(part, stages):
                 if held:
@@ -214,19 +230,22 @@ class TextFrontend:
         the rule of :func:`~scriptconv.phonemizers.base.join_sentences`. The
         text after a block starts a new sentence, as in :meth:`phonemize`, so
         one space separates the block from it, unless the block ends in a
-        space. No sentence of :meth:`phonemize` starts with that space.
+        space or in a clause symbol. No sentence of :meth:`phonemize` starts
+        with that space.
         """
         stages = self._resolve(stages)
         parts = _split_blocks(text)
         phonemes: List[str] = []
+        ends_in_token = False
         for index, part in enumerate(parts):
             if index % 2:
-                phonemes.extend(_block_phonemes(parts, index))
+                mark = self._mark_after(parts, index, stages)
+                ends_in_token = _add_block(phonemes, parts, index, mark)
             elif part:
                 part = self._run_stages(part, stages)
                 read = self.backend.phonemize_to_list(part, stages.lang)
                 self._check_read(part, read, stages)
-                if read and phonemes and phonemes[-1] != " ":
+                if read and phonemes and phonemes[-1] != " " and not ends_in_token:
                     phonemes.append(" ")
                 phonemes.extend(read)
         return phonemes
@@ -300,6 +319,31 @@ class TextFrontend:
             chunks = [list(chunk) for chunk in self.backend.phonemize_lazy(sentence, stages.lang)]
             self._check_read(sentence, [p for chunk in chunks for p in chunk], stages)
             yield from (chunk for chunk in chunks if chunk)
+
+    def _mark_after(self, parts: List[str], index: int, stages: Stages) -> Optional[str]:
+        """The clause symbol of the punctuation after the block at *index* of a split text.
+
+        The backend reads the text after a block as a sentence that starts
+        with a clause with no words, and drops that clause's symbol. The
+        symbol belongs to the clause that the block ends, so the mark is read
+        as in the same text with a plain word in place of each block: the
+        first sentence after the stages, split into clauses by the backend's
+        rules. Only a backend that keeps punctuation gives one.
+        """
+        if not self.backend._keeps_punctuation():
+            return None
+        try:
+            from quebra_frases import sentence_tokenize
+        except ImportError:
+            raise ImportError(
+                "sentence chunking needs quebra-frases — install with "
+                "`pip install scriptconv[phonemizers]`") from None
+        text = _BLOCK_WORD + parts[index + 1]
+        if index + 2 < len(parts) and parts[index + 2][2:-2].strip():
+            text += _BLOCK_WORD
+        sentence = self._run_stages(sentence_tokenize(text)[0], stages)
+        clause, mark = split_clauses(sentence)[0]
+        return mark if self.backend.remove_punctuation(clause).casefold() == _BLOCK_WORD else None
 
     def _run_stages(self, text: str, stages: Stages) -> str:
         """Steps 3 to 5 on one piece of text."""
