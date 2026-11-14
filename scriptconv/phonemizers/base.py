@@ -335,7 +335,7 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
                 if not clause:
                     continue
                 phoneme_str = _LANG_FLAGS.sub("", self.phonemize_string(clause, lang))
-                clause_phonemes = [p for p in phoneme_str if p != "\n"]
+                clause_phonemes = list(_clause_breaks_as_spaces(phoneme_str))
                 if not clause_phonemes:
                     continue
                 # the next clause starts a new word, as the text writes it

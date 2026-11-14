@@ -168,6 +168,30 @@ class TestKeepPunctuation:
         assert phonemizer.phonemize("One, two. Three?", "en") == [
             list("ONE") + [",", " "] + list("TWO") + ["."], list("THREE") + ["?"]]
 
+    @pytest.mark.parametrize("text", ["Olá\nTudo bem.", "Olá\r\nTudo bem.", "Olá\n\nTudo bem."])
+    def test_a_line_break_inside_a_clause_is_a_space(self, espeak, text):
+        # no mark ends the clause at the line break, and espeak-ng prints one there
+        espeak.keep_punctuation = True
+        words = " ".join(espeak.phonemize_string(word, "pt") for word in ("Olá", "Tudo bem"))
+        assert espeak.phonemize_to_list(text, "pt") == list(words + ".")
+        assert espeak.phonemize(text, "pt") == [list(words + ".")]
+
+    @pytest.mark.parametrize("text", ["Olá\nTudo bem.", "Olá\r\nTudo bem.", "Olá\n\nTudo bem."])
+    def test_a_line_break_from_the_unicode_backend_is_a_space(self, text):
+        unicode = get_phonemizer(Phonemizer.UNICODE, keep_punctuation=True)
+        expected = list(unicodedata.normalize("NFD", "Olá Tudo bem."))
+        assert unicode.phonemize_to_list(text, "pt") == expected
+        assert unicode.phonemize(text, "pt") == [expected]
+
+    @pytest.mark.parametrize("text", ["16:30", "10,4", "Às 16:30! Já."])
+    def test_espeak_reads_a_mark_between_digits_as_written(self, espeak, text):
+        # espeak-ng prints no line break inside "16:30" or "10,4"
+        espeak.keep_punctuation = True
+        clauses = [espeak.phonemize_string(espeak.remove_punctuation(clause), "pt") for clause in text.split("! ")]
+        assert all("\n" not in clause for clause in clauses)
+        expected = "! ".join(clauses) + ("." if text.endswith(".") else "")
+        assert "".join(espeak.phonemize_to_list(text, "pt")) == expected
+
     def test_arabic_marks_map_to_ascii(self, espeak):
         espeak.keep_punctuation = True
         phonemes = espeak.phonemize_to_list("مرحبا، كيف حالك؟ أنا بخير!", "ar")
