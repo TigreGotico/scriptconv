@@ -480,11 +480,22 @@ class TestBackends:
         plain = TextFrontend(FrontendConfig("xx", Phonemizer.UNICODE))
         assert plain.phonemize("ab, cd.", Stages(diacritize=False)) == [list("ab cd")]
 
+    def test_a_line_break_inside_a_clause_keeps_the_words_apart(self):
+        espeak = EspeakPhonemizer()
+        words = " ".join(espeak.phonemize_string(word, "pt") for word in ("Olá", "Tudo bem"))
+        kept = TextFrontend(FrontendConfig("pt", Phonemizer.ESPEAK, keep_punctuation=True,
+                                           stages=Stages(diacritize=False)), espeak)
+        assert kept.phonemize_flat("Olá\nTudo bem.") == list(words + ".")
+        assert kept.phonemize("Olá\nTudo bem.") == [list(words + ".")]
+
     def test_a_sentence_with_no_symbol_keeps_its_last_word_apart(self):
         kept = TextFrontend(FrontendConfig("pt", Phonemizer.GRAPHEMES, keep_punctuation=True,
                                            stages=Stages(diacritize=False)))
         assert kept.phonemize_flat("Espera... vamos.") == list("espera vamos.")
-        assert kept.phonemize("Espera... vamos.") == [list("espera"), list(" vamos.")]
+        assert kept.phonemize("Espera... vamos.") == [list("espera"), list("vamos.")]
+        # an inline block joins the sentence before it, and no sentence starts with a space
+        assert kept.phonemize_flat("Espera... vamos. [[a]]") == list("espera vamos. a")
+        assert kept.phonemize("Espera... vamos. [[a]]") == [list("espera"), list("vamos. a")]
         assert kept.phonemize_flat("Sim? Não.") == list("sim?não.")
         assert kept.phonemize("Sim? Não.") == [list("sim?"), list("não.")]
         plain = TextFrontend(FrontendConfig("pt", Phonemizer.GRAPHEMES,
