@@ -42,6 +42,9 @@ __all__ = ["Stages", "FrontendConfig", "TextFrontend", "spoken_normalizer"]
 
 LOG = logging.getLogger(__name__)
 
+# The word that stands for a block when the frontend reads the mark after it.
+_BLOCK_WORD = "a"
+
 # linguatag puts "ar" with any region, and each individual Arabic language in
 # Arabic script, at 5 or less from "ar". Those languages diacritize by default.
 _ARABIC_DISTANCE = 5
@@ -206,7 +209,7 @@ class TextFrontend:
         held: List[str] = []
         for index, part in enumerate(parts):
             if index % 2:
-                _add_block(held, parts, index, self._mark_after(parts[index + 1]))
+                _add_block(held, parts, index, self._mark_after(parts, index, stages))
                 continue
             for sentence in self._sentences(part, stages):
                 if held:
@@ -236,7 +239,7 @@ class TextFrontend:
         ends_in_token = False
         for index, part in enumerate(parts):
             if index % 2:
-                mark = self._mark_after(parts[index + 1])
+                mark = self._mark_after(parts, index, stages)
                 ends_in_token = _add_block(phonemes, parts, index, mark)
             elif part:
                 part = self._run_stages(part, stages)
@@ -317,19 +320,30 @@ class TextFrontend:
             self._check_read(sentence, [p for chunk in chunks for p in chunk], stages)
             yield from (chunk for chunk in chunks if chunk)
 
-    def _mark_after(self, text: str) -> Optional[str]:
-        """The clause symbol of the punctuation that starts *text*, the text after a block.
+    def _mark_after(self, parts: List[str], index: int, stages: Stages) -> Optional[str]:
+        """The clause symbol of the punctuation after the block at *index* of a split text.
 
-        The backend reads *text* as a sentence that starts with a clause with
-        no words, and drops that clause's symbol. The symbol belongs to the
-        clause that the block ends. Only a backend that keeps punctuation
-        gives one.
+        The backend reads the text after a block as a sentence that starts
+        with a clause with no words, and drops that clause's symbol. The
+        symbol belongs to the clause that the block ends, so the mark is read
+        as in the same text with a plain word in place of each block: the
+        first sentence after the stages, split into clauses by the backend's
+        rules. Only a backend that keeps punctuation gives one.
         """
-        if not self.backend._keeps_punctuation() or not text or text[0].isspace():
+        if not self.backend._keeps_punctuation():
             return None
-        from quebra_frases import sentence_tokenize
-        clause, mark = split_clauses(sentence_tokenize(text)[0])[0]
-        return None if self.backend.remove_punctuation(clause) else mark
+        try:
+            from quebra_frases import sentence_tokenize
+        except ImportError:
+            raise ImportError(
+                "sentence chunking needs quebra-frases — install with "
+                "`pip install scriptconv[phonemizers]`") from None
+        text = _BLOCK_WORD + parts[index + 1]
+        if index + 2 < len(parts) and parts[index + 2][2:-2].strip():
+            text += _BLOCK_WORD
+        sentence = self._run_stages(sentence_tokenize(text)[0], stages)
+        clause, mark = split_clauses(sentence)[0]
+        return mark if self.backend.remove_punctuation(clause).casefold() == _BLOCK_WORD else None
 
     def _run_stages(self, text: str, stages: Stages) -> str:
         """Steps 3 to 5 on one piece of text."""
