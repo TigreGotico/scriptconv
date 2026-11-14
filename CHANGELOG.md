@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a77](https://github.com/TigreGotico/scriptconv/tree/0.0.4a77) (2026-11-14)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a76...0.0.4a77)
+
+**Merged pull requests:**
+
+- fix\(diacritics\): keep the acute of Macedonian ѓ and ќ in NFD text [\#228](https://github.com/TigreGotico/scriptconv/pull/228) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a76](https://github.com/TigreGotico/scriptconv/tree/0.0.4a76) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a75...0.0.4a76)
@@ -388,10 +396,6 @@
 ## [0.0.4a26](https://github.com/TigreGotico/scriptconv/tree/0.0.4a26) (2026-09-03)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a25...0.0.4a26)
-
-**Merged pull requests:**
-
-- fix: keep punctuation between digits so clock times and decimals reach the phonemizer [\#118](https://github.com/TigreGotico/scriptconv/pull/118) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a25](https://github.com/TigreGotico/scriptconv/tree/0.0.4a25) (2026-09-03)
 
