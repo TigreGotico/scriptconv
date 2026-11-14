@@ -22,7 +22,9 @@ class TestVendoredKorean(unittest.TestCase):
 
 class TestG2PKOnPython313(unittest.TestCase):
     """scriptconv[ko] installs g2pk only below Python 3.13, because
-    python-mecab-ko has wheels up to CPython 3.12 only."""
+    python-mecab-ko has wheels up to CPython 3.12 only. On 3.13 and later,
+    pip builds python-mecab-ko from its sdist, which needs mecab-config
+    from an installed MeCab-ko."""
 
     def _message(self, version_info):
         from unittest.mock import patch
@@ -33,9 +35,11 @@ class TestG2PKOnPython313(unittest.TestCase):
                 G2PKPhonemizer()
         return str(ctx.exception)
 
-    def test_313_names_the_python_version_not_the_extra(self):
+    def test_313_says_to_install_mecab_ko_first_not_the_extra(self):
         message = self._message((3, 13, 0, "final", 0))
-        self.assertIn("Python 3.12 or older", message)
+        self.assertIn("mecab-config", message)
+        self.assertIn("'pip install g2pk'", message)
+        self.assertNotIn("Python 3.12 or older", message)
         self.assertNotIn("scriptconv[ko]", message)
 
     def test_312_names_the_extra(self):

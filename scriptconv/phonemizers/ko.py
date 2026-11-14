@@ -20,8 +20,11 @@ class G2PKPhonemizer(BasePhonemizer):
         except ImportError as e:
             if sys.version_info >= (3, 13):
                 raise ImportError(
-                    "g2pk needs Python 3.12 or older, because its dependency "
-                    "python-mecab-ko has wheels up to CPython 3.12 only."
+                    "g2pk is required for the G2PK phonemizer. Its dependency "
+                    "python-mecab-ko has wheels up to CPython 3.12 only, so on "
+                    "Python 3.13 and later pip builds it from source. Install "
+                    "MeCab-ko first, so that mecab-config is on PATH, then run "
+                    "'pip install g2pk'."
                 ) from e
             raise ImportError(
                 "g2pk is required for the G2PK phonemizer. "
