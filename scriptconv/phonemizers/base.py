@@ -46,11 +46,7 @@ PhonemizedChunks = list[list[str]]
 CLAUSE_PUNCTUATION = {".": ".", "?": "?", "!": "!", ",": ",", ":": ":", ";": ";",
                       "\u060c": ",", "\u061b": ";", "\u061f": "?"}
 _PAUSE_PUNCTUATION = {",", ":", ";"}
-# A sentence that ends in a symbol, or in the space after one, joins the next
-# sentence with no space, as Piper flattens its sentences. A sentence that ends
-# with no symbol, as one the sentence tokenizer ends at "...", is followed by a
-# space, so its last word stays apart from the first word of the next sentence.
-_JOINING_ENDS = frozenset(CLAUSE_PUNCTUATION.values()) | {" "}
+_CLAUSE_TOKENS = frozenset(CLAUSE_PUNCTUATION.values())
 # A mark that the table reads as "!" or "?", between two letters with no space
 # after it, is no clause break, but it still separates two words.
 _SEPARATING_MARKS = frozenset(mark for mark, symbol in CLAUSE_PUNCTUATION.items()
@@ -65,23 +61,39 @@ _TRAILING_PUNCTUATION = re.compile(r"[^\w\s]+\s*$")
 _LANG_FLAGS = re.compile(r"\([^)]+\)")
 
 
-def join_sentences(sentences: Iterable[List[str]]) -> List[str]:
+def join_sentences(sentences: Iterable[List[str]], keep_punctuation: bool = True) -> List[str]:
     """Per-sentence phonemes joined into one flat training stream.
 
-    A sentence that ends with no symbol, as one the sentence tokenizer ends at
-    an ASCII "...", takes a space before the next sentence, so its last word
-    stays apart from the first word of the next sentence. A sentence that ends
-    in a symbol joins the next one with no space, as Piper flattens its
-    sentences. No sentence starts with a space, because a voice never saw a
-    space at the start of an utterance, so the space exists only here.
+    A sentence that ends in a clause token joins the next one with no space,
+    as Piper flattens its sentences. A sentence that ends in a space also
+    joins with no space. Every other sentence, as one the sentence tokenizer
+    ends at an ASCII "...", takes one space before the next sentence, so its
+    last word stays apart from the first word of the next sentence. No
+    sentence starts with a space, because a voice never saw a space at the
+    start of an utterance, so the space exists only here.
+
+    Without *keep_punctuation* no sentence ends in a token, so one space
+    separates every two sentences. With it, a sentence that ends in a clause
+    symbol (``. ? ! , : ;``) counts as ending in a token. A phoneme written
+    with the same character, such as an ASCII ``":"`` for vowel length, counts
+    the same way. :meth:`BasePhonemizer.phonemize_to_list` knows which symbols
+    it appended, so it joins its own sentences without that ambiguity.
     """
+    return _join((sentence, keep_punctuation and bool(sentence)
+                  and sentence[-1] in _CLAUSE_TOKENS) for sentence in sentences)
+
+
+def _join(sentences: Iterable[Tuple[List[str], bool]]) -> List[str]:
+    """``(phonemes, ends_in_token)`` sentences joined by the rule of :func:`join_sentences`."""
     phonemes: List[str] = []
-    for sentence in sentences:
+    joins = True
+    for sentence, ends_in_token in sentences:
         if not sentence:
             continue
-        if phonemes and phonemes[-1] not in _JOINING_ENDS:
+        if not joins:
             phonemes.append(" ")
         phonemes.extend(sentence)
+        joins = ends_in_token or sentence[-1] == " "
     return phonemes
 
 
@@ -226,9 +238,13 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
     Off by default, so voices trained without punctuation receive exactly the
     sequences they were trained on. When on, :meth:`phonemize_to_list` and
     :meth:`phonemize_lazy` phonemize clause by clause and append each clause's
-    symbol the way Piper does. For the same text, :meth:`phonemize_to_list`
-    is the :func:`join_sentences` of the sentences that :meth:`phonemize_lazy`
-    yields. A backend that overrides either method owns its own output and
+    symbol the way Piper does. With the flag on or off,
+    :meth:`phonemize_to_list` of a text is the sentences that
+    :meth:`phonemize_lazy` yields for it, joined by the rule of
+    :func:`join_sentences`. :meth:`phonemize_lazy` first runs the
+    ``normalizer`` hook, and :meth:`phonemize_to_list` does not, so with a
+    hook the two read the same text only when the caller normalizes first.
+    A backend that overrides either method owns its own output and
     ignores this flag, since honouring it on one side only would make training
     and synthesis disagree.
     """
@@ -259,15 +275,22 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
     def phonemize_to_list(self, text: str, lang: str) -> List[str]:
         """Phonemes of *text* as one flat list, without normalization.
 
-        Clause breaks that a backend prints as ``"\\n"`` (espeak-ng does at
-        every comma, question mark and exclamation mark) are not phonemes:
-        each becomes one space, because the next clause starts a new word.
-        With :attr:`keep_punctuation`, the list is the :func:`join_sentences`
-        of :meth:`phonemize`, and each clause's symbol comes before its space.
+        The list is the sentences of :meth:`phonemize` joined by the rule of
+        :func:`join_sentences`, so a voice trains on the sequences that
+        synthesis gives it. Without :attr:`keep_punctuation` no punctuation
+        reaches the list, and one space separates two sentences. With it, each
+        clause's symbol comes before its space, and a sentence that ends in an
+        appended symbol joins the next one with no space. Clause breaks that a
+        backend prints as ``"\\n"`` are not phonemes: each becomes one space,
+        because the next clause starts a new word. A backend that overrides
+        :meth:`phonemize_lazy` keeps its own synthesis, so its list is the
+        whole text read by :meth:`phonemize_string`.
         """
         if self._keeps_punctuation():
-            return join_sentences(self._punctuated_sentences(text, lang))
-        return list(_clause_breaks_as_spaces(self.phonemize_string(text, lang)))
+            return _join(self._punctuated_sentences(text, lang))
+        if type(self).phonemize_lazy is not BasePhonemizer.phonemize_lazy:
+            return list(_clause_breaks_as_spaces(self.phonemize_string(text, lang)))
+        return join_sentences(self._bare_sentences(text, lang), keep_punctuation=False)
 
     def phonemize(self, text: str, lang: str) -> PhonemizedChunks:
         # PhonemizedChunks is list[list[str]]; empty text yields no
@@ -294,8 +317,12 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         if self.normalizer is not None:
             text = self.normalizer(text, lang)
         if self._keeps_punctuation():
-            yield from self._punctuated_sentences(text, lang)
-            return
+            yield from (phonemes for phonemes, _ in self._punctuated_sentences(text, lang))
+        else:
+            yield from self._bare_sentences(text, lang)
+
+    def _bare_sentences(self, text: str, lang: str) -> Iterator[List[str]]:
+        """Per-chunk phonemes, with the punctuation removed before the backend."""
         for chunk, punct, eos in self.chunk_text(text):
             phoneme_str = _clause_breaks_as_spaces(
                 self.phonemize_string(self.remove_punctuation(chunk), lang))
@@ -312,7 +339,7 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
                 and cls.phonemize_to_list is BasePhonemizer.phonemize_to_list
                 and cls.phonemize_lazy is BasePhonemizer.phonemize_lazy)
 
-    def _punctuated_sentences(self, text: str, lang: str) -> Iterator[List[str]]:
+    def _punctuated_sentences(self, text: str, lang: str) -> Iterator[Tuple[List[str], bool]]:
         """Per-sentence phonemes with each clause's punctuation appended.
 
         Each clause is phonemized on its own with its punctuation removed, so
@@ -321,6 +348,7 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         space for ``, : ;``. A space also separates a clause from the next one
         in the same sentence, after any symbol or none. No sentence starts with
         a space: :func:`join_sentences` adds the space between two sentences.
+        Each sentence comes with whether it ends in an appended symbol.
         """
         try:
             from quebra_frases import sentence_tokenize
@@ -330,6 +358,7 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
                 "`pip install scriptconv[phonemizers]`") from None
         for sentence in sentence_tokenize(text):
             phonemes: List[str] = []
+            ends_in_token = False
             for clause, mark in split_clauses(sentence):
                 clause = self.remove_punctuation(clause)
                 if not clause:
@@ -342,12 +371,13 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
                 if phonemes and phonemes[-1] != " ":
                     phonemes.append(" ")
                 phonemes.extend(clause_phonemes)
+                ends_in_token = bool(mark)
                 if mark:
                     phonemes.append(mark)
                     if mark in _PAUSE_PUNCTUATION:
                         phonemes.append(" ")
             if phonemes:
-                yield phonemes
+                yield phonemes, ends_in_token
 
     @staticmethod
     def _process_phones(raw_phones: RawPhonemizedChunks) -> PhonemizedChunks:
