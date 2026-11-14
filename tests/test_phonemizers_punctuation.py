@@ -20,7 +20,8 @@ from scriptconv.frontend import FrontendConfig, Stages, TextFrontend
 from scriptconv.phonemizers import get_phonemizer
 from scriptconv.phonemizers.base import BasePhonemizer, join_sentences
 from scriptconv.phonemizers.enums import Phonemizer
-from scriptconv.phonemizers.mul import EspeakPhonemizer
+from scriptconv.phonemizers.mul import EpitranPhonemizer, EspeakPhonemizer
+from scriptconv.phonemizers.shami import ShamiPhonemizer
 
 SONGS = "Songs near this quiet river every morning, number three."
 
@@ -32,6 +33,14 @@ MULTILINGUAL = {
     "de": ["Guten Morgen, wie geht es dir? Mir geht es gut!"],
     "ar": ["مرحبا، كيف حالك؟ أنا بخير!"],
 }
+
+
+class Long(BasePhonemizer):
+    """Writes a doubled vowel as the vowel and an ASCII ":", as Epitran writes
+    vowel length for Finnish and X-SAMPA writes it everywhere."""
+
+    def phonemize_string(self, text, lang):
+        return re.sub(r"([aeiou])\1", r"\1:", text.lower())
 
 
 class CliLike(BasePhonemizer):
@@ -106,7 +115,8 @@ class TestDefaultKeepsNoPunctuation:
         text = "Olá! Tudo bem? Sim."
         clauses = [espeak.phonemize_string(clause, "pt") for clause in ("Olá", "Tudo bem", "Sim")]
         assert espeak.phonemize_to_list(text, "pt") == list(" ".join(clauses))
-        assert espeak.phonemize_to_list(text, "pt") == join_sentences(espeak.phonemize(text, "pt"))
+        assert espeak.phonemize_to_list(text, "pt") == join_sentences(
+            espeak.phonemize(text, "pt"), keep_punctuation=False)
 
     def test_synthesis_path_is_unchanged(self):
         # chunked, punctuation removed before the backend, no symbol appended
@@ -129,7 +139,7 @@ class TestTrainingEqualsSynthesisWithoutPunctuation:
         phonemizer = CliLike() if backend == "stub" else get_phonemizer(Phonemizer(backend))
         assert "".join(phonemizer.phonemize_to_list(self.TEXT, "pt")) == expected
         assert phonemizer.phonemize_to_list(self.TEXT, "pt") == join_sentences(
-            phonemizer.phonemize(self.TEXT, "pt"))
+            phonemizer.phonemize(self.TEXT, "pt"), keep_punctuation=False)
 
     @pytest.mark.parametrize("text, chunks", [
         (TEXT, ["Olá Ana tudo bem", "Estás pronta Sim"]),
@@ -142,31 +152,90 @@ class TestTrainingEqualsSynthesisWithoutPunctuation:
         espeak = EspeakPhonemizer(prefer_espyak=prefer_espyak)
         expected = " ".join(espeak.phonemize_string(chunk, "pt") for chunk in chunks)
         assert espeak.phonemize_to_list(text, "pt") == list(expected)
-        assert espeak.phonemize_to_list(text, "pt") == join_sentences(espeak.phonemize(text, "pt"))
+        assert espeak.phonemize_to_list(text, "pt") == join_sentences(
+            espeak.phonemize(text, "pt"), keep_punctuation=False)
 
     def test_frontend_flat_equals_the_joined_chunks(self):
         for backend in ("graphemes", "unicode"):
             frontend = TextFrontend(FrontendConfig("pt", stages=Stages(diacritize=False)),
                                     get_phonemizer(Phonemizer(backend)))
             assert frontend.phonemize_flat(self.TEXT) == join_sentences(
-                frontend.phonemize(self.TEXT))
+                frontend.phonemize(self.TEXT), keep_punctuation=False)
+
+    @pytest.mark.parametrize("text, expected", [
+        # the text after a block starts a new sentence, so a space follows the block
+        ("Olá [[ˈana]], tudo bem? Sim.", "olá ˈana tudo bem sim"),
+        ("Um [[x]]. Dois; três.", "um x dois três"),
+    ])
+    def test_frontend_flat_keeps_a_block_apart(self, text, expected):
+        frontend = TextFrontend(FrontendConfig("pt", stages=Stages(diacritize=False)),
+                                get_phonemizer(Phonemizer.GRAPHEMES))
+        assert "".join(frontend.phonemize_flat(text)) == expected
+        assert frontend.phonemize_flat(text) == join_sentences(
+            frontend.phonemize(text), keep_punctuation=False)
 
     def test_the_normalizer_runs_only_on_synthesis(self):
         phonemizer = CliLike()
         phonemizer.normalizer = lambda text, lang: text.replace("3", "three")
         train = phonemizer.phonemize_to_list("number three, now.", "en")
         assert "".join(train) == "NUMBER THREE NOW"
-        assert join_sentences(phonemizer.phonemize("number 3, now.", "en")) == train
+        assert join_sentences(phonemizer.phonemize("number 3, now.", "en"),
+                              keep_punctuation=False) == train
 
     def test_a_backend_with_its_own_synthesis_keeps_its_list(self):
-        class OwnSynthesis(CliLike):
+        class OwnSynthesis(BasePhonemizer):
+            def phonemize_string(self, text, lang):
+                return text.upper()
+
             def phonemize_lazy(self, text, lang):
                 yield list(self.phonemize_string(text, lang))
 
-        assert OwnSynthesis().phonemize_to_list("one, two.", "en") == list("ONE TWO")
+        # the whole text reaches the backend, marks included
+        assert OwnSynthesis().phonemize_to_list("one, two.", "en") == list("ONE, TWO.")
+
+    def test_shami_reads_the_whole_text(self):
+        shami = ShamiPhonemizer()
+        # the front-end reads "!" aloud, so the whole-text read keeps that word
+        assert shami.phonemize_to_list("Sim!Não", "ar") == list(shami.phonemize_string("Sim!Não", "ar"))
+
+    @pytest.mark.parametrize("text, expected", [
+        ("Kaa; taa. Saa!", "ka: ta: sa:"),
+        ("Muu... kuu.", "mu: ku:"),
+    ])
+    def test_a_length_mark_does_not_join_two_words(self, text, expected):
+        assert "".join(Long().phonemize_to_list(text, "fi")) == expected
+        assert "".join(join_sentences(Long().phonemize(text, "fi"), keep_punctuation=False)) == expected
+
+    def test_epitran_finnish_keeps_the_words_apart(self):
+        epitran = EpitranPhonemizer()
+        text = "Hyvää päivää; tervetuloa. Kiitos!"
+        pieces = [epitran.phonemize_string(piece, "fi")
+                  for piece in ("Hyvää päivää", "tervetuloa", "Kiitos")]
+        assert pieces[0].endswith(":")
+        assert epitran.phonemize_to_list(text, "fi") == list(" ".join(pieces))
+
+    def test_join_without_punctuation_puts_one_space_between_sentences(self):
+        sentences = [list("a:"), list("b?"), list("c ")]
+        assert join_sentences(sentences, keep_punctuation=False) == list("a: b? c ")
+        # with punctuation, a final clause symbol reads as a token
+        assert join_sentences(sentences) == list("a:b?c ")
 
 
 class TestKeepPunctuation:
+    def test_a_length_mark_is_not_a_token(self):
+        phonemizer = Long()
+        phonemizer.keep_punctuation = True
+        # an ellipsis ends the first sentence with no token, so a space follows
+        assert "".join(phonemizer.phonemize_to_list("Kaa... Saa.", "fi")) == "ka: sa:."
+        assert phonemizer.phonemize("Kaa... Saa.", "fi") == [list("ka:"), list("sa:.")]
+
+    def test_epitran_finnish_keeps_the_words_apart(self):
+        epitran = EpitranPhonemizer()
+        epitran.keep_punctuation = True
+        first, second = (epitran.phonemize_string(piece, "fi") for piece in ("Hyvää päivää", "Kiitos"))
+        assert first.endswith(":")
+        assert epitran.phonemize_to_list("Hyvää päivää... Kiitos.", "fi") == list(f"{first} {second}.")
+
     def test_espeak_keeps_comma_and_full_stop(self, espeak):
         espeak.keep_punctuation = True
         phonemes = espeak.phonemize_to_list(SONGS, "en-us")
