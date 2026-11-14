@@ -368,20 +368,16 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
 
     @staticmethod
     def _match_lang(target_lang: str, valid_langs: Union[str, List[str]]):
-        """Closest supported language and its distance (linguatag lang_distance)."""
-        from linguatag import lang_distance
+        """Closest supported language and its distance (linguatag closest_lang)."""
+        from linguatag import closest_lang, lang_distance
         if isinstance(valid_langs, str):
             valid_langs = [valid_langs]
         if target_lang in valid_langs:
             return target_lang, 0
-        best_lang, best_distance = "und", 10000000
-        for l in valid_langs:
-            distance = lang_distance(target_lang, l)
-            if distance < best_distance:
-                best_lang, best_distance = l, distance
-        if best_distance <= 10:
-            return best_lang, best_distance
-        return "und", 10000
+        best_lang = closest_lang(target_lang, valid_langs, max_distance=10)
+        if best_lang is None:
+            return "und", 10000
+        return best_lang, lang_distance(target_lang, best_lang)
 
     @staticmethod
     def match_lang(target_lang: str, valid_langs: List[str]) -> str:
