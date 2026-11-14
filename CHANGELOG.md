@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a75](https://github.com/TigreGotico/scriptconv/tree/0.0.4a75) (2026-11-14)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a74...0.0.4a75)
+
+**Merged pull requests:**
+
+- fix\(phonemizers\): stop the local goruut server the wrapper starts [\#206](https://github.com/TigreGotico/scriptconv/pull/206) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a74](https://github.com/TigreGotico/scriptconv/tree/0.0.4a74) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a73...0.0.4a74)
@@ -380,10 +388,6 @@
 ## [0.0.4a25](https://github.com/TigreGotico/scriptconv/tree/0.0.4a25) (2026-09-03)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a24...0.0.4a25)
-
-**Merged pull requests:**
-
-- fix: pass tugaphone sub-regional lects through instead of collapsing to pt-PT [\#114](https://github.com/TigreGotico/scriptconv/pull/114) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a24](https://github.com/TigreGotico/scriptconv/tree/0.0.4a24) (2026-09-03)
 
