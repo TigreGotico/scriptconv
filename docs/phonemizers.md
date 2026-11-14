@@ -37,9 +37,9 @@ callable as its `normalizer` hook and runs it in a fixed stage order, see
 [frontend.md](frontend.md).
 
 **A backend can own a stage.** The class attribute `owned_stages` names the
-stages that a backend always runs itself, so a frontend skips them. `diacritize`
-is the only name: Tugaphone and Arbtok own it. A stage that a backend runs only
-with an optional dependency is not owned.
+stages that a backend always runs itself, so a frontend skips them. The names
+are `normalize` and `diacritize`. Tugaphone and Arbtok own `diacritize`. A
+stage that a backend runs only with an optional dependency is not owned.
 
 **A backend reports what produced its output.** `identity(lang)` returns a
 frozen `PhonemizerIdentity` with the backend, the engine distribution, its
@@ -82,8 +82,8 @@ resolves or explains itself.
 default, resolving in-house engines first:
 
 1. the explicit per-language chain (Arabic to arbtok, Basque to euskaphone,
-   Mirandese to mwl_phonemizer, Portuguese to tugaphone, Hebrew to phonikud,
-   Galician to Cotovía, and Russian to vosk for their own notations, only
+   Mirandese to its orthography2ipa specs, Portuguese to tugaphone, Hebrew to
+   phonikud, Galician to Cotovía, and Russian to vosk for their own notations, only
    when their own notation is requested: a candidate must be able to *emit*
    the requested alphabet)
 2. orthography2ipa, wherever it has a spec for the language
@@ -293,26 +293,55 @@ the edit distance from the backend output to `expected_ipa`, divided by the
 segment count of `expected_ipa`.
 
 A stress mark is one segment, because stress changes what a voice says.
-Spaces and syllable marks are not segments.
+Spaces, syllable marks and tie bars are not segments, so `t͡s` and `ts` are
+the same. This is a known limit: the PER cannot tell an affricate from a stop
+followed by a fricative, such as Polish `czy` [t͡ʂɨ] and `trzy` [tʂɨ].
 
 The gain of a stage is the PER without the stage minus the PER with it. A
 positive gain is good.
 
-The noise of a category is the PER that one sentence can add, which is 1
-divided by the row count of the category. A stage passes when its gain in its
-own category is more than the noise, and no other category loses more than
-the noise.
+A stage passes when both of these are true:
+
+- In its own category, the gain is more than the noise. The noise is the
+  largest error change in one row, between the backend with the stage and
+  the backend without it, divided by the segment count of the category. So a
+  gain passes only when more than one sentence carries it. A homograph stage
+  that fixes one vowel in each of 30 sentences passes. A stage that fixes
+  five segments in one sentence does not pass.
+- In each other category, the loss is one segment at most: the gain is at
+  least minus 1 divided by the segment count of that category. An ablation
+  is deterministic, so a larger loss is real harm. A stage that deletes one
+  sentence in another category fails.
 
 To switch a stage off, the gate calls `backend.without(stage)`. This method
 returns the same backend without that stage. When a backend has no `without`
-method, the gate prints `not ablatable` for each stage and gives no verdict.
+method, the gate prints `not ablatable` for each stage.
 
 The output gives the rows read, scored and skipped, with the reason for
-each skip.
+each skip. A row of another language is a filter. These rows are defects,
+and the gate fails:
+
+- A row with a wrong column count, an unknown category or an unknown tier.
+- A row with an empty `text`, or an `expected_ipa` with no segments.
+- A row with the `id` or the `text` of an earlier row. A repeated sentence
+  would count as many sentences and loosen the noise of its category.
+
+Give `--allow-skips` to score the other rows.
 
 The gate scores gold rows and silver rows apart, and puts the tier at the
-start of each line. Only a gold verdict decides the exit status. The exit
-status is 1 when a gold verdict fails, or when no row is scored.
+start of each line. Only gold rows decide the exit status. The last line is
+`gate: PASS` or `gate: FAIL` with the reasons. The exit status is 1 when one
+of these is true:
+
+- A gold verdict fails.
+- A gold stage is not ablatable, or has no gold rows in its own category.
+- `--stages` is empty, or the set has no gold rows.
+- The gold `full_vs_o2i` of a category is negative, so the backend is worse
+  than orthography2ipa alone.
+- A row has a defect and `--allow-skips` is not given, or no row is scored.
+
+The exit status is 2 for a usage error, such as a missing file, a wrong
+header, an unknown backend or an unknown stage.
 
 ## The backend catalog
 
@@ -321,11 +350,12 @@ epitran, transphone, ByT5/Charsiu (ONNX), the misaki family (en/ja/zh/ko/vi).
 Per-language: English (DeepPhonemizer, OpenPhonemizer, g2p_en), Japanese
 (OpenJTalk, cutlet, pykakasi), Korean (g2pk, KoG2P), Chinese (jieba, g2pM,
 xpinyin, pypinyin), Arabic (arbtok, mantoq), Hebrew (phonikud), Persian,
-Vietnamese (viphoneme, Python below 3.12 only), Portuguese (tugaphone, barranquenho), Galician
+Vietnamese (viphoneme, Python below 3.12 only), Portuguese (tugaphone), Galician
 (Cotovía), Russian (vosk, the vosk-tts inventory, `Alphabet.VOSK`, with the
 voice's pronunciation dictionary passed as `phonemizer_model`), Basque
-(AhoTTS, euskaphone), Mirandese, Levantine Arabic/English
-code-switching (shami, whose `phonemize_with_language_ids` also returns the
+(AhoTTS, euskaphone), Mirandese and Barranquenho (the orthography2ipa specs
+`mwl`, `mwl-x-sendim`, `mwl-x-ifanes` and `ext-PT-x-barranco`), Levantine
+Arabic/English code-switching (shami, whose `phonemize_with_language_ids` also returns the
 parallel per-phoneme language-ID stream), and orthography2ipa for its
 data-driven language specs. Trivial built-ins that need no extra:
 `GraphemePhonemizer` (normalized characters) and `UnicodeCodepointPhonemizer`

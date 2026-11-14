@@ -1,5 +1,7 @@
 """Frontend errors, ``PhonemizerIdentity`` and the ``owned_stages`` table."""
 import dataclasses
+import hashlib
+import logging
 import re
 import sys
 import tomllib
@@ -8,8 +10,10 @@ from pathlib import Path
 from unittest import mock
 
 import espyak.version
+import orthography2ipa
 import pytest
 import tugaphone.version
+from orthography2ipa.exceptions import EngineSourceUnavailable
 from packaging.requirements import Requirement
 
 from scriptconv.phonemizers import (
@@ -198,6 +202,56 @@ class TestIdentity:
         identity = EspeakPhonemizer(prefer_espyak=True).identity("pt")
         assert (identity.backend, identity.distribution, identity.version) == \
             ("espeak", "espyak", espyak.version.VERSION_STR)
+
+
+class TestOrthography2IPARevision:
+    @staticmethod
+    def with_lexicon(lang):
+        """The spec revision and the lexicon revision of *lang*, hashed together."""
+        patches = lang in orthography2ipa.packaged_lexicon_sources(patches=True)
+        combined = (f"{orthography2ipa.spec_revision(lang)}\n"
+                    f"{orthography2ipa.lexicon_revision(lang, patches=patches)}")
+        return "sha256:" + hashlib.sha256(combined.encode()).hexdigest()
+
+    def test_a_lect_with_no_lexicon_reports_the_spec_revision(self):
+        assert "gl-ES" not in orthography2ipa.packaged_lexicon_sources()
+        identity = Orthography2IPAPhonemizer().identity("gl")
+        assert (identity.lang, identity.revision) == \
+            ("gl-ES", orthography2ipa.spec_revision("gl-ES"))
+
+    def test_a_packaged_lexicon_changes_the_revision(self):
+        assert "pt-PT" in orthography2ipa.packaged_lexicon_sources()
+        revision = Orthography2IPAPhonemizer().identity("pt-PT").revision
+        assert revision != orthography2ipa.spec_revision("pt-PT")
+        assert revision == self.with_lexicon("pt-PT")
+
+    def test_an_engine_without_packaged_lexicons_reports_the_spec_revision(self):
+        identity = Orthography2IPAPhonemizer(packaged_lexicons=False).identity("pt-PT")
+        assert identity.revision == orthography2ipa.spec_revision("pt-PT")
+
+    def test_two_calls_give_equal_identities(self):
+        phonemizer = Orthography2IPAPhonemizer()
+        first = phonemizer.identity("pt-PT")
+        phonemizer.phonemize_string("olá", "pt-PT")
+        second = phonemizer.identity("pt-PT")
+        assert first == second
+        assert second.revision == self.with_lexicon("pt-PT")
+
+    def test_a_missing_engine_source_gives_no_revision_and_a_warning(self, monkeypatch, caplog):
+        def unavailable(code):
+            raise EngineSourceUnavailable("engine source of g2p.py is missing")
+        monkeypatch.setattr(orthography2ipa, "spec_revision", unavailable)
+        with caplog.at_level(logging.WARNING, logger="scriptconv.phonemizers.o2ipa"):
+            identity = Orthography2IPAPhonemizer().identity("gl")
+        assert identity.revision is None
+        warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warnings) == 1
+        assert "engine source" in warnings[0] and "g2p.py is missing" in warnings[0]
+
+    def test_an_equal_revision_hides_an_engine_upgrade(self):
+        current = Orthography2IPAPhonemizer().identity("gl")
+        upgraded = dataclasses.replace(current, version="99.0.0")
+        assert current.differs_from(upgraded) == ()
 
 
 class TestVietnameseNeedsAnOlderPython:

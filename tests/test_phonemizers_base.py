@@ -1,4 +1,6 @@
+import unicodedata
 import unittest
+from unittest import mock
 
 from scriptconv.phonemizers import (
     Alphabet,
@@ -13,6 +15,7 @@ from scriptconv.phonemizers import (
     get_phonemizer_class,
     phonemizer_for_lang,
 )
+from scriptconv.phonemizers import base
 
 
 class TestEnums(unittest.TestCase):
@@ -338,3 +341,90 @@ class TestRemovePunctuationKeepsDigitInternal(unittest.TestCase):
         # masculine ordinal indicator), so it is not digit:digit and is
         # stripped like any other punctuation, giving "3º".
         self.assertEqual(BasePhonemizer.remove_punctuation("3.º"), "3º")
+
+
+class TestRemovePunctuationSeparatesWords(unittest.TestCase):
+    """A "!" or "?" between two letters, with no space after it, is no
+    clause break, but it still separates two words."""
+
+    def test_mark_between_letters_becomes_a_space(self):
+        self.assertEqual(BasePhonemizer.remove_punctuation("Sim!Não! talvez"), "Sim Não talvez")
+        self.assertEqual(BasePhonemizer.remove_punctuation("Isto?Aquilo"), "Isto Aquilo")
+
+    def test_a_run_of_marks_becomes_one_space(self):
+        self.assertEqual(BasePhonemizer.remove_punctuation("Sim?!Não"), "Sim Não")
+
+    def test_a_mark_that_the_table_reads_as_a_question_mark(self):
+        self.assertEqual(BasePhonemizer.remove_punctuation("نعم؟لا"), "نعم لا")
+        self.assertEqual(BasePhonemizer.remove_punctuation("نعم!؟لا"), "نعم لا")
+
+    def test_a_stress_mark_before_the_mark(self):
+        self.assertEqual(BasePhonemizer.remove_punctuation("да\u0301!нет"), "да\u0301 нет")
+
+    def test_other_marks_still_join(self):
+        self.assertEqual(BasePhonemizer.remove_punctuation("U.S.A.! go"), "USA go")
+        self.assertEqual(BasePhonemizer.remove_punctuation("Sim! Não"), "Sim Não")
+        self.assertEqual(BasePhonemizer.remove_punctuation("Sim !Não"), "Sim Não")
+        self.assertEqual(BasePhonemizer.remove_punctuation("!Sim um!"), "Sim um")
+        self.assertEqual(BasePhonemizer.remove_punctuation("10,4 16:30"), "10,4 16:30")
+        self.assertEqual(BasePhonemizer.remove_punctuation("你好！我们"), "你好我们")
+
+    def test_a_long_run_of_marks_costs_linear_work(self):
+        # the walk back over combining marks and the scan along the run of
+        # marks each read a character a fixed number of times
+        marks = 16000
+        text = "a" + "\u0301" * marks + "!" * marks + "b"
+        lookups = scans = 0
+
+        def category(c):
+            nonlocal lookups
+            lookups += 1
+            if lookups > 3 * len(text):
+                raise AssertionError(f"over {3 * len(text)} category lookups for {len(text)} characters")
+            return unicodedata.category(c)
+
+        class ScannedMarks(frozenset):
+            def __contains__(self, c):
+                nonlocal scans
+                scans += 1
+                if scans > 3 * len(text):
+                    raise AssertionError(f"over {3 * len(text)} mark lookups for {len(text)} characters")
+                return super().__contains__(c)
+
+        with mock.patch.object(base, "unicodedata", mock.Mock(category=category)), \
+                mock.patch.object(base, "_SEPARATING_MARKS", ScannedMarks(base._SEPARATING_MARKS)):
+            self.assertEqual(BasePhonemizer.remove_punctuation(text), "a" + "\u0301" * marks + " b")
+
+
+class TestRemovePunctuationAfterStressMark(unittest.TestCase):
+    """A stress mark (U+0301) after the vowel before a hyphen or apostrophe
+    still leaves a letter on both sides, so the compound keeps its joint."""
+
+    def test_hyphen_after_stressed_vowel_kept(self):
+        self.assertEqual(BasePhonemizer.remove_punctuation("когда\u0301-нибудь"),
+                         "когда\u0301-нибудь")
+
+    def test_hyphen_in_a_sentence_kept(self):
+        self.assertEqual(BasePhonemizer.remove_punctuation("Кто\u0301-то пришёл когда\u0301-нибудь."),
+                         "Кто\u0301-то пришёл когда\u0301-нибудь")
+
+    def test_apostrophe_after_stressed_vowel_kept(self):
+        self.assertEqual(BasePhonemizer.remove_punctuation("le\u0301'ami"), "le\u0301'ami")
+
+    def test_hyphen_after_a_lone_mark_stripped(self):
+        self.assertEqual(BasePhonemizer.remove_punctuation("\u0301-нибудь"), "\u0301нибудь")
+
+    def test_a_long_run_of_marks_costs_linear_work(self):
+        marks = 16000
+        text = "a" + "\u0301" * marks + "-b"
+        lookups = 0
+
+        def category(c):
+            nonlocal lookups
+            lookups += 1
+            if lookups > 3 * len(text):
+                raise AssertionError(f"over {3 * len(text)} category lookups for {len(text)} characters")
+            return unicodedata.category(c)
+
+        with mock.patch.object(base, "unicodedata", mock.Mock(category=category)):
+            self.assertEqual(BasePhonemizer.remove_punctuation(text), text)

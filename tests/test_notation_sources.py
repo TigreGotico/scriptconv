@@ -417,6 +417,11 @@ LEFT_OUT = {
     "_1": "Wells: \"a language-specific tone number\", with six for Cantonese. "
           "Wikipedia: \"The numbers _1 to _6 are reserved diacritics\". It has "
           "no IPA value, so it stays unknown and does not read as a tie",
+    "_`": "Wells, section 24: tone 4 of Mandarin as ma_`, among other tone "
+          "spellings that he calls \"an embarras de richesses\" and votes "
+          "against. It has no IPA value, so it stays unknown and does not read "
+          "as a tie before the rhoticity mark. ma_- from the same list keeps "
+          "the table value of _-, the retracted mark",
 }
 
 # Spellings no source has.
@@ -572,6 +577,13 @@ def test_tie_before_a_digit_past_the_tone_numbers_stays(xsampa, ipa):
     assert ipa_to_xsampa(ipa, errors="strict") == xsampa
 
 
+def test_section_24_falling_tone_is_unknown_and_not_a_tie():
+    with pytest.raises(UnknownSymbolError) as caught:
+        xsampa_to_ipa("ma_`", errors="strict")
+    assert (caught.value.symbol, caught.value.position) == ("_`", 2)
+    assert xsampa_to_ipa("ma_`") == "ma_`"
+
+
 def test_tie_before_the_letter_f_stays():
     assert xsampa_to_ipa("p_f") == "p\u0361f"
 
@@ -593,11 +605,31 @@ def test_diacritic_moved_above_a_descender_keeps_its_spelling(ipa, xsampa):
     assert ipa_to_xsampa(ipa, errors="strict") == xsampa
 
 
-@pytest.mark.parametrize("ipa", ["å", "ɡ\u030A"])
-def test_ring_above_stays_unknown_on_other_letters(ipa):
+# The letters of the Wells rows whose glyph reaches more than 0.1 em below the
+# baseline in both DejaVu Sans and DejaVu Serif, measured by
+# notation-3.6-3.8-evidence/descenders.py in the workspace audits.
+DESCENDERS = "jpqyŋɖɟɠɡɣɥɧɭɮɰɱɲɳɸɻɽʂʃʄʈʐʒʝβχ"
+LETTER_SPELLING = {nfd(ipa): spelling for spelling, ipa, _ in reversed(ROWS)}
+
+
+@pytest.mark.parametrize("letter", DESCENDERS)
+def test_ring_above_a_descender_is_the_voiceless_ring(letter):
+    spelling = LETTER_SPELLING.get(letter, letter)
+    assert ipa_to_xsampa(letter + "\u030A", errors="strict") == spelling + "_0"
+
+
+@pytest.mark.parametrize("ipa, xsampa", [
+    ("n\u032A\u030A", "n_d_0"),  # dental mark below
+    ("ç\u030A", "C_0"),          # cedilla
+])
+def test_ring_above_another_diacritic_below_is_the_voiceless_ring(ipa, xsampa):
+    assert ipa_to_xsampa(ipa, errors="strict") == xsampa
+
+
+def test_ring_above_stays_unknown_on_a_letter_with_no_descender():
     # å decomposes to a plus the ring above, and it is not an IPA symbol.
     with pytest.raises(UnknownSymbolError):
-        ipa_to_xsampa(ipa, errors="strict")
+        ipa_to_xsampa("å", errors="strict")
 
 
 def test_syllabic_eng_reaches_xsampa_from_arpabet():
@@ -729,6 +761,108 @@ def test_graph_edges_read_the_same_flags():
         if key in notation._TO_IPA:
             edge = next(e for e in DEFAULT_GRAPH._edges[key.value] if e.dst == "ipa")
             assert edge.lossless is info.lossless_to_ipa
+
+
+# ---------------------------------------------------------------------------
+# Buckwalter and Arabic script: the direct edges take the same test
+# ---------------------------------------------------------------------------
+
+# Wikipedia, "Buckwalter transliteration": the scheme represents "Arabic
+# orthography strictly one-to-one". Its letter table and the list below it
+# give these spellings, for example "hamza on alif: >" and "alif maqsura: Y".
+# Each letter is named by its Unicode character name.
+BUCKWALTER_ROWS = [
+    ("'", "ARABIC LETTER HAMZA"), ("|", "ARABIC LETTER ALEF WITH MADDA ABOVE"),
+    (">", "ARABIC LETTER ALEF WITH HAMZA ABOVE"),
+    ("&", "ARABIC LETTER WAW WITH HAMZA ABOVE"),
+    ("<", "ARABIC LETTER ALEF WITH HAMZA BELOW"),
+    ("}", "ARABIC LETTER YEH WITH HAMZA ABOVE"), ("A", "ARABIC LETTER ALEF"),
+    ("b", "ARABIC LETTER BEH"), ("p", "ARABIC LETTER TEH MARBUTA"),
+    ("t", "ARABIC LETTER TEH"), ("v", "ARABIC LETTER THEH"),
+    ("j", "ARABIC LETTER JEEM"), ("H", "ARABIC LETTER HAH"),
+    ("x", "ARABIC LETTER KHAH"), ("d", "ARABIC LETTER DAL"),
+    ("*", "ARABIC LETTER THAL"), ("r", "ARABIC LETTER REH"),
+    ("z", "ARABIC LETTER ZAIN"), ("s", "ARABIC LETTER SEEN"),
+    ("$", "ARABIC LETTER SHEEN"), ("S", "ARABIC LETTER SAD"),
+    ("D", "ARABIC LETTER DAD"), ("T", "ARABIC LETTER TAH"),
+    ("Z", "ARABIC LETTER ZAH"), ("E", "ARABIC LETTER AIN"),
+    ("g", "ARABIC LETTER GHAIN"), ("f", "ARABIC LETTER FEH"),
+    ("q", "ARABIC LETTER QAF"), ("k", "ARABIC LETTER KAF"),
+    ("l", "ARABIC LETTER LAM"), ("m", "ARABIC LETTER MEEM"),
+    ("n", "ARABIC LETTER NOON"), ("h", "ARABIC LETTER HEH"),
+    ("w", "ARABIC LETTER WAW"), ("Y", "ARABIC LETTER ALEF MAKSURA"),
+    ("y", "ARABIC LETTER YEH"), ("F", "ARABIC FATHATAN"),
+    ("N", "ARABIC DAMMATAN"), ("K", "ARABIC KASRATAN"), ("a", "ARABIC FATHA"),
+    ("u", "ARABIC DAMMA"), ("i", "ARABIC KASRA"), ("~", "ARABIC SHADDA"),
+    ("o", "ARABIC SUKUN"), ("_", "ARABIC TATWEEL"),
+    ("{", "ARABIC LETTER ALEF WASLA"), ("`", "ARABIC LETTER SUPERSCRIPT ALEF"),
+]
+BUCKWALTER_LETTER = {code: unicodedata.lookup(name) for code, name in BUCKWALTER_ROWS}
+ARABIC_LETTERS = set(BUCKWALTER_LETTER.values())
+
+# Arabic Presentation Forms-A and -B whose compatibility decomposition is
+# made of the letters above. Each is a second spelling of those letters.
+PRESENTATION_FORMS = {
+    chr(cp): unicodedata.normalize("NFKC", chr(cp))
+    for cp in (*range(0xFB50, 0xFE00), *range(0xFE70, 0xFF00))
+    if unicodedata.normalize("NFKC", chr(cp)) != chr(cp)
+    and set(unicodedata.normalize("NFKC", chr(cp))) <= ARABIC_LETTERS
+}
+
+
+def direct_failures(forward, back, inventory, target):
+    """The symbols of *inventory* that fail the ``NotationInfo`` test."""
+    failures = []
+    for symbol, expected in inventory.items():
+        try:
+            out = forward(symbol, errors="strict")
+            if not set(out) <= target or back(out, errors="strict") != expected:
+                failures.append(symbol)
+        except UnknownSymbolError:
+            failures.append(symbol)
+    return failures
+
+
+def direct_edge(src, dst):
+    from scriptconv.graph import DEFAULT_GRAPH
+    return next(e for e in DEFAULT_GRAPH._edges[src] if e.dst == dst)
+
+
+@pytest.mark.parametrize("code, name", BUCKWALTER_ROWS)
+def test_buckwalter_value_matches_the_cited_scheme(code, name):
+    assert notation.buckwalter_to_arabic(code, errors="strict") == unicodedata.lookup(name)
+
+
+def test_buckwalter_to_arabic_edge_is_the_measured_round_trip():
+    inventory = {code: code for code in BUCKWALTER_LETTER}
+    target = ARABIC_LETTERS
+    failures = direct_failures(notation.buckwalter_to_arabic,
+                               notation.arabic_to_buckwalter, inventory, target)
+    assert direct_edge("buckwalter", "arabic").lossless is (not failures)
+
+
+def test_arabic_to_buckwalter_edge_is_the_measured_round_trip():
+    inventory = {letter: letter for letter in ARABIC_LETTERS} | PRESENTATION_FORMS
+    target = set("".join(BUCKWALTER_LETTER))
+    failures = direct_failures(notation.arabic_to_buckwalter,
+                               notation.buckwalter_to_arabic, inventory, target)
+    assert failures == []
+    assert direct_edge("arabic", "buckwalter").lossless is True
+
+
+@pytest.mark.parametrize("form, name, spelling", [
+    ("ﻵ", "LAM WITH ALEF WITH MADDA ABOVE ISOLATED", "l|"),
+    ("ﻶ", "LAM WITH ALEF WITH MADDA ABOVE FINAL", "l|"),
+    ("ﻷ", "LAM WITH ALEF WITH HAMZA ABOVE ISOLATED", "l>"),
+    ("ﻸ", "LAM WITH ALEF WITH HAMZA ABOVE FINAL", "l>"),
+    ("ﻹ", "LAM WITH ALEF WITH HAMZA BELOW ISOLATED", "l<"),
+    ("ﻺ", "LAM WITH ALEF WITH HAMZA BELOW FINAL", "l<"),
+    ("ﻻ", "LAM WITH ALEF ISOLATED", "lA"),
+    ("ﻼ", "LAM WITH ALEF FINAL", "lA"),
+])
+def test_lam_alef_ligature_takes_the_spelling_of_its_letters(form, name, spelling):
+    assert unicodedata.name(form) == f"ARABIC LIGATURE {name} FORM"
+    assert notation.arabic_to_buckwalter(form, errors="strict") == spelling
 
 
 # ---------------------------------------------------------------------------
