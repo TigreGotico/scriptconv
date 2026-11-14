@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a85](https://github.com/TigreGotico/scriptconv/tree/0.0.4a85) (2026-11-14)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a84...0.0.4a85)
+
+**Merged pull requests:**
+
+- fix\(frontend\): one space around a block and keep the mark after it [\#236](https://github.com/TigreGotico/scriptconv/pull/236) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a84](https://github.com/TigreGotico/scriptconv/tree/0.0.4a84) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a83...0.0.4a84)
