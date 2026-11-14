@@ -1,5 +1,53 @@
 # Changelog
 
+## [0.0.4a81](https://github.com/TigreGotico/scriptconv/tree/0.0.4a81) (2026-11-14)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a80...0.0.4a81)
+
+**Merged pull requests:**
+
+- fix\(notation\): strict refuses a stressed syllabic consonant; measure the kana and strip edges [\#200](https://github.com/TigreGotico/scriptconv/pull/200) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.0.4a80](https://github.com/TigreGotico/scriptconv/tree/0.0.4a80) (2026-11-14)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a79...0.0.4a80)
+
+**Merged pull requests:**
+
+- fix\(phonemizers\): break a Preferred-Value tie by the requested code [\#231](https://github.com/TigreGotico/scriptconv/pull/231) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a79](https://github.com/TigreGotico/scriptconv/tree/0.0.4a79) (2026-11-14)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a78...0.0.4a79)
+
+**Merged pull requests:**
+
+- fix: with keep\_punctuation off, phonemize\_to\_list returns the joined synthesis chunks [\#225](https://github.com/TigreGotico/scriptconv/pull/225) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a78](https://github.com/TigreGotico/scriptconv/tree/0.0.4a78) (2026-11-14)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a77...0.0.4a78)
+
+**Merged pull requests:**
+
+- docs\(diacritics\): state the strip NFD claim and the §325 citation exactly [\#230](https://github.com/TigreGotico/scriptconv/pull/230) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a77](https://github.com/TigreGotico/scriptconv/tree/0.0.4a77) (2026-11-14)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a76...0.0.4a77)
+
+**Merged pull requests:**
+
+- fix\(diacritics\): keep the acute of Macedonian ѓ and ќ in NFD text [\#228](https://github.com/TigreGotico/scriptconv/pull/228) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a76](https://github.com/TigreGotico/scriptconv/tree/0.0.4a76) (2026-11-14)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a75...0.0.4a76)
+
+**Merged pull requests:**
+
+- fix\(phonemizers\): remove the stress marks that goruut cannot read [\#207](https://github.com/TigreGotico/scriptconv/pull/207) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a75](https://github.com/TigreGotico/scriptconv/tree/0.0.4a75) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a74...0.0.4a75)
@@ -360,18 +408,9 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a28...0.0.4a29)
 
-**Merged pull requests:**
-
-- fix\(tests\): make the ARPA property test deterministic, and name the GOAT residue [\#123](https://github.com/TigreGotico/scriptconv/pull/123) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-- feat: ghana-g2p phonemizer backend [\#122](https://github.com/TigreGotico/scriptconv/pull/122) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a28](https://github.com/TigreGotico/scriptconv/tree/0.0.4a28) (2026-09-17)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a27...0.0.4a28)
-
-**Merged pull requests:**
-
-- chore\(deps\): refresh the vendored africa-g2p copy to v0.2.4 [\#121](https://github.com/TigreGotico/scriptconv/pull/121) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a27](https://github.com/TigreGotico/scriptconv/tree/0.0.4a27) (2026-09-16)
 
@@ -381,10 +420,6 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a25...0.0.4a26)
 
-**Merged pull requests:**
-
-- fix: keep punctuation between digits so clock times and decimals reach the phonemizer [\#118](https://github.com/TigreGotico/scriptconv/pull/118) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [0.0.4a25](https://github.com/TigreGotico/scriptconv/tree/0.0.4a25) (2026-09-03)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a24...0.0.4a25)
@@ -392,10 +427,6 @@
 ## [0.0.4a24](https://github.com/TigreGotico/scriptconv/tree/0.0.4a24) (2026-09-03)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a23...0.0.4a24)
-
-**Merged pull requests:**
-
-- fix: keep digit:digit tokens such as clock times in one chunk [\#115](https://github.com/TigreGotico/scriptconv/pull/115) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a23](https://github.com/TigreGotico/scriptconv/tree/0.0.4a23) (2026-08-15)
 

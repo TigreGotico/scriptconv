@@ -126,9 +126,11 @@ class TestStageOrder:
         backend = Echo()
         frontend = build(backend, normalizer=stages.normalize,
                          stages=Stages(diacritize=True, casing=stages.casing))
-        assert frontend.phonemize_flat("ab. cd.") == list("dNAB. CD.")
+        # the stages read the text whole; the backend reads each chunk
+        # without its punctuation, as synthesis does
+        assert frontend.phonemize_flat("ab. cd.") == list("dNAB CD")
         assert stages.stage_names() == ["normalize", "casing", "diacritize"]
-        assert backend.read == [("dNAB. CD.", "xx")]
+        assert backend.read == [("dNAB", "xx"), ("CD", "xx")]
 
     def test_prepare_runs_the_same_stages_as_phonemize(self, monkeypatch):
         stages = Recorder(monkeypatch)
@@ -174,7 +176,7 @@ class TestInlineBlocks:
         stages = Recorder(monkeypatch)
         frontend = build(Echo(), normalizer=stages.normalize, stages=Stages(diacritize=False))
         assert frontend.phonemize_flat("ab [[xy]] cd") == (
-            list("nab ") + [" ", "x", "y", " "] + list("n cd"))
+            list("nab") + [" ", "x", "y", " "] + list("n cd"))
         assert [entry[1] for entry in stages.log] == ["ab ", " cd"]
 
     def test_the_split_matches_the_block_pattern(self):
