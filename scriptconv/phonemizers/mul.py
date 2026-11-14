@@ -247,13 +247,17 @@ class CharsiuPhonemizer(ByT5Phonemizer):
                   'tam', 'tat', 'tha', 'tur', 'tuk', 'ukr', 'vie-n', 'vie-c', 'vie-s', 'wel-nw', 'wel-sw', 'ice', 'ang',
                   'gle', 'enm', 'syc', 'glg', 'sme', 'egy']
     # BCP-47 tags for the labels whose code does not name the script of their
-    # CharsiuG2P data. dicts/srp.tsv is Serbian in Cyrillic (eSpeak NG over a
-    # Leipzig word list), so a Serbian request in Cyrillic picks it over the
-    # Serbo-Croatian WikiPron list dicts/hbs-cyrl.tsv. dicts/zho-s.tsv and
-    # dicts/zho-t.tsv are ipa-dict zh_hans and zh_hant. dicts/kur.tsv is the
-    # AsoSoft Central Kurdish data, "Central Kurdish words in Standard Arabic
-    # script", which a Kurmanji request in Latin script must not reach.
-    MATCH_TAGS = {"srp": "sr-Cyrl", "zho-s": "zh-Hans", "zho-t": "zh-Hant", "kur": "ckb"}
+    # CharsiuG2P data. dicts/srp.tsv is Serbian in Cyrillic, eSpeak NG output
+    # over a word list (the CharsiuG2P README says some word lists come from
+    # the Leipzig Corpora Collection). Its tag ties with hbs-cyrl, the WikiPron
+    # Serbo-Croatian list, so a Serbian request in Cyrillic picks srp only
+    # because srp comes first in BYT5_LANGS. dicts/zho-s.tsv and dicts/zho-t.tsv
+    # are ipa-dict Mandarin in Simplified and Traditional script. Their cmn
+    # tags keep Cantonese, Hokkien and the other Chinese languages away from
+    # them. dicts/kur.tsv is the AsoSoft Central Kurdish data, "Central Kurdish
+    # words in Standard Arabic script", which a Kurmanji request in Latin
+    # script must not reach.
+    MATCH_TAGS = {"srp": "sr-Cyrl", "zho-s": "cmn-Hans", "zho-t": "cmn-Hant", "kur": "ckb"}
 
     def __init__(self, model: Optional[str] = None, tokenizer_config: Optional[str] = None,
                  providers: Optional[Sequence[ProviderSpec]] = None,
@@ -287,8 +291,8 @@ class CharsiuPhonemizer(ByT5Phonemizer):
         """
         if _is_hk_cantonese(target_lang):
             return "yue"
-        if target_lang in cls.BYT5_LANGS:
-            return target_lang
+        if target_lang.lower() in cls.BYT5_LANGS:
+            return target_lang.lower()
         tags = {cls.MATCH_TAGS.get(label, label): label for label in cls.BYT5_LANGS}
         return tags[cls.match_lang(target_lang, list(tags))]
 
