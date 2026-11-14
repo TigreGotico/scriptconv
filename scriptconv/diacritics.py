@@ -56,21 +56,23 @@ A stress mark and a letter-forming mark can be the same codepoint. In NFD text
 the Macedonian letters ѓ and ќ are г and к followed by U+0301, the codepoint
 stressonnx uses for stress. Strip keeps an acute or grave when it composes (NFC)
 with the letter before it into a letter of the language's alphabet, and removes
-it otherwise. A kept mark is written composed with its letter, so NFD ѓ and ќ
-come out as the same precomposed letters that NFC input gives. Unicode has eight
-Cyrillic letters whose NFD form ends in U+0300 or U+0301 (ѐ ѓ ќ ѝ and their
-capitals), and no Armenian or Georgian letter of that kind:
+it otherwise. A kept mark is written composed with its letter. So when U+0301
+comes right after г or к, as in NFD ѓ and ќ, strip writes the precomposed
+letter that NFC input gives. Unicode has eight Cyrillic letters whose NFD form
+ends in U+0300 or U+0301 (ѐ ѓ ќ ѝ and their capitals), and no Armenian or
+Georgian letter of that kind:
 
 - Macedonian: the 31-letter alphabet includes ѓ and ќ (Институт за македонски
   јазик „Крсте Мисирков“, Правопис на македонскиот јазик, 2nd ed., Skopje
   2017, §1, p. 3). Strip keeps these letters.
-- Macedonian ѐ and ѝ, as in сѐ, нѐ and the pronoun ѝ, are е and и with a
-  supralinear sign that tells homographs apart; the Pravopis lists them as a
-  sign (§325, p. 141), not as letters. In Bulgarian the grave over и and е is
-  the usual stress mark (Институт за български език при БАН, Езикови справки,
-  „Ударение“: промѝл, процѐнт, тѐстова), and the same sign writes the pronoun
-  ѝ. Strip removes a combining grave in both languages, as it does any other
-  stress mark.
+- Macedonian ѐ and ѝ are е and и with a supralinear sign, and the Pravopis
+  lists that sign, not these letters (§325, p. 141): „Надреден знак (`) се
+  става над е во кратката заменска форма нѐ, над и во кратката заменска форма
+  ѝ и во количествената заменска форма сѐ“. In Bulgarian the grave over и
+  and е is the usual stress mark (Институт за български език при БАН, Езикови
+  справки, „Ударение“: промѝл, процѐнт, тѐстова), and the same sign writes the
+  pronoun ѝ. Strip removes a combining grave in both languages, as it does
+  any other stress mark.
 - Latvian writes no letter with an acute or grave (Kalnača & Lokmane, Latvian
   Grammar, University of Latvia Press 2021, p. 20). A Latin vowel with a
   stress acute composes to a precomposed form such as á, but á is not a
@@ -507,10 +509,12 @@ def strip_diacritics(text: str, lang: str = "und", **_) -> str:
     stress, tashkeel for Arabic, niqqud for Hebrew) — precomposed native
     letters (Cyrillic й/ё, Latvian ī, Azerbaijani ç, Arabic hamza carriers) are
     left intact. A mark that composes with the letter before it into a letter
-    of the language's alphabet is kept too, composed with that letter, so NFD
-    Macedonian ѓ and ќ come out precomposed, as NFC input does. Raises :class:`ValueError` for languages whose
-    diacritics are part of the native orthography (e.g. European Portuguese),
-    where any removal would corrupt the spelling.
+    of the language's alphabet is kept too, composed with that letter. So when
+    U+0301 comes right after г or к, as in NFD ѓ and ќ, strip writes the
+    precomposed letter that NFC input gives. Raises
+    :class:`ValueError` for languages whose diacritics are part of the native
+    orthography (e.g. European Portuguese), where any removal would corrupt
+    the spelling.
     """
     marks = _overlay_marks(lang)
     if marks is None:

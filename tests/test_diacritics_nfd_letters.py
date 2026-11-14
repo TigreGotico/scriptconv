@@ -57,6 +57,12 @@ def test_second_acute_after_a_letter_acute_is_removed():
     assert strip_diacritics(GJE + ACUTE, "mk") == GJE
 
 
+def test_mark_at_text_start_is_removed():
+    # No letter precedes the mark, so nothing can compose with it.
+    assert strip_diacritics(ACUTE + GHE, "mk") == GHE
+    assert strip_diacritics(GRAVE, "mk") == ""
+
+
 def test_grave_after_gje_base_is_removed():
     # г + grave composes to no letter, so it is a stress mark.
     assert strip_diacritics(GHE + GRAVE + "\u0430", "mk") == GHE + "\u0430"
