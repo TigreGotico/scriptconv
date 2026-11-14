@@ -209,11 +209,12 @@ class TextFrontend:
     def phonemize_flat(self, text: str, stages: Optional[Stages] = None) -> List[str]:
         """Phonemes of *text* as one list, for training.
 
-        The text is not split into sentences. The backend's
-        ``phonemize_to_list`` reads each piece of text between blocks, so a
-        space separates a sentence that ends with no symbol from the next one,
-        as :func:`~scriptconv.phonemizers.base.join_sentences` joins them. No
-        sentence of :meth:`phonemize` starts with that space.
+        The stages read each piece of text between blocks whole, and the
+        backend's ``phonemize_to_list`` joins the sentences of that piece by
+        the rule of :func:`~scriptconv.phonemizers.base.join_sentences`. The
+        text after a block starts a new sentence, as in :meth:`phonemize`, so
+        one space separates the block from it, unless the block ends in a
+        space. No sentence of :meth:`phonemize` starts with that space.
         """
         stages = self._resolve(stages)
         parts = _split_blocks(text)
@@ -225,6 +226,8 @@ class TextFrontend:
                 part = self._run_stages(part, stages)
                 read = self.backend.phonemize_to_list(part, stages.lang)
                 self._check_read(part, read, stages)
+                if read and phonemes and phonemes[-1] != " ":
+                    phonemes.append(" ")
                 phonemes.extend(read)
         return phonemes
 

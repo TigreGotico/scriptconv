@@ -155,12 +155,14 @@ Diacritization is also exposed as a graph transform, via
 `scriptconv.diacritics.register`, parallel to the phonemization edge above,
 it adds a lang-contextual `text-diacritized` node and two edges: `text ->
 text-diacritized` (restore, wrapping `add_diacritics`, model-based and
-expensive) and `text-diacritized -> text` (strip, cheap and lossless). Strip
+expensive) and `text-diacritized -> text` (strip, cheap). Neither edge is
+lossless: strip maps a letter with a mark and the bare letter to one string. Strip
 removes only the specific overlay codepoints each backend adds, combining
 acute/grave for stress, tashkeel for Arabic, niqqud for Hebrew, never a
 blanket combining-mark filter, so precomposed native letters (Cyrillic й/ё,
 Latvian macrons, Azerbaijani ç/ö, Arabic hamza carriers) are left intact.
-That cost asymmetry is why routing never takes the round trip unless asked.
+A cheapest path never visits a node twice, so routing never takes the round
+trip unless asked.
 Strip only works for *overlay* diacritics, Arabic/Hebrew vocalization and
 East-Slavic/Turkic/Caucasian stress, whose bare form carries no marks, gated
 by exact primary-subtag match, and raises `ValueError` for languages where

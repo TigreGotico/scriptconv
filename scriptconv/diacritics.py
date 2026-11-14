@@ -51,9 +51,36 @@ corrupting the spelling (``café`` must never become ``cafe``). This split
 tracks which backend/model produced the marks: overlay backends (phonikud,
 tashkeel, stressonnx) are strippable; spelling-integral backends (bifonia) are
 not.
+
+A stress mark and a letter-forming mark can be the same codepoint. In NFD text
+the Macedonian letters ѓ and ќ are г and к followed by U+0301, the codepoint
+stressonnx uses for stress. Strip keeps an acute or grave when it composes (NFC)
+with the letter before it into a letter of the language's alphabet, and removes
+it otherwise. A kept mark is written composed with its letter. So when U+0301
+comes right after г or к, as in NFD ѓ and ќ, strip writes the precomposed
+letter that NFC input gives. Unicode has eight Cyrillic letters whose NFD form
+ends in U+0300 or U+0301 (ѐ ѓ ќ ѝ and their capitals), and no Armenian or
+Georgian letter of that kind:
+
+- Macedonian: the 31-letter alphabet includes ѓ and ќ (Институт за македонски
+  јазик „Крсте Мисирков“, Правопис на македонскиот јазик, 2nd ed., Skopje
+  2017, §1, p. 3). Strip keeps these letters.
+- Macedonian ѐ and ѝ are е and и with a supralinear sign, and the Pravopis
+  lists that sign, not these letters (§325, p. 141): „Надреден знак (`) се
+  става над е во кратката заменска форма нѐ, над и во кратката заменска форма
+  ѝ и во количествената заменска форма сѐ“. In Bulgarian the grave over и
+  and е is the usual stress mark (Институт за български език при БАН, Езикови
+  справки, „Ударение“: промѝл, процѐнт, тѐстова), and the same sign writes the
+  pronoun ѝ. Strip removes a combining grave in both languages, as it does
+  any other stress mark.
+- Latvian writes no letter with an acute or grave (Kalnača & Lokmane, Latvian
+  Grammar, University of Latvia Press 2021, p. 20). A Latin vowel with a
+  stress acute composes to a precomposed form such as á, but á is not a
+  Latvian letter, so strip removes the acute.
 """
 import os
 import tempfile
+import unicodedata
 import urllib.request
 from pathlib import Path
 from typing import Optional
@@ -444,6 +471,10 @@ _ARABIC_MARKS = frozenset(range(0x064B, 0x0660)) | frozenset({0x0670})  # tashke
 _HEBREW_MARKS = (frozenset(range(0x05B0, 0x05BE))
                  | frozenset({0x05BF, 0x05C1, 0x05C2, 0x05C4, 0x05C5, 0x05C7}))  # niqqud
 
+# Letters of a stress-family alphabet whose NFD form ends in a stress-mark
+# codepoint, by primary subtag. Sources are in the module docstring.
+_NATIVE_ACCENTED_LETTERS = {"mk": frozenset("ЃѓЌќ")}
+
 
 def _overlay_marks(lang: str) -> "frozenset | None":
     """The overlay codepoints for *lang*'s diacritization backend, or None.
@@ -477,9 +508,13 @@ def strip_diacritics(text: str, lang: str = "und", **_) -> str:
     Removes only the specific overlay codepoints (combining acute/grave for
     stress, tashkeel for Arabic, niqqud for Hebrew) — precomposed native
     letters (Cyrillic й/ё, Latvian ī, Azerbaijani ç, Arabic hamza carriers) are
-    left intact. Raises :class:`ValueError` for languages whose diacritics are
-    part of the native orthography (e.g. European Portuguese), where any removal
-    would corrupt the spelling.
+    left intact. A mark that composes with the letter before it into a letter
+    of the language's alphabet is kept too, composed with that letter. So when
+    U+0301 comes right after г or к, as in NFD ѓ and ќ, strip writes the
+    precomposed letter that NFC input gives. Raises
+    :class:`ValueError` for languages whose diacritics are part of the native
+    orthography (e.g. European Portuguese), where any removal would corrupt
+    the spelling.
     """
     marks = _overlay_marks(lang)
     if marks is None:
@@ -488,7 +523,16 @@ def strip_diacritics(text: str, lang: str = "und", **_) -> str:
             "part of the native orthography, so removal would corrupt the "
             "spelling. strip is defined only for overlay diacritics "
             "(Arabic/Hebrew vocalization, East-Slavic/Turkic stress).")
-    return "".join(c for c in text if ord(c) not in marks)
+    native = _NATIVE_ACCENTED_LETTERS.get(_primary_subtag(lang), frozenset())
+    kept = []
+    for c in text:
+        if ord(c) not in marks:
+            kept.append(c)
+            continue
+        composed = unicodedata.normalize("NFC", kept[-1] + c) if kept else c
+        if composed in native:
+            kept[-1] = composed
+    return "".join(kept)
 
 
 def register(graph) -> None:
@@ -500,9 +544,10 @@ def register(graph) -> None:
     :func:`scriptconv.phonemizers.register` to make
     ``"text-diacritized" -> "ipa"`` reachable.
 
-    ``text-diacritized -> text`` (:func:`strip_diacritics`) is lossless and
-    cheap, but gated: it raises for languages whose diacritics are native
-    orthography rather than removable overlays.
+    ``text-diacritized -> text`` (:func:`strip_diacritics`) is cheap but not
+    lossless: a letter with a mark and the bare letter strip to one string, so
+    no reverse returns both.  It is gated: it raises for languages whose
+    diacritics are native orthography rather than removable overlays.
     """
     graph.register(
         Edge("text", DIACRITIZED,
@@ -512,4 +557,4 @@ def register(graph) -> None:
     graph.register(
         Edge(DIACRITIZED, "text",
              lambda text, lang="und", **_: strip_diacritics(text, lang),
-             lossless=True))
+             lossless=False))
