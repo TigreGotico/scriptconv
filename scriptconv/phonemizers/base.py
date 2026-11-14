@@ -46,6 +46,11 @@ PhonemizedChunks = list[list[str]]
 CLAUSE_PUNCTUATION = {".": ".", "?": "?", "!": "!", ",": ",", ":": ":", ";": ";",
                       "\u060c": ",", "\u061b": ";", "\u061f": "?"}
 _PAUSE_PUNCTUATION = {",", ":", ";"}
+# A sentence that ends in a symbol, or in the space after one, joins the next
+# sentence with no space, as Piper flattens its sentences. A sentence that ends
+# with no symbol, as one the sentence tokenizer ends at "...", is followed by a
+# space, so its last word stays apart from the first word of the next sentence.
+_JOINING_ENDS = frozenset(CLAUSE_PUNCTUATION.values()) | {" "}
 # A clause ends at punctuation followed by whitespace, as in espeak-ng, so the
 # "," in "10,4" or the ":" in "16:30" never splits. A lone "." is left to the
 # sentence tokenizer, which knows abbreviations; inside a sentence an ellipsis
@@ -277,7 +282,8 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         the backend sees the same words in training and in synthesis, and the
         clause's symbol is appended after it: bare for ``. ? !``, followed by a
         space for ``, : ;``. A space also separates a clause from the next one
-        in the same sentence, after any symbol or none.
+        in the same sentence, after any symbol or none, and it starts a
+        sentence that follows one with no symbol.
         """
         try:
             from quebra_frases import sentence_tokenize
@@ -285,6 +291,7 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
             raise ImportError(
                 "sentence chunking needs quebra-frases — install with "
                 "`pip install scriptconv[phonemizers]`") from None
+        previous: List[str] = []
         for sentence in sentence_tokenize(text):
             phonemes: List[str] = []
             for clause, mark in split_clauses(sentence):
@@ -304,6 +311,9 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
                     if mark in _PAUSE_PUNCTUATION:
                         phonemes.append(" ")
             if phonemes:
+                if previous and previous[-1] not in _JOINING_ENDS:
+                    phonemes.insert(0, " ")
+                previous = phonemes
                 yield phonemes
 
     @staticmethod
@@ -401,9 +411,13 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         time "16:30", the "," in "10,4", the "." in "92.073", the "-" in "1139-1185")
         is preserved so the per-language normalizers still see it as a single token,
         matching the digit:digit exemption in ``chunk_text``.
+
+        A ``!`` or ``?`` between two letters, as in "Sim!Não", still separates
+        two words, so it becomes a space.
         """
         out = []
         chars = list(text)
+        separates = False
         for i, c in enumerate(chars):
             if c in ("'", "’", "-") and 0 < i < len(chars) - 1 and chars[i + 1].isalpha():
                 # a letter may carry combining marks, such as a stress mark (U+0301)
@@ -412,6 +426,20 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
                     letter -= 1
                 if chars[letter].isalpha():
                     out.append(c)
+                    continue
+            if c in "!?":
+                if i == 0 or chars[i - 1] not in "!?":
+                    end = i
+                    while end < len(chars) and chars[end] in "!?":
+                        end += 1
+                    letter = i - 1
+                    while letter > 0 and unicodedata.category(chars[letter]).startswith("M"):
+                        letter -= 1
+                    separates = (i > 0 and chars[letter].isalpha()
+                                 and end < len(chars) and chars[end].isalpha())
+                    if separates:
+                        out.append(" ")
+                if separates:
                     continue
             if 0 < i < len(chars) - 1 \
                     and chars[i - 1].isdigit() and chars[i + 1].isdigit():

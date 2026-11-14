@@ -480,6 +480,17 @@ class TestBackends:
         plain = TextFrontend(FrontendConfig("xx", Phonemizer.UNICODE))
         assert plain.phonemize("ab, cd.", Stages(diacritize=False)) == [list("ab cd")]
 
+    def test_a_sentence_with_no_symbol_keeps_its_last_word_apart(self):
+        kept = TextFrontend(FrontendConfig("pt", Phonemizer.GRAPHEMES, keep_punctuation=True,
+                                           stages=Stages(diacritize=False)))
+        assert kept.phonemize_flat("Espera... vamos.") == list("espera vamos.")
+        assert kept.phonemize("Espera... vamos.") == [list("espera"), list(" vamos.")]
+        assert kept.phonemize_flat("Sim? Não.") == list("sim?não.")
+        assert kept.phonemize("Sim? Não.") == [list("sim?"), list("não.")]
+        plain = TextFrontend(FrontendConfig("pt", Phonemizer.GRAPHEMES,
+                                            stages=Stages(diacritize=False)))
+        assert plain.phonemize("Espera... vamos.") == [list("espera"), list("vamos")]
+
     def test_a_given_backend_is_not_changed(self):
         given = get_phonemizer(Phonemizer.UNICODE)
         frontend = TextFrontend(FrontendConfig("xx", keep_punctuation=True,
