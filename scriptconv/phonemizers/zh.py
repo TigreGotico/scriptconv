@@ -241,8 +241,12 @@ class G2pCPhonemizer(BaseChinesePinyinPhonemizer):
             from g2pc import G2pC
         except ImportError:
             raise ImportError(
-                "g2pc phonemization needs g2pc — install with "
-                "`pip install scriptconv[zh-phonemizers]`"
+                "g2pc phonemization needs g2pc, and no scriptconv extra can "
+                "install it. g2pc needs pkuseg, which has wheels for CPython "
+                "3.5 to 3.8 only. The pkuseg sdist imports numpy in its "
+                "setup.py and does not declare numpy as a build dependency, "
+                "so an isolated build fails. Run 'pip install numpy cython "
+                "setuptools', then 'pip install --no-build-isolation g2pc'."
             ) from None
         self.g2p = G2pC()
         super().__init__(alphabet, jieba)

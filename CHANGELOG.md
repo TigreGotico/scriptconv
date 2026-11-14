@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.0.4a82](https://github.com/TigreGotico/scriptconv/tree/0.0.4a82) (2026-11-14)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a81...0.0.4a82)
+
+**Merged pull requests:**
+
+- fix\(phonemizers\): stop transphone pip installs, correct the ko errors and alphabet [\#198](https://github.com/TigreGotico/scriptconv/pull/198) ([JarbasAl](https://github.com/JarbasAl))
+- fix\(zh\): install numpy for g2pM, and say how g2pc installs [\#181](https://github.com/TigreGotico/scriptconv/pull/181) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a81](https://github.com/TigreGotico/scriptconv/tree/0.0.4a81) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a80...0.0.4a81)
@@ -364,17 +373,9 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a34...0.0.4a35)
 
-**Merged pull requests:**
-
-- fix: let africa-g2p's region-suffixed rule files be selected by name [\#128](https://github.com/TigreGotico/scriptconv/pull/128) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a34](https://github.com/TigreGotico/scriptconv/tree/0.0.4a34) (2026-09-26)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a33...0.0.4a34)
-
-**Merged pull requests:**
-
-- fix: EspeakPhonemizer.get\_lang reads a BCP-47 tag whatever its case [\#129](https://github.com/TigreGotico/scriptconv/pull/129) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a33](https://github.com/TigreGotico/scriptconv/tree/0.0.4a33) (2026-09-26)
 
@@ -395,10 +396,6 @@
 ## [0.0.4a31](https://github.com/TigreGotico/scriptconv/tree/0.0.4a31) (2026-09-23)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a30...0.0.4a31)
-
-**Merged pull requests:**
-
-- feat\(phonemizers\): a Phonetisaurus backend, registry entry and tests [\#130](https://github.com/TigreGotico/scriptconv/pull/130) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a30](https://github.com/TigreGotico/scriptconv/tree/0.0.4a30) (2026-09-17)
 

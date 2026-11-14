@@ -125,7 +125,10 @@ class TestLazyBackendImportsAreFriendly(unittest.TestCase):
             self._assert_friendly(Phonemizer.VIPHONEME)
 
     def test_g2pk(self):
-        self._assert_friendly(Phonemizer.G2PK)
+        # Below Python 3.13 the message names scriptconv[ko]. The 3.13
+        # message is checked in test_phonemizers_cjk_ar.py.
+        with patch("sys.version_info", (3, 12, 9)):
+            self._assert_friendly(Phonemizer.G2PK)
 
     def test_jieba(self):
         self._assert_friendly(Phonemizer.JIEBA)

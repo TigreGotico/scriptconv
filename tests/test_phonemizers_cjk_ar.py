@@ -1,3 +1,5 @@
+import sys
+import unicodedata
 import unittest
 
 from scriptconv.phonemizers import Phonemizer, get_phonemizer_class
@@ -16,6 +18,54 @@ class TestVendoredKorean(unittest.TestCase):
         from scriptconv.phonemizers import _thirdparty
         tables = os.path.join(os.path.dirname(_thirdparty.__file__), "ko_tables")
         self.assertTrue(os.path.isfile(os.path.join(tables, "ipa.csv")))
+
+
+class TestG2PKOnPython313(unittest.TestCase):
+    """scriptconv[ko] installs g2pk only below Python 3.13, because
+    python-mecab-ko has wheels up to CPython 3.12 only. On 3.13 and later,
+    pip builds python-mecab-ko from its sdist, which needs mecab-config
+    from an installed MeCab-ko."""
+
+    def _message(self, version_info):
+        from unittest.mock import patch
+        from scriptconv.phonemizers.ko import G2PKPhonemizer
+        with patch.dict(sys.modules, {"g2pk": None}), \
+                patch.object(sys, "version_info", version_info):
+            with self.assertRaises(ImportError) as ctx:
+                G2PKPhonemizer()
+        return str(ctx.exception)
+
+    def test_313_says_to_install_mecab_ko_first_not_the_extra(self):
+        message = self._message((3, 13, 0, "final", 0))
+        self.assertIn("mecab-config", message)
+        self.assertIn("'pip install g2pk'", message)
+        self.assertNotIn("Python 3.12 or older", message)
+        self.assertNotIn("scriptconv[ko]", message)
+
+    def test_312_names_the_extra(self):
+        self.assertIn("scriptconv[ko]", self._message((3, 12, 0, "final", 0)))
+
+
+class TestMisakiKoreanAlphabet(unittest.TestCase):
+    """misaki's KOG2P writes the pronunciation in Hangul, not IPA.
+
+    Wikipedia, "Korean phonology", revision 1374882945, section "Consonant
+    assimilation": a velar stop becomes [ŋ] before a nasal stop, and
+    한국말 is pronounced 한궁말. KOG2P writes conjoining jamo, which is the
+    NFD form of the Hangul syllables.
+    """
+
+    def test_ipa_is_refused(self):
+        with self.assertRaises(ValueError):
+            get_phonemizer(Phonemizer.MISAKI_KO, Alphabet.IPA)
+
+    @unittest.skipIf(sys.version_info >= (3, 13), "misaki declares Requires-Python <3.13")
+    def test_output_is_the_pronunciation_in_hangul(self):
+        from scriptconv.phonemizers.mul import MisakiKoPhonemizer
+        p = MisakiKoPhonemizer()
+        self.assertEqual(p.alphabet, Alphabet.HANGUL)
+        self.assertEqual(p.phonemize_string("한국말", "ko"),
+                         unicodedata.normalize("NFD", "한궁말"))
 
 
 class TestVendoredChinese(unittest.TestCase):
@@ -206,9 +256,39 @@ class TestZhBackendFriendlyImportErrors(unittest.TestCase):
         from scriptconv.phonemizers.zh import G2pMPhonemizer
         self._assert_friendly("g2pM", G2pMPhonemizer, "zh-phonemizers")
 
-    def test_g2pc_missing_dep_message(self):
+    def test_g2pc_missing_dep_message_gives_the_install_that_works(self):
+        # g2pc needs pkuseg, and PyPI has pkuseg wheels for CPython 3.5 to
+        # 3.8 only. The pkuseg sdist builds when numpy, Cython and setuptools
+        # are installed first and build isolation is off. An extra cannot
+        # do that, so the message gives the two commands.
+        import sys
+        from unittest.mock import patch
         from scriptconv.phonemizers.zh import G2pCPhonemizer
-        self._assert_friendly("g2pc", G2pCPhonemizer, "zh-phonemizers")
+        with patch.dict(sys.modules, {"g2pc": None}):
+            with self.assertRaises(ImportError) as ctx:
+                G2pCPhonemizer()
+        message = str(ctx.exception)
+        self.assertIn("pkuseg", message)
+        self.assertIn("CPython 3.5 to 3.8", message)
+        self.assertIn("'pip install numpy cython setuptools'", message)
+        self.assertIn("'pip install --no-build-isolation g2pc'", message)
+        self.assertNotIn("fails to build", message)
+        self.assertNotIn("scriptconv[", message)
+
+    def test_zh_phonemizers_extra_installs_numpy_for_g2pm(self):
+        # g2pM 0.1.2.5 imports numpy in g2pM/g2pM.py and declares no
+        # dependencies on PyPI, so the extra that installs g2pM must
+        # also install numpy.
+        import re
+        import tomllib
+        from pathlib import Path
+        pyproject = Path(__file__).resolve().parent.parent / "pyproject.toml"
+        extra = tomllib.loads(pyproject.read_text(encoding="utf-8"))[
+            "project"]["optional-dependencies"]["zh-phonemizers"]
+        names = {re.match(r"[A-Za-z0-9_.-]+", req).group(0).lower()
+                 for req in extra}
+        self.assertIn("g2pm", names)
+        self.assertIn("numpy", names)
 
     def test_pinyin_to_ipa_missing_dep_message(self):
         from scriptconv.phonemizers.zh import PypinyinPhonemizer
