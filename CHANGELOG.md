@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a79](https://github.com/TigreGotico/scriptconv/tree/0.0.4a79) (2026-11-14)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a78...0.0.4a79)
+
+**Merged pull requests:**
+
+- fix: with keep\_punctuation off, phonemize\_to\_list returns the joined synthesis chunks [\#225](https://github.com/TigreGotico/scriptconv/pull/225) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a78](https://github.com/TigreGotico/scriptconv/tree/0.0.4a78) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a77...0.0.4a78)
@@ -387,15 +395,10 @@
 **Merged pull requests:**
 
 - fix\(tests\): make the ARPA property test deterministic, and name the GOAT residue [\#123](https://github.com/TigreGotico/scriptconv/pull/123) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-- feat: ghana-g2p phonemizer backend [\#122](https://github.com/TigreGotico/scriptconv/pull/122) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a28](https://github.com/TigreGotico/scriptconv/tree/0.0.4a28) (2026-09-17)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a27...0.0.4a28)
-
-**Merged pull requests:**
-
-- chore\(deps\): refresh the vendored africa-g2p copy to v0.2.4 [\#121](https://github.com/TigreGotico/scriptconv/pull/121) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a27](https://github.com/TigreGotico/scriptconv/tree/0.0.4a27) (2026-09-16)
 
