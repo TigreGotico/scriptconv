@@ -12,6 +12,7 @@ from typing import List, Dict, Optional, Sequence, Tuple, TYPE_CHECKING
 if TYPE_CHECKING:
     import numpy as np
 
+from scriptconv.diacritics import _diacritizer_family, strip_diacritics
 from scriptconv.phonemizers.enums import Alphabet
 from scriptconv.phonemizers.base import BasePhonemizer, UnsupportedLanguageError, _check_alphabet
 # minimal ONNX session construction — scriptconv has no provider
@@ -928,6 +929,12 @@ class GoruutPhonemizer(BasePhonemizer):
         return cls.ISO639[lang]
 
     def phonemize_string(self, text: str, lang: str) -> str:
+        # goruut's dicts/<lang>/language.json maps give no stress symbol for a
+        # combining acute or grave, so a stress mark only leaves a source-script
+        # letter in the IPA or moves the vowel. dicts/arabic and dicts/hebrew3
+        # map tashkeel and niqqud, so those marks reach goruut unchanged.
+        if _diacritizer_family(lang) == "stress":
+            text = strip_diacritics(text, lang)
         lang = self.get_lang(lang)
         return str(self.pygoruut.phonemize(language=lang, sentence=text))
 

@@ -181,6 +181,30 @@ g.convert("sêde", "text-diacritized", "text", lang="pt")     # raises ValueErro
 `add_diacritics` remains the single dispatch point, the graph edge is a thin
 wrapper, not a second implementation.
 
+### Stress marks and goruut
+
+`GoruutPhonemizer` removes the stress marks of the `STRESS_LANGS` languages,
+the combining acute (U+0301) and grave (U+0300), before it calls goruut. It
+uses `strip_diacritics`, so precomposed letters such as й, ё and ā stay.
+
+goruut has no key that turns these marks into a stress symbol. In goruut
+v0.8.0, the maps in `dicts/<lang>/language.json` for Russian, Bulgarian,
+Macedonian, Kazakh, Armenian, Georgian, Slovene and Latvian have no key with
+an acute or a grave. The Ukrainian map has one acute key and the Belarusian
+map has three. Each gives a vowel without a stress symbol, for example `і́`
+gives `ʲi`.
+
+A stress mark that goruut does not map stays in the source script inside the
+IPA, or moves the vowel to the front of the word. So with goruut, the stress
+marks that `diacritize` adds for these languages have no effect.
+
+Arabic tashkeel and Hebrew niqqud reach goruut unchanged, because goruut
+reads them. In goruut v0.8.0, `dicts/arabic/language.json` has 154 keys with
+tashkeel (U+064B to U+0652), and `dicts/hebrew3/language.json`, which goruut
+uses for Hebrew, has 69 keys with niqqud. goruut reads `ثُبُوتٌ` as `θubuːt`
+and the bare `ثبوت` as `fbuːt`. goruut does not map every letter and mark
+pair, so some marked words keep an Arabic or Hebrew letter in the IPA.
+
 ## Model-backed engines: download policy
 
 ByT5 and Charsiu run large, licensed ONNX models. They require explicit local
