@@ -135,8 +135,8 @@ class ByT5Phonemizer(BasePhonemizer):
         phones = b''.join(phone_bytes).decode("utf-8", errors="ignore")
         return phones
 
-    @staticmethod
-    def _encode_text(text: str, lang: str) -> "np.ndarray":
+    @classmethod
+    def _encode_text(cls, text: str, lang: str) -> "np.ndarray":
         import numpy as np
         """
         Encodes input text and language into a numpy array suitable for the model.
@@ -149,7 +149,7 @@ class ByT5Phonemizer(BasePhonemizer):
         Returns:
             numpy.ndarray: A numpy array of encoded input IDs.
         """
-        lang = ByT5Phonemizer.get_lang(lang)  # match lang code
+        lang = cls.get_lang(lang)  # match lang code
         # Prepend language tag and encode the string to bytes
         encoded_bytes = f"<{lang}>: {text}".encode("utf-8")
         # Convert bytes to a list of integers, adding a shift to account for special tokens
