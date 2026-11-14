@@ -250,9 +250,13 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
     """
 
     strict: bool = False
-    """Raise :class:`UnreadTextError` for a token that the backend cannot read.
+    """Raise :class:`UnreadTextError` when a pinyin backend meets a syllable
+    that is not pinyin.
 
-    Off by default: the backend logs a warning and drops the token.
+    Only subclasses of
+    :class:`~scriptconv.phonemizers.zh.BaseChinesePinyinPhonemizer` read this
+    field, and only when they write IPA. With the field off, they log a
+    warning and drop the syllable. Every other backend ignores the field.
     :class:`~scriptconv.frontend.TextFrontend` sets it from
     ``FrontendConfig.strict``.
     """

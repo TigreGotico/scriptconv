@@ -81,8 +81,9 @@ class TestPinyinToIpa(unittest.TestCase):
         out = self._phonemizer(True).phonemize_string("你好", "zh")
         self.assertEqual(out.replace("↓", ""), "nixau̯")
 
-    def test_token_that_is_not_pinyin_is_kept(self):
-        # the docstring of to_ipa: fall back to the original syllable
+    def test_punctuation_is_kept(self):
+        # the docstring of to_ipa: a token with no letters or digits, such
+        # as punctuation, is kept as it is
         out = self._phonemizer(False).phonemize_string("巴，爸", "zh")
         self.assertEqual(out, "pa˥，pa˥˩")
 
@@ -122,8 +123,10 @@ class TestPinyinUmlaut(unittest.TestCase):
         self.assertEqual(p.phonemize_string(self.SENTENCE, "zh"), self.EXPECTED)
 
     def test_g2pc(self):
-        # g2pc needs pkuseg, which builds on no supported Python, so g2pc
-        # is replaced by the output that g2pc 0.9.9.3 gave for SENTENCE.
+        # g2pc needs pkuseg, whose sdist builds only when numpy, Cython and
+        # setuptools are installed first and build isolation is off. The
+        # test extra cannot do that, so g2pc is replaced by the output that
+        # g2pc 0.9.9.3 gave for SENTENCE.
         # The pinyin is the fourth field of each word.
         import sys
         import types
