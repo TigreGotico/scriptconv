@@ -30,9 +30,9 @@ Every method runs the same steps in the same order:
 6. Run the backend.
 
 A backend can own a stage. It then runs that stage itself, and the frontend
-skips it. `diacritize` is the only stage a backend can own, and Tugaphone and
-Arbtok own it. The normalisation hook runs for every backend, because the
-caller chooses it.
+skips it. A backend can own `normalize`, `diacritize` or both. Tugaphone and
+Arbtok own `diacritize`. The normalisation hook runs for every backend that
+does not own `normalize`, because the caller chooses it.
 
 ## Configuration
 
@@ -95,7 +95,7 @@ owns the stage still runs it, because it needs the marks to read the text.
 | `phonemize_lazy(text, stages=None)` | An iterator of phoneme lists, one per sentence | Synthesis. The first sentence is ready before the next one is read |
 | `phonemize(text, stages=None)` | A list of phoneme lists, one per sentence | The same, all at once |
 | `phonemize_flat(text, stages=None)` | One phoneme list | Training. The text is not split into sentences, and the backend's `phonemize_to_list` reads it |
-| `prepare(text, stages=Stages(normalize=False))` | The text after the stages | An engine that reads text and not phonemes |
+| `prepare(text, stages=None)` | The text after the stages | An engine that reads text and not phonemes. The whitespace at the edges of each piece of text between blocks stays |
 | `identity()` | A `PhonemizerIdentity` | What phonemizes the language of the frontend |
 | `with_backend(backend)` | A new `TextFrontend` | The same configuration with another backend instance |
 | `register(graph)` | `None` | Adds a `text -> <alphabet>` edge to a `ConversionGraph` |
@@ -138,8 +138,8 @@ frontend.phonemize("I have 5 cats.")
 # [['I', ' ', 'h', 'a', 'v', 'e', ' ', 'f', 'i', 'v', 'e', ' ', 'c', 'a', 't', 's']]
 ```
 
-A backend that needs its own normalisation runs it. The hook runs before that
-backend, and the backend reads what the hook gives.
+A backend that always normalises names `normalize` in `owned_stages`, and the
+frontend skips the hook for it. Every other backend reads what the hook gives.
 
 ## Failures
 

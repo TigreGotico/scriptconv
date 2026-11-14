@@ -236,9 +236,9 @@ phonemize("hello", "en", override=Phonemizer.GRUUT)
 ```
 
 Defaults resolve in-house engines first: an explicit per-language chain
-(Arabic to arbtok, Basque to euskaphone, Mirandese, Portuguese to
-tugaphone, Hebrew to phonikud, Galician to Cotovía, and Russian to vosk for
-their own notations), then orthography2ipa wherever it has a language spec,
+(Arabic to arbtok, Basque to euskaphone, Mirandese to its orthography2ipa
+specs, Portuguese to tugaphone, Hebrew to phonikud, Galician to Cotovía, and
+Russian to vosk for their own notations), then orthography2ipa wherever it has a language spec,
 then espeak as the last resort.
 
 Arabic never falls back past arbtok. A missing engine raises an error
@@ -373,7 +373,8 @@ The core installs with zero dependencies. Capabilities opt in:
 | `ja` / `zh` | Dictionary readings: kanji to kana (pykakasi), hanzi to pinyin/bopomofo (pypinyin) |
 | `phonemizers` | The phonemizer base layer (sentence chunking, language matching) |
 | `espeak`, `gruut`, `goruut`, `epitran`, `transphone`, `misaki`, `byt5` | Multilingual phonemizer backends |
-| `en-phonemizers`, `ja-phonemizers`, `zh-phonemizers`, `ko`, `ar-phonemizers`, `eu`, `pt-phonemizers`, `gl`, `he`, `fa`, `vi`, `mwl`, `shami`, `o2i` | Per-language phonemizer backends |
+| `en-phonemizers`, `ja-phonemizers`, `zh-phonemizers`, `ko`, `ar-phonemizers`, `eu`, `pt-phonemizers`, `gl`, `he`, `fa`, `vi`, `shami`, `o2i` | Per-language phonemizer backends. `o2i` also gives Mirandese and Barranquenho |
+| `mwl` | The same packages as `o2i` |
 | `tashkeel` | Arabic diacritization for the phonemizer pipeline (text2tashkeel) |
 | `stress` | Word-stress restoration for 26 stressonnx language tags: East Slavic; Bulgarian, Macedonian, and Slovene; Latvian; Armenian; Georgian; and Turkic/Caucasian, for the phonemizer pipeline (stressonnx; not yet on PyPI) |
 | `pt` | European-Portuguese heterophonic-homograph sense diacritics for the phonemizer pipeline (bifonia) |
@@ -433,12 +434,11 @@ extras:
   and the whole phonemizer layer.
 - [orthography2ipa](https://github.com/TigreGotico/orthography2ipa): a
   data-driven orthography-to-IPA engine, and the usual per-language
-  phonemizer default.
+  phonemizer default. Its specs give the Mirandese and Barranquenho
+  phonemizers.
 - [arbtok](https://github.com/TigreGotico/arbtok): Arabic phonemizer (dialect-aware).
 - [euskaphone](https://github.com/TigreGotico/euskaphone): Basque phonemizer (dialect-aware).
 - [tugaphone](https://github.com/TigreGotico/tugaphone): Portuguese phonemizer (dialect-aware).
-- [mwl_phonemizer](https://github.com/TigreGotico/mwl_phonemizer): Mirandese phonemizer.
-- [g2p_barranquenho](https://github.com/TigreGotico/g2p_barranquenho): Barranquenho phonemizer.
 - [pycotovia](https://github.com/TigreGotico/pycotovia): a pure-Python
   phonemizer port of the Cotovía Galician TTS engine, whose notation
   scriptconv transcodes.
