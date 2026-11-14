@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a76](https://github.com/TigreGotico/scriptconv/tree/0.0.4a76) (2026-11-14)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a75...0.0.4a76)
+
+**Merged pull requests:**
+
+- fix\(phonemizers\): remove the stress marks that goruut cannot read [\#207](https://github.com/TigreGotico/scriptconv/pull/207) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a75](https://github.com/TigreGotico/scriptconv/tree/0.0.4a75) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a74...0.0.4a75)
@@ -392,10 +400,6 @@
 ## [0.0.4a24](https://github.com/TigreGotico/scriptconv/tree/0.0.4a24) (2026-09-03)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a23...0.0.4a24)
-
-**Merged pull requests:**
-
-- fix: keep digit:digit tokens such as clock times in one chunk [\#115](https://github.com/TigreGotico/scriptconv/pull/115) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a23](https://github.com/TigreGotico/scriptconv/tree/0.0.4a23) (2026-08-15)
 
