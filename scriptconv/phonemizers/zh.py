@@ -207,8 +207,9 @@ class G2pCPhonemizer(BaseChinesePinyinPhonemizer):
             from g2pc import G2pC
         except ImportError:
             raise ImportError(
-                "g2pc phonemization needs g2pc — install with "
-                "`pip install scriptconv[zh-phonemizers]`"
+                "g2pc phonemization needs g2pc, and no scriptconv extra can "
+                "install it: g2pc needs pkuseg, which has wheels for CPython "
+                "3.5 to 3.8 only and fails to build from source on Python 3.11 to 3.13"
             ) from None
         self.g2p = G2pC()
         super().__init__(alphabet, jieba)

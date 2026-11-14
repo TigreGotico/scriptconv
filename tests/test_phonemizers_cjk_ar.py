@@ -73,9 +73,19 @@ class TestZhBackendFriendlyImportErrors(unittest.TestCase):
         from scriptconv.phonemizers.zh import G2pMPhonemizer
         self._assert_friendly("g2pM", G2pMPhonemizer, "zh-phonemizers")
 
-    def test_g2pc_missing_dep_message(self):
+    def test_g2pc_missing_dep_message_names_the_reason(self):
+        # g2pc needs pkuseg, and PyPI has pkuseg wheels for CPython 3.5 to
+        # 3.8 only, so no extra can install it. The message says why.
+        import sys
+        from unittest.mock import patch
         from scriptconv.phonemizers.zh import G2pCPhonemizer
-        self._assert_friendly("g2pc", G2pCPhonemizer, "zh-phonemizers")
+        with patch.dict(sys.modules, {"g2pc": None}):
+            with self.assertRaises(ImportError) as ctx:
+                G2pCPhonemizer()
+        message = str(ctx.exception)
+        self.assertIn("pkuseg", message)
+        self.assertIn("CPython 3.5 to 3.8", message)
+        self.assertNotIn("scriptconv[", message)
 
     def test_pinyin_to_ipa_missing_dep_message(self):
         from scriptconv.phonemizers.zh import PypinyinPhonemizer
