@@ -592,7 +592,7 @@ def test_buckwalter_lam_alef_ligature():
     assert arabic_to_buckwalter("\uFEFB") == "lA"   # لا ligature
     assert arabic_to_buckwalter("\uFEF9") == "l<"   # لإ ligature
     assert arabic_to_buckwalter("\uFEF7") == "l>"   # لأ ligature
-    assert arabic_to_buckwalter("\uFEF8") == "l|"   # لآ ligature
+    assert arabic_to_buckwalter("\uFEF8") == "l>"   # لأ ligature, final form
     # Decomposed forms (lam + alef as separate chars) also work
     assert arabic_to_buckwalter("لا") == "lA"
     assert arabic_to_buckwalter("لأ") == "l>"

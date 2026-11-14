@@ -20,10 +20,19 @@ them. The lexicon belongs to that engine, so no other orthography2ipa engine in
 the process sees it. With ``packaged_lexicons=False`` the engine holds an empty
 lexicon and runs on the rules alone.
 """
-from typing import Dict, List
+import dataclasses
+import hashlib
+import logging
+from typing import Dict, List, Optional
 
-from scriptconv.phonemizers.base import BasePhonemizer, UnsupportedLanguageError
+from scriptconv.phonemizers.base import (
+    BasePhonemizer,
+    PhonemizerIdentity,
+    UnsupportedLanguageError,
+)
 from scriptconv.phonemizers.enums import Alphabet
+
+LOG = logging.getLogger(__name__)
 
 
 class Orthography2IPAPhonemizer(BasePhonemizer):
@@ -43,18 +52,50 @@ class Orthography2IPAPhonemizer(BasePhonemizer):
         self.packaged_lexicons = packaged_lexicons
         self._cache: Dict[str, object] = {}
 
+    def _lexicon_patches(self, resolved_lang: str) -> Optional[bool]:
+        """The ``patches`` flag of the packaged lexicon that the engine of
+        *resolved_lang* holds, or ``None`` when the engine holds no lexicon."""
+        import orthography2ipa
+        if (not self.packaged_lexicons
+                or resolved_lang not in orthography2ipa.packaged_lexicon_sources()):
+            return None
+        return resolved_lang in orthography2ipa.packaged_lexicon_sources(patches=True)
+
     def _engine(self, resolved_lang: str):
         """Return, lazily creating and caching, the G2P engine for *resolved_lang*."""
         if resolved_lang not in self._cache:
             import orthography2ipa
-            lexicon = {}
-            if (self.packaged_lexicons and resolved_lang
-                    in orthography2ipa.packaged_lexicon_sources()):
-                patches = resolved_lang in orthography2ipa.packaged_lexicon_sources(patches=True)
-                lexicon = orthography2ipa.packaged_lexicon(resolved_lang, patches=patches)
+            patches = self._lexicon_patches(resolved_lang)
+            lexicon = ({} if patches is None
+                       else orthography2ipa.packaged_lexicon(resolved_lang, patches=patches))
             self._cache[resolved_lang] = orthography2ipa.G2P(
                 resolved_lang, pipeline=orthography2ipa.Pipeline(lexicon=lexicon))
         return self._cache[resolved_lang]
+
+    def identity(self, lang: str) -> PhonemizerIdentity:
+        """The base identity, with ``revision`` set to the orthography2ipa
+        spec revision of the resolved lect.
+
+        When the engine holds a packaged lexicon, ``revision`` is the sha256 of
+        the spec revision and the lexicon revision, so a lexicon change also
+        changes it. When orthography2ipa cannot read its engine source,
+        ``revision`` is ``None``.
+        """
+        import orthography2ipa
+        from orthography2ipa.exceptions import EngineSourceUnavailable
+        identity = super().identity(lang)
+        try:
+            revision = orthography2ipa.spec_revision(identity.lang)
+        except EngineSourceUnavailable as exc:
+            LOG.warning("orthography2ipa cannot read its engine source, so the "
+                        "identity of %r has no revision: %s", identity.lang, exc)
+            return identity
+        patches = self._lexicon_patches(identity.lang)
+        if patches is not None:
+            lexicon = orthography2ipa.lexicon_revision(identity.lang, patches=patches)
+            combined = f"{revision}\n{lexicon}".encode()
+            revision = "sha256:" + hashlib.sha256(combined).hexdigest()
+        return dataclasses.replace(identity, revision=revision)
 
     @classmethod
     def supported_langs(cls) -> List[str]:

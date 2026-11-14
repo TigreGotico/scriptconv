@@ -25,7 +25,7 @@ import re
 import string
 import unicodedata
 from importlib import metadata
-from typing import Callable, ClassVar, Iterator, List, Optional, Tuple, Literal, Union
+from typing import Callable, ClassVar, Iterable, Iterator, List, Optional, Tuple, Literal, Union
 
 from scriptconv.phonemizers.enums import Alphabet
 from scriptconv.version import VERSION_STR
@@ -46,6 +46,15 @@ PhonemizedChunks = list[list[str]]
 CLAUSE_PUNCTUATION = {".": ".", "?": "?", "!": "!", ",": ",", ":": ":", ";": ";",
                       "\u060c": ",", "\u061b": ";", "\u061f": "?"}
 _PAUSE_PUNCTUATION = {",", ":", ";"}
+# A sentence that ends in a symbol, or in the space after one, joins the next
+# sentence with no space, as Piper flattens its sentences. A sentence that ends
+# with no symbol, as one the sentence tokenizer ends at "...", is followed by a
+# space, so its last word stays apart from the first word of the next sentence.
+_JOINING_ENDS = frozenset(CLAUSE_PUNCTUATION.values()) | {" "}
+# A mark that the table reads as "!" or "?", between two letters with no space
+# after it, is no clause break, but it still separates two words.
+_SEPARATING_MARKS = frozenset(mark for mark, symbol in CLAUSE_PUNCTUATION.items()
+                              if symbol in ("!", "?"))
 # A clause ends at punctuation followed by whitespace, as in espeak-ng, so the
 # "," in "10,4" or the ":" in "16:30" never splits. A lone "." is left to the
 # sentence tokenizer, which knows abbreviations; inside a sentence an ellipsis
@@ -54,6 +63,37 @@ _PAUSE_PUNCTUATION = {",", ":", ";"}
 _CLAUSE_BREAK = re.compile(r"(?:\.\.+|\u2026|[,:;!?|\u060c\u061b\u061f])[^\w\s]*(?=\s)")
 _TRAILING_PUNCTUATION = re.compile(r"[^\w\s]+\s*$")
 _LANG_FLAGS = re.compile(r"\([^)]+\)")
+
+
+def join_sentences(sentences: Iterable[List[str]]) -> List[str]:
+    """Per-sentence phonemes joined into one flat training stream.
+
+    A sentence that ends with no symbol, as one the sentence tokenizer ends at
+    an ASCII "...", takes a space before the next sentence, so its last word
+    stays apart from the first word of the next sentence. A sentence that ends
+    in a symbol joins the next one with no space, as Piper flattens its
+    sentences. No sentence starts with a space, because a voice never saw a
+    space at the start of an utterance, so the space exists only here.
+    """
+    phonemes: List[str] = []
+    for sentence in sentences:
+        if not sentence:
+            continue
+        if phonemes and phonemes[-1] not in _JOINING_ENDS:
+            phonemes.append(" ")
+        phonemes.extend(sentence)
+    return phonemes
+
+
+def _clause_breaks_as_spaces(phonemes: str) -> str:
+    """*phonemes* with each clause break that a backend prints as a line break read as one space.
+
+    espeak-ng prints each clause on its own line. The next clause starts a new
+    word, so a break between two clauses is a space, and never a double one.
+    """
+    if "\n" not in phonemes:
+        return phonemes
+    return " ".join(line.strip() for line in phonemes.split("\n") if line.strip())
 
 
 def _clause_mark(punctuation: str) -> Optional[str]:
@@ -186,8 +226,9 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
     Off by default, so voices trained without punctuation receive exactly the
     sequences they were trained on. When on, :meth:`phonemize_to_list` and
     :meth:`phonemize_lazy` phonemize clause by clause and append each clause's
-    symbol the way Piper does, and the two return the same phonemes for the
-    same text. A backend that overrides either method owns its own output and
+    symbol the way Piper does. For the same text, :meth:`phonemize_to_list`
+    is the :func:`join_sentences` of the sentences that :meth:`phonemize_lazy`
+    yields. A backend that overrides either method owns its own output and
     ignores this flag, since honouring it on one side only would make training
     and synthesis disagree.
     """
@@ -201,7 +242,7 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
     """
 
     owned_stages: ClassVar[frozenset[str]] = frozenset()
-    """Stages this backend always runs itself. ``"diacritize"`` is the only name.
+    """Stages this backend always runs itself: ``"normalize"``, ``"diacritize"`` or both.
 
     A stage that runs only with an optional dependency is not owned.
     """
@@ -227,14 +268,14 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         """Phonemes of *text* as one flat list, without normalization.
 
         Clause breaks that a backend prints as ``"\\n"`` (espeak-ng does at
-        every comma, question mark and exclamation mark) are not phonemes and
-        are dropped; with :attr:`keep_punctuation` the clause's punctuation
-        takes their place.
+        every comma, question mark and exclamation mark) are not phonemes:
+        each becomes one space, because the next clause starts a new word.
+        With :attr:`keep_punctuation`, the list is the :func:`join_sentences`
+        of :meth:`phonemize`, and each clause's symbol comes before its space.
         """
         if self._keeps_punctuation():
-            return [p for sentence in self._punctuated_sentences(text, lang)
-                    for p in sentence]
-        return [p for p in self.phonemize_string(text, lang) if p != "\n"]
+            return join_sentences(self._punctuated_sentences(text, lang))
+        return list(_clause_breaks_as_spaces(self.phonemize_string(text, lang)))
 
     def phonemize(self, text: str, lang: str) -> PhonemizedChunks:
         # PhonemizedChunks is list[list[str]]; empty text yields no
@@ -264,7 +305,8 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
             yield from self._punctuated_sentences(text, lang)
             return
         for chunk, punct, eos in self.chunk_text(text):
-            phoneme_str = self.phonemize_string(self.remove_punctuation(chunk), lang)
+            phoneme_str = _clause_breaks_as_spaces(
+                self.phonemize_string(self.remove_punctuation(chunk), lang))
             # Filter out (lang) switch (flags) that surround words from languages
             # other than the current voice — mirrors _process_phones().
             phoneme_str = re.sub(r"\([^)]+\)", "", phoneme_str)
@@ -284,7 +326,9 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         Each clause is phonemized on its own with its punctuation removed, so
         the backend sees the same words in training and in synthesis, and the
         clause's symbol is appended after it: bare for ``. ? !``, followed by a
-        space for ``, : ;``.
+        space for ``, : ;``. A space also separates a clause from the next one
+        in the same sentence, after any symbol or none. No sentence starts with
+        a space: :func:`join_sentences` adds the space between two sentences.
         """
         try:
             from quebra_frases import sentence_tokenize
@@ -299,9 +343,12 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
                 if not clause:
                     continue
                 phoneme_str = _LANG_FLAGS.sub("", self.phonemize_string(clause, lang))
-                clause_phonemes = [p for p in phoneme_str if p != "\n"]
+                clause_phonemes = list(_clause_breaks_as_spaces(phoneme_str))
                 if not clause_phonemes:
                     continue
+                # the next clause starts a new word, as the text writes it
+                if phonemes and phonemes[-1] != " ":
+                    phonemes.append(" ")
                 phonemes.extend(clause_phonemes)
                 if mark:
                     phonemes.append(mark)
@@ -405,14 +452,37 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         time "16:30", the "," in "10,4", the "." in "92.073", the "-" in "1139-1185")
         is preserved so the per-language normalizers still see it as a single token,
         matching the digit:digit exemption in ``chunk_text``.
+
+        A mark that :data:`CLAUSE_PUNCTUATION` reads as ``!`` or ``?``, such as
+        the Arabic ``؟``, between two letters, as in "Sim!Não", still
+        separates two words, so a run of them becomes one space.
         """
         out = []
         chars = list(text)
+        separates = False
         for i, c in enumerate(chars):
-            if c in ("'", "’", "-") and 0 < i < len(chars) - 1 \
-                    and chars[i - 1].isalpha() and chars[i + 1].isalpha():
-                out.append(c)
-                continue
+            if c in ("'", "’", "-") and 0 < i < len(chars) - 1 and chars[i + 1].isalpha():
+                # a letter may carry combining marks, such as a stress mark (U+0301)
+                letter = i - 1
+                while letter > 0 and unicodedata.category(chars[letter]).startswith("M"):
+                    letter -= 1
+                if chars[letter].isalpha():
+                    out.append(c)
+                    continue
+            if c in _SEPARATING_MARKS:
+                if i == 0 or chars[i - 1] not in _SEPARATING_MARKS:
+                    end = i
+                    while end < len(chars) and chars[end] in _SEPARATING_MARKS:
+                        end += 1
+                    letter = i - 1
+                    while letter > 0 and unicodedata.category(chars[letter]).startswith("M"):
+                        letter -= 1
+                    separates = (i > 0 and chars[letter].isalpha()
+                                 and end < len(chars) and chars[end].isalpha())
+                    if separates:
+                        out.append(" ")
+                if separates:
+                    continue
             if 0 < i < len(chars) - 1 \
                     and chars[i - 1].isdigit() and chars[i + 1].isdigit():
                 out.append(c)

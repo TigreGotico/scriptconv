@@ -9,8 +9,12 @@ import logging
 import re
 import sys
 import time
+import tomllib
+from importlib.metadata import metadata
+from pathlib import Path
 
 import pytest
+from packaging.requirements import Requirement
 
 from scriptconv import frontend as frontend_module
 from scriptconv.frontend import FrontendConfig, Stages, TextFrontend, spoken_normalizer
@@ -44,6 +48,10 @@ class Echo(BasePhonemizer):
 
 class Owner(Echo):
     owned_stages = frozenset({"diacritize"})
+
+
+class NormalizeOwner(Echo):
+    owned_stages = frozenset({"normalize"})
 
 
 class Mute(Echo):
@@ -122,12 +130,20 @@ class TestStageOrder:
         assert stages.stage_names() == ["normalize", "casing", "diacritize"]
         assert backend.read == [("dNAB. CD.", "xx")]
 
-    def test_prepare_runs_no_hook_by_default(self, monkeypatch):
+    def test_prepare_runs_the_same_stages_as_phonemize(self, monkeypatch):
         stages = Recorder(monkeypatch)
         frontend = build(Echo(), normalizer=stages.normalize, stages=Stages(diacritize=True))
-        assert frontend.prepare("ab. cd.") == "dab. cd."
-        assert stages.stage_names() == ["diacritize"]
-        assert frontend.prepare("ab", Stages()) == "dnab"
+        assert frontend.prepare("ab. cd.") == "dnab. cd."
+        assert stages.stage_names() == ["normalize", "diacritize"]
+        assert frontend.prepare("ab", Stages(normalize=False)) == "dab"
+
+    def test_prepare_with_no_stages_normalises(self):
+        hook = spoken_normalizer()
+        frontend = build(Echo(), "en", normalizer=hook, stages=Stages(diacritize=False))
+        text = "I have 5 cats and 20% of them sleep."
+        expected = hook(text, "en")
+        assert expected != text
+        assert frontend.prepare(text) == expected
 
     def test_a_call_can_skip_the_hook(self, monkeypatch):
         stages = Recorder(monkeypatch)
@@ -218,7 +234,30 @@ class TestInlineBlocks:
     def test_prepare_keeps_the_block_as_written(self, monkeypatch):
         Recorder(monkeypatch)
         frontend = build(Echo(), stages=Stages(diacritize=True))
-        assert frontend.prepare("ab [[xy]] cd") == "dab [[xy]]d cd"
+        assert frontend.prepare("ab [[xy]] cd") == "dab [[xy]] dcd"
+
+    # A hook that joins words with single spaces drops the space at each edge
+    # of the text it reads. The space next to a block is part of the text.
+
+    @staticmethod
+    def edge_stripping_hook(text, lang):
+        return " ".join(text.upper().split())
+
+    @pytest.mark.parametrize("text, pieces", [
+        ("  mama\t[[abc]]\nana  ", ["  ", "mama", "\t[[abc]]\n", "ana", "  "]),
+        ("[[a]] [[b]]", ["", "", "[[a]] [[b]]", "", ""]),
+        (" x  y [[a]]", [" ", "x  y", " [[a]]", "", ""]),
+    ])
+    def test_prepare_keeps_the_whitespace_at_the_edges_of_each_piece(self, text, pieces):
+        frontend = build(Echo(), normalizer=self.edge_stripping_hook, stages=Stages(diacritize=False))
+        lead, first, middle, last, trail = pieces
+        expected = (lead + self.edge_stripping_hook(first, "xx") + middle
+                    + self.edge_stripping_hook(last, "xx") + trail)
+        assert frontend.prepare(text, Stages()) == expected
+
+    def test_prepare_mama_abc_ana_keeps_both_spaces(self):
+        frontend = build(Echo(), normalizer=self.edge_stripping_hook, stages=Stages(diacritize=False))
+        assert frontend.prepare("mama [[abc]] ana", Stages()) == "MAMA [[abc]] ANA"
 
 
 class TestOwnedStages:
@@ -244,6 +283,38 @@ class TestOwnedStages:
         frontend = build(Owner(), normalizer=stages.normalize)
         assert frontend.phonemize("ab") == [list("nab")]
         assert stages.stage_names() == ["normalize"]
+
+    @pytest.mark.parametrize("path", ["phonemize_lazy", "phonemize", "phonemize_flat", "prepare"])
+    @pytest.mark.parametrize("call", [None, Stages(), Stages(normalize=True)])
+    def test_an_owner_of_normalize_never_gets_the_hook(self, monkeypatch, path, call):
+        stages = Recorder(monkeypatch)
+        backend = NormalizeOwner()
+        frontend = build(backend, normalizer=stages.normalize, stages=Stages(diacritize=False))
+        result = getattr(frontend, path)("ab. cd [[xy]] ef", call)
+        if path == "prepare":
+            assert result == "ab. cd [[xy]] ef"
+        else:
+            list(result)
+            assert backend.read and all("n" not in text for text, _ in backend.read)
+        assert stages.log == []
+
+    def test_an_owner_of_normalize_still_gets_the_diacritizer(self, monkeypatch):
+        stages = Recorder(monkeypatch)
+        frontend = build(NormalizeOwner(), normalizer=stages.normalize, stages=Stages(diacritize=True))
+        assert frontend.phonemize("ab") == [list("dab")]
+        assert frontend.prepare("ab") == "dab"
+        assert stages.stage_names() == ["diacritize", "diacritize"]
+
+    def test_an_owner_of_both_stages_reads_the_text_as_given(self, monkeypatch):
+        class BothOwner(Echo):
+            owned_stages = frozenset({"normalize", "diacritize"})
+
+        stages = Recorder(monkeypatch)
+        frontend = build(BothOwner(), normalizer=stages.normalize, stages=Stages(diacritize=True))
+        assert frontend.phonemize("ab") == [list("ab")]
+        assert frontend.phonemize_flat("ab") == list("ab")
+        assert frontend.prepare("ab") == "ab"
+        assert stages.log == []
 
     def test_a_backend_that_owns_nothing_gets_the_diacritizer(self, monkeypatch):
         stages = Recorder(monkeypatch)
@@ -409,6 +480,28 @@ class TestBackends:
         plain = TextFrontend(FrontendConfig("xx", Phonemizer.UNICODE))
         assert plain.phonemize("ab, cd.", Stages(diacritize=False)) == [list("ab cd")]
 
+    def test_a_line_break_inside_a_clause_keeps_the_words_apart(self):
+        espeak = EspeakPhonemizer()
+        words = " ".join(espeak.phonemize_string(word, "pt") for word in ("Olá", "Tudo bem"))
+        kept = TextFrontend(FrontendConfig("pt", Phonemizer.ESPEAK, keep_punctuation=True,
+                                           stages=Stages(diacritize=False)), espeak)
+        assert kept.phonemize_flat("Olá\nTudo bem.") == list(words + ".")
+        assert kept.phonemize("Olá\nTudo bem.") == [list(words + ".")]
+
+    def test_a_sentence_with_no_symbol_keeps_its_last_word_apart(self):
+        kept = TextFrontend(FrontendConfig("pt", Phonemizer.GRAPHEMES, keep_punctuation=True,
+                                           stages=Stages(diacritize=False)))
+        assert kept.phonemize_flat("Espera... vamos.") == list("espera vamos.")
+        assert kept.phonemize("Espera... vamos.") == [list("espera"), list("vamos.")]
+        # an inline block joins the sentence before it, and no sentence starts with a space
+        assert kept.phonemize_flat("Espera... vamos. [[a]]") == list("espera vamos. a")
+        assert kept.phonemize("Espera... vamos. [[a]]") == [list("espera"), list("vamos. a")]
+        assert kept.phonemize_flat("Sim? Não.") == list("sim?não.")
+        assert kept.phonemize("Sim? Não.") == [list("sim?"), list("não.")]
+        plain = TextFrontend(FrontendConfig("pt", Phonemizer.GRAPHEMES,
+                                            stages=Stages(diacritize=False)))
+        assert plain.phonemize("Espera... vamos.") == [list("espera"), list("vamos")]
+
     def test_a_given_backend_is_not_changed(self):
         given = get_phonemizer(Phonemizer.UNICODE)
         frontend = TextFrontend(FrontendConfig("xx", keep_punctuation=True,
@@ -477,6 +570,13 @@ class TestSpokenNormalizer:
         monkeypatch.setitem(sys.modules, "text2spoken", None)
         with pytest.raises(ImportError, match=r"scriptconv\[normalize\]"):
             spoken_normalizer()
+
+    def test_the_extra_installs_every_language_extra_of_text2spoken(self):
+        pyproject = tomllib.loads((Path(__file__).parent.parent / "pyproject.toml").read_text(encoding="utf-8"))
+        requirement, = map(Requirement, pyproject["project"]["optional-dependencies"]["normalize"])
+        languages = set(metadata("text2spoken").get_all("Provides-Extra")) - {"test"}
+        assert requirement.name == "text2spoken"
+        assert languages <= requirement.extras, f"text2spoken extras missing: {sorted(languages - requirement.extras)}"
 
 
 class TestModulePhonemize:
