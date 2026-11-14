@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a73](https://github.com/TigreGotico/scriptconv/tree/0.0.4a73) (2026-11-14)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a72...0.0.4a73)
+
+**Merged pull requests:**
+
+- fix: keep words apart at a sentence with no mark and at a joined ! or ? [\#221](https://github.com/TigreGotico/scriptconv/pull/221) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a72](https://github.com/TigreGotico/scriptconv/tree/0.0.4a72) (2026-11-13)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a71...0.0.4a72)
@@ -392,10 +400,6 @@
 ## [0.0.4a21](https://github.com/TigreGotico/scriptconv/tree/0.0.4a21) (2026-08-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a20...0.0.4a21)
-
-**Merged pull requests:**
-
-- fix: raise MissingLanguageError for None/empty/und in match\_lang [\#108](https://github.com/TigreGotico/scriptconv/pull/108) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a20](https://github.com/TigreGotico/scriptconv/tree/0.0.4a20) (2026-08-14)
 
