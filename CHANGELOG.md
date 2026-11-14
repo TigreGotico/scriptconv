@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a80](https://github.com/TigreGotico/scriptconv/tree/0.0.4a80) (2026-11-14)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a79...0.0.4a80)
+
+**Merged pull requests:**
+
+- fix\(phonemizers\): break a Preferred-Value tie by the requested code [\#231](https://github.com/TigreGotico/scriptconv/pull/231) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a79](https://github.com/TigreGotico/scriptconv/tree/0.0.4a79) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a78...0.0.4a79)
@@ -391,10 +399,6 @@
 ## [0.0.4a29](https://github.com/TigreGotico/scriptconv/tree/0.0.4a29) (2026-09-17)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a28...0.0.4a29)
-
-**Merged pull requests:**
-
-- fix\(tests\): make the ARPA property test deterministic, and name the GOAT residue [\#123](https://github.com/TigreGotico/scriptconv/pull/123) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a28](https://github.com/TigreGotico/scriptconv/tree/0.0.4a28) (2026-09-17)
 
