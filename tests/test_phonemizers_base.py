@@ -354,6 +354,10 @@ class TestRemovePunctuationSeparatesWords(unittest.TestCase):
     def test_a_run_of_marks_becomes_one_space(self):
         self.assertEqual(BasePhonemizer.remove_punctuation("Sim?!Não"), "Sim Não")
 
+    def test_a_mark_that_the_table_reads_as_a_question_mark(self):
+        self.assertEqual(BasePhonemizer.remove_punctuation("نعم؟لا"), "نعم لا")
+        self.assertEqual(BasePhonemizer.remove_punctuation("نعم!؟لا"), "نعم لا")
+
     def test_a_stress_mark_before_the_mark(self):
         self.assertEqual(BasePhonemizer.remove_punctuation("да\u0301!нет"), "да\u0301 нет")
 
@@ -366,9 +370,11 @@ class TestRemovePunctuationSeparatesWords(unittest.TestCase):
         self.assertEqual(BasePhonemizer.remove_punctuation("你好！我们"), "你好我们")
 
     def test_a_long_run_of_marks_costs_linear_work(self):
+        # the walk back over combining marks and the scan along the run of
+        # marks each read a character a fixed number of times
         marks = 16000
         text = "a" + "\u0301" * marks + "!" * marks + "b"
-        lookups = 0
+        lookups = scans = 0
 
         def category(c):
             nonlocal lookups
@@ -377,7 +383,16 @@ class TestRemovePunctuationSeparatesWords(unittest.TestCase):
                 raise AssertionError(f"over {3 * len(text)} category lookups for {len(text)} characters")
             return unicodedata.category(c)
 
-        with mock.patch.object(base, "unicodedata", mock.Mock(category=category)):
+        class ScannedMarks(frozenset):
+            def __contains__(self, c):
+                nonlocal scans
+                scans += 1
+                if scans > 3 * len(text):
+                    raise AssertionError(f"over {3 * len(text)} mark lookups for {len(text)} characters")
+                return super().__contains__(c)
+
+        with mock.patch.object(base, "unicodedata", mock.Mock(category=category)), \
+                mock.patch.object(base, "_SEPARATING_MARKS", ScannedMarks(base._SEPARATING_MARKS)):
             self.assertEqual(BasePhonemizer.remove_punctuation(text), "a" + "\u0301" * marks + " b")
 
 

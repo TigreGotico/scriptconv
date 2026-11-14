@@ -4,7 +4,7 @@ By default no punctuation reaches the phonemes: voices trained that way must
 keep receiving the sequences they learned. ``keep_punctuation`` opts in to the
 Piper convention, where every clause is followed by its symbol (``. ? !`` bare,
 ``, : ;`` followed by a space). Clause breaks that espeak-ng prints as ``"\\n"``
-are never returned as phonemes, in either mode.
+are never returned as phonemes, in either mode: each one is a space.
 
 The espeak tests run against the espeak-ng binary when it is installed and
 against the pure-Python espyak port otherwise, so they assert the punctuation
@@ -16,7 +16,7 @@ import unicodedata
 import pytest
 
 from scriptconv.phonemizers import get_phonemizer
-from scriptconv.phonemizers.base import BasePhonemizer
+from scriptconv.phonemizers.base import BasePhonemizer, join_sentences
 from scriptconv.phonemizers.enums import Phonemizer
 from scriptconv.phonemizers.mul import EspeakPhonemizer
 
@@ -78,17 +78,34 @@ class TestDefaultKeepsNoPunctuation:
     def test_default_matches_the_previous_definitions(self, espeak):
         # phonemize_to_list was list(phonemize_string) and phonemize_lazy
         # phonemized each chunk_text chunk with its punctuation removed; the
-        # default output is those, less the newline clause breaks
+        # default output is those, with a space at each newline clause break
         for lang, texts in MULTILINGUAL.items():
             for text in texts:
                 raw = espeak.phonemize_string(text, lang)
-                assert espeak.phonemize_to_list(text, lang) == [p for p in raw if p != "\n"]
+                assert espeak.phonemize_to_list(text, lang) == list(raw.replace("\n", " "))
                 previous = [
                     list(re.sub(r"\([^)]+\)", "", espeak.phonemize_string(
                         espeak.remove_punctuation(chunk), lang)))
                     for chunk, _, _ in espeak.chunk_text(text)]
                 assert espeak.phonemize(text, lang) == previous
                 assert list(espeak.phonemize_lazy(text, lang)) == previous
+
+    @pytest.mark.parametrize("text, expected", [
+        ("one,two?three", "ONE TWO THREE"),
+        ("one,, two", "ONE TWO"),
+        ("one ,\n, two!", "ONE TWO"),
+        ("one!", "ONE"),
+    ])
+    def test_a_clause_break_is_one_space(self, text, expected):
+        assert "".join(CliLike().phonemize_to_list(text, "en")) == expected
+
+    @pytest.mark.parametrize("prefer_espyak", [False, True])
+    def test_espeak_reads_the_clauses_apart(self, prefer_espyak):
+        espeak = EspeakPhonemizer(prefer_espyak=prefer_espyak)
+        text = "Olá! Tudo bem? Sim."
+        clauses = [espeak.phonemize_string(clause, "pt") for clause in ("Olá", "Tudo bem", "Sim")]
+        assert espeak.phonemize_to_list(text, "pt") == list(" ".join(clauses))
+        assert espeak.phonemize_to_list(text, "pt") == join_sentences(espeak.phonemize(text, "pt"))
 
     def test_synthesis_path_is_unchanged(self):
         # chunked, punctuation removed before the backend, no symbol appended
@@ -116,9 +133,9 @@ class TestKeepPunctuation:
         for lang, texts in MULTILINGUAL.items():
             for text in texts:
                 train = espeak.phonemize_to_list(text, lang)
-                synth = flat(espeak.phonemize(text, lang))
-                assert train == synth, (lang, text)
-                assert flat(espeak.phonemize_lazy(text, lang)) == synth
+                synth = espeak.phonemize(text, lang)
+                assert train == join_sentences(synth), (lang, text)
+                assert list(espeak.phonemize_lazy(text, lang)) == synth
                 assert "\n" not in train
 
     def test_symbols_follow_piper(self):
@@ -162,7 +179,7 @@ class TestKeepPunctuation:
         phonemizer.normalizer = lambda text, lang: text.replace("3", "three")
         train = phonemizer.phonemize_to_list("number three.", "en")
         assert train[-1] == "."
-        assert flat(phonemizer.phonemize("number 3.", "en")) == train
+        assert join_sentences(phonemizer.phonemize("number 3.", "en")) == train
 
     def test_a_backend_with_its_own_list_ignores_the_flag(self):
         class OwnList(CliLike):
@@ -201,11 +218,14 @@ class TestWordsStayApart:
         ("unicode", "Isto?Aquilo", "Isto Aquilo"),
         ("stub", "Isto?Aquilo", "ISTO AQUILO"),
         ("graphemes", "Sim?!Não", "sim não"),
+        # every mark that the clause table reads as "?" counts
+        ("graphemes", "نعم؟لا", "نعم لا"),
+        ("unicode", "نعم؟لا", "نعم لا"),
     ])
     def test_words_stay_apart(self, backend, text, expected):
         phonemizer = self.kept(backend)
         assert "".join(phonemizer.phonemize_to_list(text, "pt")) == expected
-        assert "".join(flat(phonemizer.phonemize(text, "pt"))) == expected
+        assert "".join(join_sentences(phonemizer.phonemize(text, "pt"))) == expected
 
     @pytest.mark.parametrize("text, parts", [
         # two sentences: each read on its own, then a space between them
@@ -223,7 +243,7 @@ class TestWordsStayApart:
         for part in parts[1:]:
             words += [" "] + espeak.phonemize_to_list(part, "pt")
         assert espeak.phonemize_to_list(text, "pt") == words
-        assert flat(espeak.phonemize(text, "pt")) == words
+        assert join_sentences(espeak.phonemize(text, "pt")) == words
 
     @pytest.mark.parametrize("backend, text, expected", [
         # a sentence that ends in a symbol joins the next one, as in Piper
@@ -245,12 +265,28 @@ class TestWordsStayApart:
         assert "".join(phonemizer.phonemize_to_list(text, "pt")) == expected
         assert "".join(flat(phonemizer.phonemize(text, "pt"))) == expected
 
-    def test_a_space_starts_the_sentence_after_one_with_no_symbol(self):
-        phonemizer = self.kept("stub")
-        assert phonemizer.phonemize("Espera... vamos.", "pt") == [
-            list("ESPERA"), list(" VAMOS.")]
-        assert phonemizer.phonemize("Espera. Vamos...", "pt") == [
-            list("ESPERA."), list("VAMOS")]
+    @pytest.mark.parametrize("backend, text, sentences", [
+        ("stub", "Espera... vamos.", ["ESPERA", "VAMOS."]),
+        ("stub", "a ... b", ["A", "B"]),
+        ("stub", "Espera. Vamos...", ["ESPERA.", "VAMOS"]),
+        ("graphemes", "Espera... vamos.", ["espera", "vamos."]),
+        ("graphemes", "a ... b", ["a", "b"]),
+    ])
+    def test_no_sentence_starts_with_a_space(self, backend, text, sentences):
+        # a voice never saw a space at the start of an utterance; the space
+        # between two sentences exists only in the flat training stream
+        phonemizer = self.kept(backend)
+        assert phonemizer.phonemize(text, "pt") == [list(s) for s in sentences]
+        assert list(phonemizer.phonemize_lazy(text, "pt")) == [list(s) for s in sentences]
+
+    @pytest.mark.parametrize("text", ["Espera... vamos.", "a ... b"])
+    @pytest.mark.parametrize("prefer_espyak", [False, True])
+    def test_no_espeak_sentence_starts_with_a_space(self, text, prefer_espyak):
+        espeak = EspeakPhonemizer(prefer_espyak=prefer_espyak)
+        espeak.keep_punctuation = True
+        sentences = espeak.phonemize(text, "pt")
+        assert len(sentences) == 2
+        assert all(sentence and sentence[0] != " " for sentence in sentences)
 
     def test_synthesis_without_punctuation_keeps_the_words_apart(self):
         phonemizer = get_phonemizer(Phonemizer.GRAPHEMES)

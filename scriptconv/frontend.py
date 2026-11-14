@@ -28,7 +28,6 @@ from typing import Callable, Iterator, List, Optional
 from scriptconv.diacritics import _DIACRITIZER_PACKAGES, _diacritizer_family, diacritize
 from scriptconv.graph import ConversionGraph, Edge
 from scriptconv.phonemizers.base import (
-    _JOINING_ENDS,
     BasePhonemizer,
     PhonemizerIdentity,
     StageError,
@@ -211,7 +210,10 @@ class TextFrontend:
         """Phonemes of *text* as one list, for training.
 
         The text is not split into sentences. The backend's
-        ``phonemize_to_list`` reads each piece of text between blocks.
+        ``phonemize_to_list`` reads each piece of text between blocks, so a
+        space separates a sentence that ends with no symbol from the next one,
+        as :func:`~scriptconv.phonemizers.base.join_sentences` joins them. No
+        sentence of :meth:`phonemize` starts with that space.
         """
         stages = self._resolve(stages)
         parts = _split_blocks(text)
@@ -288,23 +290,13 @@ class TextFrontend:
             raise ImportError(
                 "sentence chunking needs quebra-frases — install with "
                 "`pip install scriptconv[phonemizers]`") from None
-        # The backend reads one sentence at a time here, so the space that
-        # phonemize_to_list puts after a sentence with no symbol is added here.
-        punctuated = self.backend._keeps_punctuation()
-        previous: List[str] = []
         for sentence in sentence_tokenize(text):
             if not sentence.strip():
                 continue
             sentence = self._run_stages(sentence, stages)
             chunks = [list(chunk) for chunk in self.backend.phonemize_lazy(sentence, stages.lang)]
             self._check_read(sentence, [p for chunk in chunks for p in chunk], stages)
-            chunks = [chunk for chunk in chunks if chunk]
-            if not chunks:
-                continue
-            if punctuated and previous and previous[-1] not in _JOINING_ENDS:
-                chunks[0].insert(0, " ")
-            previous = chunks[-1]
-            yield from chunks
+            yield from (chunk for chunk in chunks if chunk)
 
     def _run_stages(self, text: str, stages: Stages) -> str:
         """Steps 3 to 5 on one piece of text."""

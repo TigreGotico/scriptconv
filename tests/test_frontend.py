@@ -484,7 +484,10 @@ class TestBackends:
         kept = TextFrontend(FrontendConfig("pt", Phonemizer.GRAPHEMES, keep_punctuation=True,
                                            stages=Stages(diacritize=False)))
         assert kept.phonemize_flat("Espera... vamos.") == list("espera vamos.")
-        assert kept.phonemize("Espera... vamos.") == [list("espera"), list(" vamos.")]
+        assert kept.phonemize("Espera... vamos.") == [list("espera"), list("vamos.")]
+        # an inline block joins the sentence before it, and no sentence starts with a space
+        assert kept.phonemize_flat("Espera... vamos. [[a]]") == list("espera vamos. a")
+        assert kept.phonemize("Espera... vamos. [[a]]") == [list("espera"), list("vamos. a")]
         assert kept.phonemize_flat("Sim? Não.") == list("sim?não.")
         assert kept.phonemize("Sim? Não.") == [list("sim?"), list("não.")]
         plain = TextFrontend(FrontendConfig("pt", Phonemizer.GRAPHEMES,
