@@ -36,7 +36,7 @@ ja = ["pykakasi>=2.3,<3"]
 zh = ["pypinyin>=0.50,<1"]
 # --- phonemizer wrappers (scriptconv.phonemizers) ---
 phonemizers = ["quebra-frases", "linguatag[langcodes]>=0.2.1a1"]
-normalize = ["text2spoken>=0.0.2a1"]
+normalize = ["text2spoken[pt,ru]>=0.0.2a30"]
 espeak = ["scriptconv[phonemizers]", "espyak"]
 gruut = ["scriptconv[phonemizers]", "gruut"]
 goruut = ["scriptconv[phonemizers]", "pygoruut"]

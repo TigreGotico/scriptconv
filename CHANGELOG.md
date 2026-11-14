@@ -1,5 +1,77 @@
 # Changelog
 
+## [0.0.4a74](https://github.com/TigreGotico/scriptconv/tree/0.0.4a74) (2026-11-14)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a73...0.0.4a74)
+
+**Merged pull requests:**
+
+- fix: keep the joint space out of synthesis chunks and read clause breaks as spaces [\#223](https://github.com/TigreGotico/scriptconv/pull/223) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a73](https://github.com/TigreGotico/scriptconv/tree/0.0.4a73) (2026-11-14)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a72...0.0.4a73)
+
+**Merged pull requests:**
+
+- fix: keep words apart at a sentence with no mark and at a joined ! or ? [\#221](https://github.com/TigreGotico/scriptconv/pull/221) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a72](https://github.com/TigreGotico/scriptconv/tree/0.0.4a72) (2026-11-13)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a71...0.0.4a72)
+
+**Merged pull requests:**
+
+- fix: make the normalize extra install every text2spoken language [\#219](https://github.com/TigreGotico/scriptconv/pull/219) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a71](https://github.com/TigreGotico/scriptconv/tree/0.0.4a71) (2026-11-13)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a70...0.0.4a71)
+
+**Merged pull requests:**
+
+- fix\(vosk\): look up a stress-marked word in the dictionary [\#217](https://github.com/TigreGotico/scriptconv/pull/217) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a70](https://github.com/TigreGotico/scriptconv/tree/0.0.4a70) (2026-11-13)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a69...0.0.4a70)
+
+**Merged pull requests:**
+
+- fix\(phonemizers\): keep the space after a clause inside a sentence [\#215](https://github.com/TigreGotico/scriptconv/pull/215) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.0.4a69](https://github.com/TigreGotico/scriptconv/tree/0.0.4a69) (2026-11-13)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a68...0.0.4a69)
+
+**Merged pull requests:**
+
+- fix\(vosk\): read a combining acute as stress on the vowel before it [\#213](https://github.com/TigreGotico/scriptconv/pull/213) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a68](https://github.com/TigreGotico/scriptconv/tree/0.0.4a68) (2026-11-13)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a67...0.0.4a68)
+
+**Merged pull requests:**
+
+- fix: run the hook in prepare and skip it for a backend that owns normalize [\#211](https://github.com/TigreGotico/scriptconv/pull/211) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a67](https://github.com/TigreGotico/scriptconv/tree/0.0.4a67) (2026-11-13)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a66...0.0.4a67)
+
+**Merged pull requests:**
+
+- fix\(phonemizers\): keep a hyphen or apostrophe after a stress mark [\#208](https://github.com/TigreGotico/scriptconv/pull/208) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a66](https://github.com/TigreGotico/scriptconv/tree/0.0.4a66) (2026-11-13)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a65...0.0.4a66)
+
+**Merged pull requests:**
+
+- fix\(espeak\): stress the syllable a combining acute marks in ru and uk [\#205](https://github.com/TigreGotico/scriptconv/pull/205) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a65](https://github.com/TigreGotico/scriptconv/tree/0.0.4a65) (2026-11-12)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a64...0.0.4a65)
@@ -297,10 +369,6 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a26...0.0.4a27)
 
-**Merged pull requests:**
-
-- docs: add OVOS G2P plugin page [\#104](https://github.com/TigreGotico/scriptconv/pull/104) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [0.0.4a26](https://github.com/TigreGotico/scriptconv/tree/0.0.4a26) (2026-09-03)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a25...0.0.4a26)
@@ -329,66 +397,33 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a22...0.0.4a23)
 
-**Merged pull requests:**
-
-- fix: accept English phonetic-detail IPA on ARPABET input [\#111](https://github.com/TigreGotico/scriptconv/pull/111) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [0.0.4a22](https://github.com/TigreGotico/scriptconv/tree/0.0.4a22) (2026-08-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a21...0.0.4a22)
-
-**Merged pull requests:**
-
-- fix: he extra installs phonikud, not just phonikud-onnx [\#107](https://github.com/TigreGotico/scriptconv/pull/107) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a21](https://github.com/TigreGotico/scriptconv/tree/0.0.4a21) (2026-08-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a20...0.0.4a21)
 
-**Merged pull requests:**
-
-- fix: raise MissingLanguageError for None/empty/und in match\_lang [\#108](https://github.com/TigreGotico/scriptconv/pull/108) ([JarbasAl](https://github.com/JarbasAl))
-- fix: resolve BCP-47 zh region tags in EspeakPhonemizer.get\_lang [\#105](https://github.com/TigreGotico/scriptconv/pull/105) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [0.0.4a20](https://github.com/TigreGotico/scriptconv/tree/0.0.4a20) (2026-08-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a19...0.0.4a20)
-
-**Merged pull requests:**
-
-- fix: agree diacritizer family routing with stressonnx 0.0.3a2 resolution [\#103](https://github.com/TigreGotico/scriptconv/pull/103) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a19](https://github.com/TigreGotico/scriptconv/tree/0.0.4a19) (2026-08-03)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a18...0.0.4a19)
 
-**Merged pull requests:**
-
-- feat: mantoq, halabi and iqra as distinct phonemizer edges with Alphabet.HALABI output [\#101](https://github.com/TigreGotico/scriptconv/pull/101) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [0.0.4a18](https://github.com/TigreGotico/scriptconv/tree/0.0.4a18) (2026-08-02)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a17...0.0.4a18)
-
-**Merged pull requests:**
-
-- fix: rename the mantoq notation to halabi [\#99](https://github.com/TigreGotico/scriptconv/pull/99) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a17](https://github.com/TigreGotico/scriptconv/tree/0.0.4a17) (2026-08-02)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a16...0.0.4a17)
 
-**Merged pull requests:**
-
-- fix: plain h missing from the X-SAMPA table [\#97](https://github.com/TigreGotico/scriptconv/pull/97) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [0.0.4a16](https://github.com/TigreGotico/scriptconv/tree/0.0.4a16) (2026-08-02)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a15...0.0.4a16)
-
-**Merged pull requests:**
-
-- fix: plain r \(alveolar trill\) missing from the X-SAMPA table [\#95](https://github.com/TigreGotico/scriptconv/pull/95) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a15](https://github.com/TigreGotico/scriptconv/tree/0.0.4a15) (2026-08-02)
 
