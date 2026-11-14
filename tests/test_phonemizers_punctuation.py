@@ -1,7 +1,8 @@
 """Clause punctuation in phonemizer output.
 
 By default no punctuation reaches the phonemes: voices trained that way must
-keep receiving the sequences they learned. ``keep_punctuation`` opts in to the
+keep receiving the sequences they learned, and training reads the same
+sequences as synthesis. ``keep_punctuation`` opts in to the
 Piper convention, where every clause is followed by its symbol (``. ? !`` bare,
 ``, : ;`` followed by a space). Clause breaks that espeak-ng prints as ``"\\n"``
 are never returned as phonemes, in either mode: each one is a space.
@@ -15,6 +16,7 @@ import unicodedata
 
 import pytest
 
+from scriptconv.frontend import FrontendConfig, Stages, TextFrontend
 from scriptconv.phonemizers import get_phonemizer
 from scriptconv.phonemizers.base import BasePhonemizer, join_sentences
 from scriptconv.phonemizers.enums import Phonemizer
@@ -76,28 +78,27 @@ class TestDefaultKeepsNoPunctuation:
                 assert "\n" not in espeak.phonemize_to_list(text, lang)
 
     def test_default_matches_the_previous_definitions(self, espeak):
-        # phonemize_to_list was list(phonemize_string) and phonemize_lazy
-        # phonemized each chunk_text chunk with its punctuation removed; the
-        # default output is those, with a space at each newline clause break
+        # phonemize_lazy phonemizes each chunk_text chunk with its punctuation
+        # removed, and phonemize_to_list joins those chunks
         for lang, texts in MULTILINGUAL.items():
             for text in texts:
-                raw = espeak.phonemize_string(text, lang)
-                assert espeak.phonemize_to_list(text, lang) == list(raw.replace("\n", " "))
                 previous = [
                     list(re.sub(r"\([^)]+\)", "", espeak.phonemize_string(
                         espeak.remove_punctuation(chunk), lang)))
                     for chunk, _, _ in espeak.chunk_text(text)]
                 assert espeak.phonemize(text, lang) == previous
                 assert list(espeak.phonemize_lazy(text, lang)) == previous
+                assert espeak.phonemize_to_list(text, lang) == join_sentences(previous)
 
     @pytest.mark.parametrize("text, expected", [
-        ("one,two?three", "ONE TWO THREE"),
+        ("one, two?three", "ONE TWO THREE"),
         ("one,, two", "ONE TWO"),
         ("one ,\n, two!", "ONE TWO"),
         ("one!", "ONE"),
     ])
     def test_a_clause_break_is_one_space(self, text, expected):
         assert "".join(CliLike().phonemize_to_list(text, "en")) == expected
+        assert "".join(join_sentences(CliLike().phonemize(text, "en"))) == expected
 
     @pytest.mark.parametrize("prefer_espyak", [False, True])
     def test_espeak_reads_the_clauses_apart(self, prefer_espyak):
@@ -111,6 +112,58 @@ class TestDefaultKeepsNoPunctuation:
         # chunked, punctuation removed before the backend, no symbol appended
         assert CliLike().phonemize("one, two. three!", "en") == [
             list("ONE TWO"), list("THREE")]
+
+
+class TestTrainingEqualsSynthesisWithoutPunctuation:
+    """With the flag off, the training stream is the synthesis chunks joined by
+    the contract rule, so no mark that synthesis removes reaches training."""
+
+    TEXT = 'Olá, "Ana", tudo bem! Estás pronta?Sim.'
+
+    @pytest.mark.parametrize("backend, expected", [
+        ("graphemes", "olá ana tudo bem estás pronta sim"),
+        ("unicode", unicodedata.normalize("NFD", "Olá Ana tudo bem Estás pronta Sim")),
+        ("stub", "OLÁ ANA TUDO BEM ESTÁS PRONTA SIM"),
+    ])
+    def test_no_mark_reaches_training(self, backend, expected):
+        phonemizer = CliLike() if backend == "stub" else get_phonemizer(Phonemizer(backend))
+        assert "".join(phonemizer.phonemize_to_list(self.TEXT, "pt")) == expected
+        assert phonemizer.phonemize_to_list(self.TEXT, "pt") == join_sentences(
+            phonemizer.phonemize(self.TEXT, "pt"))
+
+    @pytest.mark.parametrize("text, chunks", [
+        (TEXT, ["Olá Ana tudo bem", "Estás pronta Sim"]),
+        # espeak-ng reads a dash as a pause, and synthesis never sends it
+        ("Olá, tudo bem! Estás pronto - ou não? Sim.",
+         ["Olá tudo bem", "Estás pronto  ou não", "Sim"]),
+    ])
+    @pytest.mark.parametrize("prefer_espyak", [False, True])
+    def test_espeak_trains_on_the_synthesis_chunks(self, text, chunks, prefer_espyak):
+        espeak = EspeakPhonemizer(prefer_espyak=prefer_espyak)
+        expected = " ".join(espeak.phonemize_string(chunk, "pt") for chunk in chunks)
+        assert espeak.phonemize_to_list(text, "pt") == list(expected)
+        assert espeak.phonemize_to_list(text, "pt") == join_sentences(espeak.phonemize(text, "pt"))
+
+    def test_frontend_flat_equals_the_joined_chunks(self):
+        for backend in ("graphemes", "unicode"):
+            frontend = TextFrontend(FrontendConfig("pt", stages=Stages(diacritize=False)),
+                                    get_phonemizer(Phonemizer(backend)))
+            assert frontend.phonemize_flat(self.TEXT) == join_sentences(
+                frontend.phonemize(self.TEXT))
+
+    def test_the_normalizer_runs_only_on_synthesis(self):
+        phonemizer = CliLike()
+        phonemizer.normalizer = lambda text, lang: text.replace("3", "three")
+        train = phonemizer.phonemize_to_list("number three, now.", "en")
+        assert "".join(train) == "NUMBER THREE NOW"
+        assert join_sentences(phonemizer.phonemize("number 3, now.", "en")) == train
+
+    def test_a_backend_with_its_own_synthesis_keeps_its_list(self):
+        class OwnSynthesis(CliLike):
+            def phonemize_lazy(self, text, lang):
+                yield list(self.phonemize_string(text, lang))
+
+        assert OwnSynthesis().phonemize_to_list("one, two.", "en") == list("ONE TWO")
 
 
 class TestKeepPunctuation:

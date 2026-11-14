@@ -226,9 +226,9 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
     Off by default, so voices trained without punctuation receive exactly the
     sequences they were trained on. When on, :meth:`phonemize_to_list` and
     :meth:`phonemize_lazy` phonemize clause by clause and append each clause's
-    symbol the way Piper does. For the same text, :meth:`phonemize_to_list`
-    is the :func:`join_sentences` of the sentences that :meth:`phonemize_lazy`
-    yields. A backend that overrides either method owns its own output and
+    symbol the way Piper does. With the flag on or off, for the same text,
+    :meth:`phonemize_to_list` is the :func:`join_sentences` of the sentences
+    that :meth:`phonemize_lazy` yields. A backend that overrides either method owns its own output and
     ignores this flag, since honouring it on one side only would make training
     and synthesis disagree.
     """
@@ -259,15 +259,20 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
     def phonemize_to_list(self, text: str, lang: str) -> List[str]:
         """Phonemes of *text* as one flat list, without normalization.
 
-        Clause breaks that a backend prints as ``"\\n"`` (espeak-ng does at
-        every comma, question mark and exclamation mark) are not phonemes:
-        each becomes one space, because the next clause starts a new word.
-        With :attr:`keep_punctuation`, the list is the :func:`join_sentences`
-        of :meth:`phonemize`, and each clause's symbol comes before its space.
+        The list is the :func:`join_sentences` of :meth:`phonemize`, so a voice
+        trains on the sequences that synthesis gives it. Without
+        :attr:`keep_punctuation` no punctuation reaches the list, and with it
+        each clause's symbol comes before its space. Clause breaks that a
+        backend prints as ``"\\n"`` are not phonemes: each becomes one space,
+        because the next clause starts a new word. A backend that overrides
+        :meth:`phonemize_lazy` keeps its own synthesis, so its list is the
+        whole text read by :meth:`phonemize_string`.
         """
         if self._keeps_punctuation():
             return join_sentences(self._punctuated_sentences(text, lang))
-        return list(_clause_breaks_as_spaces(self.phonemize_string(text, lang)))
+        if type(self).phonemize_lazy is not BasePhonemizer.phonemize_lazy:
+            return list(_clause_breaks_as_spaces(self.phonemize_string(text, lang)))
+        return join_sentences(self._bare_sentences(text, lang))
 
     def phonemize(self, text: str, lang: str) -> PhonemizedChunks:
         # PhonemizedChunks is list[list[str]]; empty text yields no
@@ -295,7 +300,11 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
             text = self.normalizer(text, lang)
         if self._keeps_punctuation():
             yield from self._punctuated_sentences(text, lang)
-            return
+        else:
+            yield from self._bare_sentences(text, lang)
+
+    def _bare_sentences(self, text: str, lang: str) -> Iterator[List[str]]:
+        """Per-chunk phonemes, with the punctuation removed before the backend."""
         for chunk, punct, eos in self.chunk_text(text):
             phoneme_str = _clause_breaks_as_spaces(
                 self.phonemize_string(self.remove_punctuation(chunk), lang))
