@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a78](https://github.com/TigreGotico/scriptconv/tree/0.0.4a78) (2026-11-14)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a77...0.0.4a78)
+
+**Merged pull requests:**
+
+- docs\(diacritics\): state the strip NFD claim and the §325 citation exactly [\#230](https://github.com/TigreGotico/scriptconv/pull/230) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a77](https://github.com/TigreGotico/scriptconv/tree/0.0.4a77) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a76...0.0.4a77)
