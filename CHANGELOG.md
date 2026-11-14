@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a81](https://github.com/TigreGotico/scriptconv/tree/0.0.4a81) (2026-11-14)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a80...0.0.4a81)
+
+**Merged pull requests:**
+
+- fix\(notation\): strict refuses a stressed syllabic consonant; measure the kana and strip edges [\#200](https://github.com/TigreGotico/scriptconv/pull/200) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a80](https://github.com/TigreGotico/scriptconv/tree/0.0.4a80) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a79...0.0.4a80)
