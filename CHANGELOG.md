@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a86](https://github.com/TigreGotico/scriptconv/tree/0.0.4a86) (2026-11-14)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a85...0.0.4a86)
+
+**Merged pull requests:**
+
+- fix\(zh\): keep every phoneme of a syllable in Chinese IPA [\#178](https://github.com/TigreGotico/scriptconv/pull/178) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a85](https://github.com/TigreGotico/scriptconv/tree/0.0.4a85) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a84...0.0.4a85)
