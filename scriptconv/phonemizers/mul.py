@@ -246,6 +246,14 @@ class CharsiuPhonemizer(ByT5Phonemizer):
                   'srp', 'hbs-latn', 'hbs-cyrl', 'snd', 'slo', 'slv', 'spa', 'spa-latin', 'spa-me', 'swa', 'swe', 'tgl',
                   'tam', 'tat', 'tha', 'tur', 'tuk', 'ukr', 'vie-n', 'vie-c', 'vie-s', 'wel-nw', 'wel-sw', 'ice', 'ang',
                   'gle', 'enm', 'syc', 'glg', 'sme', 'egy']
+    # BCP-47 tags for the labels whose code does not name the script of their
+    # CharsiuG2P data. dicts/srp.tsv is Serbian in Cyrillic (eSpeak NG over a
+    # Leipzig word list), so a Serbian request in Cyrillic picks it over the
+    # Serbo-Croatian WikiPron list dicts/hbs-cyrl.tsv. dicts/zho-s.tsv and
+    # dicts/zho-t.tsv are ipa-dict zh_hans and zh_hant. dicts/kur.tsv is the
+    # AsoSoft Central Kurdish data, "Central Kurdish words in Standard Arabic
+    # script", which a Kurmanji request in Latin script must not reach.
+    MATCH_TAGS = {"srp": "sr-Cyrl", "zho-s": "zh-Hans", "zho-t": "zh-Hant", "kur": "ckb"}
 
     def __init__(self, model: Optional[str] = None, tokenizer_config: Optional[str] = None,
                  providers: Optional[Sequence[ProviderSpec]] = None,
@@ -279,7 +287,10 @@ class CharsiuPhonemizer(ByT5Phonemizer):
         """
         if _is_hk_cantonese(target_lang):
             return "yue"
-        return cls.match_lang(target_lang, cls.BYT5_LANGS)
+        if target_lang in cls.BYT5_LANGS:
+            return target_lang
+        tags = {cls.MATCH_TAGS.get(label, label): label for label in cls.BYT5_LANGS}
+        return tags[cls.match_lang(target_lang, list(tags))]
 
     def phonemize_string(self, text: str, lang: str) -> str:
         # charsiu models can't handle whitespace, need to be phonemized word by word
