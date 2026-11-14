@@ -509,8 +509,9 @@ def strip_diacritics(text: str, lang: str = "und", **_) -> str:
     stress, tashkeel for Arabic, niqqud for Hebrew) — precomposed native
     letters (Cyrillic й/ё, Latvian ī, Azerbaijani ç, Arabic hamza carriers) are
     left intact. A mark that composes with the letter before it into a letter
-    of the language's alphabet is kept too, composed with that letter, so NFD
-    Macedonian ѓ and ќ come out precomposed, as NFC input does. Raises
+    of the language's alphabet is kept too, composed with that letter. So when
+    U+0301 comes right after г or к, as in NFD ѓ and ќ, strip writes the
+    precomposed letter that NFC input gives. Raises
     :class:`ValueError` for languages whose diacritics are part of the native
     orthography (e.g. European Portuguese), where any removal would corrupt
     the spelling.
