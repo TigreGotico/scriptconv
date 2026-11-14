@@ -81,9 +81,13 @@ class TestIpaToArpaCompat(unittest.TestCase):
     def test_custom_unknown_token(self):
         self.assertEqual(N.ipa_to_arpa("χ", unknown="<UNK>"), "<UNK>")
 
-    def test_diacritics_never_treated_as_unknown(self):
-        # combining marks qualify the preceding phoneme even under strict
-        self.assertEqual(N.ipa_to_arpa("kæ̃t", errors="strict"), "K AE T")
+    def test_diacritics_dropped_by_default_and_refused_under_strict(self):
+        # A combining mark qualifies the phoneme before it. The default drops
+        # it, and strict, which never drops a mark, names it.
+        self.assertEqual(N.ipa_to_arpa("kæ̃t"), "K AE T")
+        with self.assertRaises(UnknownSymbolError) as caught:
+            N.ipa_to_arpa("kæ̃t", errors="strict")
+        self.assertEqual((caught.exception.symbol, caught.exception.position), ("\u0303", 2))
 
 
 class TestConvertFacade(unittest.TestCase):

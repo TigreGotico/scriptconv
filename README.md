@@ -116,7 +116,8 @@ Two contracts make this trustworthy:
 - **`errors=`, codecs-style.** Every converter takes
   `errors="pass" | "replace" | "strict" | "ignore"` for symbols outside its
   table. `"strict"` raises `UnknownSymbolError(symbol, position, notation)`.
-  The defaults preserve each converter's long-standing behavior.
+  Strict drops no mark and accepts spaces, the Unicode White_Space
+  characters. The defaults preserve each converter's long-standing behavior.
 
 - **Stress is preserved, not discarded.** With `stress=True`, ARPABET stress
   digits become IPA `ˈ`/`ˌ` placed before the stressed vowel. This is
@@ -235,9 +236,9 @@ phonemize("hello", "en", override=Phonemizer.GRUUT)
 ```
 
 Defaults resolve in-house engines first: an explicit per-language chain
-(Arabic to arbtok, Basque to euskaphone, Mirandese, Portuguese to
-tugaphone, Hebrew to phonikud, Galician to Cotovía, and Russian to vosk for
-their own notations), then orthography2ipa wherever it has a language spec,
+(Arabic to arbtok, Basque to euskaphone, Mirandese to its orthography2ipa
+specs, Portuguese to tugaphone, Hebrew to phonikud, Galician to Cotovía, and
+Russian to vosk for their own notations), then orthography2ipa wherever it has a language spec,
 then espeak as the last resort.
 
 Arabic never falls back past arbtok. A missing engine raises an error
@@ -347,9 +348,9 @@ placeholder (`?`, the historical `ipa_to_arpa` default, tunable via
 
 | Notation | `to_ipa` → `from_ipa` round-trip | `from_ipa` → `to_ipa` round-trip | Unknown-token behaviour |
 |----------|----------------------------------|----------------------------------|-------------------------|
-| **ARPABET** | **Lossless with `stress=True`** (digits map to IPA `ˈ`/`ˌ` before the stressed vowel; residues: extended-ARPABET `AX` and `AXR` normalise to CMUdict's `AH0` and `ER0` spellings, stable from the IPA side). Default `stress=False` drops digits, and merges `AH0` with `AX` and `ER0` with `AXR` | **Lossy** (ARPABET is an English-only inventory, so any IPA symbol outside it becomes the *unknown* placeholder) | `arpa_to_ipa`: passed through unchanged. `ipa_to_arpa`: diacritics, suprasegmentals and word gaps are dropped. Other out-of-inventory symbols follow `errors=` (default `"replace"` → `?`) |
+| **ARPABET** | **Exact with `stress=True`** (digits map to IPA `ˈ`/`ˌ` before the stressed vowel; residues: extended-ARPABET `AX` and `AXR` normalise to CMUdict's `AH0` and `ER0` spellings, stable from the IPA side). Default `stress=False` drops digits, and merges `AH0` with `AX` and `ER0` with `AXR` | **Lossy** (ARPABET is an English-only inventory, so any IPA symbol outside it becomes the *unknown* placeholder) | `arpa_to_ipa`: passed through unchanged. `ipa_to_arpa`: diacritics, suprasegmentals and word gaps are dropped. Other out-of-inventory symbols follow `errors=` (default `"replace"` → `?`) |
 | **X-SAMPA** | Exact for every spelling Wells lists; a second spelling (`v\`, `_=`, `_~`) returns as the first (`P`, `=`, `~`) | Exact for every symbol Wells lists, each taken alone, including diacritics and tones | Passed through unchanged |
-| **Buckwalter ↔ Arabic** | Exact (precomposed lam-alef ligatures decompose to two characters, visually identical) | Exact | Follows `errors=` (default: passed through) |
+| **Buckwalter ↔ Arabic** | Exact | Exact. An Arabic presentation form, such as the lam-alef ligature `ﻻ`, returns as the letters it stands for | Follows `errors=` (default: passed through) |
 | **Halabi → IPA** | One-directional (gemination and word markers are consumed; there is no IPA to Halabi) | Not applicable | Follows `errors=` (default: passed through) |
 | **Lexique ↔ IPA** | Exact except the `°`/`3` schwa pair (both map to `ə`; the reverse always produces `°`) | **Lossy** (French inventory; IPA outside it passes through) | Passed through unchanged |
 | **Kirshenbaum ↔ IPA** | **Lossy** (keys such as `F`, `K` and `P`, the digits and punctuation give output that is not IPA) | **Lossy** (restricted ASCII inventory; IPA outside it passes through) | Passed through unchanged |
@@ -358,9 +359,10 @@ placeholder (`?`, the historical `ipa_to_arpa` default, tunable via
 
 Every row is backed by a test. `NOTATION_INFO` exposes the same facts to
 code, so a program can branch on whether a conversion is safe before making
-it. A conversion is lossless when every symbol of its source inventory converts
-under `errors="strict"` to symbols of the target inventory and the reverse
-conversion returns it, so a symbol that only passes through does not count.
+it. Its flags follow one definition of lossless, which
+[docs/notation.md](docs/notation.md#queryable-fidelity-notation_info) states. A
+conversion with `stress=True` or another option can be exact where the flag is
+`False`, because the flag measures the defaults.
 
 ## Extras
 
@@ -371,7 +373,8 @@ The core installs with zero dependencies. Capabilities opt in:
 | `ja` / `zh` | Dictionary readings: kanji to kana (pykakasi), hanzi to pinyin/bopomofo (pypinyin) |
 | `phonemizers` | The phonemizer base layer (sentence chunking, language matching) |
 | `espeak`, `gruut`, `goruut`, `epitran`, `transphone`, `misaki`, `byt5` | Multilingual phonemizer backends |
-| `en-phonemizers`, `ja-phonemizers`, `zh-phonemizers`, `ko`, `ar-phonemizers`, `eu`, `pt-phonemizers`, `gl`, `he`, `fa`, `vi`, `mwl`, `shami`, `o2i` | Per-language phonemizer backends |
+| `en-phonemizers`, `ja-phonemizers`, `zh-phonemizers`, `ko`, `ar-phonemizers`, `eu`, `pt-phonemizers`, `gl`, `he`, `fa`, `vi`, `shami`, `o2i` | Per-language phonemizer backends. `o2i` also gives Mirandese and Barranquenho |
+| `mwl` | The same packages as `o2i` |
 | `tashkeel` | Arabic diacritization for the phonemizer pipeline (text2tashkeel) |
 | `stress` | Word-stress restoration for 26 stressonnx language tags: East Slavic; Bulgarian, Macedonian, and Slovene; Latvian; Armenian; Georgian; and Turkic/Caucasian, for the phonemizer pipeline (stressonnx; not yet on PyPI) |
 | `pt` | European-Portuguese heterophonic-homograph sense diacritics for the phonemizer pipeline (bifonia) |
@@ -431,12 +434,11 @@ extras:
   and the whole phonemizer layer.
 - [orthography2ipa](https://github.com/TigreGotico/orthography2ipa): a
   data-driven orthography-to-IPA engine, and the usual per-language
-  phonemizer default.
+  phonemizer default. Its specs give the Mirandese and Barranquenho
+  phonemizers.
 - [arbtok](https://github.com/TigreGotico/arbtok): Arabic phonemizer (dialect-aware).
 - [euskaphone](https://github.com/TigreGotico/euskaphone): Basque phonemizer (dialect-aware).
 - [tugaphone](https://github.com/TigreGotico/tugaphone): Portuguese phonemizer (dialect-aware).
-- [mwl_phonemizer](https://github.com/TigreGotico/mwl_phonemizer): Mirandese phonemizer.
-- [g2p_barranquenho](https://github.com/TigreGotico/g2p_barranquenho): Barranquenho phonemizer.
 - [pycotovia](https://github.com/TigreGotico/pycotovia): a pure-Python
   phonemizer port of the Cotovía Galician TTS engine, whose notation
   scriptconv transcodes.
