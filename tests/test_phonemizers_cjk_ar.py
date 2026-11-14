@@ -73,9 +73,11 @@ class TestZhBackendFriendlyImportErrors(unittest.TestCase):
         from scriptconv.phonemizers.zh import G2pMPhonemizer
         self._assert_friendly("g2pM", G2pMPhonemizer, "zh-phonemizers")
 
-    def test_g2pc_missing_dep_message_names_the_reason(self):
+    def test_g2pc_missing_dep_message_gives_the_install_that_works(self):
         # g2pc needs pkuseg, and PyPI has pkuseg wheels for CPython 3.5 to
-        # 3.8 only, so no extra can install it. The message says why.
+        # 3.8 only. The pkuseg sdist builds when numpy, Cython and setuptools
+        # are installed first and build isolation is off. An extra cannot
+        # do that, so the message gives the two commands.
         import sys
         from unittest.mock import patch
         from scriptconv.phonemizers.zh import G2pCPhonemizer
@@ -85,7 +87,25 @@ class TestZhBackendFriendlyImportErrors(unittest.TestCase):
         message = str(ctx.exception)
         self.assertIn("pkuseg", message)
         self.assertIn("CPython 3.5 to 3.8", message)
+        self.assertIn("'pip install numpy cython setuptools'", message)
+        self.assertIn("'pip install --no-build-isolation g2pc'", message)
+        self.assertNotIn("fails to build", message)
         self.assertNotIn("scriptconv[", message)
+
+    def test_zh_phonemizers_extra_installs_numpy_for_g2pm(self):
+        # g2pM 0.1.2.5 imports numpy in g2pM/g2pM.py and declares no
+        # dependencies on PyPI, so the extra that installs g2pM must
+        # also install numpy.
+        import re
+        import tomllib
+        from pathlib import Path
+        pyproject = Path(__file__).resolve().parent.parent / "pyproject.toml"
+        extra = tomllib.loads(pyproject.read_text(encoding="utf-8"))[
+            "project"]["optional-dependencies"]["zh-phonemizers"]
+        names = {re.match(r"[A-Za-z0-9_.-]+", req).group(0).lower()
+                 for req in extra}
+        self.assertIn("g2pm", names)
+        self.assertIn("numpy", names)
 
     def test_pinyin_to_ipa_missing_dep_message(self):
         from scriptconv.phonemizers.zh import PypinyinPhonemizer
