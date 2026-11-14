@@ -1,8 +1,20 @@
 # Changelog
 
+## [0.0.4a84](https://github.com/TigreGotico/scriptconv/tree/0.0.4a84) (2026-11-14)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a83...0.0.4a84)
+
+**Merged pull requests:**
+
+- fix: match Charsiu labels by the script of their data [\#237](https://github.com/TigreGotico/scriptconv/pull/237) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a83](https://github.com/TigreGotico/scriptconv/tree/0.0.4a83) (2026-11-14)
 
-[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a81...0.0.4a83)
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a82...0.0.4a83)
+
+## [0.0.4a82](https://github.com/TigreGotico/scriptconv/tree/0.0.4a82) (2026-11-14)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a81...0.0.4a82)
 
 **Merged pull requests:**
 
@@ -381,17 +393,9 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a32...0.0.4a33)
 
-**Merged pull requests:**
-
-- docs\(phonetisaurus\): name the one library the wheel does not ship, and add the real-engine cell [\#132](https://github.com/TigreGotico/scriptconv/pull/132) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a32](https://github.com/TigreGotico/scriptconv/tree/0.0.4a32) (2026-09-26)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a31...0.0.4a32)
-
-**Merged pull requests:**
-
-- feat\(kab\): add the Matoub Kabyle phonemizer as its own route [\#133](https://github.com/TigreGotico/scriptconv/pull/133) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a31](https://github.com/TigreGotico/scriptconv/tree/0.0.4a31) (2026-09-23)
 
