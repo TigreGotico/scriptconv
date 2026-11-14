@@ -198,6 +198,8 @@ _IPA_ARPA_RE = re.compile("|".join(re.escape(s) for s in _IPA_ARPA_KEYS_SORTED))
 # ARPABET vowel class — the symbols that carry stress digits.
 _ARPA_VOWELS = {"AO", "AA", "IY", "UW", "EH", "IH", "UH", "AH", "AE", "AX",
                 "IX", "UX", "EY", "AY", "OW", "AW", "OY", "ER", "AXR"}
+# Syllabic consonants: the nucleus of a syllable that has no ARPABET vowel.
+_ARPA_SYLLABIC = {"EM", "EN", "ENG", "EL"}
 _STRESS_MARKS = {"ˈ": "1", "ˌ": "2"}  # IPA primary/secondary stress
 
 
@@ -291,8 +293,9 @@ def ipa_to_arpa(ipa_string: str, unknown: str = "?",
     ``unknown=""`` still drops silently.  Under the other policies, combining
     marks and modifier letters qualify the preceding phoneme and are dropped
     rather than treated as unknowns.  ``"strict"`` drops no mark: it raises
-    on a mark with no ARPABET value, and on a stress mark that no vowel
-    follows.  With ``stress=False`` a stress mark is dropped under every
+    on a mark with no ARPABET value, on a stress mark that no vowel
+    follows, and on a stress mark whose syllable has a syllabic consonant
+    (``EL``, ``EM``, ``EN``, ``ENG``) and no vowel.  With ``stress=False`` a stress mark is dropped under every
     policy, because the caller asked for no stress digits.  Spaces, the
     characters with the Unicode White_Space property, are dropped too: ARPABET
     tokens are space-separated, so the output keeps no word boundary.
@@ -320,6 +323,10 @@ def ipa_to_arpa(ipa_string: str, unknown: str = "?",
         m = _IPA_ARPA_RE.match(ipa_string, pos)
         if m:
             tok = _IPA_TO_ARPA[m.group(0)]
+            # ARPABET has no stress digit for a syllabic consonant, and the
+            # next vowel is in another syllable.
+            if pending_stress and errors == "strict" and tok in _ARPA_SYLLABIC:
+                raise UnknownSymbolError(ipa_string[stress_pos], stress_pos, "arpa")
             if stress and tok in _ARPA_VOWELS:
                 # Stress-aware output follows CMUdict spelling for exact
                 # round-trips; extended-ARPABET AX and AXR input normalizes
@@ -1375,6 +1382,8 @@ def iqra_halabi_to_ipa(tokens: str, errors: str = "pass") -> str:
     vowels distinct and reads gemination off a literal doubled consonant
     letter — the ``phoneme_ref`` convention.  Unknown tokens follow the
     ``errors`` policy (``"pass"`` by default: passed through verbatim).
+    A space separates two phones, and ``phoneme_ref`` has no word boundary,
+    so the output has no space.
 
     Examples
     --------

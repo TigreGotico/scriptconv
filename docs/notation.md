@@ -95,11 +95,13 @@ its position and the notation. Strict follows three rules:
 3. Strict accepts spaces. A space is a character with the Unicode White_Space
    property, 25 code points. Each converter keeps a space under every policy, because a
    space is not an unknown symbol. ARPABET has no word boundary, so `ipa_to_arpa`
-   drops the space and `arpa_to_ipa` splits its tokens on it. U+001C to U+001F and
-   U+200B are not White_Space, so strict raises on them.
+   drops the space and `arpa_to_ipa` splits its tokens on it. `iqra_halabi_to_ipa`
+   also drops the space: in the IqraEval `phoneme_ref` notation a space separates
+   two phones, and the notation has no word boundary. U+001C to U+001F and U+200B
+   are not White_Space, so strict raises on them.
 
-With `stress=False`, `ipa_to_arpa` drops a stress mark under every policy, because
-the caller asked for ARPABET with no stress digits.
+With `stress=False`, the default, `ipa_to_arpa` drops stress marks even under strict,
+because the caller asked for ARPABET with no stress digits.
 
 ---
 
@@ -137,7 +139,8 @@ arpa_to_ipa("UNKNOWN")        # "UNKNOWN"  (passed through)
 ### ipa_to_arpa
 
 ```python
-def ipa_to_arpa(ipa_string: str, unknown: str = "?") -> str
+def ipa_to_arpa(ipa_string: str, unknown: str = "?",
+                errors: str = "replace", stress: bool = False) -> str
 ```
 
 Converts an IPA string to a space-separated ARPABET sequence. Matches the longest IPA
@@ -149,7 +152,10 @@ The tied affricates `t͡ʃ` and `d͡ʒ` give `CH` and `JH`, with the tie above o
 With `stress=True`, a stress mark gives its digit to the next vowel. The IPA puts the
 mark before the stressed syllable, so `bəˈnænə` gives `B AH0 N AE1 N AH0`, as in the
 CMU Pronouncing Dictionary. A mark before the vowel gives the same result. A stress
-mark does not cross a space.
+mark does not cross a space. ARPABET gives a syllabic consonant (`EL`, `EM`, `EN`,
+`ENG`) no stress digit. So strict raises on a stress mark whose syllable has a
+syllabic consonant and no vowel: `ipa_to_arpa("ˈl̩ə", stress=True, errors="strict")`
+raises on `ˈ`. The other policies give the digit to the next vowel, `EL AH1`.
 
 ```python
 ipa_to_arpa("həloʊ")   # "HH AX L OW"
@@ -253,8 +259,9 @@ The tie bar is `_`, which also opens a diacritic, so `t͡s` gives `t_s` and `t͡
 `tT`: Wells assumes affricate status where no tie is written, and the tie itself does
 not come back. `a͡ɨ` gives `a1` for the same reason, because `_1` is a tone number.
 A tone number has no IPA value, so `xsampa_to_ipa` treats each of `_1` to `_6` as one
-unknown symbol. The falling tone ``_` `` of Wells's section 24 is one unknown symbol for
-the same reason, and not a tie before the rhoticity mark. `a_7`, `a_8` and `a_9` are the tie and a vowel, because the tone numbers
+unknown symbol. Wells's section 24 writes the Mandarin falling tone as ``ma_` ``. The
+table writes the fall as `_F` or `_\` and does not map ``_` ``, so it is one unknown
+symbol, and not a tie before the rhoticity mark. `a_7`, `a_8` and `a_9` are the tie and a vowel, because the tone numbers
 stop at 6.
 X-SAMPA → IPA → X-SAMPA is lossless for every spelling Wells lists. A second spelling
 returns as the first.

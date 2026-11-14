@@ -417,9 +417,10 @@ LEFT_OUT = {
     "_1": "Wells: \"a language-specific tone number\", with six for Cantonese. "
           "Wikipedia: \"The numbers _1 to _6 are reserved diacritics\". It has "
           "no IPA value, so it stays unknown and does not read as a tie",
-    "_`": "Wells, section 24: tone 4 of Mandarin as ma_`, among other tone "
-          "spellings that he calls \"an embarras de richesses\" and votes "
-          "against. It has no IPA value, so it stays unknown and does not read "
+    "_`": "Wells, section 24: \"tone 4 ma_` <\\>ma or <F>ma\", the fall of "
+          "Mandarin, in a list he calls \"an embarras de richesses\" and votes "
+          "against. It is a tone mark that this table does not map: the table "
+          "writes the fall as _F or _\\. So it stays unknown and does not read "
           "as a tie before the rhoticity mark. ma_- from the same list keeps "
           "the table value of _-, the retracted mark",
 }
