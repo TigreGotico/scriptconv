@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 import subprocess
+import weakref
 from importlib import metadata
 from typing import List, Dict, Optional, Sequence, Tuple, TYPE_CHECKING
 
@@ -716,6 +717,15 @@ class GruutPhonemizer(BasePhonemizer):
         return pho.strip()
 
 
+def _stop_goruut_server(process: subprocess.Popen) -> None:
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
+
+
 class GoruutPhonemizer(BasePhonemizer):
     """
     A phonemizer class that uses the pygoruut library to convert text into phonemes.
@@ -872,11 +882,25 @@ class GoruutPhonemizer(BasePhonemizer):
             ) from e
 
         self.pygoruut_langs = PygoruutLanguages()
+        self._server_finalizer = None
         if remote_url is not None:
             # 'https://hashtron.cloud'
             self.pygoruut = Pygoruut(api=remote_url)
         else:
             self.pygoruut = Pygoruut()
+            # Pygoruut.__del__ never runs: its stderr drainer thread holds the
+            # instance, so the server outlives the process unless stopped here.
+            self._server_finalizer = weakref.finalize(
+                self, _stop_goruut_server, self.pygoruut.process)
+
+    def close(self) -> None:
+        """Stop the local goruut server that this phonemizer started.
+
+        The server also stops when the phonemizer is garbage-collected and at
+        interpreter exit. A remote server is never stopped.
+        """
+        if self._server_finalizer is not None:
+            self._server_finalizer()
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
