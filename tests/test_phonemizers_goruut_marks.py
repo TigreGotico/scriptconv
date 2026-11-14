@@ -116,6 +116,15 @@ class TestGoruutMarks(unittest.TestCase):
                 ipa = self.phonemizer.phonemize_string(marked, lang)
                 self.assertEqual(_in_script(ipa, script), "", ipa)
 
+    def test_nfd_macedonian_reaches_goruut_as_nfc(self):
+        # ѓ and ќ are г and к plus U+0301 in NFD. goruut's Macedonian map has
+        # keys for the precomposed letters only.
+        nfc = "\u045c\u0435 \u0453\u0430\u0432\u043e\u043b"
+        nfd = unicodedata.normalize("NFD", nfc)
+        self.assertNotEqual(nfd, nfc)
+        self.assertEqual(self._sent_to_goruut(nfd, "mk"), nfc)
+        self.assertEqual(self._sent_to_goruut(nfc, "mk"), nfc)
+
     def test_goruut_receives_the_vowel_marks(self):
         for lang, _, marked in VOCALIZED:
             with self.subTest(lang=lang, text=marked):

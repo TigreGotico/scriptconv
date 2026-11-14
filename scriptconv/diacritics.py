@@ -56,13 +56,14 @@ A stress mark and a letter-forming mark can be the same codepoint. In NFD text
 the Macedonian letters ѓ and ќ are г and к followed by U+0301, the codepoint
 stressonnx uses for stress. Strip keeps an acute or grave when it composes (NFC)
 with the letter before it into a letter of the language's alphabet, and removes
-it otherwise, so NFD ѓ and ќ survive as they do in NFC. Unicode has eight
+it otherwise. A kept mark is written composed with its letter, so NFD ѓ and ќ
+come out as the same precomposed letters that NFC input gives. Unicode has eight
 Cyrillic letters whose NFD form ends in U+0300 or U+0301 (ѐ ѓ ќ ѝ and their
 capitals), and no Armenian or Georgian letter of that kind:
 
 - Macedonian: the 31-letter alphabet includes ѓ and ќ (Институт за македонски
   јазик „Крсте Мисирков“, Правопис на македонскиот јазик, 2nd ed., Skopje
-  2017, §1, p. 3). Strip keeps their acute.
+  2017, §1, p. 3). Strip keeps these letters.
 - Macedonian ѐ and ѝ, as in сѐ, нѐ and the pronoun ѝ, are е and и with a
   supralinear sign that tells homographs apart; the Pravopis lists them as a
   sign (§325, p. 141), not as letters. In Bulgarian the grave over и and е is
@@ -506,8 +507,8 @@ def strip_diacritics(text: str, lang: str = "und", **_) -> str:
     stress, tashkeel for Arabic, niqqud for Hebrew) — precomposed native
     letters (Cyrillic й/ё, Latvian ī, Azerbaijani ç, Arabic hamza carriers) are
     left intact. A mark that composes with the letter before it into a letter
-    of the language's alphabet is kept too, so NFD Macedonian ѓ and ќ survive
-    as they do in NFC. Raises :class:`ValueError` for languages whose
+    of the language's alphabet is kept too, composed with that letter, so NFD
+    Macedonian ѓ and ќ come out precomposed, as NFC input does. Raises :class:`ValueError` for languages whose
     diacritics are part of the native orthography (e.g. European Portuguese),
     where any removal would corrupt the spelling.
     """
@@ -521,10 +522,12 @@ def strip_diacritics(text: str, lang: str = "und", **_) -> str:
     native = _NATIVE_ACCENTED_LETTERS.get(_primary_subtag(lang), frozenset())
     kept = []
     for c in text:
-        if ord(c) in marks and not (
-                kept and unicodedata.normalize("NFC", kept[-1] + c) in native):
+        if ord(c) not in marks:
+            kept.append(c)
             continue
-        kept.append(c)
+        composed = unicodedata.normalize("NFC", kept[-1] + c) if kept else c
+        if composed in native:
+            kept[-1] = composed
     return "".join(kept)
 
 
