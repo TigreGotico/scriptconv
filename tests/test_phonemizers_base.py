@@ -343,6 +343,44 @@ class TestRemovePunctuationKeepsDigitInternal(unittest.TestCase):
         self.assertEqual(BasePhonemizer.remove_punctuation("3.º"), "3º")
 
 
+class TestRemovePunctuationSeparatesWords(unittest.TestCase):
+    """A "!" or "?" between two letters, with no space after it, is no
+    clause break, but it still separates two words."""
+
+    def test_mark_between_letters_becomes_a_space(self):
+        self.assertEqual(BasePhonemizer.remove_punctuation("Sim!Não! talvez"), "Sim Não talvez")
+        self.assertEqual(BasePhonemizer.remove_punctuation("Isto?Aquilo"), "Isto Aquilo")
+
+    def test_a_run_of_marks_becomes_one_space(self):
+        self.assertEqual(BasePhonemizer.remove_punctuation("Sim?!Não"), "Sim Não")
+
+    def test_a_stress_mark_before_the_mark(self):
+        self.assertEqual(BasePhonemizer.remove_punctuation("да\u0301!нет"), "да\u0301 нет")
+
+    def test_other_marks_still_join(self):
+        self.assertEqual(BasePhonemizer.remove_punctuation("U.S.A.! go"), "USA go")
+        self.assertEqual(BasePhonemizer.remove_punctuation("Sim! Não"), "Sim Não")
+        self.assertEqual(BasePhonemizer.remove_punctuation("Sim !Não"), "Sim Não")
+        self.assertEqual(BasePhonemizer.remove_punctuation("!Sim um!"), "Sim um")
+        self.assertEqual(BasePhonemizer.remove_punctuation("10,4 16:30"), "10,4 16:30")
+        self.assertEqual(BasePhonemizer.remove_punctuation("你好！我们"), "你好我们")
+
+    def test_a_long_run_of_marks_costs_linear_work(self):
+        marks = 16000
+        text = "a" + "\u0301" * marks + "!" * marks + "b"
+        lookups = 0
+
+        def category(c):
+            nonlocal lookups
+            lookups += 1
+            if lookups > 3 * len(text):
+                raise AssertionError(f"over {3 * len(text)} category lookups for {len(text)} characters")
+            return unicodedata.category(c)
+
+        with mock.patch.object(base, "unicodedata", mock.Mock(category=category)):
+            self.assertEqual(BasePhonemizer.remove_punctuation(text), "a" + "\u0301" * marks + " b")
+
+
 class TestRemovePunctuationAfterStressMark(unittest.TestCase):
     """A stress mark (U+0301) after the vowel before a hyphen or apostrophe
     still leaves a letter on both sides, so the compound keeps its joint."""

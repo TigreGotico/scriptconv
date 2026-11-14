@@ -11,6 +11,7 @@ against the pure-Python espyak port otherwise, so they assert the punctuation
 and its position, not the exact phonemes the two produce for the words.
 """
 import re
+import unicodedata
 
 import pytest
 
@@ -173,6 +174,89 @@ class TestKeepPunctuation:
         # one side overridden: honouring the flag on the other side alone would
         # make training and synthesis disagree
         assert phonemizer.phonemize("one, two.", "en") == [list("ONE TWO")]
+
+
+class TestWordsStayApart:
+    """A sentence that ends with no symbol, and a ``!`` or ``?`` between two
+    letters, both separate two words, so the phonemes keep a space there."""
+
+    @staticmethod
+    def kept(backend):
+        phonemizer = CliLike() if backend == "stub" else get_phonemizer(Phonemizer(backend))
+        phonemizer.keep_punctuation = True
+        return phonemizer
+
+    @pytest.mark.parametrize("backend, text, expected", [
+        # quebra_frases ends a sentence at an ASCII "...", with no symbol
+        ("graphemes", "Espera... vamos.", "espera vamos."),
+        ("unicode", "Espera... vamos.", unicodedata.normalize("NFD", "Espera vamos.")),
+        ("stub", "Espera... vamos.", "ESPERA VAMOS."),
+        ("graphemes", "a ... b", "a b"),
+        ("stub", "a ... b", "A B"),
+        # a "!" or "?" with no space after it is no clause break
+        ("graphemes", "Sim!Não! talvez", "sim não! talvez"),
+        ("unicode", "Sim!Não! talvez", unicodedata.normalize("NFD", "Sim Não! talvez")),
+        ("stub", "Sim!Não! talvez", "SIM NÃO! TALVEZ"),
+        ("graphemes", "Isto?Aquilo", "isto aquilo"),
+        ("unicode", "Isto?Aquilo", "Isto Aquilo"),
+        ("stub", "Isto?Aquilo", "ISTO AQUILO"),
+        ("graphemes", "Sim?!Não", "sim não"),
+    ])
+    def test_words_stay_apart(self, backend, text, expected):
+        phonemizer = self.kept(backend)
+        assert "".join(phonemizer.phonemize_to_list(text, "pt")) == expected
+        assert "".join(flat(phonemizer.phonemize(text, "pt"))) == expected
+
+    @pytest.mark.parametrize("text, parts", [
+        # two sentences: each read on its own, then a space between them
+        ("Espera... vamos.", ["Espera", "vamos."]),
+        ("a ... b", ["a", "b"]),
+        # one sentence: read as the text with a written space
+        ("sim!não! talvez", ["sim não! talvez"]),
+        ("isto?aquilo", ["isto aquilo"]),
+    ])
+    @pytest.mark.parametrize("prefer_espyak", [False, True])
+    def test_espeak_reads_the_words_apart(self, text, parts, prefer_espyak):
+        espeak = EspeakPhonemizer(prefer_espyak=prefer_espyak)
+        espeak.keep_punctuation = True
+        words = espeak.phonemize_to_list(parts[0], "pt")
+        for part in parts[1:]:
+            words += [" "] + espeak.phonemize_to_list(part, "pt")
+        assert espeak.phonemize_to_list(text, "pt") == words
+        assert flat(espeak.phonemize(text, "pt")) == words
+
+    @pytest.mark.parametrize("backend, text, expected", [
+        # a sentence that ends in a symbol joins the next one, as in Piper
+        ("graphemes", "estás? Eu", "estás?eu"),
+        ("stub", "estás? Eu", "ESTÁS?EU"),
+        ("graphemes", "Olá, ... vamos.", "olá, vamos."),
+        ("graphemes", "U.S.A.! go", "usa! go"),
+        ("graphemes", "10,4", "10,4"),
+        ("graphemes", "16:30", "16,30"),
+        ("unicode", "16:30", "16:30"),
+        ("stub", "um!", "UM!"),
+        ("graphemes", "um!", "um!"),
+        # a full-width mark gives no space: CJK text writes none
+        ("graphemes", "你好！我们走。", "你好我们走"),
+        ("unicode", "你好！我们走。", "你好我们走"),
+    ])
+    def test_joins_that_stay(self, backend, text, expected):
+        phonemizer = self.kept(backend)
+        assert "".join(phonemizer.phonemize_to_list(text, "pt")) == expected
+        assert "".join(flat(phonemizer.phonemize(text, "pt"))) == expected
+
+    def test_a_space_starts_the_sentence_after_one_with_no_symbol(self):
+        phonemizer = self.kept("stub")
+        assert phonemizer.phonemize("Espera... vamos.", "pt") == [
+            list("ESPERA"), list(" VAMOS.")]
+        assert phonemizer.phonemize("Espera. Vamos...", "pt") == [
+            list("ESPERA."), list("VAMOS")]
+
+    def test_synthesis_without_punctuation_keeps_the_words_apart(self):
+        phonemizer = get_phonemizer(Phonemizer.GRAPHEMES)
+        assert phonemizer.phonemize("Sim!Não! talvez", "pt") == [list("sim não talvez")]
+        chunks = phonemizer.phonemize("Espera... vamos.", "pt")
+        assert [chunk for chunk in chunks if chunk] == [list("espera"), list("vamos")]
 
 
 class TestSplitClauses:
