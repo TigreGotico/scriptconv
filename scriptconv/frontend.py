@@ -332,6 +332,11 @@ class TextFrontend:
         """
         if not self.backend._keeps_punctuation():
             return None
+        # A letter or digit first gives the clause a word, and no text gives
+        # it no mark, so the stages need not run.
+        first = parts[index + 1].lstrip()[:1]
+        if not first or first.isalnum():
+            return None
         try:
             from quebra_frases import sentence_tokenize
         except ImportError:
