@@ -260,9 +260,11 @@ def _orthography_edges() -> List[Edge]:
         from scriptconv.cangjie import to_cangjie
         return to_cangjie(text)
 
+    # Lossy by the NotationInfo definition: a kana with no counterpart in the
+    # other script, such as ゟ, ヷ or a hentaigana, passes through unchanged.
     return [
-        Edge("hira", "kana", hira_to_kana, lossless=True),
-        Edge("kana", "hira", kana_to_hira, lossless=True),
+        Edge("hira", "kana", hira_to_kana, lossless=False),
+        Edge("kana", "hira", kana_to_hira, lossless=False),
         Edge("hangul", "jamo", hangul_to_jamo, lossless=False),
         Edge("japanese", "hira", japanese_to_hira, requires="ja"),
         Edge("japanese", "kana", japanese_to_kana, requires="ja"),

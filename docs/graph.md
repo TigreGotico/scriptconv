@@ -78,13 +78,14 @@ can do the same with its own `register(graph)`.
 `text-diacritized` node and a pair of edges, `text -> text-diacritized`
 (restore: Arabic tashkeel, Hebrew niqqud, East-Slavic/Turkic/Caucasian stress,
 European-Portuguese sense marks) and `text-diacritized -> text` (strip).
-Restore is model-based and expensive (`lossless=False`), strip is cheap and
-removes only the specific overlay codepoints each backend adds (combining
+Restore is model-based and expensive. Strip is cheap, and it is not lossless
+either: a letter with a mark and the bare letter strip to one string, so no
+reverse returns both. Both edges carry `lossless=False`. Strip removes only the specific overlay codepoints each backend adds (combining
 acute/grave for stress, tashkeel for Arabic, niqqud for Hebrew), never a
 blanket combining-mark filter, so precomposed native letters (Cyrillic й/ё,
-Latvian macrons, Azerbaijani ç/ö, Arabic hamza carriers) survive intact. That
-cost asymmetry is why routing never prefers the round trip over doing
-nothing. Strip is also gated, by exact primary-subtag match, to *overlay*
+Latvian macrons, Azerbaijani ç/ö, Arabic hamza carriers) survive intact. A
+cheapest path never visits a node twice, so routing never takes the round
+trip. Strip is also gated, by exact primary-subtag match, to *overlay*
 diacritics (Arabic/Hebrew vocalization, East-Slavic/Turkic stress), whose bare
 canonical form carries no marks, European Portuguese diacritics are native
 orthography, so stripping them would corrupt the spelling (`café` → `cafe`),
