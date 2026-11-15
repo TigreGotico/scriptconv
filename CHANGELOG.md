@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a95](https://github.com/TigreGotico/scriptconv/tree/0.0.4a95) (2026-11-15)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a94...0.0.4a95)
+
+**Merged pull requests:**
+
+- fix\(deps\): the normalize extra pulls the ar extra of text2spoken [\#258](https://github.com/TigreGotico/scriptconv/pull/258) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a94](https://github.com/TigreGotico/scriptconv/tree/0.0.4a94) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a93...0.0.4a94)
@@ -384,10 +392,6 @@
 ## [0.0.4a45](https://github.com/TigreGotico/scriptconv/tree/0.0.4a45) (2026-11-06)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a44...0.0.4a45)
-
-**Merged pull requests:**
-
-- fix: correct ARPABET and X-SAMPA tables against their sources [\#157](https://github.com/TigreGotico/scriptconv/pull/157) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a44](https://github.com/TigreGotico/scriptconv/tree/0.0.4a44) (2026-11-05)
 
