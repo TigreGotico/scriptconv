@@ -30,7 +30,7 @@ from scriptconv.phonemizers import (
     get_phonemizer,
     phonemize,
 )
-from scriptconv.phonemizers.base import join_sentences
+from scriptconv.phonemizers.base import GraphemePhonemizer, join_sentences
 from scriptconv.phonemizers.mul import EspeakPhonemizer
 from scriptconv.version import VERSION_STR
 
@@ -84,8 +84,36 @@ class Recorder:
         return [entry[0] for entry in self.log]
 
 
+class LongVowel(GraphemePhonemizer):
+    """Graphemes, with the X-SAMPA length symbol ":" after a vowel at the end of a word."""
+
+    def phonemize_string(self, text, lang):
+        return re.sub(r"([aeiou])\b", r"\1:", super().phonemize_string(text, lang))
+
+
+class Glottal(GraphemePhonemizer):
+    """Graphemes, with the X-SAMPA glottal stop "?" for an "h" at the end of a word."""
+
+    def phonemize_string(self, text, lang):
+        return re.sub(r"h\b", "?", super().phonemize_string(text, lang))
+
+
 def build(backend, lang="xx", **config):
     return TextFrontend(FrontendConfig(lang, **config), backend)
+
+
+class Joined(str):
+    """A piece of text that counts the characters that each ``+`` with it copies."""
+
+    copied = 0
+
+    def __add__(self, other):
+        Joined.copied += len(self) + len(other)
+        return Joined(str.__add__(self, other))
+
+    def __radd__(self, other):
+        Joined.copied += len(self) + len(other)
+        return Joined(str.__add__(other, self))
 
 
 class Scanned(str):
@@ -188,7 +216,7 @@ class TestInlineBlocks:
     def test_an_empty_block_leaves_one_space(self, keep):
         frontend = TextFrontend(FrontendConfig("pt", Phonemizer.GRAPHEMES, keep_punctuation=keep,
                                                stages=Stages(diacritize=False)))
-        assert frontend.phonemize("ab [[]] cd") == [list("ab "), list("cd")]
+        assert frontend.phonemize("ab [[]] cd") == [list("ab cd")]
         assert frontend.phonemize_flat("ab [[]] cd") == list("ab cd")
 
     def test_a_block_after_a_pause_mark_takes_its_space(self):
@@ -217,13 +245,15 @@ class TestInlineBlocks:
         (True, "Espera [[a]]... vamos.", ["espera a", "vamos."], "espera a vamos."),
         (False, "Um [[x]]. Dois; três.", ["um x", "dois", "três"], "um x dois três"),
         (False, "Olá, [[ana]], tudo bem?", ["olá ana", "tudo bem"], "olá ana tudo bem"),
-        # an empty block ends no clause, so it takes no mark
-        (True, "ab [[]]. cd", ["ab ", "cd"], "ab cd"),
+        # an empty block reads as no text, so the full stop ends the clause of "ab"
+        (True, "ab [[]]. cd", ["ab.", "cd"], "ab.cd"),
         # the comma ends the clause of the word after the block, so it stays with that word
         (True, "Olá [[ˈana]]s, tudo bem?", ["olá ˈana", "s, tudo bem?"], "olá ˈana s, tudo bem?"),
         # a mark with a block directly after it ends no clause
         (True, "[[x]],[[y]]", ["xy"], "xy"),
         (True, "[[x]].[[y]]", ["xy"], "xy"),
+        # with punctuation off, no space ends the sentence of the block
+        (False, "Sim [[x.]]vem.", ["sim x.", "vem"], "sim x. vem"),
     ])
     def test_a_block_with_no_clause_symbol_keeps_its_space(self, keep, text, sentences, flat):
         frontend = TextFrontend(FrontendConfig("pt", Phonemizer.GRAPHEMES, keep_punctuation=keep,
@@ -231,7 +261,8 @@ class TestInlineBlocks:
         assert frontend.phonemize(text) == [list(sentence) for sentence in sentences]
         assert frontend.phonemize_flat(text) == list(flat)
 
-    @pytest.mark.parametrize("text", ["[[x]],[[y]]", "[[x]].[[y]]", "[[x]]?[[y]]"])
+    @pytest.mark.parametrize("text", ["[[x]],[[y]]", "[[x]].[[y]]", "[[x]]?[[y]]",
+                                      "Sim.[[rui]] vem", "Sim![[rui]] vem"])
     def test_a_mark_before_the_next_block_gives_no_token(self, text):
         def frontend(keep):
             return TextFrontend(FrontendConfig("pt", Phonemizer.GRAPHEMES, keep_punctuation=keep,
@@ -247,6 +278,17 @@ class TestInlineBlocks:
         ("[[x]] ; [[y]] !", "x ; y !"),
         ("[[x]],[[y]]", "x,y"),
         ("[[x]].[[y]]", "x.y"),
+        # "|" ends a clause with no symbol
+        ("Olá [[x]]| vem.", "Olá x| vem."),
+        # a clause with no word after the mark gives no space
+        ("Olá [[x]]! ... vem.", "Olá x! ... vem."),
+        # a pause mark takes its space all the same
+        ("Olá [[x]], ... sim.", "Olá x, ... sim."),
+        ("Olá [[x]]:", "Olá x:"),
+        # a mark directly before the block joins it, and the space before the mark stays
+        ("Sim .[[x]] vem.", "Sim .x vem."),
+        # a block directly after a word joins it, though a space comes earlier in the text
+        ("Olá vem[[rui]] já.", "Olá vemrui já."),
     ])
     def test_a_mark_after_a_block_reads_as_after_a_plain_word(self, text, plain):
         kept = TextFrontend(FrontendConfig("fr", Phonemizer.GRAPHEMES, keep_punctuation=True,
@@ -334,16 +376,41 @@ class TestInlineBlocks:
         "Olá! [[rui]] tudo bem?",
         # a sentence with no word gives no phonemes, so "Fim." joins the block
         "Fim. ... [[rui]] vem.",
+        # the splitter keeps the clause after '."' or "Dr." in its sentence
+        'Tudo." [[rui]] vem.',
+        "Sim. Dr. [[rui]] vem.",
+        # the splitter keeps the clause after "!" or "?!" in its sentence
+        "Olá [[rui]]! tudo bem?",
+        "Olá [[rui]]?! tudo bem?",
+        # a line break or a tab is a space
+        "Sim.\n[[rui]] vem.",
+        "Sim\n[[rui]] vem.",
+        "Sim [[rui]]\nvem.",
+        # an empty block reads as no text
+        "Sim. [[]] [[rui]] vem.",
     ])
     def test_a_block_after_a_sentence_token_joins_as_in_plain_text(self, keep, backend, text):
         frontend = TextFrontend(FrontendConfig("pt-PT", backend, keep_punctuation=keep,
                                                stages=Stages(diacritize=False)))
-        plain = text.replace("[[", "").replace("]]", "")
+        plain = text.replace("[[]]", "").replace("[[", "").replace("]]", "")
         # each block holds the backend's own reading of its word
         blocks = re.sub(r"\[\[(\w+)\]\]",
                         lambda word: f"[[{''.join(frontend.phonemize_flat(word[1]))}]]", text)
         assert frontend.phonemize_flat(blocks) == frontend.phonemize_flat(plain)
         assert join_sentences(frontend.phonemize(blocks), keep) == frontend.phonemize_flat(plain)
+
+    # The unicode backend copies a tab to its output, and a block reads a tab
+    # as one space symbol, so the tab row reads the backends that turn a tab
+    # into a space.
+    @pytest.mark.parametrize("keep", [True, False])
+    @pytest.mark.parametrize("backend", [Phonemizer.GRAPHEMES, Phonemizer.ORTHOGRAPHY2IPA])
+    def test_a_tab_around_a_block_is_a_space(self, keep, backend):
+        frontend = TextFrontend(FrontendConfig("pt-PT", backend, keep_punctuation=keep,
+                                               stages=Stages(diacritize=False)))
+        rui = "".join(frontend.phonemize_flat("rui"))
+        expected = frontend.phonemize_flat("Sim\trui\tvem.")
+        assert frontend.phonemize_flat(f"Sim\t[[{rui}]]\tvem.") == expected
+        assert join_sentences(frontend.phonemize(f"Sim\t[[{rui}]]\tvem."), keep) == expected
 
     @pytest.mark.parametrize("keep, backend, text, start, tail", [
         # the block symbols end in "." with punctuation off, and still keep their space
@@ -352,8 +419,6 @@ class TestInlineBlocks:
         (True, Phonemizer.ORTHOGRAPHY2IPA, '[[ana]]." 1. [[rui]] vem.', "ana rui ", "vem."),
         # the block ends in "." but its clause ends in an ellipsis, which gives no token
         (True, Phonemizer.GRAPHEMES, "[[x.]]... [[y]]", "x. y", ""),
-        # the splitter keeps "Dr." in the sentence of the block, so the block starts none
-        (True, Phonemizer.GRAPHEMES, "Sim. Dr. [[rui]]", "sim.dr. rui", ""),
     ])
     def test_a_block_keeps_its_space_unless_it_starts_a_sentence_after_a_token(
             self, keep, backend, text, start, tail):
@@ -363,20 +428,121 @@ class TestInlineBlocks:
         assert frontend.phonemize_flat(text) == expected
         assert join_sentences(frontend.phonemize(text), keep) == expected
 
-    @pytest.mark.parametrize("text, expected", [
-        # an empty block holds no word, so it starts no sentence and the text reads as on dev
-        ("Sim. [[]]. vem.", "sim. vem."),
-        ("Sim. [[ ]]. vem.", "sim. vem."),
-        ("Sim. [[]]. 1.", "sim. 1."),
-        ("Sim. [[]]. [[rui]] vem.", "sim. rui vem."),
-        # no clause before the block holds a word, so no mark ends that sentence
-        ("Sim.[[]]. [[rui]] vem.", "sim. rui vem."),
+    @pytest.mark.parametrize("text", [
+        "Sim. [[]]. vem.",
+        "Sim. [[ ]]. vem.",
+        "Sim. [[]]. 1.",
+        "Sim. [[]]. [[rui]] vem.",
+        "Sim.[[]]. [[rui]] vem.",
+        "Sim. [[]][[rui]] vem.",
+        # "!" ends no sentence, so the text after the block keeps its space
+        "Sim! [[]] vem.",
+        "Sim! [[]]1.",
+        "Sim![[]] vem.",
+        "Sim.[[]] vem.",
+        # the full stop after the block ends the sentence of "Dr."
+        "Dr. [[]]. [[rui]] vem.",
+        # nothing follows the block, so the full stop before it stays
+        "Sim.1. [[]]",
+        # a mark directly before a word gives no symbol, and the space before it stays
+        "Sim. [[]].[[rui]] vem.",
+        "Sim! [[]].[[rui]] vem.",
+        # a tab is whitespace, so a block of a tab is empty
+        "Sim [[\t]]vem.",
     ])
-    def test_an_empty_block_starts_no_sentence(self, text, expected):
-        kept = TextFrontend(FrontendConfig("pt-PT", Phonemizer.GRAPHEMES, keep_punctuation=True,
-                                           stages=Stages(diacritize=False)))
-        assert kept.phonemize_flat(text) == list(expected)
-        assert join_sentences(kept.phonemize(text)) == list(expected)
+    @pytest.mark.parametrize("keep", [True, False])
+    def test_an_empty_block_reads_as_no_text(self, keep, text):
+        frontend = TextFrontend(FrontendConfig("pt-PT", Phonemizer.GRAPHEMES,
+                                               keep_punctuation=keep,
+                                               stages=Stages(diacritize=False)))
+        plain = re.sub(r"\[\[\s*\]\]", "", text).replace("[[", "").replace("]]", "")
+        expected = frontend.phonemize_flat(plain)
+        assert frontend.phonemize_flat(text) == expected
+        assert join_sentences(frontend.phonemize(text), keep) == expected
+
+    @pytest.mark.parametrize("keep", [True, False])
+    @pytest.mark.parametrize("text", ["Sim [[x.]][[]]vem.", "Sim [[x.]][[]] vem.",
+                                      "Sim. [[]] [[rui]] vem.", "[[x]][[]]. vem."])
+    def test_a_text_reads_as_without_its_empty_block(self, keep, text):
+        frontend = TextFrontend(FrontendConfig("pt-PT", Phonemizer.GRAPHEMES,
+                                               keep_punctuation=keep,
+                                               stages=Stages(diacritize=False)))
+        expected = frontend.phonemize_flat(text.replace("[[]]", ""))
+        assert frontend.phonemize_flat(text) == expected
+        assert join_sentences(frontend.phonemize(text), keep) == expected
+
+    @pytest.mark.parametrize("keep", [True, False])
+    @pytest.mark.parametrize("text", [
+        "[[x]]. [[?]]... vem.",
+        "[[x]]. [[?]] vem.",
+        "[[x]]. [[!]] vem.",
+        "Sim. [[,]] vem.",
+        "[[x]]? [[?]]. vem.",
+        "Olá [[x]] [[?]] sim.",
+        "Sim [[x.]]...",
+        "Sim [[x.]]-vem.",
+        "Sim [[x.]][[]] vem.",
+    ])
+    def test_a_block_that_ends_in_a_mark_reads_as_a_plain_word(self, keep, text):
+        frontend = TextFrontend(FrontendConfig("pt-PT", Phonemizer.GRAPHEMES,
+                                               keep_punctuation=keep,
+                                               stages=Stages(diacritize=False)))
+        symbols = re.search(r"\[\[([^\]]*\W)\]\]", text)[1]
+        # "k" stands for that block in the plain text, and its symbols take its place
+        plain = (text.replace(f"[[{symbols}]]", "k").replace("[[]]", "")
+                 .replace("[[", "").replace("]]", ""))
+        expected = list("".join(frontend.phonemize_flat(plain)).replace("k", symbols))
+        assert frontend.phonemize_flat(text) == expected
+        assert join_sentences(frontend.phonemize(text), keep) == expected
+
+    # A backend can write a phoneme with the character of a clause symbol, as
+    # X-SAMPA writes ":" for length and "?" for a glottal stop. That phoneme
+    # stays before a block, as before a plain word.
+    @pytest.mark.parametrize("backend, text, expected", [
+        (LongVowel, "Casa [[rui:]] vem.", "casa: rui: vem."),
+        (LongVowel, "Ana [[rui:]]", "ana: rui:"),
+        (LongVowel, "Casa\n[[rui:]]", "casa: rui:"),
+        (Glottal, "Nah [[rui]] vem.", "na? rui vem."),
+        # the clause symbols of the text still read as in the plain text
+        (LongVowel, "Uma, [[rui:]] vem.", "uma:, rui: vem."),
+        (Glottal, "Bah. [[rui]] vem.", "ba?.rui vem."),
+    ])
+    def test_a_phoneme_written_as_a_clause_symbol_stays_before_a_block(
+            self, backend, text, expected):
+        frontend = TextFrontend(FrontendConfig("pt-PT", Phonemizer.GRAPHEMES,
+                                               keep_punctuation=True,
+                                               stages=Stages(diacritize=False)), backend())
+        plain = re.sub(r"\[\[(\w+):?\]\]", r"\1", text)
+        assert frontend.phonemize_flat(plain) == list(expected)
+        assert frontend.phonemize_flat(text) == list(expected)
+        assert join_sentences(frontend.phonemize(text), True) == list(expected)
+
+    # The text between the blocks holds no word, so the mark at the end of
+    # the first block is its own symbol, and it stays.
+    @pytest.mark.parametrize("text, start", [
+        ("[[x!]]![[y]] vem.", "x!"),
+        ("[[x?]]?[[y]]", "x?"),
+        ("Sim [[x.]]![[y]]", "sim x."),
+    ])
+    def test_a_mark_after_a_block_leaves_the_block_symbols(self, text, start):
+        frontend = TextFrontend(FrontendConfig("pt-PT", Phonemizer.GRAPHEMES,
+                                               keep_punctuation=True,
+                                               stages=Stages(diacritize=False)))
+        assert "".join(frontend.phonemize_flat(text)).startswith(start)
+        assert "".join(join_sentences(frontend.phonemize(text), True)).startswith(start)
+
+    # orthography2ipa reads a clause of only digits to nothing, so the "?" of
+    # "Sim" is the last symbol before the block. It ends a clause, so it stays.
+    @pytest.mark.parametrize("text", ["Sim? 1...\n[[ʁuj]] vem.", "Sim? 1... [[ʁuj]] vem.",
+                                      "Sim? 1.[[ʁuj]] vem."])
+    def test_the_mark_of_an_earlier_clause_stays_before_a_block(self, text):
+        frontend = TextFrontend(FrontendConfig("pt-PT", Phonemizer.ORTHOGRAPHY2IPA,
+                                               keep_punctuation=True,
+                                               stages=Stages(diacritize=False)))
+        sim = frontend.phonemize_flat("Sim?")
+        assert sim[-1] == "?"
+        assert frontend.phonemize_flat(text)[:len(sim)] == sim
+        assert join_sentences(frontend.phonemize(text), True)[:len(sim)] == sim
 
     def test_the_split_matches_the_block_pattern(self):
         # Every string of up to 7 characters over the symbols that matter.
@@ -419,6 +585,23 @@ class TestInlineBlocks:
         frontend_module._split_blocks(text)
         assert len(text) <= text.read <= 3 * len(text), text.read
 
+    # A text of empty blocks joins into one piece. When each piece is added
+    # to the text joined so far, each + copies all of that text again, and the
+    # copies grow with the square of the number of pieces. A join that copies
+    # each piece once copies no characters through +.
+
+    @pytest.mark.parametrize("unit", ["ab[[]]", "a [[ ]] ", "[[x]] b[[]]"])
+    def test_empty_blocks_join_in_linear_time(self, unit, monkeypatch):
+        split = frontend_module._split_blocks
+        monkeypatch.setattr(Joined, "copied", 0)
+        monkeypatch.setattr(frontend_module, "_split_blocks",
+                            lambda text: [Joined(part) for part in split(text)])
+        text = unit * 10000
+        parts = frontend_module._split_blocks_to_read(text)
+        assert "".join(parts) == re.sub(r"\[\[\s*\]\]", "", text)
+        assert len(parts) == 2 * text.count("[[x]]") + 1
+        assert Joined.copied <= 2 * len(text), Joined.copied
+
     # The counter sees only find. Time sees every way to read the text. The
     # real scan of a million characters takes about a millisecond, and a
     # quadratic one takes minutes, so the bound and the timeout leave a wide
@@ -430,6 +613,14 @@ class TestInlineBlocks:
         text = unit * 200000
         start = time.perf_counter()
         frontend_module._split_blocks(text)
+        assert time.perf_counter() - start < 2
+
+    @pytest.mark.timeout(20)
+    @pytest.mark.parametrize("unit", ["ab[[]]", "a [[ ]] "])
+    def test_a_long_text_of_empty_blocks_joins_in_well_under_two_seconds(self, unit):
+        text = unit * 640000
+        start = time.perf_counter()
+        frontend_module._split_blocks_to_read(text)
         assert time.perf_counter() - start < 2
 
     def test_prepare_keeps_the_block_as_written(self, monkeypatch):

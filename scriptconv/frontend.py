@@ -18,12 +18,27 @@ for it.
 
 With ``strict=False`` a failed stage logs a warning and the text continues
 without that stage. With ``strict=True`` it raises :class:`StageError`.
+
+Around a block, the spaces and clause symbols are those of the same text with a
+plain word in place of the block, and an empty block reads as no text. Some
+differences stay:
+
+- A backend can change a word by the word after it. orthography2ipa voices a
+  final consonant before a voiced sound, but a block holds its word as read
+  alone.
+- The frontend counts a digit as a word, but orthography2ipa reads a clause of
+  only digits to nothing without a normaliser.
+- A block gives one space symbol for a run of whitespace, but the unicode
+  backend copies each tab and space.
+- A mark directly before a block gives no symbol and no space, but plain
+  text reads ``!`` or ``?`` between two words as a space.
 """
 import copy
 import dataclasses
 import importlib.util
 import logging
-from typing import Callable, Iterator, List, Optional
+import re
+from typing import Callable, Iterable, Iterator, List, Optional, Tuple
 
 from scriptconv.diacritics import _DIACRITIZER_PACKAGES, _diacritizer_family, diacritize
 from scriptconv.graph import ConversionGraph, Edge
@@ -45,6 +60,9 @@ LOG = logging.getLogger(__name__)
 
 # The word that stands for a block when the frontend reads the mark after it.
 _BLOCK_WORD = "a"
+# Text that ends in whitespace and then only marks. The marks join the block
+# after them as they join a plain word, and the whitespace stays.
+_SPACE_BEFORE_BLOCK = re.compile(r"\s\W*$")
 
 # linguatag puts "ar" with any region, and each individual Arabic language in
 # Arabic script, at 5 or less from "ar". Those languages diacritize by default.
@@ -143,31 +161,22 @@ def _split_blocks(text: str) -> List[str]:
     return parts
 
 
-def _add_block(phonemes: List[str], parts: List[str], index: int, mark: Optional[str],
-               joins: bool) -> bool:
-    """Append the symbols of the inline block at *index* of a split text to *phonemes*.
+def _split_blocks_to_read(text: str) -> List[str]:
+    """*text* split as by :func:`_split_blocks`, with no empty block.
 
-    A space before or after the block in the text becomes a space symbol,
-    unless *phonemes* is empty or already ends in a space. *joins* drops the
-    space before the block: the block starts a sentence after a sentence that
-    ends in a clause symbol, and the two sentences join with no space. *mark*
-    is the clause symbol of the punctuation directly after the block. It
-    follows the block's symbols as the backend appends it after a clause:
-    bare for ``. ? !``, followed by a space for ``, : ;``. Returns whether
-    *mark* was appended.
+    An empty block, or one of only whitespace, reads as no text, so the text
+    on its two sides joins into one piece.
     """
-    if parts[index - 1].endswith(" ") and phonemes and phonemes[-1] != " " and not joins:
-        phonemes.append(" ")
-    symbols = parts[index][2:-2].strip()
-    phonemes.extend(symbols)
-    if mark and symbols:
-        phonemes.append(mark)
-        if mark in _PAUSE_PUNCTUATION:
-            phonemes.append(" ")
-        return True
-    if parts[index + 1].startswith(" ") and phonemes and phonemes[-1] != " ":
-        phonemes.append(" ")
-    return False
+    parts = _split_blocks(text)
+    joined: List[str] = []
+    pieces = parts[:1]
+    for block, after in zip(parts[1::2], parts[2::2]):
+        if block[2:-2].strip():
+            joined += ["".join(pieces), block]
+            pieces = []
+        pieces.append(after)
+    joined.append("".join(pieces))
+    return joined
 
 
 class TextFrontend:
@@ -223,17 +232,16 @@ class TextFrontend:
         sentence that gives no phonemes is not yielded.
         """
         stages = self._resolve(stages)
-        parts = _split_blocks(text)
+        parts = _split_blocks_to_read(text)
         if len(parts) == 1:
-            yield from self._sentences(text, stages)
+            yield from self._sentences(parts[0], stages)
             return
         # A block can extend the sentence before it, so that sentence is held
         # until the next part is known.
         held: List[str] = []
         for index, part in enumerate(parts):
             if index % 2:
-                _add_block(held, parts, index, self._mark_after(parts, index, stages),
-                           self._joins_sentence(held, parts, index))
+                self._add_block(held, parts, index, stages)
                 continue
             for sentence in self._sentences(part, stages):
                 if held:
@@ -259,14 +267,12 @@ class TextFrontend:
         after a sentence that ends in a clause symbol takes no space before it.
         """
         stages = self._resolve(stages)
-        parts = _split_blocks(text)
+        parts = _split_blocks_to_read(text)
         phonemes: List[str] = []
         ends_in_token = False
         for index, part in enumerate(parts):
             if index % 2:
-                mark = self._mark_after(parts, index, stages)
-                joins = self._joins_sentence(phonemes, parts, index)
-                ends_in_token = _add_block(phonemes, parts, index, mark, joins)
+                ends_in_token = self._add_block(phonemes, parts, index, stages)
             elif part:
                 part = self._run_stages(part, stages)
                 read = self.backend.phonemize_to_list(part, stages.lang)
@@ -340,15 +346,50 @@ class TextFrontend:
             self._check_read(sentence, [p for chunk in chunks for p in chunk], stages)
             yield from (chunk for chunk in chunks if chunk)
 
-    def _mark_after(self, parts: List[str], index: int, stages: Stages) -> Optional[str]:
-        """The clause symbol of the punctuation after the block at *index* of a split text.
+    def _add_block(self, phonemes: List[str], parts: List[str], index: int, stages: Stages) -> bool:
+        """Append the symbols of the inline block at *index* of a split text to *phonemes*.
 
-        The backend reads the text after a block as a sentence that starts
-        with a clause with no words, and drops that clause's symbol. The
+        A space, tab or line break before the block in the text, also with
+        marks between it and the block, or a space after the block, becomes a
+        space symbol, unless *phonemes* is empty or
+        already ends in a space. :meth:`_before_block` reads what comes before
+        the block, and :meth:`_mark_after` reads the clause symbol after it. A
+        block whose symbols end in a character that is also a clause symbol,
+        with no clause symbol after it, takes a space before the next word,
+        because that character ends no sentence. Returns whether *phonemes*
+        ends in a clause symbol that joins the next sentence with no space.
+        """
+        text, after = parts[index - 1], parts[index + 1]
+        symbols = parts[index][2:-2].strip()
+        before = self._before_block(phonemes, text, index > 1)
+        if before is False:
+            phonemes.pop()
+        if _SPACE_BEFORE_BLOCK.search(text) and phonemes and phonemes[-1] != " " and not before:
+            phonemes.append(" ")
+        phonemes.extend(symbols)
+        mark = self._mark_after(after, index + 2 < len(parts), stages)
+        if mark:
+            phonemes.extend(mark)
+            return True
+        if after.startswith(" ") or (
+                self.backend._keeps_punctuation() and symbols[-1] in _CLAUSE_TOKENS
+                and self.backend.remove_punctuation(after).strip()):
+            if phonemes[-1] != " ":
+                phonemes.append(" ")
+        return False
+
+    def _mark_after(self, after: str, block_follows: bool, stages: Stages) -> Optional[str]:
+        """The clause symbol in the text *after* a block, and the space after that symbol.
+
+        *block_follows* tells whether a block that holds symbols follows
+        *after*. The backend reads the text after a block as a sentence that
+        starts with a clause with no words, and drops that clause's symbol. The
         symbol belongs to the clause that the block ends, so the mark is read
         as in the same text with a plain word in place of each block: the
         first sentence after the stages, split into clauses by the backend's
-        rules. Only a backend that keeps punctuation gives one.
+        rules. A space follows ``, : ;``, and it follows ``. ? !`` when the
+        sentence holds another clause after the block's. Only a backend that
+        keeps punctuation gives a mark.
         """
         if not self.backend._keeps_punctuation():
             return None
@@ -357,42 +398,61 @@ class TextFrontend:
         # deletes every letter and digit before the mark, that no stage adds
         # a mark in front of the first letter or digit, and that no stage adds
         # a mark to text that holds only words.
-        first = parts[index + 1].lstrip()[:1]
+        first = after.lstrip()[:1]
         if not first or first.isalnum():
             return None
-        text = _BLOCK_WORD + parts[index + 1]
-        if index + 2 < len(parts) and parts[index + 2][2:-2].strip():
+        text = _BLOCK_WORD + after
+        if block_follows:
             text += _BLOCK_WORD
         sentence = self._run_stages(_sentence_tokenize(text)[0], stages)
-        clause, mark = split_clauses(sentence)[0]
-        return mark if self.backend.remove_punctuation(clause).casefold() == _BLOCK_WORD else None
+        (clause, mark), *rest = split_clauses(sentence)
+        if not mark or self.backend.remove_punctuation(clause).casefold() != _BLOCK_WORD:
+            return None
+        if mark in _PAUSE_PUNCTUATION or any(self.backend.remove_punctuation(c) for c, _ in rest):
+            return mark + " "
+        return mark
 
-    def _joins_sentence(self, phonemes: List[str], parts: List[str], index: int) -> bool:
-        """Whether the block at *index* of a split text starts a sentence after a clause symbol.
+    def _before_block(self, phonemes: List[str], text: str, after_block: bool) -> Optional[bool]:
+        """How a block follows *phonemes* and the *text* before it, read as in the plain text.
 
-        Such a block joins *phonemes*, the symbols before it, with no space,
-        by the rule of :func:`~scriptconv.phonemizers.base.join_sentences`.
-        The sentence break is read as in the same text with a plain word in
-        place of each block. Only a backend that keeps punctuation joins, and
-        an empty block holds no word, so it starts no sentence.
+        *text* reads with a plain word in place of the block, and in front of
+        it when *after_block*, for the block before it.
+
+        ``True``: the block starts a sentence after one that ends in a clause
+        symbol, so no space comes before it, by the rule of
+        :func:`~scriptconv.phonemizers.base.join_sentences`. ``False``: the
+        clause symbol at the end of *phonemes* ends no clause in the plain
+        text, as after ``Tudo."``, after ``Dr.`` or directly before the block.
+        The block continues the clause, so the symbol goes. ``None``: neither.
+        Only a backend that keeps punctuation gives ``True`` or ``False``.
+
+        The symbol goes only when it is the mark of the last clause of
+        *text*, which the backend writes after that clause. Any other symbol
+        is a phoneme, such as an X-SAMPA ``:`` for length, and it stays.
         """
-        if not (self.backend._keeps_punctuation() and parts[index][2:-2].strip() and phonemes
-                and phonemes[-1] in _CLAUSE_TOKENS and parts[index - 1].endswith(" ")):
-            return False
-        # The break is read without the stages. This assumes that no stage
-        # adds or removes the mark that ends a sentence.
-        text = parts[index - 1] + _BLOCK_WORD
-        if index > 1 and parts[index - 2][2:-2].strip():
-            text = _BLOCK_WORD + text
-        *before, sentence = _sentence_tokenize(text)
-        if self.backend.remove_punctuation(sentence).strip().casefold() != _BLOCK_WORD:
-            return False
-        # A clause with no word gives no phonemes, and a sentence with no word
-        # gives none either, so the mark that counts is that of the last
-        # clause that holds a word.
-        marks = [mark for piece in before for clause, mark in split_clauses(piece)
-                 if self.backend.remove_punctuation(clause).strip()]
-        return bool(marks) and marks[-1] is not None
+        if not (self.backend._keeps_punctuation() and phonemes
+                and phonemes[-1] in _CLAUSE_TOKENS):
+            return None
+        # The text is read without the stages. This assumes that no stage
+        # adds or removes the mark that ends a clause.
+        *before, sentence = _sentence_tokenize(
+            (_BLOCK_WORD if after_block else "") + text + _BLOCK_WORD)
+        clauses = self._clauses_with_words((*before, sentence))
+        mark = clauses[-2][1] if len(clauses) > 1 else None
+        if self.backend.remove_punctuation(clauses[-1][0]).casefold() != _BLOCK_WORD or not mark:
+            read = self._clauses_with_words(_sentence_tokenize(text))
+            return False if read and read[-1][1] == phonemes[-1] else None
+        return self.backend.remove_punctuation(sentence).strip().casefold() == _BLOCK_WORD or None
+
+    def _clauses_with_words(self, sentences: Iterable[str]) -> List[Tuple[str, Optional[str]]]:
+        """The ``(clause, mark)`` pairs of *sentences* whose clause holds a word.
+
+        A clause with no word gives no phonemes, and a sentence with no word
+        gives none either, so these are the clauses that the backend reads.
+        """
+        return [(clause, mark) for sentence in sentences
+                for clause, mark in split_clauses(sentence)
+                if self.backend.remove_punctuation(clause).strip()]
 
     def _run_stages(self, text: str, stages: Stages) -> str:
         """Steps 3 to 5 on one piece of text."""
