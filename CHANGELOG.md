@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a94](https://github.com/TigreGotico/scriptconv/tree/0.0.4a94) (2026-11-15)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a93...0.0.4a94)
+
+**Merged pull requests:**
+
+- fix: read the g2pM erhua suffix r5 as a rhotic coda [\#247](https://github.com/TigreGotico/scriptconv/pull/247) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a93](https://github.com/TigreGotico/scriptconv/tree/0.0.4a93) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a92...0.0.4a93)
@@ -388,10 +396,6 @@
 ## [0.0.4a43](https://github.com/TigreGotico/scriptconv/tree/0.0.4a43) (2026-11-05)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a42...0.0.4a43)
-
-**Merged pull requests:**
-
-- test: assert the sounds that set the tugaphone lects apart [\#154](https://github.com/TigreGotico/scriptconv/pull/154) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a42](https://github.com/TigreGotico/scriptconv/tree/0.0.4a42) (2026-11-04)
 
