@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a87](https://github.com/TigreGotico/scriptconv/tree/0.0.4a87) (2026-11-15)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a86...0.0.4a87)
+
+**Merged pull requests:**
+
+- fix: prefix Charsiu input with the Charsiu language label [\#238](https://github.com/TigreGotico/scriptconv/pull/238) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a86](https://github.com/TigreGotico/scriptconv/tree/0.0.4a86) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a85...0.0.4a86)
@@ -392,10 +400,6 @@
 ## [0.0.4a36](https://github.com/TigreGotico/scriptconv/tree/0.0.4a36) (2026-10-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a35...0.0.4a36)
-
-**Merged pull requests:**
-
-- fix: keep clause punctuation as an opt-in, never return espeak newlines [\#139](https://github.com/TigreGotico/scriptconv/pull/139) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a35](https://github.com/TigreGotico/scriptconv/tree/0.0.4a35) (2026-09-26)
 
