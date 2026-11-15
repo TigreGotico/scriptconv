@@ -366,6 +366,7 @@ class TestInlineBlocks:
     @pytest.mark.parametrize("text, expected", [
         # an empty block holds no word, so it starts no sentence and the text reads as on dev
         ("Sim. [[]]. vem.", "sim. vem."),
+        ("Sim. [[ ]]. vem.", "sim. vem."),
         ("Sim. [[]]. 1.", "sim. 1."),
         ("Sim. [[]]. [[rui]] vem.", "sim. rui vem."),
         # no clause before the block holds a word, so no mark ends that sentence
