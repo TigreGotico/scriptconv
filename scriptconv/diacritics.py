@@ -3,9 +3,10 @@
 This module OWNS diacritization — lang→backend routing, lazy/cached backend
 loading (phonikud, text2tashkeel, stressonnx, bifonia), and the overlay-strip
 helpers. :mod:`scriptconv.phonemizers` (``BasePhonemizer`` and subclasses)
-knows nothing about diacritics: phonemization (orthography → sound) and
-diacritization (a text → text graph transform disambiguating pronunciation
-before G2P) are separate concerns.
+runs no diacritizer: phonemization (orthography → sound) and diacritization
+(a text → text graph transform disambiguating pronunciation before G2P) are
+separate concerns. A backend only removes, through
+:func:`replace_stress_mark`, a stress mark that it does not read.
 
 Diacritization (Arabic tashkeel, Hebrew niqqud, East-Slavic/Turkic/Caucasian
 word stress, European-Portuguese homograph sense marks) is, architecturally,
@@ -78,7 +79,9 @@ Georgian letter of that kind:
   stress acute composes to a precomposed form such as á, but á is not a
   Latvian letter, so strip removes the acute.
 """
+import functools
 import os
+import re
 import tempfile
 import unicodedata
 import urllib.request
@@ -86,7 +89,7 @@ from pathlib import Path
 from typing import Optional
 
 from scriptconv.graph import Edge
-from scriptconv.phonemizers.base import _primary_subtag
+from scriptconv.phonemizers.base import STRESS_MARK, BasePhonemizer, _primary_subtag
 
 #: The lang-contextual node produced by diacritization.  Like ``"text"`` it is
 #: meaningful only with ``lang=`` context and exists only in opted-in graphs.
@@ -402,6 +405,12 @@ def _sense_diacritics_pt(text: str, lang: str) -> str:
     return add_extra_diacritics(text, lang)
 
 
+# The prefix separator that phonikud writes inside a word, after a prefix letter
+# and its marks (phonikud_onnx PREFIX_CHAR, phonikud lexicon PREFIX_DIACRITIC).
+# A "|" with no Hebrew letter or mark on one side is the writer's, and stays.
+_PREFIX_SEPARATOR = re.compile(r"(?<=[\u0591-\u05c7\u05d0-\u05f2])\|(?=[\u05d0-\u05f2])")
+
+
 def diacritize(text: str, lang: str = "und", diacritizer_model=None,
                waqf: Optional[bool] = None, **kwargs) -> str:
     """Add pronunciation-disambiguating diacritics to *text* for *lang*.
@@ -413,7 +422,10 @@ def diacritize(text: str, lang: str = "und", diacritizer_model=None,
     - Hebrew (``he``) — niqqud via phonikud; ``diacritizer_model`` is the
       phonikud ONNX path (or a zero-arg callable). Optional: when omitted the
       small public phonikud model is auto-downloaded and cached
-      (``$SCRIPTCONV_CACHE``/``$XDG_CACHE_HOME``).
+      (``$SCRIPTCONV_CACHE``/``$XDG_CACHE_HOME``). phonikud writes ``|``
+      after a prefix letter (``שֶׁ|אֵינָם``); the returned text has no ``|``
+      inside a word, because a phonemizer that splits text at ``|`` would cut
+      the word. A ``|`` between two words stays.
     - Arabic (``ar``, every individual Arabic language such as ``arz`` or
       ``apc``, and Hassaniyya ``mey``, in Arabic script) — tashkeel via
       text2tashkeel (``[tashkeel]``); ``diacritizer_model`` is the
@@ -441,7 +453,7 @@ def diacritize(text: str, lang: str = "und", diacritizer_model=None,
                          or kwargs.get("model"))
     family = _diacritizer_family(lang)
     if family == "he":
-        return _phonikud(diacritizer_model).add_diacritics(text)
+        return _PREFIX_SEPARATOR.sub("", _phonikud(diacritizer_model).add_diacritics(text))
     if family == "ar":
         return _tashkeel(diacritizer_model, waqf=bool(waqf)).diacritize(text)
     if family == "stress":
@@ -533,6 +545,72 @@ def strip_diacritics(text: str, lang: str = "und", **_) -> str:
         if composed in native:
             kept[-1] = composed
     return "".join(kept)
+
+
+# The tags that stressonnx marks (stressonnx/languages/*.json), and the script of each.
+_STRESS_SCRIPTS = {
+    **dict.fromkeys(("ba", "be", "bg", "cv", "kbd", "kjh", "kk", "ky", "mdf", "mk", "myv", "ru",
+                     "sah", "tg", "tt", "udm", "uk", "xal", "az-Cyrl", "uz-Cyrl"), "Cyrl"),
+    **dict.fromkeys(("lv", "sl", "az-Latn", "uz-Latn"), "Latn"),
+    "hy": "Armn",
+    "ka": "Geor",
+}
+# The vowel letters of each script after which stressonnx writes the mark
+# (stressonnx _common.SCRIPT_VOWELS).
+_STRESS_VOWELS = {
+    "Cyrl": frozenset("\u0430\u0435\u0451\u0438\u043e\u0443\u044b\u044d\u044e\u044f"
+                      "\u0456\u0457\u0454\u04d9\u04e9\u04af\u04b1\u04d1\u04d7\u04f3"
+                      "\u04e5\u04e7\u045e\u044a\u04e3\u04ef\u04f1"),
+    "Latn": frozenset("aeiouy\u00e1\u00e9\u00ed\u00f3\u00fa\u00e0\u00e8\u00ec\u00f2\u00f9"
+                      "\u00e2\u00ea\u00ee\u00f4\u00fb\u00e4\u00eb\u00ef\u00f6\u00fc"
+                      "\u00e5\u00e6\u00f8\u0153\u00e3\u00f5\u0101\u0113\u012b\u014d\u016b"
+                      "\u0259\u0131"),
+    "Armn": frozenset("\u0561\u0565\u0567\u0568\u056b\u0578\u0582\u0585"),
+    "Geor": frozenset("\u10d0\u10d4\u10d8\u10dd\u10e3"),
+}
+
+
+@functools.lru_cache(maxsize=None)
+def _stress_vowels(lang: str) -> frozenset:
+    """The vowel letters that carry a stress mark in *lang*, or none for a language stressonnx does not mark.
+
+    linguatag matches *lang* to a stressonnx tag as :meth:`BasePhonemizer.match_lang`
+    does, so ``rus`` and ``ukr`` match ``ru`` and ``uk``, and ``kk-Latn`` or
+    ``ru-Latn``, a script that stressonnx does not write, matches nothing.
+    """
+    tag, distance = BasePhonemizer._match_lang(lang, sorted(_STRESS_SCRIPTS))
+    return _STRESS_VOWELS[_STRESS_SCRIPTS[tag]] if distance <= 10 else frozenset()
+
+
+def replace_stress_mark(text: str, lang: str, before: str = "", after: str = "") -> str:
+    """*text* with each stress mark (U+0301) that stressonnx can write for *lang* rewritten.
+
+    A stress mark is a U+0301 after a vowel letter of the script that
+    stressonnx writes for *lang*. That vowel gets *before* in front of it and
+    *after* behind it, in place of the mark, so with neither the mark is
+    removed. Any other acute is spelling and stays as written: after a
+    consonant, as in NFD Macedonian ѓ and ќ, after a letter of another
+    script, as in a Latin ``café`` in Russian text, and in a language that
+    stressonnx does not mark. The combining grave (U+0300) stays.
+    """
+    if STRESS_MARK not in text:
+        return text
+    vowels = _stress_vowels(lang)
+    if not vowels:
+        return text
+    out = []
+    base = None  # where in out the last character that is not a combining mark starts
+    for c in text:
+        # the first code point of the lowercase form, so that a capital Turkic İ (i + U+0307) counts
+        if c == STRESS_MARK and base is not None and out[base].lower()[:1] in vowels:
+            out.insert(base, before)
+            base += 1
+            out.append(after)
+            continue
+        if not unicodedata.combining(c):
+            base = len(out)
+        out.append(c)
+    return "".join(out)
 
 
 def register(graph) -> None:
