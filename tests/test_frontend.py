@@ -142,30 +142,32 @@ class TestStageOrder:
                               ("diacritize", "NAB", "xx", None)]
         assert backend.read == [("dNAB", "xx")]
 
-    def test_each_sentence_runs_the_stages_on_its_own(self, monkeypatch):
+    def test_the_text_is_normalised_whole_and_each_sentence_diacritized(self, monkeypatch):
         stages = Recorder(monkeypatch)
         backend = Echo()
         frontend = build(backend, normalizer=stages.normalize, stages=Stages(diacritize=True))
-        assert frontend.phonemize("ab. cd.") == [list("dnab"), list("dncd")]
-        assert stages.log == [("normalize", "ab.", "xx"), ("diacritize", "nab.", "xx", None),
-                              ("normalize", "cd.", "xx"), ("diacritize", "ncd.", "xx", None)]
+        assert frontend.phonemize("ab. cd.") == [list("dnab"), list("dcd")]
+        assert stages.log == [("normalize", "ab. cd.", "xx"), ("diacritize", "nab.", "xx", None),
+                              ("diacritize", "cd.", "xx", None)]
 
-    def test_flat_takes_the_text_whole_in_the_same_order(self, monkeypatch):
+    def test_flat_runs_the_same_order(self, monkeypatch):
         stages = Recorder(monkeypatch)
         backend = Echo()
         frontend = build(backend, normalizer=stages.normalize,
                          stages=Stages(diacritize=True, casing=stages.casing))
-        # the stages read the text whole; the backend reads each chunk
-        # without its punctuation, as synthesis does
-        assert frontend.phonemize_flat("ab. cd.") == list("dNAB CD")
-        assert stages.stage_names() == ["normalize", "casing", "diacritize"]
-        assert backend.read == [("dNAB", "xx"), ("CD", "xx")]
+        # normalisation and casing read the text whole, the diacritizer reads
+        # each sentence, and the backend reads each chunk without its
+        # punctuation, as synthesis does
+        assert frontend.phonemize_flat("ab. cd.") == list("dNAB dCD")
+        assert stages.log == [("normalize", "ab. cd.", "xx"), ("casing", "nab. cd."),
+                              ("diacritize", "NAB.", "xx", None), ("diacritize", "CD.", "xx", None)]
+        assert backend.read == [("dNAB", "xx"), ("dCD", "xx")]
 
     def test_prepare_runs_the_same_stages_as_phonemize(self, monkeypatch):
         stages = Recorder(monkeypatch)
         frontend = build(Echo(), normalizer=stages.normalize, stages=Stages(diacritize=True))
-        assert frontend.prepare("ab. cd.") == "dnab. cd."
-        assert stages.stage_names() == ["normalize", "diacritize"]
+        assert frontend.prepare("ab. cd.") == "dnab. dcd."
+        assert stages.stage_names() == ["normalize", "diacritize", "diacritize"]
         assert frontend.prepare("ab", Stages(normalize=False)) == "dab"
 
     def test_prepare_with_no_stages_normalises(self):
@@ -325,7 +327,7 @@ class TestInlineBlocks:
 
     @pytest.mark.parametrize("text, lazy, flat", [
         ("Olá [[x]] sim. [[y]], b.",
-         ["Olá ", " sim.", "a, b.", ", b."], ["Olá ", " sim. ", "a, b.", ", b."]),
+         ["Olá ", " sim. ", "a, b.", ", b."], ["Olá ", " sim. ", "a, b.", ", b."]),
         # a digit gives the clause a word, as a letter does
         ("Olá [[x]] 2 gatos, b.", ["Olá ", " 2 gatos, b."], ["Olá ", " 2 gatos, b."]),
         # no text after the block gives no mark
@@ -930,7 +932,7 @@ class TestBackends:
     def test_identity_names_the_backend_and_the_language(self):
         frontend = TextFrontend(FrontendConfig("pt-PT", Phonemizer.UNICODE))
         assert frontend.identity() == PhonemizerIdentity(
-            "unicode", "scriptconv", VERSION_STR, "pt-PT", None)
+            "unicode", "scriptconv", VERSION_STR, "pt-PT", None, frontend_module.FRONTEND_VERSION)
         reference = TextFrontend(FrontendConfig("pt-PT", Phonemizer.UNICODE, stages=Stages(lang="es")))
         assert reference.identity().lang == "es"
 

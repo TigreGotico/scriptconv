@@ -25,7 +25,7 @@ import re
 import string
 import unicodedata
 from importlib import metadata
-from typing import Callable, ClassVar, Iterable, Iterator, List, Optional, Tuple, Literal, Union
+from typing import Callable, ClassVar, Iterable, Iterator, List, Mapping, Optional, Tuple, Literal, Union
 
 from scriptconv.phonemizers.enums import Alphabet
 from scriptconv.version import VERSION_STR
@@ -177,6 +177,9 @@ class PhonemizerIdentity:
     """The resolved lect, ``"pt-PT-x-porto"``."""
     revision: Optional[str] = None
     """The orthography2ipa spec revision, when the backend has one."""
+    frontend: Optional[int] = None
+    """The version of the stage order of :class:`~scriptconv.frontend.TextFrontend`.
+    ``None`` for a backend called directly."""
 
     def differs_from(self, other: "PhonemizerIdentity") -> Tuple[str, ...]:
         """Names of the fields that differ from *other*, ``revision`` first.
@@ -190,6 +193,25 @@ class PhonemizerIdentity:
                  if getattr(self, field.name) != getattr(other, field.name)
                  and not (same_spec and field.name == "version")]
         return tuple(sorted(names, key=lambda name: name != "revision"))
+
+
+@dataclasses.dataclass(frozen=True)
+class Segment:
+    """One sentence or clause of a text that a backend reads whole.
+
+    :meth:`BasePhonemizer.phonemize_segments` yields these in reading order.
+    """
+
+    phonemes: Tuple[str, ...]
+    """The output symbols, as :meth:`BasePhonemizer.phonemize_lazy` yields them."""
+    mark: Optional[str] = None
+    """The clause symbol that ends the segment, a value of
+    :data:`CLAUSE_PUNCTUATION`, or ``None``. The frontend appends it when it
+    keeps punctuation."""
+    ends_sentence: bool = True
+    """Whether the segment ends a sentence."""
+    streams: Mapping[str, Tuple] = dataclasses.field(default_factory=dict)
+    """Side streams of the backend, such as stress, each in step with :attr:`phonemes`."""
 
 
 class MissingLanguageError(ValueError):
@@ -273,6 +295,14 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
     A stage that runs only with an optional dependency is not owned.
     """
 
+    reads_whole_text: ClassVar[bool] = False
+    """The backend reads the whole text and reports its own sentence and clause
+    marks through :meth:`phonemize_segments`.
+
+    :class:`~scriptconv.frontend.TextFrontend` then does not cut the text into
+    sentences for it. Only a backend that owns ``normalize`` sets it.
+    """
+
     engine_distribution: ClassVar[Optional[str]] = None
     """The distribution that holds the engine. ``None`` means code inside
     scriptconv, or inside the scriptconv-copyleft or scriptconv-nonfree
@@ -340,6 +370,18 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
             yield from (phonemes for phonemes, _ in self._punctuated_sentences(text, lang))
         else:
             yield from self._bare_sentences(text, lang)
+
+    def phonemize_segments(self, text: str, lang: str) -> Iterator[Segment]:
+        """The segments of *text* in reading order, read in one pass.
+
+        A backend that sets :attr:`reads_whole_text` cuts its own output at
+        its own sentence and clause marks. The segment text holds no
+        punctuation: the mark that ends a segment is in :attr:`Segment.mark`.
+
+        Raises:
+            NotImplementedError: If the backend does not read whole text.
+        """
+        raise NotImplementedError(f"{type(self).__name__} does not read whole text")
 
     def _bare_sentences(self, text: str, lang: str) -> Iterator[List[str]]:
         """Per-chunk phonemes, with the punctuation removed before the backend."""

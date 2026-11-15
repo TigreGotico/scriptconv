@@ -21,7 +21,7 @@ from scriptconv.phonemizers import (
 )
 from scriptconv.phonemizers._thirdparty import dizione
 from scriptconv.phonemizers._thirdparty.dizione.symbols import SYMBOL_TO_ID, Phonemized
-from scriptconv.phonemizers.dizione import DATA_DIR, DizionePhonemizer
+from scriptconv.phonemizers.dizione import DATA_DIR, DizionePhonemizer, _token_clauses
 
 
 @pytest.fixture(scope="module")
@@ -131,29 +131,86 @@ class TestNormalization:
         assert backend.phonemize("dog", "en-US") == [list("kˈæt")]
 
 
-class TestFrontendSentences:
-    """TextFrontend splits sentences with quebra_frases before the backend reads them.
+def check_join_rule(whole, parts):
+    """The join rule for segments that each have their own ``<bos>`` and ``<eos>``.
 
-    dizione then reads each piece alone, so an abbreviation that quebra_frases
-    takes as a sentence end loses the words after it. ``phonemize_flat`` and
-    the backend's own methods read the text whole.
+    1. Join the segments.
+    2. Drop each inner ``<eos>`` ``<bos>`` pair together with its ids and
+       stress values. The first ``<bos>`` and the last ``<eos>`` stay.
+    3. The result equals *whole* (``tokens(text)``) in symbols, ids and stress.
+    4. At every cut, the word gap (``<sp>``) or punctuation symbol that *whole*
+       has there appears exactly once: the symbols on the two sides of the cut
+       are the symbols on the two sides of the same place in *whole*.
     """
+    assert all(part.symbols[0] == "<bos>" and part.symbols[-1] == "<eos>" for part in parts)
+    assert all(len(part.symbols) == len(part.ids) == len(part.stress) for part in parts)
+    symbols = [s for part in parts for s in part.symbols]
+    ids = [i for part in parts for i in part.ids]
+    stress = [v for part in parts for v in part.stress]
+    inner = {index for index in range(1, len(symbols) - 1)
+             if (symbols[index], symbols[index + 1]) == ("<eos>", "<bos>")}
+    inner |= {index + 1 for index in inner}
+    keep = [index for index in range(len(symbols)) if index not in inner]
+    assert [symbols[i] for i in keep] == list(whole.symbols)
+    assert [ids[i] for i in keep] == list(whole.ids)
+    assert [stress[i] for i in keep] == list(whole.stress)
+    cut = 0
+    for left, right in zip(parts, parts[1:]):
+        cut += len(left.symbols) - 2
+        assert (left.symbols[-2], right.symbols[1]) == (whole.symbols[cut], whole.symbols[cut + 1])
 
-    @pytest.mark.parametrize("text, pieces, word, split, whole", [
-        ("Prof. Close the door.", ["Prof.", "Close the door."], 1, "klˈoʊz", "klˈoʊs"),
-        ("Jan. 1, 2000", ["Jan.", "1, 2000"], 1, "wˌʌn", "fˈɜːst"),
-        ("See p. 12.", ["See p.", "12."], 1, "pˈiː", "pˈeɪdʒ"),
-    ])
-    def test_the_frontend_reads_each_piece_alone(self, phonemizer, text, pieces, word, split,
-                                                 whole):
-        frontend = TextFrontend(FrontendConfig(lang="en-US"), backend=phonemizer)
-        read = frontend.phonemize(text)
-        assert read == [sentence for piece in pieces
-                        for sentence in phonemizer.phonemize(piece, "en-US")]
-        assert "".join(read[0] + [" "] + read[1]).split(" ")[word] == split
-        flat = "".join(frontend.phonemize_flat(text))
-        assert flat == phonemizer.phonemize_string(text, "en-US")
-        assert flat.split(" ")[word] == whole
+
+class TestWholeText:
+    """dizione reads the whole text once and cuts its own output at its own marks."""
+
+    TEXTS = [
+        "Hello, world. Mrs. Jones met Mr. Smith at St. Paul's!",
+        "Really?! \"Stop.\" Then he left...",
+        "Jan. 1, 2000. See p. 12 and No. 5.",
+        "Hi?, there; ok: fine. .",
+        "One sentence with no mark",
+        "Prof. Close the door. Prof. X",
+    ]
+
+    def test_it_reads_whole_text(self, phonemizer):
+        assert DizionePhonemizer.reads_whole_text is True
+        assert DizionePhonemizer.owned_stages == frozenset({"normalize"})
+
+    @pytest.mark.parametrize("text", TEXTS)
+    def test_the_sentences_follow_the_join_rule(self, phonemizer, text):
+        sentences = phonemizer.token_segments(text)
+        check_join_rule(phonemizer.tokens(text), sentences)
+        assert sum(segment.ends_sentence for segment in phonemizer.phonemize_segments(text, "en-US")) \
+            == len(sentences) == len(phonemizer.phonemize(text, "en-US"))
+
+    @pytest.mark.parametrize("text", TEXTS)
+    def test_the_clauses_follow_the_join_rule(self, phonemizer, text):
+        whole = phonemizer.tokens(text)
+        check_join_rule(whole, _token_clauses(whole))
+
+    def test_a_sentence_ends_after_its_run_of_marks(self, phonemizer):
+        sentences = phonemizer.token_segments("Really?! Yes.")
+        assert [s.symbols[-3:] for s in sentences] == [("?", "!", "<eos>"), ("s", ".", "<eos>")]
+
+    def test_an_abbreviation_ends_no_sentence(self, phonemizer):
+        assert len(phonemizer.token_segments("Mrs. Jones met Mr. Smith.")) == 1
+
+    def test_the_segments_carry_the_marks_and_the_stress(self, phonemizer):
+        segments = list(phonemizer.phonemize_segments("Hello, world! Hi; there", "en-US"))
+        assert [("".join(s.phonemes), s.mark, s.ends_sentence) for s in segments] == [
+            ("həlˈoʊ", ",", False), ("wˈɜːld", "!", True), ("hˈaɪ", ";", False), ("ðˈɛɹ", None, True)]
+        hello = segments[0]
+        assert len(hello.streams["stress"]) == len(hello.phonemes)
+        # the stress mark and its vowel "oʊ" carry stress 1, every other character 0
+        assert hello.streams["stress"] == (0, 0, 0, 1, 1, 1)
+
+    def test_text_with_nothing_to_read_gives_no_segment(self, phonemizer):
+        assert list(phonemizer.phonemize_segments("  ", "en-US")) == []
+        assert list(phonemizer.phonemize_segments("...", "en-US")) == []
+
+    def test_the_segments_check_the_language(self, phonemizer):
+        with pytest.raises(UnsupportedLanguageError):
+            next(phonemizer.phonemize_segments("cat", "en-GB"))
 
 
 class TestLanguages:
