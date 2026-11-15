@@ -19,8 +19,10 @@ CharsiuG2P (github.com/lingjzhu/CharsiuG2P) trains each label on one file in
 - ``fra-qu.tsv`` is ipa-dict ``fr_QC.txt`` (``sources/info/others/fr-qc_info.txt``),
   Quebec French with affricates before high front vowels: ``tu t͡sy``,
   ``dire d͡zɪʁ``. ``fra.tsv`` is ipa-dict ``fr_FR.txt``: ``tu ty``.
-- ``spa-me.tsv`` is ipa-dict ``es_MX.txt`` (``sources/info/others/es-mx_info.txt``),
-  with seseo: ``cielo sjelo``. ``spa.tsv`` holds the same data.
+- ``spa.tsv`` and ``spa-me.tsv`` both hold the readings of ipa-dict ``es_MX.txt``
+  (``sources/info/others/es-mx_info.txt``), with seseo: ``cielo sjelo``. The
+  model scores lower with the ``spa-me`` prompt, so Spanish requests keep
+  ``spa``.
 - ``arm-w.tsv`` is the WikiPron Western Armenian list
   (``sources/info/wikipron/arm_armn_w_narrow_info.txt``), with the Western
   stops: ``պապ bɑb`` against ``arm-e.tsv`` ``pɑp``. ISO 639-3 gives Western
@@ -77,8 +79,8 @@ class TestCharsiuMatchTags(unittest.TestCase):
     def test_quebec_french_reaches_the_quebec_list(self):
         self.assertPicks("fra-qu", ["fr-CA", "fr-Latn-CA"])
 
-    def test_mexican_spanish_reaches_the_mexican_list(self):
-        self.assertPicks("spa-me", ["es-MX", "es-Latn-MX"])
+    def test_spanish_in_the_americas_keeps_the_spanish_list(self):
+        self.assertPicks("spa", ["es-MX", "es-419", "es-AR", "es-US"])
 
     def test_western_armenian_reaches_the_western_list(self):
         self.assertPicks("arm-w", ["hyw", "hyw-AM"])

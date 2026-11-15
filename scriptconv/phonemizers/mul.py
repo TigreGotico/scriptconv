@@ -257,11 +257,13 @@ class CharsiuPhonemizer(ByT5Phonemizer):
     # them. dicts/kur.tsv is the AsoSoft Central Kurdish data, "Central Kurdish
     # words in Standard Arabic script", which a Kurmanji request in Latin
     # script must not reach. dicts/fra-qu.tsv is ipa-dict fr_QC, Quebec French
-    # (tu t͡sy), and dicts/spa-me.tsv is ipa-dict es_MX, Mexican Spanish. Read
-    # as codes, their suffixes name Europe and Montenegro. dicts/arm-w.tsv is
+    # (tu t͡sy). Read as a code, its suffix names Europe. dicts/arm-w.tsv is
     # the WikiPron Western Armenian list (պապ bɑb), which has its own code.
+    # dicts/spa-me.tsv holds the same ipa-dict es_MX readings as dicts/spa.tsv,
+    # and the model scores lower with the spa-me prompt, so Spanish requests
+    # keep spa.
     MATCH_TAGS = {"srp": "sr-Cyrl", "zho-s": "cmn-Hans", "zho-t": "cmn-Hant", "kur": "ckb",
-                  "fra-qu": "fr-CA", "spa-me": "es-MX", "arm-w": "hyw"}
+                  "fra-qu": "fr-CA", "arm-w": "hyw"}
 
     def __init__(self, model: Optional[str] = None, tokenizer_config: Optional[str] = None,
                  providers: Optional[Sequence[ProviderSpec]] = None,
