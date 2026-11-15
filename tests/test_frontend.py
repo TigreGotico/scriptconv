@@ -266,6 +266,32 @@ class TestInlineBlocks:
         assert kept.phonemize("Olá [[x]]§, sim.") == [list("olá x"), list("parágrafo, sim.")]
         assert kept.phonemize_flat("Olá [[x]]§, sim.") == list("olá x parágrafo, sim.")
 
+    @pytest.mark.parametrize("text, casing", [
+        # a casing stage changes the case of the word that stands for the block
+        ("Olá [[x]], b.", str.upper),
+        # an empty block is no word, so the comma still has a space after it
+        ("Olá [[x]],[[]] b.", None),
+    ])
+    def test_the_mark_reads_as_in_plain_text(self, text, casing):
+        kept = TextFrontend(FrontendConfig("pt", Phonemizer.GRAPHEMES, keep_punctuation=True,
+                                           stages=Stages(diacritize=False, casing=casing)))
+        assert kept.phonemize(text) == [list("olá x, "), list("b.")]
+        assert kept.phonemize_flat(text) == list("olá x, b.")
+
+    def test_the_stages_read_the_mark_only_when_one_can_follow_the_block(self):
+        read = []
+
+        def casing(text):
+            read.append(text)
+            return text
+        kept = TextFrontend(FrontendConfig("pt", Phonemizer.GRAPHEMES, keep_punctuation=True,
+                                           stages=Stages(diacritize=False, casing=casing)))
+        kept.phonemize("Olá [[x]] sim. [[y]], b.")
+        assert read == ["Olá ", " sim.", "a, b.", ", b."]
+        read.clear()
+        kept.phonemize_flat("Olá [[x]] sim. [[y]], b.")
+        assert read == ["Olá ", " sim. ", "a, b.", ", b."]
+
     @pytest.mark.parametrize("override", ["phonemize_lazy", "phonemize_to_list"])
     def test_a_backend_with_its_own_output_gets_no_mark(self, override):
         def own(self, text, lang):
