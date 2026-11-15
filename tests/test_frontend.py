@@ -30,6 +30,7 @@ from scriptconv.phonemizers import (
     get_phonemizer,
     phonemize,
 )
+from scriptconv.phonemizers.base import join_sentences
 from scriptconv.phonemizers.mul import EspeakPhonemizer
 from scriptconv.version import VERSION_STR
 
@@ -313,6 +314,34 @@ class TestInlineBlocks:
         for path in ("phonemize", "phonemize_flat"):
             text = "Um [[x]]. Dois"
             assert getattr(frontend(True), path)(text) == getattr(frontend(False), path)(text)
+
+    # A block reads as the same text with a plain word in its place, so the
+    # expected stream is that plain text read by the same frontend.
+
+    @pytest.mark.parametrize("keep", [True, False])
+    @pytest.mark.parametrize("backend", [Phonemizer.GRAPHEMES, Phonemizer.UNICODE,
+                                         Phonemizer.ORTHOGRAPHY2IPA])
+    @pytest.mark.parametrize("text", [
+        "Olá [[x]] sim. [[y]], b.",
+        # a block ends the first sentence, and another block starts the second
+        "Olá [[ana]]. [[rui]] sim.",
+        # a block starts the second sentence
+        "Sim. [[rui]] vem.",
+        "Tudo bem? [[rui]] sim.",
+        # an ellipsis ends the sentence with no token, so the space stays
+        "Espera... [[rui]] vamos.",
+        # the splitter keeps the clause after "Olá!" in its sentence, so the space stays
+        "Olá! [[rui]] tudo bem?",
+    ])
+    def test_a_block_after_a_sentence_token_joins_as_in_plain_text(self, keep, backend, text):
+        frontend = TextFrontend(FrontendConfig("pt-PT", backend, keep_punctuation=keep,
+                                               stages=Stages(diacritize=False)))
+        plain = text.replace("[[", "").replace("]]", "")
+        # each block holds the backend's own reading of its word
+        blocks = re.sub(r"\[\[(\w+)\]\]",
+                        lambda word: f"[[{''.join(frontend.phonemize_flat(word[1]))}]]", text)
+        assert frontend.phonemize_flat(blocks) == frontend.phonemize_flat(plain)
+        assert join_sentences(frontend.phonemize(blocks), keep) == frontend.phonemize_flat(plain)
 
     def test_the_split_matches_the_block_pattern(self):
         # Every string of up to 7 characters over the symbols that matter.
@@ -630,9 +659,10 @@ class TestBackends:
                                            stages=Stages(diacritize=False)))
         assert kept.phonemize_flat("Espera... vamos.") == list("espera vamos.")
         assert kept.phonemize("Espera... vamos.") == [list("espera"), list("vamos.")]
-        # an inline block joins the sentence before it, and no sentence starts with a space
-        assert kept.phonemize_flat("Espera... vamos. [[a]]") == list("espera vamos. a")
-        assert kept.phonemize("Espera... vamos. [[a]]") == [list("espera"), list("vamos. a")]
+        # an inline block joins the sentence before it, and no sentence starts with a space;
+        # the block starts a sentence after "vamos.", so it joins with no space
+        assert kept.phonemize_flat("Espera... vamos. [[a]]") == list("espera vamos.a")
+        assert kept.phonemize("Espera... vamos. [[a]]") == [list("espera"), list("vamos.a")]
         assert kept.phonemize_flat("Sim? Não.") == list("sim?não.")
         assert kept.phonemize("Sim? Não.") == [list("sim?"), list("não.")]
         plain = TextFrontend(FrontendConfig("pt", Phonemizer.GRAPHEMES,

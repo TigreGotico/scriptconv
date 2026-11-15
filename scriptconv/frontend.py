@@ -28,6 +28,7 @@ from typing import Callable, Iterator, List, Optional
 from scriptconv.diacritics import _DIACRITIZER_PACKAGES, _diacritizer_family, diacritize
 from scriptconv.graph import ConversionGraph, Edge
 from scriptconv.phonemizers.base import (
+    _CLAUSE_TOKENS,
     _PAUSE_PUNCTUATION,
     BasePhonemizer,
     PhonemizerIdentity,
@@ -101,6 +102,21 @@ class FrontendConfig:
     strict: bool = False
 
 
+def _sentence_tokenize(text: str) -> List[str]:
+    """*text* split into sentences by quebra-frases.
+
+    Raises:
+        ImportError: If the ``phonemizers`` extra is not installed.
+    """
+    try:
+        from quebra_frases import sentence_tokenize
+    except ImportError:
+        raise ImportError(
+            "sentence chunking needs quebra-frases — install with "
+            "`pip install scriptconv[phonemizers]`") from None
+    return sentence_tokenize(text)
+
+
 def _split_blocks(text: str) -> List[str]:
     r"""*text* split around its inline blocks, with text at even indices and blocks at odd ones.
 
@@ -127,16 +143,20 @@ def _split_blocks(text: str) -> List[str]:
     return parts
 
 
-def _add_block(phonemes: List[str], parts: List[str], index: int, mark: Optional[str]) -> bool:
+def _add_block(phonemes: List[str], parts: List[str], index: int, mark: Optional[str],
+               joins: bool) -> bool:
     """Append the symbols of the inline block at *index* of a split text to *phonemes*.
 
     A space before or after the block in the text becomes a space symbol,
-    unless *phonemes* is empty or already ends in a space. *mark* is the clause
-    symbol of the punctuation directly after the block. It follows the block's
-    symbols as the backend appends it after a clause: bare for ``. ? !``,
-    followed by a space for ``, : ;``. Returns whether *mark* was appended.
+    unless *phonemes* is empty or already ends in a space. *joins* drops the
+    space before the block: the block starts a sentence after a sentence that
+    ends in a clause symbol, and the two sentences join with no space. *mark*
+    is the clause symbol of the punctuation directly after the block. It
+    follows the block's symbols as the backend appends it after a clause:
+    bare for ``. ? !``, followed by a space for ``, : ;``. Returns whether
+    *mark* was appended.
     """
-    if parts[index - 1].endswith(" ") and phonemes and phonemes[-1] != " ":
+    if parts[index - 1].endswith(" ") and phonemes and phonemes[-1] != " " and not joins:
         phonemes.append(" ")
     symbols = parts[index][2:-2].strip()
     phonemes.extend(symbols)
@@ -197,8 +217,10 @@ class TextFrontend:
         """Phonemes of *text*, one list per sentence, as each sentence is read.
 
         A block's symbols join the sentence before the block, and the text
-        after a block starts a new sentence. A sentence that gives no phonemes
-        is not yielded.
+        after a block starts a new sentence. A block that starts a sentence
+        after a sentence that ends in a clause symbol follows that symbol with
+        no space, as the two sentences join in :meth:`phonemize_flat`. A
+        sentence that gives no phonemes is not yielded.
         """
         stages = self._resolve(stages)
         parts = _split_blocks(text)
@@ -210,7 +232,8 @@ class TextFrontend:
         held: List[str] = []
         for index, part in enumerate(parts):
             if index % 2:
-                _add_block(held, parts, index, self._mark_after(parts, index, stages))
+                _add_block(held, parts, index, self._mark_after(parts, index, stages),
+                           self._joins_sentence(held, parts, index))
                 continue
             for sentence in self._sentences(part, stages):
                 if held:
@@ -232,7 +255,8 @@ class TextFrontend:
         text after a block starts a new sentence, as in :meth:`phonemize`, so
         one space separates the block from it, unless the block ends in a
         space or in a clause symbol. No sentence of :meth:`phonemize` starts
-        with that space.
+        with that space. By the same rule, a block that starts a sentence
+        after a sentence that ends in a clause symbol takes no space before it.
         """
         stages = self._resolve(stages)
         parts = _split_blocks(text)
@@ -241,7 +265,8 @@ class TextFrontend:
         for index, part in enumerate(parts):
             if index % 2:
                 mark = self._mark_after(parts, index, stages)
-                ends_in_token = _add_block(phonemes, parts, index, mark)
+                joins = self._joins_sentence(phonemes, parts, index)
+                ends_in_token = _add_block(phonemes, parts, index, mark, joins)
             elif part:
                 part = self._run_stages(part, stages)
                 read = self.backend.phonemize_to_list(part, stages.lang)
@@ -307,13 +332,7 @@ class TextFrontend:
 
     def _sentences(self, text: str, stages: Stages) -> Iterator[List[str]]:
         """Steps 2 to 6 on text with no block."""
-        try:
-            from quebra_frases import sentence_tokenize
-        except ImportError:
-            raise ImportError(
-                "sentence chunking needs quebra-frases — install with "
-                "`pip install scriptconv[phonemizers]`") from None
-        for sentence in sentence_tokenize(text):
+        for sentence in _sentence_tokenize(text):
             if not sentence.strip():
                 continue
             sentence = self._run_stages(sentence, stages)
@@ -341,18 +360,32 @@ class TextFrontend:
         first = parts[index + 1].lstrip()[:1]
         if not first or first.isalnum():
             return None
-        try:
-            from quebra_frases import sentence_tokenize
-        except ImportError:
-            raise ImportError(
-                "sentence chunking needs quebra-frases — install with "
-                "`pip install scriptconv[phonemizers]`") from None
         text = _BLOCK_WORD + parts[index + 1]
         if index + 2 < len(parts) and parts[index + 2][2:-2].strip():
             text += _BLOCK_WORD
-        sentence = self._run_stages(sentence_tokenize(text)[0], stages)
+        sentence = self._run_stages(_sentence_tokenize(text)[0], stages)
         clause, mark = split_clauses(sentence)[0]
         return mark if self.backend.remove_punctuation(clause).casefold() == _BLOCK_WORD else None
+
+    def _joins_sentence(self, phonemes: List[str], parts: List[str], index: int) -> bool:
+        """Whether the block at *index* of a split text starts a sentence after a clause symbol.
+
+        Such a block joins *phonemes*, the symbols before it, with no space,
+        by the rule of :func:`~scriptconv.phonemizers.base.join_sentences`.
+        The sentence break is read as in the same text with a plain word in
+        place of each block. Only a backend that keeps punctuation joins.
+        """
+        if not (self.backend._keeps_punctuation() and phonemes
+                and phonemes[-1] in _CLAUSE_TOKENS and parts[index - 1].endswith(" ")):
+            return False
+        # The break is read without the stages. This assumes that no stage
+        # adds or removes the mark that ends a sentence.
+        text = parts[index - 1] + _BLOCK_WORD
+        if index > 1 and parts[index - 2][2:-2].strip():
+            text = _BLOCK_WORD + text
+        *before, sentence = _sentence_tokenize(text)
+        return (bool(before) and split_clauses(before[-1])[-1][1] is not None
+                and self.backend.remove_punctuation(sentence).strip().casefold() == _BLOCK_WORD)
 
     def _run_stages(self, text: str, stages: Stages) -> str:
         """Steps 3 to 5 on one piece of text."""
