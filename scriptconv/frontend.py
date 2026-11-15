@@ -373,9 +373,10 @@ class TextFrontend:
         Such a block joins *phonemes*, the symbols before it, with no space,
         by the rule of :func:`~scriptconv.phonemizers.base.join_sentences`.
         The sentence break is read as in the same text with a plain word in
-        place of each block. Only a backend that keeps punctuation joins.
+        place of each block. Only a backend that keeps punctuation joins, and
+        an empty block holds no word, so it starts no sentence.
         """
-        if not (self.backend._keeps_punctuation() and phonemes
+        if not (self.backend._keeps_punctuation() and parts[index][2:-2].strip() and phonemes
                 and phonemes[-1] in _CLAUSE_TOKENS and parts[index - 1].endswith(" ")):
             return False
         # The break is read without the stages. This assumes that no stage

@@ -363,6 +363,20 @@ class TestInlineBlocks:
         assert frontend.phonemize_flat(text) == expected
         assert join_sentences(frontend.phonemize(text), keep) == expected
 
+    @pytest.mark.parametrize("text, expected", [
+        # an empty block holds no word, so it starts no sentence and the text reads as on dev
+        ("Sim. [[]]. vem.", "sim. vem."),
+        ("Sim. [[]]. 1.", "sim. 1."),
+        ("Sim. [[]]. [[rui]] vem.", "sim. rui vem."),
+        # no clause before the block holds a word, so no mark ends that sentence
+        ("Sim.[[]]. [[rui]] vem.", "sim. rui vem."),
+    ])
+    def test_an_empty_block_starts_no_sentence(self, text, expected):
+        kept = TextFrontend(FrontendConfig("pt-PT", Phonemizer.GRAPHEMES, keep_punctuation=True,
+                                           stages=Stages(diacritize=False)))
+        assert kept.phonemize_flat(text) == list(expected)
+        assert join_sentences(kept.phonemize(text)) == list(expected)
+
     def test_the_split_matches_the_block_pattern(self):
         # Every string of up to 7 characters over the symbols that matter.
         pattern = re.compile(r"(\[\[.*?\]\])")
