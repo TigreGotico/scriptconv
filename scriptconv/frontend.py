@@ -38,7 +38,7 @@ import dataclasses
 import importlib.util
 import logging
 import re
-from typing import Callable, Iterator, List, Optional
+from typing import Callable, Iterable, Iterator, List, Optional, Tuple
 
 from scriptconv.diacritics import _DIACRITIZER_PACKAGES, _diacritizer_family, diacritize
 from scriptconv.graph import ConversionGraph, Edge
@@ -168,12 +168,14 @@ def _split_blocks_to_read(text: str) -> List[str]:
     on its two sides joins into one piece.
     """
     parts = _split_blocks(text)
-    joined = parts[:1]
+    joined: List[str] = []
+    pieces = parts[:1]
     for block, after in zip(parts[1::2], parts[2::2]):
         if block[2:-2].strip():
-            joined += [block, after]
-        else:
-            joined[-1] += after
+            joined += ["".join(pieces), block]
+            pieces = []
+        pieces.append(after)
+    joined.append("".join(pieces))
     return joined
 
 
@@ -423,6 +425,10 @@ class TextFrontend:
         text, as after ``Tudo."``, after ``Dr.`` or directly before the block.
         The block continues the clause, so the symbol goes. ``None``: neither.
         Only a backend that keeps punctuation gives ``True`` or ``False``.
+
+        The symbol goes only when it is the mark of the last clause of
+        *text*, which the backend writes after that clause. Any other symbol
+        is a phoneme, such as an X-SAMPA ``:`` for length, and it stays.
         """
         if not (self.backend._keeps_punctuation() and phonemes
                 and phonemes[-1] in _CLAUSE_TOKENS):
@@ -431,16 +437,22 @@ class TextFrontend:
         # adds or removes the mark that ends a clause.
         *before, sentence = _sentence_tokenize(
             (_BLOCK_WORD if after_block else "") + text + _BLOCK_WORD)
-        # A clause with no word gives no phonemes, and a sentence with no word
-        # gives none either, so the clauses that count are those with a word.
-        clauses = [(clause, mark) for piece in (*before, sentence)
-                   for clause, mark in split_clauses(piece)
-                   if self.backend.remove_punctuation(clause).strip()]
+        clauses = self._clauses_with_words((*before, sentence))
         mark = clauses[-2][1] if len(clauses) > 1 else None
         if self.backend.remove_punctuation(clauses[-1][0]).casefold() != _BLOCK_WORD or not mark:
-            # The symbol came from the text only if the text holds a word.
-            return False if self.backend.remove_punctuation(text).strip() else None
+            read = self._clauses_with_words(_sentence_tokenize(text))
+            return False if read and read[-1][1] == phonemes[-1] else None
         return self.backend.remove_punctuation(sentence).strip().casefold() == _BLOCK_WORD or None
+
+    def _clauses_with_words(self, sentences: Iterable[str]) -> List[Tuple[str, Optional[str]]]:
+        """The ``(clause, mark)`` pairs of *sentences* whose clause holds a word.
+
+        A clause with no word gives no phonemes, and a sentence with no word
+        gives none either, so these are the clauses that the backend reads.
+        """
+        return [(clause, mark) for sentence in sentences
+                for clause, mark in split_clauses(sentence)
+                if self.backend.remove_punctuation(clause).strip()]
 
     def _run_stages(self, text: str, stages: Stages) -> str:
         """Steps 3 to 5 on one piece of text."""
