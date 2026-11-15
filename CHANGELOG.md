@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a92](https://github.com/TigreGotico/scriptconv/tree/0.0.4a92) (2026-11-15)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a91...0.0.4a92)
+
+**Merged pull requests:**
+
+- fix\(deps\): the normalize extra pulls the es extra of text2spoken [\#253](https://github.com/TigreGotico/scriptconv/pull/253) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a91](https://github.com/TigreGotico/scriptconv/tree/0.0.4a91) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a90...0.0.4a91)
@@ -385,17 +393,9 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a41...0.0.4a42)
 
-**Merged pull requests:**
-
-- fix: name the missing lex\_lookup binary for epitran English [\#151](https://github.com/TigreGotico/scriptconv/pull/151) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [0.0.4a41](https://github.com/TigreGotico/scriptconv/tree/0.0.4a41) (2026-11-04)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a40...0.0.4a41)
-
-**Merged pull requests:**
-
-- fix\(deps\): require the linguatag release that rejects empty subtags [\#150](https://github.com/TigreGotico/scriptconv/pull/150) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a40](https://github.com/TigreGotico/scriptconv/tree/0.0.4a40) (2026-11-04)
 
