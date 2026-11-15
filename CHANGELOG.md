@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a89](https://github.com/TigreGotico/scriptconv/tree/0.0.4a89) (2026-11-15)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a88...0.0.4a89)
+
+**Merged pull requests:**
+
+- fix\(frontend\): skip the stages when no mark can follow a block [\#246](https://github.com/TigreGotico/scriptconv/pull/246) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a88](https://github.com/TigreGotico/scriptconv/tree/0.0.4a88) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a87...0.0.4a88)
@@ -385,17 +393,9 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a38...0.0.4a39)
 
-**Merged pull requests:**
-
-- fix\(epitran\): use the Japanese map names epitran ships [\#145](https://github.com/TigreGotico/scriptconv/pull/145) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a38](https://github.com/TigreGotico/scriptconv/tree/0.0.4a38) (2026-11-04)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a37...0.0.4a38)
-
-**Merged pull requests:**
-
-- fix: match language tags with linguatag [\#144](https://github.com/TigreGotico/scriptconv/pull/144) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a37](https://github.com/TigreGotico/scriptconv/tree/0.0.4a37) (2026-11-03)
 
