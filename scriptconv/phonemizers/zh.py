@@ -9,11 +9,14 @@ suffix combines with the final sound of the syllable, and regular but complex
 sound changes occur as a result (described in detail under erhua)." The
 section "Syllables" gives the coda as "one of [n, ŋ, ɚ̯, i̯, u̯]".
 
-So a pinyin token ``r``, which g2pM writes as ``r5``, is the coda ɚ̯ of the
-syllable before it, and not a syllable of its own. The sound changes to the
-rest of the final are not applied. A backend that writes the suffix as ``er``
-gives the same token as the independent morpheme 儿 ér, so that suffix reads
-as a full syllable.
+So when g2pM reads 儿 after a syllable as ``r5``, that token is the coda ɚ̯
+of the syllable before it, and not a syllable of its own. The coda goes before
+the tone mark, where the output writes the other vocalic codas (爱 ai̯↘, 后
+xou̯↘), and after a nasal coda, which follows the tone mark. The sound changes
+to the rest of the final are not applied. A Latin ``r`` that a backend passes
+through is not pinyin and gives no IPA. A backend that writes the suffix as
+``er`` gives the same token as the independent morpheme 儿 ér, so that suffix
+reads as a full syllable.
 """
 import abc
 import logging
@@ -34,8 +37,14 @@ LOG = logging.getLogger(__name__)
 # pinyin_to_ipa reads "ü" and "v", and rejects "u:" and "nue".
 _NUE_LUE = re.compile(r"^([nl])u(?=[eēéěè])")
 
-# The erhua suffix as pinyin spells it, with an optional tone number
+# The erhua suffix as g2pM spells it, with or without the tone number
 _ERHUA_SUFFIX = re.compile(r"r[1-5]?")
+# The tone mark at the end of a syllable in the IPA output
+_FINAL_TONE = re.compile(r"[˥˦˧˨˩→↗↓↘]*$")
+
+
+class _ErhuaSuffix(str):
+    """A pinyin token ``r`` that g2pM read from the character 儿."""
 
 
 def _standard_pinyin(syllable: str) -> str:
@@ -162,9 +171,10 @@ class BaseChinesePinyinPhonemizer(BasePhonemizer):
         Converts a list of pinyin syllables to IPA.
 
         A token with no letters or digits, such as punctuation, is kept as it
-        is. The erhua suffix ``r`` gives the coda ɚ̯, which ends the syllable
-        before it. A syllable that is not pinyin gives no IPA: it logs a
-        warning, or raises :class:`UnreadTextError` when :attr:`strict` is set.
+        is. An erhua suffix that the backend read from 儿 gives the coda ɚ̯ of
+        the syllable before it. A syllable that is not pinyin gives no IPA: it
+        logs a warning, or raises :class:`UnreadTextError` when :attr:`strict`
+        is set.
 
         Args:
             phones (List[str]): List of pinyin syllables or phrases.
@@ -177,13 +187,16 @@ class BaseChinesePinyinPhonemizer(BasePhonemizer):
             if p == " ":
                 ipa_phones.append(" ")
                 continue
+            if isinstance(p, _ErhuaSuffix):
+                host = ipa_phones[-1]
+                tone = _FINAL_TONE.search(host).start()
+                ipa_phones[-1] = host[:tone] + "ɚ̯" + host[tone:]
+                ipa_phones.append("")
+                continue
             pho_str = ""
             for sp in p.split():  # G2P might return phrases with multiple syllables
                 if not any(c.isalnum() for c in sp):
                     pho_str += sp
-                    continue
-                if _ERHUA_SUFFIX.fullmatch(sp):
-                    pho_str += "ɚ̯"
                     continue
                 try:
                     readings = self.pinyin_to_ipa(_standard_pinyin(sp))
@@ -319,7 +332,21 @@ class G2pMPhonemizer(BaseChinesePinyinPhonemizer):
         Returns:
             List[str]: Pinyin tokens.
         """
-        return self.g2p(text, tone=self.tone, char_split=self.char_split)
+        tokens = self.g2p(text, tone=self.tone, char_split=self.char_split)
+        # g2pM gives one token for each character that it reads, and passes the
+        # other characters through as they are, so a token that does not start
+        # the rest of the text was read from the character at pos.
+        pos, after_syllable = 0, False
+        for i, token in enumerate(tokens):
+            if text.startswith(token, pos):
+                pos += len(token)
+                after_syllable = False
+                continue
+            if after_syllable and text[pos] == "儿" and _ERHUA_SUFFIX.fullmatch(token):
+                tokens[i] = _ErhuaSuffix(token)
+            pos += 1
+            after_syllable = True
+        return tokens
 
 
 class XpinyinPhonemizer(BaseChinesePinyinPhonemizer):
