@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a97](https://github.com/TigreGotico/scriptconv/tree/0.0.4a97) (2026-11-15)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a96...0.0.4a97)
+
+**Merged pull requests:**
+
+- fix\(frontend\): read blocks as their plain text at marks and line breaks [\#263](https://github.com/TigreGotico/scriptconv/pull/263) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a96](https://github.com/TigreGotico/scriptconv/tree/0.0.4a96) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a95...0.0.4a96)
@@ -387,11 +395,6 @@
 ## [0.0.4a46](https://github.com/TigreGotico/scriptconv/tree/0.0.4a46) (2026-11-09)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a45...0.0.4a46)
-
-**Merged pull requests:**
-
-- fix\(o2i\): give the phonemizer's own engine the packaged lexicon [\#161](https://github.com/TigreGotico/scriptconv/pull/161) ([JarbasAl](https://github.com/JarbasAl))
-- fix\(espeak\): respell the French words espeak-ng reads as English [\#160](https://github.com/TigreGotico/scriptconv/pull/160) ([goldyfruit](https://github.com/goldyfruit))
 
 ## [0.0.4a45](https://github.com/TigreGotico/scriptconv/tree/0.0.4a45) (2026-11-06)
 
