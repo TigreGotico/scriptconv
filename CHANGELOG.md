@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a98](https://github.com/TigreGotico/scriptconv/tree/0.0.4a98) (2026-11-15)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a97...0.0.4a98)
+
+**Merged pull requests:**
+
+- refactor: take restricted backends from scriptconv-copyleft and scriptconv-nonfree [\#264](https://github.com/TigreGotico/scriptconv/pull/264) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a97](https://github.com/TigreGotico/scriptconv/tree/0.0.4a97) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a96...0.0.4a97)
@@ -387,10 +395,6 @@
 ## [0.0.4a47](https://github.com/TigreGotico/scriptconv/tree/0.0.4a47) (2026-11-09)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a46...0.0.4a47)
-
-**Merged pull requests:**
-
-- test\(ghana\): read the Dagbani expectation from the engine [\#163](https://github.com/TigreGotico/scriptconv/pull/163) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a46](https://github.com/TigreGotico/scriptconv/tree/0.0.4a46) (2026-11-09)
 
