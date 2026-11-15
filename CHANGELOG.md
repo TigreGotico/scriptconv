@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a100](https://github.com/TigreGotico/scriptconv/tree/0.0.4a100) (2026-11-15)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a99...0.0.4a100)
+
+**Merged pull requests:**
+
+- feat: add the 90-symbol Shami inventory [\#268](https://github.com/TigreGotico/scriptconv/pull/268) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a99](https://github.com/TigreGotico/scriptconv/tree/0.0.4a99) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a98...0.0.4a99)
@@ -387,10 +395,6 @@
 ## [0.0.4a49](https://github.com/TigreGotico/scriptconv/tree/0.0.4a49) (2026-11-10)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a48...0.0.4a49)
-
-**Merged pull requests:**
-
-- fix: measure language distance from the requested tag in match\_lang [\#168](https://github.com/TigreGotico/scriptconv/pull/168) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a48](https://github.com/TigreGotico/scriptconv/tree/0.0.4a48) (2026-11-10)
 
