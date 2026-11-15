@@ -1,0 +1,26 @@
+name: Extra Licences
+
+# Resolves every extra and fails on a copyleft or non-commercial
+# distribution outside scriptconv-copyleft and scriptconv-nonfree.
+on:
+  pull_request:
+    branches: [dev]
+  workflow_dispatch:
+
+jobs:
+  extra_licences:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Check the licences of every extra
+        run: python scripts/check_extra_licences.py

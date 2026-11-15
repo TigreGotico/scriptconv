@@ -366,14 +366,15 @@ conversion with `stress=True` or another option can be exact where the flag is
 
 ## Extras
 
-The core installs with zero dependencies. Capabilities opt in:
+The core installs with zero dependencies. Capabilities opt in. Some extras
+install scriptconv-copyleft or scriptconv-nonfree: see [Licensing](#licensing).
 
 | Extra | Enables |
 |---|---|
-| `ja` / `zh` | Dictionary readings: kanji to kana (pykakasi), hanzi to pinyin/bopomofo (pypinyin) |
+| `ja` / `zh` | Dictionary readings: kanji to kana (pykakasi, through scriptconv-copyleft), hanzi to pinyin/bopomofo (pypinyin) |
 | `phonemizers` | The phonemizer base layer (sentence chunking, language matching) |
 | `espeak`, `gruut`, `goruut`, `epitran`, `transphone`, `misaki`, `byt5` | Multilingual phonemizer backends |
-| `en-phonemizers`, `ja-phonemizers`, `zh-phonemizers`, `ko`, `ar-phonemizers`, `eu`, `pt-phonemizers`, `gl`, `he`, `fa`, `vi`, `shami`, `o2i` | Per-language phonemizer backends. `o2i` also gives Mirandese and Barranquenho |
+| `en-phonemizers`, `ja-phonemizers`, `zh-phonemizers`, `ko`, `ar-phonemizers`, `eu`, `pt-phonemizers`, `gl`, `he`, `fa`, `vi`, `shami`, `o2i`, `africa`, `ghana` | Per-language phonemizer backends. `o2i` also gives Mirandese and Barranquenho |
 | `mwl` | The same packages as `o2i` |
 | `tashkeel` | Arabic diacritization for the phonemizer pipeline (text2tashkeel) |
 | `stress` | Word-stress restoration for 26 stressonnx language tags: East Slavic; Bulgarian, Macedonian, and Slovene; Latvian; Armenian; Georgian; and Turkic/Caucasian, for the phonemizer pipeline (stressonnx; not yet on PyPI) |
@@ -414,14 +415,37 @@ Set `SCRIPTCONV_PHONETISAURUS_MODEL` to a trained FST to run it.
 
 ## Licensing
 
-scriptconv is Apache-2.0, with one deliberate, clearly bounded exception:
-`scriptconv/phonemizers/_vendored/` quarantines two unpublished third-party
-G2P implementations under **their own licenses**: mantoq's phonetisation
-core (CC BY-NC 4.0, non-commercial) and KoG2P (GPL-3.0), each with its
-LICENSE.md in the directory and in the wheel. Nothing imports them at
-package import time. They load only when a caller explicitly requests those
-phonemizers, and unencumbered defaults (arbtok for Arabic, g2pk for Korean)
-exist for both.
+The scriptconv wheel is `Apache-2.0 AND MIT`. The code of scriptconv is
+Apache-2.0. Two vendored tables are MIT, and the wheel carries their notices:
+the Cangjie5 code table (`scriptconv/data/LICENSE.cangjie5`) and the
+Hangul-to-IPA converter of stannam/hangul_to_ipa with its tables
+(`scriptconv/phonemizers/_thirdparty/LICENSE.hangul_to_ipa`).
+
+The phonemizer wrappers whose code, engine or dependencies are under a
+copyleft or a non-commercial licence are in two sister packages:
+
+| Package | Holds | Installed by the extras |
+|---|---|---|
+| [scriptconv-copyleft](https://github.com/TigreGotico/scriptconv-copyleft) | the espeak, Cotovía, AhoTTS, transphone, misaki, g2pfa, g2pk and KoG2P wrappers, the pykakasi wrapper and the Japanese functions of `readings` | `espeak`, `transphone`, `misaki`, `gl`, `eu`, `fa`, `ko`, `ja`, `ja-phonemizers` |
+| [scriptconv-nonfree](https://github.com/TigreGotico/scriptconv-nonfree) | the Mantoq, Halabi and Iqra wrappers with the vendored mantoq and iqra_phonetiser, the viphoneme wrapper, and the africa-g2p and ghana-g2p wrappers | `ar-phonemizers`, `vi`, `africa`, `ghana` |
+
+Each sister package states its own licence. scriptconv-nonfree holds code
+under CC BY-NC 4.0, which forbids commercial use. The registry resolves these
+wrappers from the sister package, so an install of the extra gives the same
+backend as before. Without the package, `get_phonemizer` raises an
+`ImportError` that names the extra. The `ar-phonemizers` extra installs
+scriptconv-nonfree. To use only arbtok, the Arabic default, install
+`scriptconv[phonemizers]` and `arbtok`.
+
+Two dependencies under the LGPL or the GPL stay in the extras of this
+package: `distance` and `num2words`. g2p_en declares `distance` and never
+imports it. num2words only turns digits into words, and text2spoken does that
+work in its normalise stage before the phonemizer runs. gruut, misaki,
+openphonemizer and phonikud call it for numbers. Neither of the two makes a
+wrapper move to a sister package. `scripts/check_extra_licences.py` resolves
+every extra and fails on any other copyleft or non-commercial distribution,
+and `tests/test_wheel_licences.py` fails when the wheel holds a file under a
+licence other than Apache-2.0 or MIT.
 
 ## Related projects
 

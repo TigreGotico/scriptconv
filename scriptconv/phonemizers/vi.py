@@ -1,51 +1,9 @@
-import sys
+"""The Vietnamese wrapper ``VIPhonemePhonemizer`` is in scriptconv-nonfree.
 
-from scriptconv.phonemizers.base import BasePhonemizer
-from scriptconv.phonemizers.enums import Alphabet
+``pip install scriptconv[vi]`` installs that package. Import the class from
+``scriptconv_nonfree.phonemizers.vi``, or construct it through
+:func:`scriptconv.phonemizers.get_phonemizer`.
+"""
+from scriptconv.phonemizers._moved import deprecated_getattr
 
-
-class VIPhonemePhonemizer(BasePhonemizer):
-    """https://github.com/v-nhandt21/Viphoneme"""
-
-    engine_distribution = "viphoneme"
-
-    def __init__(self):
-        try:
-            from viphoneme import vi2IPA
-        except ImportError as e:
-            if sys.version_info >= (3, 12):
-                raise ImportError(
-                    "The VIPhoneme phonemizer needs Python below 3.12, because "
-                    "viphoneme depends on vinorm, and vinorm imports the 'imp' "
-                    "module that Python 3.12 removed."
-                ) from e
-            raise ImportError(
-                "viphoneme is required for the VIPhoneme phonemizer. "
-                "Install it with 'pip install viphoneme' "
-                "(or 'pip install scriptconv[vi]')."
-            ) from e
-        self.g2p = vi2IPA
-        super().__init__(Alphabet.IPA)
-
-    @classmethod
-    def get_lang(cls, target_lang: str) -> str:
-        """
-        Validates and returns the closest supported language code.
-
-        Args:
-            target_lang (str): The language code to validate.
-
-        Returns:
-            str: The validated language code.
-
-        Raises:
-            ValueError: If the language code is unsupported.
-        """
-        # this check is here only to throw an exception if invalid language is provided
-        return cls.match_lang(target_lang, ["vi"])
-
-    def phonemize_string(self, text: str, lang: str = "vi") -> str:
-        """
-        """
-        lang = self.get_lang(lang)
-        return self.g2p(text)
+__getattr__ = deprecated_getattr(__name__)

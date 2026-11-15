@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68.0"]
+requires = ["setuptools>=77.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,7 +7,13 @@ name = "scriptconv"
 dynamic = ["version"]
 description = "The one stop for text conversion: a zero-dependency script & phoneme-notation core — ISO-15924 detection & metadata, IPA↔ARPABET/X-SAMPA/Lexique/Kirshenbaum/Cotovía/RFE, Buckwalter↔Arabic, Hangul→jamo, kana — with phonemizer integrations behind optional extras"
 readme = "README.md"
-license = {text = "Apache-2.0"}
+license = "Apache-2.0 AND MIT"
+license-files = [
+    "LICENSE",
+    "scriptconv/data/LICENSE.cangjie5",
+    "scriptconv/phonemizers/_thirdparty/LICENSE.hangul_to_ipa",
+    "scriptconv/phonemizers/_vendored/matoub_kab/LICENSE.md",
+]
 requires-python = ">=3.11"
 dependencies = []
 classifiers = [
@@ -19,7 +25,6 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
 ]
 keywords = [
@@ -32,38 +37,39 @@ keywords = [
 version = {attr = "scriptconv.version.VERSION_STR"}
 
 [project.optional-dependencies]
-ja = ["pykakasi>=2.3,<3"]
+ja = ["scriptconv-copyleft[ja]>=0.1.0a1"]
 zh = ["pypinyin>=0.50,<1"]
 # --- phonemizer wrappers (scriptconv.phonemizers) ---
 phonemizers = ["quebra-frases", "linguatag[langcodes]>=0.2.3a1"]
 normalize = ["text2spoken[ar,es,eu,pt,ru]>=0.0.2a46"]
-espeak = ["scriptconv[phonemizers]", "espyak"]
+espeak = ["scriptconv[phonemizers]", "scriptconv-copyleft[espeak]>=0.1.0a1"]
 gruut = ["scriptconv[phonemizers]", "gruut"]
 goruut = ["scriptconv[phonemizers]", "pygoruut"]
 epitran = ["scriptconv[phonemizers]", "epitran>=1.26.1"]
-transphone = ["scriptconv[phonemizers]", "transphone", "pip", "jieba", "pypinyin", "unidic-lite"]
+transphone = ["scriptconv[phonemizers]", "scriptconv-copyleft[transphone]>=0.1.0a1"]
 phonetisaurus = ["scriptconv[phonemizers]", "phonetisaurus"]
-misaki = ["scriptconv[phonemizers]", "misaki[en,ko,zh]; python_version<'3.13'", "python-mecab-ko; python_version<'3.13'", "fugashi; python_version<'3.13'", "jaconv; python_version<'3.13'", "mojimoji; python_version<'3.13'", "pyopenjtalk; python_version<'3.13'", "unidic-lite; python_version<'3.13'", "pip; python_version<'3.13'", "spacy>=3.7,<4.0; python_version<'3.13'"]
+misaki = ["scriptconv[phonemizers]", "scriptconv-copyleft[misaki]>=0.1.0a1"]
 byt5 = ["scriptconv[phonemizers]", "onnxruntime", "numpy"]
 o2i = ["scriptconv[phonemizers]", "orthography2ipa>=7.123.0a2", "o2i-lexicons>=0.7.0a1"]
-eu = ["scriptconv[phonemizers]", "euskaphone", "ahotts_g2p"]
+eu = ["scriptconv[phonemizers]", "euskaphone", "scriptconv-copyleft[eu]>=0.1.0a1"]
 pt-phonemizers = ["scriptconv[phonemizers]", "tugaphone>=1.2.0a1"]
 mwl = ["scriptconv[o2i]"]
-ghana = ["scriptconv[phonemizers]", "ghana-g2p>=0.1.1"]
-gl = ["scriptconv[phonemizers]", "pycotovia"]
+ghana = ["scriptconv[phonemizers]", "scriptconv-nonfree[ghana]>=0.1.0a1"]
+africa = ["scriptconv[phonemizers]", "scriptconv-nonfree>=0.1.0a1"]
+gl = ["scriptconv[phonemizers]", "scriptconv-copyleft[gl]>=0.1.0a1"]
 he = ["scriptconv[phonemizers]", "phonikud-onnx", "phonikud"]
-fa = ["scriptconv[phonemizers]", "persian_phonemizer", "hazm>=0.10", "spacy>=3.7,<4.0"]
-vi = ["scriptconv[phonemizers]", "viphoneme; python_version<'3.12'", "vinorm; python_version<'3.12'", "underthesea; python_version<'3.12'", "eng_to_ipa; python_version<'3.12'"]
+fa = ["scriptconv[phonemizers]", "scriptconv-copyleft[fa]>=0.1.0a1"]
+vi = ["scriptconv[phonemizers]", "scriptconv-nonfree[vi]>=0.1.0a1"]
 tashkeel = ["scriptconv[phonemizers]", "text2tashkeel>=0.2.0a1"]
 stress = ["scriptconv[phonemizers]", "stressonnx>=0.0.3a2"]
 pt = ["scriptconv[phonemizers]", "bifonia>=0.3.0a1"]
-ja-phonemizers = ["scriptconv[phonemizers]", "pyopenjtalk", "cutlet", "unidic-lite", "pykakasi>=2.3,<3"]
-ko = ["scriptconv[phonemizers]", "g2pk; python_version<'3.13'", "regex"]
+ja-phonemizers = ["scriptconv[phonemizers]", "pyopenjtalk", "cutlet", "unidic-lite", "scriptconv-copyleft[ja-phonemizers]>=0.1.0a1"]
+ko = ["scriptconv[phonemizers]", "scriptconv-copyleft[ko]>=0.1.0a1"]
 zh-phonemizers = ["scriptconv[phonemizers]", "jieba", "pypinyin>=0.50,<1", "xpinyin", "g2pM", "numpy", "pinyin_to_ipa"]
 en-phonemizers = ["scriptconv[phonemizers]", "g2p_en", "openphonemizer", "deep-phonemizer", "requests"]
-ar-phonemizers = ["scriptconv[phonemizers]", "arbtok", "ovos-number-parser"]
+ar-phonemizers = ["scriptconv[phonemizers]", "arbtok", "scriptconv-nonfree[ar-phonemizers]>=0.1.0a1"]
 shami = ["scriptconv[phonemizers]", "regex"]
-test = ["pytest", "pytest-timeout", "misaki[en,ko]; python_version<'3.13'", "spacy>=3.7,<4.0; python_version<'3.13'", "pykakasi>=2.3,<3", "pypinyin>=0.50,<1", "pinyin_to_ipa", "xpinyin", "g2pM", "numpy", "quebra-frases", "linguatag[langcodes]>=0.2.3a1", "scriptconv[normalize]", "ovos-utils>=0.1.0", "regex", "ovos-number-parser", "bifonia>=0.3.0a1", "stressonnx>=0.0.3a2", "text2tashkeel>=0.2.0a1", "tugaphone>=1.2.0a1", "ghana-g2p>=0.1.1", "espyak", "epitran>=1.26.1", "orthography2ipa>=7.123.0a2", "o2i-lexicons>=0.7.0a1", "euskaphone", "pygoruut", "g2pk; python_version<'3.13'", "packaging", "tomli; python_version < '3.11'"]
+test = ["pytest", "pytest-timeout", "scriptconv-copyleft[espeak,ja]>=0.1.0a1", "scriptconv-nonfree[ar-phonemizers]>=0.1.0a1", "pypinyin>=0.50,<1", "pinyin_to_ipa", "xpinyin", "g2pM", "numpy", "quebra-frases", "linguatag[langcodes]>=0.2.3a1", "scriptconv[normalize]", "ovos-utils>=0.1.0", "regex", "bifonia>=0.3.0a1", "stressonnx>=0.0.3a2", "text2tashkeel>=0.2.0a1", "tugaphone>=1.2.0a1", "epitran>=1.26.1", "orthography2ipa>=7.123.0a2", "o2i-lexicons>=0.7.0a1", "euskaphone", "pygoruut", "packaging", "setuptools>=77.0", "tomli; python_version < '3.11'"]
 
 [project.urls]
 Homepage = "https://github.com/TigreGotico/scriptconv"
@@ -76,13 +82,6 @@ include = ["scriptconv*"]
 scriptconv = ["py.typed"]
 "scriptconv.data" = ["*.tsv.gz"]
 "scriptconv.phonemizers._thirdparty" = ["ko_tables/*.csv", "ko_tables/*.tsv"]
-"scriptconv.phonemizers._vendored.kog2p" = ["rulebook.txt", "LICENSE.md"]
-"scriptconv.phonemizers._vendored.mantoq" = ["LICENSE.md"]
-"scriptconv.phonemizers._vendored.iqra_phonetiser" = ["LICENSE.md"]
-"scriptconv.phonemizers._vendored.africa_g2p" = [
-    "LICENSE.md", "DATA_LICENSE.md",
-    "languages/*.json", "data/*.json",
-]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

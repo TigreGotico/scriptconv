@@ -1,4 +1,4 @@
-# taken from https://github.com/stannam/hangul_to_ipa
+# taken from https://github.com/stannam/hangul_to_ipa (MIT: see LICENSE.hangul_to_ipa)
 import csv
 import math
 import os.path

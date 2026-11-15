@@ -225,30 +225,38 @@ air-gapped host. (`en.py`'s DeepPhonemizer backend similarly fetches its own
 model via the `dp` package, that fetch is DeepPhonemizer's, not scriptconv's,
 but the net effect for a caller is the same, no local path required.)
 
-## Licensing quarantine, `_vendored`
+## Backends in scriptconv-copyleft and scriptconv-nonfree
 
-Two G2P implementations are unpublished upstream and carry licenses
-incompatible with Apache-2.0 redistribution as part of this library's own
-code, so they are vendored in an explicitly quarantined subpackage,
-`scriptconv/phonemizers/_vendored/`, **under their own licenses**:
+A wrapper moves out of scriptconv when its own code, a dependency of its
+engine, or a binary it runs is under a copyleft or a non-commercial licence.
+Two sister packages hold those wrappers, and their vendored code, under the
+licences of that code:
 
-- `mantoq/`, the Halabi Arabic-Phonetiser pipeline, its phonetisation core
-  is **CC BY-NC 4.0** (non-commercial). See `mantoq/LICENSE.md`.
-- `kog2p/`, Korean G2P, **GPL-3.0**. See `kog2p/LICENSE.md`.
+- **scriptconv-copyleft** holds KoG2P and the espeak, Cotovía, AhoTTS,
+  transphone, misaki, g2pfa, g2pk and pykakasi wrappers, and the Japanese
+  functions of `scriptconv.readings`.
+- **scriptconv-nonfree** holds mantoq, iqra_phonetiser, africa-g2p and their
+  wrappers (Mantoq, Halabi, Iqra, AfricaG2P), and the viphoneme and
+  ghana-g2p wrappers.
 
-The quarantine's guarantees: nothing imports it at package import time.
-Using these backends is an explicit per-request opt-in that accepts the
-subpackage's license, encumbered license headers exist nowhere else in the
-tree, and both notices ship in the wheel. An externally installed `mantoq` or
-`kog2p` package takes precedence over the vendored copy. Unencumbered
-defaults exist for both languages (arbtok, g2pk) and are what the
-per-language resolution selects.
+The registry keeps every member and its extra. A moved member imports from
+its sister package when it is resolved, and the extra that served it
+installs that package, so `pip install scriptconv[espeak]` still gives the
+espeak backend. Without the sister package, `get_phonemizer` raises an
+`ImportError` that names the extra. scriptconv never imports a sister
+package at package import time.
+
+The old import paths, for example
+`scriptconv.phonemizers.mul.EspeakPhonemizer`, give the class from the
+sister package with a `DeprecationWarning` until the release that
+`scriptconv.phonemizers._moved.REMOVAL_VERSION` names.
 
 ### Three Arabic edges on the same Halabi phonetiser
 
 `mantoq`, `halabi` and `iqra` share one backend — Nawar Halabi's
-Arabic-Phonetiser (2016, CC BY-NC 4.0), vendored/externally-installed as the
-`mantoq` package — at three different points in its pipeline:
+Arabic-Phonetiser (2016, CC BY-NC 4.0), vendored in scriptconv-nonfree or
+installed as the `mantoq` package — at three different points in its
+pipeline:
 
 - `Phonemizer.MANTOQ` (`MantoqPhonemizer`): the full pipeline, mantoq's own
   diacritizer restoring tashkeel on bare text before the phonetiser runs.
