@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a88](https://github.com/TigreGotico/scriptconv/tree/0.0.4a88) (2026-11-15)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a87...0.0.4a88)
+
+**Merged pull requests:**
+
+- fix: match Charsiu dialect labels to their BCP-47 tags [\#245](https://github.com/TigreGotico/scriptconv/pull/245) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a87](https://github.com/TigreGotico/scriptconv/tree/0.0.4a87) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a86...0.0.4a87)
@@ -392,10 +400,6 @@
 ## [0.0.4a37](https://github.com/TigreGotico/scriptconv/tree/0.0.4a37) (2026-11-03)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a36...0.0.4a37)
-
-**Merged pull requests:**
-
-- feat\(o2i\): enable the packaged orthography2ipa lexicons [\#142](https://github.com/TigreGotico/scriptconv/pull/142) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a36](https://github.com/TigreGotico/scriptconv/tree/0.0.4a36) (2026-10-14)
 
