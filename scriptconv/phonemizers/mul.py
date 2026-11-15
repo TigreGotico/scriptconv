@@ -256,8 +256,12 @@ class CharsiuPhonemizer(ByT5Phonemizer):
     # tags keep Cantonese, Hokkien and the other Chinese languages away from
     # them. dicts/kur.tsv is the AsoSoft Central Kurdish data, "Central Kurdish
     # words in Standard Arabic script", which a Kurmanji request in Latin
-    # script must not reach.
-    MATCH_TAGS = {"srp": "sr-Cyrl", "zho-s": "cmn-Hans", "zho-t": "cmn-Hant", "kur": "ckb"}
+    # script must not reach. dicts/fra-qu.tsv is ipa-dict fr_QC, Quebec French
+    # (tu t͡sy), and dicts/spa-me.tsv is ipa-dict es_MX, Mexican Spanish. Read
+    # as codes, their suffixes name Europe and Montenegro. dicts/arm-w.tsv is
+    # the WikiPron Western Armenian list (պապ bɑb), which has its own code.
+    MATCH_TAGS = {"srp": "sr-Cyrl", "zho-s": "cmn-Hans", "zho-t": "cmn-Hant", "kur": "ckb",
+                  "fra-qu": "fr-CA", "spa-me": "es-MX", "arm-w": "hyw"}
 
     def __init__(self, model: Optional[str] = None, tokenizer_config: Optional[str] = None,
                  providers: Optional[Sequence[ProviderSpec]] = None,
