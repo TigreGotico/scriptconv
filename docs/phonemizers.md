@@ -122,7 +122,7 @@ four such backends, each lazy-imported and each raising a named
 
 | Language(s) | Backend | Extra | What it restores |
 |---|---|---|---|
-| `he` | phonikud (`phonikud_model=`), or Nakdimon with `diacritizer_model="nakdimon"` | `he` | niqqud |
+| `he` | phonikud (`phonikud_model=`), or Nakdimon with `diacritizer_model="nakdimon"` | `he` | niqqud, without the `\|` that phonikud writes after a prefix letter |
 | Arabic in Arabic script, as linguatag reads the tag: `ar` with any region, the individual Arabic languages such as `arz`, `apc` and `ary`, and Hassaniyya `mey` (not `ar-Latn`, nor `acy` and `pga`, which CLDR writes in Latin script) | text2tashkeel; `waqf=True` gives the pausal form | `tashkeel` | tashkeel (+ hamza, dagger alef) |
 | 26 stressonnx tags (`STRESS_LANGS`): East Slavic (`ru`, `uk`, `be`), Bulgarian/Macedonian/Slovene (`bg`, `mk`, `sl`), Latvian (`lv`), Armenian (`hy`), Georgian (`ka`), Turkic/Caucasian (`az`, `ba`, `cv`, `kbd`, `kjh`, `kk`, `ky`, `mdf`, `myv`, `sah`, `tg`, `tt`, `udm`, `uz`, `xal`) | stressonnx | `stress` | word stress |
 | Tags at linguatag distance 0 from `pt-PT`: `pt`, `pt-PT`, `pt-Latn-PT`, `por`, and lects such as `pt-PT-x-porto` (not `pt-BR`, `pt-AO`, `pt-MZ`) | bifonia, which receives the full tag | `pt` | heterophonic-homograph sense diacritics |
@@ -193,6 +193,57 @@ g.convert("sêde", "text-diacritized", "text", lang="pt")     # raises ValueErro
 
 `add_diacritics` remains the single dispatch point, the graph edge is a thin
 wrapper, not a second implementation.
+
+### Stress marks and the backends that read them
+
+stressonnx writes the stress mark U+0301 after the stressed vowel. A backend
+reads the mark only in the languages that it declares in
+`stress_mark_langs`, and `reads_stress_mark(lang)` gives the answer through
+linguatag, so `ru-RU` matches `ru` and `uk` does not.
+
+In a language that stressonnx marks and that the backend does not declare,
+the backend removes U+0301 from its text before it reads it. Then the marked
+text gives the same output as the plain text. The removal is in
+`BasePhonemizer`, on every method that takes text, so a direct call and a
+`TextFrontend` call give the same output. A text method must be an instance
+method: a `staticmethod` or `classmethod` in its place raises `TypeError`
+when the class is made.
+
+linguatag matches the language to a stressonnx tag, the same way as the
+declaration, so `rus` and `ukr` get the removal and `kk-Latn` does not. The
+removal takes only a U+0301 after a vowel letter of the script that
+stressonnx writes for the language: Cyrillic for `ru`, Latin for `lv` and
+`sl`, Georgian for `ka`, Armenian for `hy`. Every other acute is spelling and
+stays: in a language that stressonnx does not mark (`café` in `pt-PT`),
+after a letter of another script (`café` in Russian text), and after a
+consonant (the NFD Macedonian letters ѓ and ќ). The removal also keeps the
+combining grave (U+0300).
+
+In a language that stressonnx writes in Latin script (`lv`, `sl`, `az-Latn`
+and `uz-Latn`, and bare `az` and `uz`), an NFD acute on a Latin vowel looks
+the same as a stress mark, so the removal also takes it: an NFD `café` in
+such a text becomes `cafe`.
+
+A declaration comes from a probe, not from a guess. The probe reads each word
+of a word list plain and marked, with each backend that loads and each
+language that the backend serves. A language is declared only when the mark
+moves the stress onto the marked vowel and changes nothing else:
+
+```bash
+python scripts/probe_stress_marks.py words.tsv --out cells.tsv
+```
+
+`words.tsv` has the columns `lang` and `marked`, one marked word per row.
+
+| Backend | Reads U+0301 in |
+| --- | --- |
+| `vosk` | `ru` |
+| `graphemes` | every language, as text: `stress_notation="acute"` keeps U+0301, `"plus"` writes `+` before the stressed vowel (`прив+ет`), `"none"` removes it |
+| `unicode` | every language, as a codepoint |
+| every other backend in scriptconv | none |
+
+A backend in scriptconv-copyleft or scriptconv-nonfree declares its own
+languages in the same attribute.
 
 ### Stress marks and goruut
 

@@ -62,6 +62,8 @@ class VoskPhonemizer(BasePhonemizer):
     _ACUTE_STRESS = re.compile(r"\+?([" + "".join(vowels) + "])" + _ACUTE)
     # One match per vowel letter, with the "+" marks before it.
     _MARKED_VOWEL = re.compile(r"\+*[" + "".join(vowels) + "]")
+    # scripts/probe_stress_marks.py: the mark moves the stress, and nothing else
+    stress_mark_langs = frozenset({"ru"})
 
     def __init__(self, alphabet: Alphabet = Alphabet.VOSK,
                  model: Optional[str] = None):

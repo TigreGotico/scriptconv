@@ -21,6 +21,8 @@ legitimately differ on text containing digits.
 """
 import abc
 import dataclasses
+import functools
+import inspect
 import re
 import string
 import unicodedata
@@ -59,6 +61,11 @@ _SEPARATING_MARKS = frozenset(mark for mark, symbol in CLAUSE_PUNCTUATION.items(
 _CLAUSE_BREAK = re.compile(r"(?:\.\.+|\u2026|[,:;!?|\u060c\u061b\u061f])[^\w\s]*(?=\s)")
 _TRAILING_PUNCTUATION = re.compile(r"[^\w\s]+\s*$")
 _LANG_FLAGS = re.compile(r"\([^)]+\)")
+# The stress mark that the diacritize stage (stressonnx) writes after a stressed vowel.
+STRESS_MARK = "\u0301"
+# The methods through which text reaches a backend.
+_TEXT_METHODS = ("phonemize_string", "phonemize_to_list", "phonemize", "phonemize_lazy",
+                 "phonemize_segments")
 
 
 def join_sentences(sentences: Iterable[List[str]], keep_punctuation: bool = True) -> List[str]:
@@ -237,6 +244,28 @@ _SISTER_DISTRIBUTIONS = {"scriptconv_copyleft": "scriptconv-copyleft",
                          "scriptconv_nonfree": "scriptconv-nonfree"}
 
 
+def _without_unread_stress_mark(method: Callable) -> Callable:
+    """*method* with the stress mark removed from its text where the backend does not read it."""
+    parameter = inspect.signature(method).parameters.get("lang")
+    default_lang = None if parameter is None or parameter.default is parameter.empty else parameter.default
+
+    @functools.wraps(method)
+    def read(self, text, *args, **kwargs):
+        lang = args[0] if args else kwargs.get("lang", default_lang)
+        if text and lang and STRESS_MARK in text and not self.reads_stress_mark(lang):
+            from scriptconv.diacritics import replace_stress_mark
+            text = replace_stress_mark(text, lang)
+        return method(self, text, *args, **kwargs)
+
+    return read
+
+
+@functools.lru_cache(maxsize=None)
+def _declared(langs: frozenset, lang: str) -> bool:
+    """True when linguatag matches *lang* to one of *langs*, as :meth:`BasePhonemizer.match_lang` does."""
+    return bool(langs) and BasePhonemizer._match_lang(lang, sorted(langs))[1] <= 10
+
+
 class BasePhonemizer(metaclass=abc.ABCMeta):
     keep_punctuation: bool = False
     """Keep clause punctuation (``, . ? ! : ;``) in the phoneme output.
@@ -280,6 +309,28 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
     wrapper class names scriptconv and not the engine that produced the
     phonemes."""
 
+    stress_mark_langs: ClassVar[frozenset[str]] = frozenset()
+    """Languages in which this backend reads the stress mark (U+0301 after a vowel) as stress.
+
+    ``scripts/probe_stress_marks.py`` gives the declaration: only a language
+    in which the mark moves the stress to the marked vowel, and changes
+    nothing else, is declared. For a language of
+    :data:`scriptconv.diacritics.STRESS_LANGS` that the backend does not
+    declare, the backend removes the mark from its text before it reads it.
+    """
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        # every text path, also one that a backend overrides, reads the mark as declared
+        for name in _TEXT_METHODS:
+            if name in cls.__dict__:
+                method = cls.__dict__[name]
+                if not inspect.isfunction(method):
+                    raise TypeError(f"{cls.__qualname__}.{name} must be an instance method that takes "
+                                    f"(self, text, lang), so that the stress mark is removed from its text "
+                                    f"in a language the backend does not read it in")
+                setattr(cls, name, _without_unread_stress_mark(method))
+
     def __init__(self, alphabet: Alphabet = Alphabet.UNICODE,
                  normalizer: Optional[Callable[[str, str], str]] = None):
         super().__init__()
@@ -291,6 +342,10 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def phonemize_string(self, text: str, lang: str) -> str:
         raise NotImplementedError
+
+    def reads_stress_mark(self, lang: str) -> bool:
+        """True when this backend reads the stress mark in *lang*, as :attr:`stress_mark_langs` declares."""
+        return _declared(self.stress_mark_langs, lang)
 
     def phonemize_to_list(self, text: str, lang: str) -> List[str]:
         """Phonemes of *text* as one flat list, without normalization.
@@ -603,9 +658,29 @@ class GraphemePhonemizer(BasePhonemizer):
     A phonemizer class that treats input text as graphemes (characters).
     It performs text normalization and returns the normalized text as a string
     of characters.
+
+    ``stress_notation`` is how the output writes the stress mark (U+0301
+    after a vowel) of a :data:`scriptconv.diacritics.STRESS_LANGS` language:
+    ``"acute"`` keeps U+0301, ``"plus"`` writes ``+`` before the stressed
+    vowel (``прив+ет``), and ``"none"`` removes the mark. In any other
+    language an acute is spelling and stays.
     """
+    STRESS_NOTATIONS = ("acute", "plus", "none")
     # Regular expression matching whitespace:
     whitespace_re = re.compile(r"\s+")
+
+    def __init__(self, alphabet: Alphabet = Alphabet.UNICODE,
+                 normalizer: Optional[Callable[[str, str], str]] = None,
+                 stress_notation: str = "acute"):
+        if stress_notation not in self.STRESS_NOTATIONS:
+            raise ValueError(f"stress_notation must be one of {self.STRESS_NOTATIONS}, "
+                             f"not {stress_notation!r}")
+        super().__init__(alphabet, normalizer)
+        self.stress_notation = stress_notation
+
+    def reads_stress_mark(self, lang: str) -> bool:
+        """The output writes the mark, in every language, unless the notation is ``"none"``."""
+        return self.stress_notation != "none"
 
     def phonemize_string(self, text: str, lang: str) -> str:
         """
@@ -626,6 +701,9 @@ class GraphemePhonemizer(BasePhonemizer):
         text = text.replace(":", ",")
         text = re.sub(r"[\<\>\(\)\[\]\"]+", "", text)
         text = re.sub(self.whitespace_re, " ", text).strip()
+        if self.stress_notation == "plus":
+            from scriptconv.diacritics import replace_stress_mark
+            text = replace_stress_mark(text, lang, before="+")
         return text
 
 
@@ -637,6 +715,10 @@ class UnicodeCodepointPhonemizer(BasePhonemizer):
     def __init__(self, form: Literal["NFC", "NFD", "NFKC", "NFKD"] = "NFD"):
         self.form = form
         super().__init__(Alphabet.UNICODE)
+
+    def reads_stress_mark(self, lang: str) -> bool:
+        """The output is the text's codepoints, so the mark is one of them in every language."""
+        return True
 
     def phonemize_string(self, text: str, lang: str) -> str:
         # Phonemes = codepoints
