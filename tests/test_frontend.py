@@ -332,6 +332,8 @@ class TestInlineBlocks:
         "Espera... [[rui]] vamos.",
         # the splitter keeps the clause after "Olá!" in its sentence, so the space stays
         "Olá! [[rui]] tudo bem?",
+        # a sentence with no word gives no phonemes, so "Fim." joins the block
+        "Fim. ... [[rui]] vem.",
     ])
     def test_a_block_after_a_sentence_token_joins_as_in_plain_text(self, keep, backend, text):
         frontend = TextFrontend(FrontendConfig("pt-PT", backend, keep_punctuation=keep,
@@ -342,6 +344,24 @@ class TestInlineBlocks:
                         lambda word: f"[[{''.join(frontend.phonemize_flat(word[1]))}]]", text)
         assert frontend.phonemize_flat(blocks) == frontend.phonemize_flat(plain)
         assert join_sentences(frontend.phonemize(blocks), keep) == frontend.phonemize_flat(plain)
+
+    @pytest.mark.parametrize("keep, backend, text, start, tail", [
+        # the block symbols end in "." with punctuation off, and still keep their space
+        (False, Phonemizer.GRAPHEMES, "Sim. [[x.]]. [[y]] vem.", "sim x. y ", "vem."),
+        # "1." gives orthography2ipa no phonemes, so no token comes before the block
+        (True, Phonemizer.ORTHOGRAPHY2IPA, '[[ana]]." 1. [[rui]] vem.', "ana rui ", "vem."),
+        # the block ends in "." but its clause ends in an ellipsis, which gives no token
+        (True, Phonemizer.GRAPHEMES, "[[x.]]... [[y]]", "x. y", ""),
+        # the splitter keeps "Dr." in the sentence of the block, so the block starts none
+        (True, Phonemizer.GRAPHEMES, "Sim. Dr. [[rui]]", "sim.dr. rui", ""),
+    ])
+    def test_a_block_keeps_its_space_unless_it_starts_a_sentence_after_a_token(
+            self, keep, backend, text, start, tail):
+        frontend = TextFrontend(FrontendConfig("pt-PT", backend, keep_punctuation=keep,
+                                               stages=Stages(diacritize=False)))
+        expected = list(start) + frontend.phonemize_flat(tail)
+        assert frontend.phonemize_flat(text) == expected
+        assert join_sentences(frontend.phonemize(text), keep) == expected
 
     def test_the_split_matches_the_block_pattern(self):
         # Every string of up to 7 characters over the symbols that matter.

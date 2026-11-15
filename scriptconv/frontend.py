@@ -384,8 +384,14 @@ class TextFrontend:
         if index > 1 and parts[index - 2][2:-2].strip():
             text = _BLOCK_WORD + text
         *before, sentence = _sentence_tokenize(text)
-        return (bool(before) and split_clauses(before[-1])[-1][1] is not None
-                and self.backend.remove_punctuation(sentence).strip().casefold() == _BLOCK_WORD)
+        if self.backend.remove_punctuation(sentence).strip().casefold() != _BLOCK_WORD:
+            return False
+        # A clause with no word gives no phonemes, and a sentence with no word
+        # gives none either, so the mark that counts is that of the last
+        # clause that holds a word.
+        marks = [mark for piece in before for clause, mark in split_clauses(piece)
+                 if self.backend.remove_punctuation(clause).strip()]
+        return bool(marks) and marks[-1] is not None
 
     def _run_stages(self, text: str, stages: Stages) -> str:
         """Steps 3 to 5 on one piece of text."""
