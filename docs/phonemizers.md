@@ -190,15 +190,23 @@ reads the mark only in the languages that it declares in
 `stress_mark_langs`, and `reads_stress_mark(lang)` gives the answer through
 linguatag, so `ru-RU` matches `ru` and `uk` does not.
 
-In a `STRESS_LANGS` language that the backend does not declare, the backend
-removes U+0301 from its text before it reads it. Then the marked text gives
-the same output as the plain text. The removal is in `BasePhonemizer`, on
-every method that takes text, so a direct call and a `TextFrontend` call
-give the same output.
+In a language that stressonnx marks and that the backend does not declare,
+the backend removes U+0301 from its text before it reads it. Then the marked
+text gives the same output as the plain text. The removal is in
+`BasePhonemizer`, on every method that takes text, so a direct call and a
+`TextFrontend` call give the same output. A text method must be an instance
+method: a `staticmethod` or `classmethod` in its place raises `TypeError`
+when the class is made.
 
-An acute in any other language is spelling and stays (`café`). The removal
-also keeps the combining grave (U+0300) and the NFD Macedonian letters ѓ
-and ќ.
+linguatag matches the language to a stressonnx tag, the same way as the
+declaration, so `rus` and `ukr` get the removal and `kk-Latn` does not. The
+removal takes only a U+0301 after a vowel letter of the script that
+stressonnx writes for the language: Cyrillic for `ru`, Latin for `lv` and
+`sl`, Georgian for `ka`, Armenian for `hy`. Every other acute is spelling and
+stays: in a language that stressonnx does not mark (`café` in `pt-PT`),
+after a letter of another script (`café` in Russian text), and after a
+consonant (the NFD Macedonian letters ѓ and ќ). The removal also keeps the
+combining grave (U+0300).
 
 A declaration comes from a probe, not from a guess. The probe reads each word
 of a word list plain and marked, with each backend that loads and each

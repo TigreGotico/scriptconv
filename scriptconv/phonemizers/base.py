@@ -324,7 +324,12 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         # every text path, also one that a backend overrides, reads the mark as declared
         for name in _TEXT_METHODS:
             if name in cls.__dict__:
-                setattr(cls, name, _without_unread_stress_mark(cls.__dict__[name]))
+                method = cls.__dict__[name]
+                if not inspect.isfunction(method):
+                    raise TypeError(f"{cls.__qualname__}.{name} must be an instance method that takes "
+                                    f"(self, text, lang), so that the stress mark is removed from its text "
+                                    f"in a language the backend does not read it in")
+                setattr(cls, name, _without_unread_stress_mark(method))
 
     def __init__(self, alphabet: Alphabet = Alphabet.UNICODE,
                  normalizer: Optional[Callable[[str, str], str]] = None):

@@ -26,6 +26,25 @@ class Recorder(BasePhonemizer):
         return text
 
 
+class EveryPathRecorder(BasePhonemizer):
+    """A backend that overrides every text method, so each one returns the text it receives."""
+
+    def phonemize_string(self, text: str, lang: str) -> str:
+        return text
+
+    def phonemize_to_list(self, text: str, lang: str) -> List[str]:
+        return [text]
+
+    def phonemize(self, text: str, lang: str) -> List[List[str]]:
+        return [[text]]
+
+    def phonemize_lazy(self, text: str, lang: str) -> Iterator[List[str]]:
+        yield [text]
+
+    def phonemize_segments(self, text: str, lang: str) -> List[str]:
+        return [text]
+
+
 class LazyRecorder(Recorder):
     """A backend that overrides the sentence path and does not call phonemize_string."""
 
@@ -47,6 +66,25 @@ class TestRemoval(unittest.TestCase):
         self.assertEqual(backend.phonemize(marked, "ru"), [list(plain)])
         self.assertEqual(list(LazyRecorder().phonemize_lazy(marked, "ru")), [list(plain)])
 
+    def test_every_overridden_text_method_loses_the_mark(self):
+        marked, plain = f"за{ACUTE}мок", "замок"
+        backend = EveryPathRecorder()
+        self.assertEqual(backend.phonemize_string(marked, "ru"), plain)
+        self.assertEqual(backend.phonemize_to_list(marked, "ru"), [plain])
+        self.assertEqual(backend.phonemize(marked, "ru"), [[plain]])
+        self.assertEqual(list(backend.phonemize_lazy(marked, "ru")), [[plain]])
+        self.assertEqual(backend.phonemize_segments(marked, "ru"), [plain])
+
+    def test_every_tag_of_a_stress_language_loses_the_mark(self):
+        # linguatag matches these tags to a stressonnx language, as the declaration does
+        for text, lang in [(f"за{ACUTE}мок", "rus"), (f"за{ACUTE}мок", "rus-Cyrl"),
+                           (f"за{ACUTE}мок", "ukr"), (f"за{ACUTE}мок", "ru-RU"),
+                           (f"Bo{ACUTE}bu", "lv"), (f"me{ACUTE}sece", "slv"),
+                           (f"ა{ACUTE}ბა", "ka"), (f"ա{ACUTE}ր", "hy"),
+                           (f"о{ACUTE}т", "uz-Cyrl-UZ"), (f"о{ACUTE}т", "be-tarask")]:
+            with self.subTest(lang=lang):
+                self.assertEqual(Recorder().phonemize_string(text, lang), text.replace(ACUTE, ""))
+
     def test_declared_language_keeps_the_mark(self):
         marked = f"за{ACUTE}мок"
         self.assertEqual(DeclaresRussian().phonemize_string(marked, "ru"), marked)
@@ -58,9 +96,12 @@ class TestRemoval(unittest.TestCase):
         self.assertEqual(DeclaresRussian().phonemize_string(f"за{ACUTE}мок", "be"), "замок")
 
     def test_an_acute_that_is_spelling_stays(self):
-        # Portuguese and Spanish write the acute; NFD Macedonian ѓ is г + U+0301
+        # Portuguese and Spanish write the acute; NFD Macedonian ѓ is г + U+0301;
+        # a Latin letter in Cyrillic text, and Kazakh in its Latin alphabet (ǵ, ó)
         for text, lang in [(f"cafe{ACUTE}", "pt-PT"), (f"cafe{ACUTE}", "es"),
-                           (f"г{ACUTE}аво", "mk")]:
+                           (f"г{ACUTE}аво", "mk"), (f"Это Cafe{ACUTE} на углу.", "ru"),
+                           (f"G{ACUTE}ylym o{ACUTE}ner", "kk-Latn"),
+                           (f"G{ACUTE}ylym o{ACUTE}ner", "kk"), (f"cafe{ACUTE}", "ru-Latn")]:
             with self.subTest(lang=lang):
                 self.assertEqual(Recorder().phonemize_string(text, lang), text)
 
@@ -68,10 +109,22 @@ class TestRemoval(unittest.TestCase):
         grave = "\u0300"
         self.assertEqual(Recorder().phonemize_string(f"и{grave} ка{ACUTE}к", "bg"), f"и{grave} как")
 
+    def test_a_mark_after_no_vowel_stays(self):
+        for text in [f"1{ACUTE} к{ACUTE}", f"«{ACUTE}за»"]:
+            with self.subTest(text):
+                self.assertEqual(replace_stress_mark(text, "ru", before="+"), text)
+
+    def test_a_static_or_class_text_method_is_refused(self):
+        for wrap in (staticmethod, classmethod):
+            with self.subTest(wrap.__name__), self.assertRaises(TypeError):
+                type("Static", (BasePhonemizer,), {"phonemize_string": wrap(lambda *args: args[-2])})
+
     def test_replace_writes_around_the_marked_letter(self):
         self.assertEqual(replace_stress_mark(f"приве{ACUTE}т", "ru", before="+"), "прив+ет")
         self.assertEqual(replace_stress_mark(f"приве{ACUTE}т", "ru", after="+"), "приве+т")
         self.assertEqual(replace_stress_mark(f"приве{ACUTE}т", "ru"), "привет")
+        # NFD ё: the mark follows the diaeresis of its vowel
+        self.assertEqual(replace_stress_mark(f"ве\u0308{ACUTE}л", "ru", before="+"), "в+е\u0308л")
 
 
 class TestGruutRussian(unittest.TestCase):
@@ -117,6 +170,10 @@ class TestGraphemeStressNotation(unittest.TestCase):
     def test_spelling_acute_is_not_rewritten(self):
         graphemes = GraphemePhonemizer(stress_notation="plus")
         self.assertEqual(graphemes.phonemize_string(f"cafe{ACUTE}", "pt-PT"), f"cafe{ACUTE}")
+        self.assertEqual(graphemes.phonemize_string(f"cafe{ACUTE} у до{ACUTE}ма", "ru"),
+                         f"cafe{ACUTE} у д+ома")
+        self.assertEqual(graphemes.phonemize_string(f"g{ACUTE}ylym o{ACUTE}ner", "kk-Latn"),
+                         f"g{ACUTE}ylym o{ACUTE}ner")
 
     def test_unknown_notation_is_refused(self):
         with self.assertRaises(ValueError):
@@ -132,6 +189,12 @@ class TestHebrewPrefixSeparator(unittest.TestCase):
             phonikud.return_value.add_diacritics.return_value = self.PHONIKUD
             self.assertEqual(diacritize("שאינם ואשר בעבר | סוף", "he"),
                              "שֶׁאֵינָם וַאֲשֶׁר בֶּעָבָר | סוף")
+
+    def test_a_bar_between_two_words_stays(self):
+        for text in ["בעבר | סוף", "בעבר| סוף", "בעבר |סוף", "סוף|", "|סוף", "a|b"]:
+            with self.subTest(text), patch("scriptconv.diacritics._phonikud") as phonikud:
+                phonikud.return_value.add_diacritics.return_value = text
+                self.assertEqual(diacritize(text, "he"), text)
 
 
 if __name__ == "__main__":
