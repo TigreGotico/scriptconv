@@ -16,6 +16,8 @@ license-files = [
     "scriptconv/phonemizers/_thirdparty/dizione/built/LICENSE.cmudict",
     "scriptconv/phonemizers/_thirdparty/dizione/built/LICENSE.homograph-data",
     "scriptconv/phonemizers/_vendored/matoub_kab/LICENSE.md",
+    "scriptconv/phonemizers/_thirdparty/g2pw/LICENSE",
+    "scriptconv/phonemizers/_thirdparty/nakdimon/LICENSE",
 ]
 requires-python = ">=3.11"
 dependencies = []
@@ -60,7 +62,7 @@ mwl = ["scriptconv[o2i]"]
 ghana = ["scriptconv[phonemizers]", "scriptconv-nonfree[ghana]>=0.1.0a1"]
 africa = ["scriptconv[phonemizers]", "scriptconv-nonfree>=0.1.0a1"]
 gl = ["scriptconv[phonemizers]", "scriptconv-copyleft[gl]>=0.1.0a1"]
-he = ["scriptconv[phonemizers]", "phonikud-onnx", "phonikud"]
+he = ["scriptconv[phonemizers]", "phonikud-onnx", "phonikud", "onnxruntime>=1.17", "numpy"]
 fa = ["scriptconv[phonemizers]", "scriptconv-copyleft[fa]>=0.1.0a1"]
 vi = ["scriptconv[phonemizers]", "scriptconv-nonfree[vi]>=0.1.0a1"]
 tashkeel = ["scriptconv[phonemizers]", "text2tashkeel>=0.2.0a1"]
@@ -68,11 +70,11 @@ stress = ["scriptconv[phonemizers]", "stressonnx>=0.0.3a2"]
 pt = ["scriptconv[phonemizers]", "bifonia>=0.3.0a1"]
 ja-phonemizers = ["scriptconv[phonemizers]", "pyopenjtalk", "cutlet", "unidic-lite", "scriptconv-copyleft[ja-phonemizers]>=0.1.0a1"]
 ko = ["scriptconv[phonemizers]", "scriptconv-copyleft[ko]>=0.1.0a1"]
-zh-phonemizers = ["scriptconv[phonemizers]", "jieba", "pypinyin>=0.50,<1", "xpinyin", "g2pM", "numpy", "pinyin_to_ipa"]
+zh-phonemizers = ["scriptconv[phonemizers]", "jieba", "pypinyin>=0.50,<1", "xpinyin", "g2pM", "numpy", "pinyin_to_ipa", "onnxruntime>=1.17", "tokenizers>=0.15", "huggingface_hub>=0.25"]
 en-phonemizers = ["scriptconv[phonemizers]", "g2p_en", "openphonemizer", "deep-phonemizer", "requests", "numpy>=1.24,<3"]
 ar-phonemizers = ["scriptconv[phonemizers]", "arbtok", "scriptconv-nonfree[ar-phonemizers]>=0.1.0a1"]
 shami = ["scriptconv[phonemizers]", "regex"]
-test = ["pytest", "pytest-timeout", "scriptconv-copyleft[espeak,ja]>=0.1.0a1", "scriptconv-nonfree[ar-phonemizers]>=0.1.0a1", "pypinyin>=0.50,<1", "pinyin_to_ipa", "xpinyin", "g2pM", "numpy", "quebra-frases", "linguatag[langcodes]>=0.2.3a1", "scriptconv[normalize]", "ovos-utils>=0.1.0", "regex", "bifonia>=0.3.0a1", "stressonnx>=0.0.3a2", "text2tashkeel>=0.2.0a1", "tugaphone>=1.2.0a1", "epitran>=1.26.1", "orthography2ipa>=7.123.0a2", "o2i-lexicons>=0.7.0a1", "euskaphone", "pygoruut", "packaging", "setuptools>=77.0", "tomli; python_version < '3.11'"]
+test = ["pytest", "pytest-timeout", "scriptconv-copyleft[espeak,ja]>=0.1.0a1", "scriptconv-nonfree[ar-phonemizers]>=0.1.0a1", "pypinyin>=0.50,<1", "pinyin_to_ipa", "xpinyin", "g2pM", "numpy", "onnxruntime>=1.17", "tokenizers>=0.15", "huggingface_hub>=0.25", "quebra-frases", "linguatag[langcodes]>=0.2.3a1", "scriptconv[normalize]", "ovos-utils>=0.1.0", "regex", "bifonia>=0.3.0a1", "stressonnx>=0.0.3a2", "text2tashkeel>=0.2.0a1", "tugaphone>=1.2.0a1", "epitran>=1.26.1", "orthography2ipa>=7.123.0a2", "o2i-lexicons>=0.7.0a1", "euskaphone", "pygoruut", "packaging", "setuptools>=77.0", "tomli; python_version < '3.11'"]
 
 [project.urls]
 Homepage = "https://github.com/TigreGotico/scriptconv"
@@ -85,6 +87,7 @@ include = ["scriptconv*"]
 scriptconv = ["py.typed"]
 "scriptconv.data" = ["*.tsv.gz"]
 "scriptconv.phonemizers._thirdparty" = ["ko_tables/*.csv", "ko_tables/*.tsv"]
+"scriptconv.phonemizers._thirdparty.g2pw" = ["*.json", "*.txt"]
 "scriptconv.phonemizers._thirdparty.dizione" = ["data/*.txt", "built/*", "UPSTREAM.md"]
 
 [tool.pytest.ini_options]

@@ -122,10 +122,21 @@ four such backends, each lazy-imported and each raising a named
 
 | Language(s) | Backend | Extra | What it restores |
 |---|---|---|---|
-| `he` | phonikud (`phonikud_model=`) | `he` | niqqud |
+| `he` | phonikud (`phonikud_model=`), or Nakdimon with `diacritizer_model="nakdimon"` | `he` | niqqud |
 | Arabic in Arabic script, as linguatag reads the tag: `ar` with any region, the individual Arabic languages such as `arz`, `apc` and `ary`, and Hassaniyya `mey` (not `ar-Latn`, nor `acy` and `pga`, which CLDR writes in Latin script) | text2tashkeel; `waqf=True` gives the pausal form | `tashkeel` | tashkeel (+ hamza, dagger alef) |
 | 26 stressonnx tags (`STRESS_LANGS`): East Slavic (`ru`, `uk`, `be`), Bulgarian/Macedonian/Slovene (`bg`, `mk`, `sl`), Latvian (`lv`), Armenian (`hy`), Georgian (`ka`), Turkic/Caucasian (`az`, `ba`, `cv`, `kbd`, `kjh`, `kk`, `ky`, `mdf`, `myv`, `sah`, `tg`, `tt`, `udm`, `uz`, `xal`) | stressonnx | `stress` | word stress |
 | Tags at linguatag distance 0 from `pt-PT`: `pt`, `pt-PT`, `pt-Latn-PT`, `por`, and lects such as `pt-PT-x-porto` (not `pt-BR`, `pt-AO`, `pt-MZ`) | bifonia, which receives the full tag | `pt` | heterophonic-homograph sense diacritics |
+
+phonikud is the Hebrew default. `diacritize(text, "he",
+diacritizer_model="nakdimon")` uses Nakdimon instead (Gershuni and Pinter,
+"Restoring Hebrew Diacritics Without a Dictionary", Findings of NAACL 2022).
+Nakdimon predicts a vowel point, a dagesh and a shin or sin dot for each
+letter. Text that already holds a vowel point, a dagesh or a shin or sin dot
+stays as written. The code and the model are under the MIT licence:
+
+| File | Source | Revision | Size | Licence |
+|---|---|---|---|---|
+| `Nakdimon.onnx` | github.com/elazarg/nakdimon, `nakdimon/data/` | `5b73cdd6a43ad465faabc8c1118933592df356c8` | 21 MB | MIT |
 
 Stress is free and either unwritten or under-marked in all of these
 languages. East Slavic is the clearest case: stress is also mobile (it
@@ -224,6 +235,51 @@ else `$XDG_CACHE_HOME` (default `~/.cache`), and reuses it afterward. Pass
 air-gapped host. (`en.py`'s DeepPhonemizer backend similarly fetches its own
 model via the `dp` package, that fetch is DeepPhonemizer's, not scriptconv's,
 but the net effect for a caller is the same, no local path required.)
+
+The Nakdimon model follows the same rule. It goes into
+`<base>/scriptconv/nakdimon`, from a fixed commit of its repository. A
+download with a sha256 that differs from the pinned value is discarded. With
+no network and no cached model, `diacritize` raises `ModelUnavailableError`.
+
+The g2pW backend gets its files through `huggingface_hub`, at a fixed
+revision, into the shared Hugging Face cache. With no network and no cached
+copy, it raises `ModelUnavailableError`.
+
+## g2pW, Mandarin pinyin symbols
+
+`Phonemizer.G2PW` reads Mandarin with g2pW (Chen et al., "g2pW: A Conditional
+Weighted Softmax BERT for Polyphone Disambiguation in Mandarin", INTERSPEECH
+2022). A BERT model reads each polyphonic character in the context of its
+sentence, and tables give the reading of the other characters. The model runs
+on onnxruntime, with no torch. Simplified and traditional characters both
+read. Install the backend with `pip install scriptconv[zh-phonemizers]`.
+
+The output alphabet is `Alphabet.PINYIN`. Each syllable gives three symbols:
+the initial, the final and the tone digit 1 to 5. A syllable with no initial
+takes `Ø`, and a final writes ü as `v`. A space and the marks
+`。 . ？ ? ！ ! — … 、 ， , ： : ； ;` stay as symbols, so the backend ignores
+`keep_punctuation`. A lowercase Latin letter that is also a symbol, such as
+`a` or `b`, stays too. `phonemize_string` joins the symbols with a space.
+
+```python
+from scriptconv.phonemizers import Alphabet, Phonemizer, get_phonemizer
+
+g2pw = get_phonemizer(Phonemizer.G2PW, Alphabet.PINYIN)
+g2pw.phonemize("银行在哪里？", "zh")
+# [['y', 'in', '2', 'h', 'ang', '2', 'z', 'ai', '4', 'n', 'a', '3', 'l', 'i', '3', '？']]
+g2pw.phonemize("我要去行走。", "zh")
+# [['w', 'o', '3', 'y', 'ao', '4', 'q', 'u', '4', 'x', 'ing', '2', 'z', 'ou', '3', '。']]
+```
+
+The backend does not read digits, and a digit gives no symbol. Numbers,
+dates and units belong to the normalisation stage, which runs before the
+backend.
+
+| File | Source | Revision | Size | Licence |
+|---|---|---|---|---|
+| `g2pw.tar.gz`: the ONNX model, `config.py` and the character lists | Hugging Face dataset `rhasspy/piper-checkpoints`, `zh/zh_CN/_resources/` | `581dcfb1856912507627724d4ab2817a20e889ca` | 113 MB | MIT (dataset card); the g2pW weights are Apache-2.0 |
+| `tokenizer.json` | Hugging Face model `google-bert/bert-base-chinese` | `8f23c25b06e129b6c986331a13d8d025a92cf0ea` | 269 KB | Apache-2.0 |
+| Three reading tables, in the wheel | github.com/GitYCC/g2pW, `g2pw/` | `b9328ce8129c4717a70f16a2688542a0197541dd` | 1.9 MB | Apache-2.0 |
 
 ## dizione, American English
 
@@ -501,7 +557,7 @@ Multilingual: espeak (subprocess with espyak fallback), gruut, goruut,
 epitran, transphone, ByT5/Charsiu (ONNX), the misaki family (en/ja/zh/ko/vi).
 Per-language: English (DeepPhonemizer, OpenPhonemizer, g2p_en, dizione), Japanese
 (OpenJTalk, cutlet, pykakasi), Korean (g2pk, KoG2P), Chinese (jieba, g2pM,
-xpinyin, pypinyin), Arabic (arbtok, mantoq), Hebrew (phonikud), Persian,
+xpinyin, pypinyin, g2pW), Arabic (arbtok, mantoq), Hebrew (phonikud), Persian,
 Vietnamese (viphoneme, Python below 3.12 only), Portuguese (tugaphone), Galician
 (Cotovía), Russian (vosk, the vosk-tts inventory, `Alphabet.VOSK`, with the
 voice's pronunciation dictionary passed as `phonemizer_model`), Basque

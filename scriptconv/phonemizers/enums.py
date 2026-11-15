@@ -76,6 +76,7 @@ class Phonemizer(str, Enum):
     KOG2PK = "kog2p" # korean
     G2PC = "g2pc" # chinese
     G2PM = "g2pm" # chinese
+    G2PW = "g2pw"  # chinese (g2pW polyphone model; pinyin initials, finals and tones)
     PYPINYIN = "pypinyin" # chinese
     XPINYIN = "xpinyin" # chinese
     JIEBA = "jieba" # chinese  (not a real phonemizer!)

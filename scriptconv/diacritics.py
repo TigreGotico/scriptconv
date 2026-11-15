@@ -78,15 +78,17 @@ Georgian letter of that kind:
   stress acute composes to a precomposed form such as á, but á is not a
   Latvian letter, so strip removes the acute.
 """
+import hashlib
 import os
 import tempfile
 import unicodedata
+import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Optional
 
 from scriptconv.graph import Edge
-from scriptconv.phonemizers.base import _primary_subtag
+from scriptconv.phonemizers.base import ModelUnavailableError, _primary_subtag
 
 #: The lang-contextual node produced by diacritization.  Like ``"text"`` it is
 #: meaningful only with ``lang=`` context and exists only in opted-in graphs.
@@ -342,6 +344,79 @@ def _phonikud(phonikud_model=None):
     return _PHONIKUD_CACHE[model]
 
 
+#: The ``diacritizer_model`` value that selects Nakdimon for Hebrew.
+NAKDIMON = "nakdimon"
+
+# The Nakdimon ONNX model (MIT) at a fixed commit of its repository, and the
+# sha256 of the file. The model is 21 MB.
+_NAKDIMON_URL = ("https://raw.githubusercontent.com/elazarg/nakdimon/"
+                 "5b73cdd6a43ad465faabc8c1118933592df356c8/nakdimon/data/Nakdimon.onnx")
+_NAKDIMON_SHA256 = "ab08a8c47daf33886c224859347fa5420c2bfe7ecf4afd2d3387f32b0af12c67"
+_NAKDIMON_CACHE: dict = {}  # model path -> Nakdimon
+
+
+def _default_nakdimon_model() -> str:
+    """The path of the Nakdimon model, downloaded into the cache on first use.
+
+    The cache is ``<base>/scriptconv/nakdimon``, with ``<base>`` as for
+    phonikud. A download whose sha256 differs from the pinned one is
+    discarded.
+
+    Raises:
+        ModelUnavailableError: If the model is not cached and the download fails.
+    """
+    base = os.environ.get("SCRIPTCONV_CACHE") or os.environ.get(
+        "XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
+    dest = Path(base) / "scriptconv" / "nakdimon" / f"Nakdimon-{_NAKDIMON_SHA256[:12]}.onnx"
+    if dest.is_file():
+        return str(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(dir=str(dest.parent), prefix=".nakdimon-", suffix=".tmp")
+    try:
+        digest = hashlib.sha256()
+        with os.fdopen(fd, "wb") as tmp_f, urllib.request.urlopen(_NAKDIMON_URL) as resp:
+            while chunk := resp.read(1024 * 1024):
+                digest.update(chunk)
+                tmp_f.write(chunk)
+        if digest.hexdigest() != _NAKDIMON_SHA256:
+            raise ModelUnavailableError(
+                f"the Nakdimon model from {_NAKDIMON_URL} has sha256 "
+                f"{digest.hexdigest()}, not {_NAKDIMON_SHA256}")
+        os.replace(tmp_path, dest)
+    except (urllib.error.URLError, OSError) as e:
+        raise ModelUnavailableError(
+            f"the Nakdimon model is not in {dest.parent} and cannot be "
+            f"downloaded from {_NAKDIMON_URL}: {e}") from e
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+    return str(dest)
+
+
+def _nakdimon(text: str) -> str:
+    """*text* with niqqud from Nakdimon.
+
+    Text that holds any vowel point, dagesh, shin or sin dot is returned as
+    written: its writer chose the marks. Install onnxruntime with ``pip
+    install scriptconv[he]``.
+    """
+    try:
+        import onnxruntime
+
+        from scriptconv.phonemizers._thirdparty.nakdimon import Nakdimon, remove_niqqud
+    except ImportError:
+        raise ImportError(
+            "Hebrew diacritization with Nakdimon needs onnxruntime and numpy — "
+            "install with `pip install scriptconv[he]`") from None
+    if remove_niqqud(text) != text:
+        return text
+    model = _default_nakdimon_model()
+    if model not in _NAKDIMON_CACHE:
+        _NAKDIMON_CACHE[model] = Nakdimon(onnxruntime.InferenceSession(
+            model, providers=["CPUExecutionProvider"]))
+    return _NAKDIMON_CACHE[model].diacritize(text)
+
+
 def _tashkeel(model: Optional[str] = None, waqf: bool = False):
     """Lazily build (and cache) the text2tashkeel Diacritizer used for Arabic.
 
@@ -413,7 +488,9 @@ def diacritize(text: str, lang: str = "und", diacritizer_model=None,
     - Hebrew (``he``) — niqqud via phonikud; ``diacritizer_model`` is the
       phonikud ONNX path (or a zero-arg callable). Optional: when omitted the
       small public phonikud model is auto-downloaded and cached
-      (``$SCRIPTCONV_CACHE``/``$XDG_CACHE_HOME``).
+      (``$SCRIPTCONV_CACHE``/``$XDG_CACHE_HOME``). ``diacritizer_model="nakdimon"``
+      selects the Nakdimon model instead, downloaded and cached the same way;
+      text that already holds niqqud stays as written.
     - Arabic (``ar``, every individual Arabic language such as ``arz`` or
       ``apc``, and Hassaniyya ``mey``, in Arabic script) — tashkeel via
       text2tashkeel (``[tashkeel]``); ``diacritizer_model`` is the
@@ -441,6 +518,8 @@ def diacritize(text: str, lang: str = "und", diacritizer_model=None,
                          or kwargs.get("model"))
     family = _diacritizer_family(lang)
     if family == "he":
+        if diacritizer_model == NAKDIMON:
+            return _nakdimon(text)
         return _phonikud(diacritizer_model).add_diacritics(text)
     if family == "ar":
         return _tashkeel(diacritizer_model, waqf=bool(waqf)).diacritize(text)
