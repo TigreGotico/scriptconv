@@ -39,6 +39,7 @@ ROOT = Path(__file__).resolve().parent.parent
 OWNED = {
     Phonemizer.TUGAPHONE: {"diacritize"},
     Phonemizer.ARBTOK: {"diacritize"},
+    Phonemizer.DIZIONE: {"normalize"},
 }
 
 # Code written or vendored in scriptconv, scriptconv-copyleft or
@@ -48,7 +49,7 @@ IN_TREE = {
     Phonemizer.UNICODE, Phonemizer.GRAPHEMES, Phonemizer.AFRICA_G2P,
     Phonemizer.MATOUB_KAB, Phonemizer.MANTOQ, Phonemizer.HALABI, Phonemizer.IQRA,
     Phonemizer.KOG2PK, Phonemizer.SHAMI, Phonemizer.VOSK, Phonemizer.BYT5,
-    Phonemizer.CHARSIU,
+    Phonemizer.CHARSIU, Phonemizer.DIZIONE,
 }
 # An engine that no extra can name: a binary, and a distribution the zh extra
 # does not list.

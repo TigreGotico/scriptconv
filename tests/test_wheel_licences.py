@@ -32,9 +32,11 @@ FIRST_PARTY = {
 CANGJIE5 = "scriptconv/data/LICENSE.cangjie5"
 HANGUL_TO_IPA = "scriptconv/phonemizers/_thirdparty/LICENSE.hangul_to_ipa"
 MATOUB = "scriptconv/phonemizers/_vendored/matoub_kab/LICENSE.md"
+DIZIONE = "scriptconv/phonemizers/_thirdparty/dizione/LICENSE"
 # path prefix -> (licence, the notice the wheel carries for it, if any)
 THIRD_PARTY = {
     "scriptconv/data/cangjie5_tc.tsv.gz": ("MIT", CANGJIE5),
+    "scriptconv/phonemizers/_thirdparty/dizione/": ("Apache-2.0", DIZIONE),
     "scriptconv/phonemizers/_thirdparty/hangul2ipa.py": ("MIT", HANGUL_TO_IPA),
     "scriptconv/phonemizers/_thirdparty/ko_tables/": ("MIT", HANGUL_TO_IPA),
     "scriptconv/phonemizers/_thirdparty/shami/": ("Apache-2.0", None),
@@ -102,7 +104,9 @@ def test_the_wheel_carries_each_third_party_notice(wheel):
     for licence, notice in THIRD_PARTY.values():
         if notice is not None:
             text = _text(wheel, licences + notice)
-            assert ("MIT License" if licence == "MIT" else "Apache-2.0") in text, notice
+            names = (("MIT License",) if licence == "MIT"
+                     else ("Apache-2.0", "Apache License, Version 2.0"))
+            assert any(name in text for name in names), notice
 
 
 def test_no_file_holds_a_restricted_licence(wheel):

@@ -1,0 +1,103 @@
+# Abbreviations written with a full stop, and what to say for them.
+#
+# Columns (two or more spaces): abbreviation without its stop, when it applies,
+# words to say. The stop is not a sentence end. "when":
+#   always     wherever it is written with the stop
+#   small      like "always", but not in capitals (CT. and FL. are states)
+#   title      before a capitalised word, with or without the stop (Mr Smith)
+#   number     only before a number (No. 5, p. 12)
+# Decided in the code: "St." and "Dr." are Saint or Doctor before a name and
+# Street or Drive after one; "est." is "established" before a year and
+# "estimated" otherwise; "no." is also "number" after "ref.", "serial",
+# "account" and the like; "max.", "min." and "est." in small letters are the
+# abbreviation only before a word in small letters ("max. load").
+
+mr        title    mister
+mrs       title    mrs
+ms        title    ms
+prof      title    professor
+gen       title    general
+col       title    colonel
+lt        title    lieutenant
+capt      title    captain
+sgt       title    sergeant
+cpl       title    corporal
+rev       title    reverend
+hon       title    honorable
+gov       title    governor
+sen       title    senator
+rep       title    representative
+pres      title    president
+mt        title    mount
+ft        title    fort
+fr        title    father
+jr        always   junior
+sr        always   senior
+vs        always   versus
+etc       always   et cetera
+inc       always   incorporated
+ltd       always   limited
+co        always   company
+corp      always   corporation
+ave       always   avenue
+blvd      always   boulevard
+rd        always   road
+ln        always   lane
+hwy       always   highway
+apt       always   apartment
+bldg      always   building
+dept      always   department
+govt      always   government
+univ      always   university
+assn      always   association
+bros      always   brothers
+approx    always   approximately
+est       always   established
+misc      always   miscellaneous
+tel       always   telephone
+max       always   maximum
+min       always   minimum
+sq        always   square
+pkwy      always   parkway
+appt      always   appointment
+qty       always   quantity
+acct      always   account
+avg       always   average
+incl      always   including
+excl      always   excluding
+attn      always   attention
+fl        small    floor
+ct        small    court
+no        number   number
+nos       number   numbers
+p         number   page
+pp        number   pages
+fig       number   figure
+vol       number   volume
+ch        number   chapter
+sec       number   section
+ref       number   reference
+ext       number   extension
+ste       number   suite
+rm        number   room
+ca        number   circa
+jan       always   January
+feb       always   February
+mar       always   March
+apr       always   April
+jun       always   June
+jul       always   July
+aug       always   August
+sep       always   September
+sept      always   September
+oct       always   October
+nov       always   November
+dec       always   December
+mon       always   Monday
+tue       always   Tuesday
+tues      always   Tuesday
+wed       always   Wednesday
+thu       always   Thursday
+thur      always   Thursday
+thurs     always   Thursday
+fri       always   Friday

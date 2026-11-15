@@ -225,6 +225,69 @@ air-gapped host. (`en.py`'s DeepPhonemizer backend similarly fetches its own
 model via the `dp` package, that fetch is DeepPhonemizer's, not scriptconv's,
 but the net effect for a caller is the same, no local path required.)
 
+## dizione, American English
+
+`Phonemizer.DIZIONE` reads American English text into IPA. The engine is
+[dizione](https://github.com/n4ze3m/dizione), Apache-2.0. Its code is vendored
+byte for byte under `scriptconv/phonemizers/_thirdparty/dizione/`, with its
+licence and the upstream commit in `UPSTREAM.md`. dizione looks words up in a
+dictionary built from CMUdict. It picks the reading of a homograph from the
+words around it, and a small model guesses the words that the dictionary does
+not have. Its own text rules read numbers, dates, money, units and
+abbreviations.
+
+```python
+from scriptconv.phonemizers.dizione import DizionePhonemizer
+
+dz = DizionePhonemizer()
+dz.phonemize_string("You read it yesterday.", "en-US")  # 'juː ɹˈɛd ɪt jˈɛstɚdˌeɪ'
+dz.phonemize_string("It costs $12.", "en-US")  # 'ɪt kˈɔsts twˈɛlv dˈɑːlɚz'
+```
+
+The built data (the dictionary, the alignment table, the model and the
+homograph weights, 5.4 MB) is not in the wheel. It is in the Hugging Face
+repository `TigreGotico/dizione-data`, a byte-identical copy of the folder
+`phonemizer/` of `n4ze3m/tiny-voca`. The constructor with no `data_dir`
+downloads the revision that `DATA_REVISION` pins into the shared Hugging Face
+cache, or reads it from there. Offline, with nothing cached, it raises
+`ModelUnavailableError`. Pass `data_dir=` to read the files from a directory.
+The dictionary and the model come from CMUdict (BSD-style licence, in
+`LICENSE.cmudict`). The homograph weights come from the Wikipedia Homograph
+Data (Apache-2.0).
+
+dizione reads the text itself, so the backend owns the `normalize` stage.
+The frontend gives it the text as written, with `Dr.` and `$12.99` intact.
+`phonemize_lazy` splits the sentences where dizione ends them, so an
+abbreviation such as `Mrs.` ends no sentence.
+
+The IPA string has a space between two words and a stress mark directly
+before its vowel, as dizione writes it. It has no control symbol (`<bos>`,
+`<eos>`, `<pad>`, `<sp>`) and no punctuation, because `.` is the IPA syllable
+break. A TTS engine that reads dizione's token ids needs more than the IPA
+string, so `DizionePhonemizer.tokens(text)` returns dizione's own
+`Phonemized` object unchanged: the symbols, the ids into
+`dizione.symbols.SYMBOLS` and the stress of each symbol (0, 1 or 2).
+`identity(lang)` puts dizione's build fingerprint in `revision`, so tokens
+from two builds of code, tables or data never mix.
+
+`overrides=` takes pronunciations that win over every other source, in
+CMUdict notation or as phones with stress marks:
+`DizionePhonemizer(overrides={"kubernetes": "k ˌuː b ɚ n ˈɛ ɾ iː z"})`.
+
+Limits:
+
+- dizione reads American English only. A tag must resolve to `en-US`, or to
+  a lect of it such as `en-US-x-nyc`. A bare `en` is British English by the
+  default-region rule, so it is refused with `UnsupportedLanguageError`, like
+  `en-GB` and every other region.
+- dizione also reads the overrides file named by the environment variable
+  `DIZIONE_OVERRIDES`, in every instance. Unset it to get only the overrides
+  that you pass.
+- About one unknown word in three that the model guesses has an error, and
+  foreign names have the most.
+- `keep_punctuation` has no effect: the IPA string has no punctuation, and
+  `tokens()` has all of it.
+
 ## Backends in scriptconv-copyleft and scriptconv-nonfree
 
 A wrapper moves out of scriptconv when its own code or a dependency of its
@@ -382,7 +445,7 @@ header, an unknown backend or an unknown stage.
 
 Multilingual: espeak (subprocess with espyak fallback), gruut, goruut,
 epitran, transphone, ByT5/Charsiu (ONNX), the misaki family (en/ja/zh/ko/vi).
-Per-language: English (DeepPhonemizer, OpenPhonemizer, g2p_en), Japanese
+Per-language: English (DeepPhonemizer, OpenPhonemizer, g2p_en, dizione), Japanese
 (OpenJTalk, cutlet, pykakasi), Korean (g2pk, KoG2P), Chinese (jieba, g2pM,
 xpinyin, pypinyin), Arabic (arbtok, mantoq), Hebrew (phonikud), Persian,
 Vietnamese (viphoneme, Python below 3.12 only), Portuguese (tugaphone), Galician
