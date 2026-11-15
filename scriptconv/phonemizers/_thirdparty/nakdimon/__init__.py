@@ -12,7 +12,9 @@ from ``nakdimon/hebrew.py``. The tables with their mask entry come from
 ``CharacterTable`` in ``nakdimon/dataset.py``, and the order in which
 :meth:`Nakdimon.diacritize` writes the marks comes from ``merge`` in the same
 file. Unlike ``nakdimon/predict.py``, the model reads the whole text as one
-sequence, with no padding and no split into lines.
+sequence, with no padding and no split into lines. Upstream ``normalize`` also
+maps each final letter to its regular form, after the test for a valid
+letter; the final letters are valid letters, so that map is left out.
 """
 import re
 from typing import List
@@ -29,7 +31,6 @@ NIQQUD_SIN = [RAFE, "\u05C1", "\u05C2"]
 DAGESH = [RAFE, "\u05BC"]
 VALID_LETTERS = [" ", "!", '"', "'", "(", ")", ",", "-", ".", ":", ";", "?"] + HEBREW_LETTERS
 SPECIAL_TOKENS = ["H", "O", "5"]
-ENDINGS_TO_REGULAR = dict(zip("ךםןףץ", "כמנפצ"))
 
 # Each class table starts with the mask entry, so a model class is an index.
 _LETTER_IDS = {c: i for i, c in enumerate([""] + SPECIAL_TOKENS + VALID_LETTERS)}
@@ -49,8 +50,6 @@ def normalize(c: str) -> str:
     """The character of the model's alphabet that stands for *c*."""
     if c in VALID_LETTERS:
         return c
-    if c in ENDINGS_TO_REGULAR:
-        return ENDINGS_TO_REGULAR[c]
     if c in ("\n", "\t"):
         return " "
     if c in ("־", "‒", "–", "—", "―", "−"):

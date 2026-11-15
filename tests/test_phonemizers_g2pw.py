@@ -1,4 +1,4 @@
-"""The g2pW backend gives the symbols of Piper's ``pinyin`` phoneme type.
+"""The g2pW backend gives the reference symbols.
 
 Each expected value comes from the reference: OHF-Voice/piper1-gpl at
 d76f335d9eb5dea5ef6d7d70b2d6114e6303fa08, with the g2pW archive of
@@ -9,12 +9,16 @@ run as::
     ChinesePhonemizer(model_dir="<the unpacked g2pw.tar.gz>").phonemize(text)
 
 The sample in ``data/g2pw_parity_zh.jsonl`` holds sentences of the FLORES-200
-devtest that hold no digit, with the reference output. Piper reads digits with
-its own number words before g2pW. Here that is the normalisation stage, so no
-digit reaches these tests.
+devtest that hold no digit, with the reference output. The reference reads
+digits with its own number words before g2pW. Here that is the normalisation
+stage, so the parity rows hold no digit.
 """
+import gzip
+import io
 import json
+import logging
 import subprocess
+import tarfile
 import sys
 from pathlib import Path
 from unittest.mock import patch
@@ -26,6 +30,7 @@ from scriptconv.phonemizers import (
     ModelUnavailableError,
     Phonemizer,
     PhonemizerIdentity,
+    UnreadTextError,
     UnsupportedLanguageError,
     get_phonemizer,
 )
@@ -91,6 +96,33 @@ def test_a_digit_gives_no_symbol(g2pw, digits):
     assert g2pw.phonemize(digits, "zh") == []
 
 
+# The reference gives s an 1 for the 3, with its own number words.
+APPLES = ["w", "o", "3", "y", "ou", "3", "g", "e", "5", "p", "ing", "2", "g", "uo", "3", "。"]
+
+
+def test_a_dropped_digit_is_named_in_a_warning(g2pw, caplog):
+    with caplog.at_level(logging.WARNING, logger="scriptconv.phonemizers.g2pw"):
+        assert g2pw.phonemize("我有3个苹果。", "zh") == [APPLES]
+    assert any("'3'" in record.getMessage() for record in caplog.records)
+
+
+def test_a_dropped_digit_raises_in_strict_mode(g2pw):
+    g2pw.strict = True
+    try:
+        with pytest.raises(UnreadTextError, match="'3'") as error:
+            g2pw.phonemize("我有3个苹果。", "zh")
+    finally:
+        g2pw.strict = False
+    assert error.value.unread == ("3",)
+
+
+def test_a_capital_dotted_i_before_a_polyphone_reads_the_polyphone(g2pw):
+    # str.lower() writes İ as two code points. The reference reads "i行长来了。" as
+    # i x ing 2 zh ang 3 l ai 2 l e 5 。, and İ is not a symbol.
+    assert g2pw.phonemize("İ行长来了。", "zh") == [
+        ["x", "ing", "2", "zh", "ang", "3", "l", "ai", "2", "l", "e", "5", "。"]]
+
+
 def test_double_quotes_are_removed_before_the_model(g2pw):
     assert g2pw.phonemize("“爱好和平的人们。”", "zh") == REFERENCE["爱好和平的人们。"]
 
@@ -147,3 +179,62 @@ def test_offline_with_no_cache_raises_model_unavailable(tmp_path):
     assert result.stdout.startswith("ModelUnavailableError"), result.stderr
     assert "rhasspy/piper-checkpoints" in result.stdout
     assert issubclass(ModelUnavailableError, ValueError)
+
+
+def _hub(monkeypatch, files, offline, fail=None):
+    """Serve each Hub file from *files*, by its name; record the force_download flags."""
+    import huggingface_hub
+    real = huggingface_hub.hf_hub_download
+    calls = []
+
+    def download(repo_id, filename, repo_type=None, revision=None, force_download=False, **kwargs):
+        calls.append((filename.rsplit("/", 1)[-1], force_download))
+        if fail:
+            raise fail
+        name = filename.rsplit("/", 1)[-1]
+        if name in files:
+            return str(files[name])
+        return real(repo_id, filename, repo_type=repo_type, revision=revision)
+
+    monkeypatch.setattr(huggingface_hub, "hf_hub_download", download)
+    monkeypatch.setattr(huggingface_hub.constants, "HF_HUB_OFFLINE", offline)
+    return calls
+
+
+def _truncated_archive() -> bytes:
+    """The first part of a gzipped tar archive."""
+    data = io.BytesIO()
+    with tarfile.open(fileobj=data, mode="w") as archive:
+        member = tarfile.TarInfo("g2pw.onnx")
+        member.size = 4096
+        archive.addfile(member, io.BytesIO(bytes(4096)))
+    return gzip.compress(data.getvalue())[:200]
+
+
+@pytest.mark.parametrize("name, content", [("g2pw.tar.gz", b"not an archive"),
+                                           ("g2pw.tar.gz", _truncated_archive()),
+                                           ("tokenizer.json", b""),
+                                           ("tokenizer.json", b"{not json")],
+                         ids=["bad archive", "truncated archive", "empty tokenizer", "invalid tokenizer"])
+def test_a_cached_file_that_fails_its_check_offline_raises_model_unavailable(
+        tmp_path, monkeypatch, name, content):
+    (tmp_path / name).write_bytes(content)
+    calls = _hub(monkeypatch, {name: tmp_path / name}, offline=True)
+    with pytest.raises(ModelUnavailableError, match=name):
+        G2PWPhonemizer()
+    assert (name, True) not in calls
+
+
+def test_a_cached_file_that_fails_its_check_is_downloaded_again_once(tmp_path, monkeypatch):
+    (tmp_path / "g2pw.tar.gz").write_bytes(b"not an archive")
+    calls = _hub(monkeypatch, {"g2pw.tar.gz": tmp_path / "g2pw.tar.gz"}, offline=False)
+    with pytest.raises(ModelUnavailableError, match="g2pw.tar.gz"):
+        G2PWPhonemizer()
+    assert calls == [("g2pw.tar.gz", False), ("g2pw.tar.gz", True)]
+
+
+def test_a_dropped_download_raises_model_unavailable(monkeypatch):
+    _hub(monkeypatch, {}, offline=False, fail=OSError("Consistency check failed: file should be "
+                                                     "of size 112991734 but has size 1048576"))
+    with pytest.raises(ModelUnavailableError, match="Consistency check failed"):
+        G2PWPhonemizer()

@@ -6,19 +6,20 @@ character in the context of its sentence with a BERT model, and reads the
 other characters from tables. :mod:`scriptconv.phonemizers._thirdparty.g2pw`
 runs it on onnxruntime, with no torch.
 
-The backend writes each syllable as three symbols: the pinyin initial, the
-final and the tone digit 1 to 5. A syllable with no initial takes ``Ø``. The
-final writes ü as ``v``. The symbols, the split of a syllable and the marks
-that stay come from ``src/piper/phonemize_chinese.py`` of OHF-Voice/piper1-gpl
-at commit d76f335d9eb5dea5ef6d7d70b2d6114e6303fa08, a file whose header says:
-"Partially written by ChatGPT (December 2025). This code is Apache 2.0
-licensed." These are :data:`PINYIN_INITIALS`, :data:`SYMBOLS`,
-:func:`_normalize_syllable`, :func:`_split_syllable` and the loop of
-:meth:`G2PWPhonemizer._sentence_symbols`.
+The backend writes a syllable as three symbols: the Hanyu Pinyin initial
+(ISO 7098), the final and the tone digit 1 to 5. A syllable with no initial
+takes ``Ø``. The final writes ü as ``v``, as the g2pW reading table
+``bopomofo_to_pinyin_wo_tune_dict.json`` does. Five rows of that table do not
+split into an initial and a final of :data:`SYMBOLS`. ``n`` and ``ê`` give
+one symbol, the syllable with its tone digit, such as ``n2``. ``hm``, ``hng``
+and ``ng`` give three symbols, ``h m``, ``h ng`` or ``n g`` and the tone
+digit, and ``m``, ``ng`` and ``g`` are not finals.
 
 The backend does not read digits. Numbers, dates and units are the
 normalisation stage, which the caller runs before the backend. A digit gives
-no symbol.
+no symbol: the backend logs a warning that names it, or raises
+:class:`~scriptconv.phonemizers.base.UnreadTextError` when
+:attr:`~scriptconv.phonemizers.base.BasePhonemizer.strict` is set.
 
 The model files come from the Hugging Face Hub at a fixed revision, into the
 shared Hugging Face cache:
@@ -29,10 +30,14 @@ shared Hugging Face cache:
   https://huggingface.co/YC-Chen/g2pW).
 - ``tokenizer.json`` of google-bert/bert-base-chinese (Apache-2.0).
 
-Offline, with no cached copy, the backend raises
+Each file must have its pinned sha256. A cached file with another sha256 is
+downloaded again once. Offline, with no cached copy or with no copy that
+passes the check, the backend raises
 :class:`~scriptconv.phonemizers.base.ModelUnavailableError`.
 """
 import ast
+import hashlib
+import logging
 import os
 import re
 import tarfile
@@ -44,18 +49,23 @@ from scriptconv.phonemizers.base import (
     BasePhonemizer,
     ModelUnavailableError,
     PhonemizedChunks,
+    UnreadTextError,
     _check_alphabet,
 )
 from scriptconv.phonemizers.enums import Alphabet
 
 __all__ = ["G2PWPhonemizer", "PINYIN_INITIALS", "SYMBOLS"]
 
-#: ``(repo_id, repo_type, filename, revision)`` of the g2pW model archive.
+LOG = logging.getLogger(__name__)
+
+#: ``(repo_id, repo_type, filename, revision, sha256)`` of the g2pW model archive.
 MODEL_ARCHIVE = ("rhasspy/piper-checkpoints", "dataset", "zh/zh_CN/_resources/g2pw.tar.gz",
-                 "581dcfb1856912507627724d4ab2817a20e889ca")
-#: ``(repo_id, repo_type, filename, revision)`` of the bert-base-chinese tokenizer.
+                 "581dcfb1856912507627724d4ab2817a20e889ca",
+                 "252c6f561c11014fbb243d70aec993a816d82109887b91edcda0261ab9967060")
+#: ``(repo_id, repo_type, filename, revision, sha256)`` of the bert-base-chinese tokenizer.
 TOKENIZER = ("google-bert/bert-base-chinese", "model", "tokenizer.json",
-             "8f23c25b06e129b6c986331a13d8d025a92cf0ea")
+             "8f23c25b06e129b6c986331a13d8d025a92cf0ea",
+             "55c5edcfb8936895e019b2d8f97dcb547734f25b29f95009155f4c8c15649aae")
 
 #: The pinyin initials, longest first, so that ``zh`` matches before ``z``.
 PINYIN_INITIALS = ("zh", "ch", "sh", "b", "p", "m", "f", "d", "t", "n", "l", "g", "k",
@@ -104,16 +114,48 @@ def _split_syllable(syllable: str) -> Tuple[str, str, Optional[str]]:
     return initial, base[len(initial):], tone
 
 
-def _hub_file(repo_id: str, repo_type: str, filename: str, revision: str) -> str:
-    """The local path of a file of the Hub, downloaded into the shared cache if needed."""
-    from huggingface_hub import hf_hub_download
-    from huggingface_hub.errors import LocalEntryNotFoundError
-    try:
-        return hf_hub_download(repo_id, filename, repo_type=repo_type, revision=revision)
-    except LocalEntryNotFoundError as e:
+def _sha256(path: str) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as f:
+        while chunk := f.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _hub_file(repo_id: str, repo_type: str, filename: str, revision: str, sha256: str) -> str:
+    """The local path of a file of the Hub with the sha256 *sha256*, in the shared cache.
+
+    The file is downloaded when it is not cached. A cached file with another
+    sha256 is downloaded again once, unless the Hub is offline.
+
+    Raises:
+        ModelUnavailableError: If no copy with the sha256 is cached or can be downloaded.
+    """
+    from huggingface_hub import constants, hf_hub_download
+    name = f"{repo_id}/{filename} at revision {revision}"
+
+    def download(force: bool) -> str:
+        try:
+            return hf_hub_download(repo_id, filename, repo_type=repo_type, revision=revision,
+                                   force_download=force)
+        except Exception as e:
+            raise ModelUnavailableError(f"{name} is not in the Hugging Face cache with "
+                                        f"sha256 {sha256} and cannot be downloaded: {e}") from e
+
+    path = download(force=False)
+    digest = _sha256(path)
+    if digest == sha256:
+        return path
+    cause = f"the cached file {path} has sha256 {digest}, not {sha256}"
+    if constants.HF_HUB_OFFLINE:
+        raise ModelUnavailableError(f"{name}: {cause}, and the Hugging Face Hub is offline")
+    LOG.warning("%s: %s; downloading it again", name, cause)
+    path = download(force=True)
+    digest = _sha256(path)
+    if digest != sha256:
         raise ModelUnavailableError(
-            f"{repo_id}/{filename} at revision {revision} is not in the Hugging Face "
-            f"cache and cannot be downloaded: {e}") from e
+            f"{name}: the downloaded file {path} has sha256 {digest}, not {sha256}")
+    return path
 
 
 def _model_config(source: str) -> dict:
@@ -190,12 +232,19 @@ class G2PWPhonemizer(BasePhonemizer):
         return cls.match_lang(target_lang, ["zh"])
 
     def _sentence_symbols(self, sentence: str) -> List[str]:
-        """The symbols of one sentence."""
+        """The symbols of one sentence.
+
+        A digit gives no symbol. The backend logs a warning that names the
+        digits, or raises :class:`UnreadTextError` in strict mode.
+        """
         symbols: List[str] = []
+        unread: List[str] = []
         for syllable, char in zip(self.converter(sentence)[0], sentence):
             if syllable is None:
                 if char in _KEPT:
                     symbols.append(char)
+                elif char.isdigit():
+                    unread.append(char)
                 continue
             syllable = _normalize_syllable(syllable)
             initial, final, tone = _split_syllable(syllable)
@@ -203,6 +252,12 @@ class G2PWPhonemizer(BasePhonemizer):
                 symbols.append(syllable)
                 continue
             symbols += [initial or "Ø", final, tone]
+        if unread:
+            message = (f"g2pW reads no digit, so {''.join(unread)!r} of {sentence!r} gives no "
+                       "symbol; numbers belong to the normalisation stage")
+            if self.strict:
+                raise UnreadTextError(message, tuple(unread))
+            LOG.warning(message)
         return symbols
 
     def phonemize_lazy(self, text: str, lang: str) -> Iterator[List[str]]:

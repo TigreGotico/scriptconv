@@ -19,6 +19,10 @@ The changes from g2pW:
 - The training paths, the part-of-speech tags and the progress bar are left
   out. ``style`` is always pinyin and the simplified-to-traditional mapping
   is always on.
+- The text is lowercased one character at a time, keeping the first code
+  point of each lowercase form. g2pW lowercases the whole text, and a
+  character that lowercases to two code points, such as İ, moves every
+  character after it, so the model reads the wrong one.
 
 The three tables in this directory are the files of ``g2pw/`` at the same
 commit, unchanged: ``char_bopomofo_dict.json``,
@@ -190,7 +194,9 @@ class G2PWConverter:
             start = max(0, query_id - window // 2)
             text = text[start:min(len(text), query_id + window // 2)]
             query_id -= start
-        text = text.lower()
+        # One code point per character, so that query_id still points at the
+        # queried character: str.lower() writes İ as i and U+0307.
+        text = "".join(c.lower()[:1] for c in text)
         try:
             tokens, text_to_token, token_to_text = tokenize_and_map(self.tokenizer, text)
         except Exception as e:

@@ -81,6 +81,8 @@ Georgian letter of that kind:
 """
 import functools
 import hashlib
+import http.client
+import logging
 import os
 import re
 import tempfile
@@ -94,6 +96,8 @@ from scriptconv.graph import Edge
 from scriptconv.phonemizers.base import (
     STRESS_MARK, BasePhonemizer, ModelUnavailableError, _primary_subtag,
 )
+
+LOG = logging.getLogger(__name__)
 
 #: The lang-contextual node produced by diacritization.  Like ``"text"`` it is
 #: meaningful only with ``lang=`` context and exists only in opted-in graphs.
@@ -360,21 +364,23 @@ _NAKDIMON_SHA256 = "ab08a8c47daf33886c224859347fa5420c2bfe7ecf4afd2d3387f32b0af1
 _NAKDIMON_CACHE: dict = {}  # model path -> Nakdimon
 
 
-def _default_nakdimon_model() -> str:
-    """The path of the Nakdimon model, downloaded into the cache on first use.
-
-    The cache is ``<base>/scriptconv/nakdimon``, with ``<base>`` as for
-    phonikud. A download whose sha256 differs from the pinned one is
-    discarded.
-
-    Raises:
-        ModelUnavailableError: If the model is not cached and the download fails.
-    """
+def _nakdimon_path() -> Path:
+    """The cache path of the Nakdimon model: ``<base>/scriptconv/nakdimon``, ``<base>`` as for phonikud."""
     base = os.environ.get("SCRIPTCONV_CACHE") or os.environ.get(
         "XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
-    dest = Path(base) / "scriptconv" / "nakdimon" / f"Nakdimon-{_NAKDIMON_SHA256[:12]}.onnx"
-    if dest.is_file():
-        return str(dest)
+    return Path(base) / "scriptconv" / "nakdimon" / f"Nakdimon-{_NAKDIMON_SHA256[:12]}.onnx"
+
+
+def _download_nakdimon(dest: Path, reason: str) -> None:
+    """Download the Nakdimon model to *dest* and check its sha256.
+
+    The download goes to a temporary file that replaces *dest* only when its
+    sha256 is the pinned one, so no partial or wrong file stays.
+
+    Raises:
+        ModelUnavailableError: If the download fails or gives other bytes.
+            The message names *dest* and holds *reason*.
+    """
     dest.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_path = tempfile.mkstemp(dir=str(dest.parent), prefix=".nakdimon-", suffix=".tmp")
     try:
@@ -385,17 +391,58 @@ def _default_nakdimon_model() -> str:
                 tmp_f.write(chunk)
         if digest.hexdigest() != _NAKDIMON_SHA256:
             raise ModelUnavailableError(
-                f"the Nakdimon model from {_NAKDIMON_URL} has sha256 "
-                f"{digest.hexdigest()}, not {_NAKDIMON_SHA256}")
+                f"the Nakdimon model {dest} {reason}, and the download from {_NAKDIMON_URL} "
+                f"has sha256 {digest.hexdigest()}, not {_NAKDIMON_SHA256}")
         os.replace(tmp_path, dest)
-    except (urllib.error.URLError, OSError) as e:
+    except (urllib.error.URLError, http.client.HTTPException, OSError) as e:
         raise ModelUnavailableError(
-            f"the Nakdimon model is not in {dest.parent} and cannot be "
-            f"downloaded from {_NAKDIMON_URL}: {e}") from e
+            f"the Nakdimon model {dest} {reason}, and it cannot be downloaded from "
+            f"{_NAKDIMON_URL}: {e!r}") from e
     finally:
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
-    return str(dest)
+
+
+def _load_nakdimon(path: Path):
+    """The Nakdimon diacritizer of the model at *path*, after its sha256 check."""
+    import onnxruntime
+
+    from scriptconv.phonemizers._thirdparty.nakdimon import Nakdimon
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    if digest != _NAKDIMON_SHA256:
+        raise ValueError(f"sha256 {digest}, not {_NAKDIMON_SHA256}")
+    return Nakdimon(onnxruntime.InferenceSession(str(path), providers=["CPUExecutionProvider"]))
+
+
+def _nakdimon_model():
+    """The Nakdimon diacritizer of the pinned model, downloaded into the cache on first use.
+
+    The cached file must have the pinned sha256 and load. A file that fails
+    is removed and downloaded again once.
+
+    Raises:
+        ModelUnavailableError: If no model passes the check, because the
+            download fails or the session is offline. The message names the
+            file and the cause.
+    """
+    dest = _nakdimon_path()
+    if str(dest) in _NAKDIMON_CACHE:
+        return _NAKDIMON_CACHE[str(dest)]
+    reason = "is not cached"
+    if dest.is_file():
+        try:
+            _NAKDIMON_CACHE[str(dest)] = _load_nakdimon(dest)
+            return _NAKDIMON_CACHE[str(dest)]
+        except Exception as e:
+            reason = f"fails its check ({e!r}) and was removed"
+            LOG.warning("the Nakdimon model %s %s; downloading it again", dest, reason)
+            dest.unlink()
+    _download_nakdimon(dest, reason)
+    try:
+        _NAKDIMON_CACHE[str(dest)] = _load_nakdimon(dest)
+    except Exception as e:
+        raise ModelUnavailableError(f"the Nakdimon model {dest} does not load: {e!r}") from e
+    return _NAKDIMON_CACHE[str(dest)]
 
 
 def _nakdimon(text: str) -> str:
@@ -406,20 +453,16 @@ def _nakdimon(text: str) -> str:
     install scriptconv[he]``.
     """
     try:
-        import onnxruntime
+        import onnxruntime  # noqa: F401
 
-        from scriptconv.phonemizers._thirdparty.nakdimon import Nakdimon, remove_niqqud
+        from scriptconv.phonemizers._thirdparty.nakdimon import remove_niqqud
     except ImportError:
         raise ImportError(
             "Hebrew diacritization with Nakdimon needs onnxruntime and numpy — "
             "install with `pip install scriptconv[he]`") from None
     if remove_niqqud(text) != text:
         return text
-    model = _default_nakdimon_model()
-    if model not in _NAKDIMON_CACHE:
-        _NAKDIMON_CACHE[model] = Nakdimon(onnxruntime.InferenceSession(
-            model, providers=["CPUExecutionProvider"]))
-    return _NAKDIMON_CACHE[model].diacritize(text)
+    return _nakdimon_model().diacritize(text)
 
 
 def _tashkeel(model: Optional[str] = None, waqf: bool = False):

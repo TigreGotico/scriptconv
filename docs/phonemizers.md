@@ -288,13 +288,18 @@ model via the `dp` package, that fetch is DeepPhonemizer's, not scriptconv's,
 but the net effect for a caller is the same, no local path required.)
 
 The Nakdimon model follows the same rule. It goes into
-`<base>/scriptconv/nakdimon`, from a fixed commit of its repository. A
-download with a sha256 that differs from the pinned value is discarded. With
-no network and no cached model, `diacritize` raises `ModelUnavailableError`.
+`<base>/scriptconv/nakdimon`, from a fixed commit of its repository. The
+model must have its pinned sha256 when it is downloaded and each time it
+loads from the cache. A cached file that fails the check or does not load is
+removed and downloaded again once. With no network and no model that passes
+the check, `diacritize` raises `ModelUnavailableError`, which names the file
+and the cause.
 
 The g2pW backend gets its files through `huggingface_hub`, at a fixed
-revision, into the shared Hugging Face cache. With no network and no cached
-copy, it raises `ModelUnavailableError`.
+revision, into the shared Hugging Face cache. Each file must have its pinned
+sha256. A cached file with another sha256 is downloaded again once, unless
+the Hub is offline (`HF_HUB_OFFLINE`). With no copy that passes the check,
+the backend raises `ModelUnavailableError`.
 
 ## g2pW, Mandarin pinyin symbols
 
@@ -305,9 +310,13 @@ sentence, and tables give the reading of the other characters. The model runs
 on onnxruntime, with no torch. Simplified and traditional characters both
 read. Install the backend with `pip install scriptconv[zh-phonemizers]`.
 
-The output alphabet is `Alphabet.PINYIN`. Each syllable gives three symbols:
+The output alphabet is `Alphabet.PINYIN`. A syllable gives three symbols:
 the initial, the final and the tone digit 1 to 5. A syllable with no initial
-takes `Ø`, and a final writes ü as `v`. A space and the marks
+takes `Ø`, and a final writes ü as `v`. Five rows of the g2pW reading table
+do not split into an initial and a final of `SYMBOLS`. `n` and `ê` give one
+symbol, the syllable with its tone digit, such as `n2`. `hm`, `hng` and `ng`
+give `h m`, `h ng` or `n g` and the tone digit, and `m`, `ng` and `g` are not
+finals. A space and the marks
 `。 . ？ ? ！ ! — … 、 ， , ： : ； ;` stay as symbols, so the backend ignores
 `keep_punctuation`. A lowercase Latin letter that is also a symbol, such as
 `a` or `b`, stays too. `phonemize_string` joins the symbols with a space.
@@ -324,7 +333,9 @@ g2pw.phonemize("我要去行走。", "zh")
 
 The backend does not read digits, and a digit gives no symbol. Numbers,
 dates and units belong to the normalisation stage, which runs before the
-backend.
+backend. A digit that reaches the backend is logged in a warning that names
+it. With `strict=True` (`FrontendConfig.strict`, or the backend's `strict`
+field), the backend raises `UnreadTextError` instead.
 
 | File | Source | Revision | Size | Licence |
 |---|---|---|---|---|
