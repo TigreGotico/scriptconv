@@ -200,6 +200,47 @@ class TestPinyinUmlaut(unittest.TestCase):
         self.assertEqual(p.phonemize_string("二", "zh"), "aɚ̯↘")
 
 
+class TestErhua(unittest.TestCase):
+    """The erhua suffix 儿 and the independent morpheme 儿 ér.
+
+    Wikipedia, "Standard Chinese phonology", revision 1384691172, section
+    "Rhotic coda": the suffix is written "in pinyin as r" and "combines with
+    the final sound of the syllable". The section "Syllables" writes that coda
+    as ɚ̯. The independent morpheme ér is [aɚ̯] in China. Initials and finals
+    come from the consonant table and the five vowel table: n [n], -a [a],
+    d [t], -ou [ou̯], q [tɕʰ], -ü [y], -e [ɤ], z [ts], -i after z [ɹ̩], which
+    retone writes ɨ. Retone writes the dipping tone ↓, the falling tone ↘, the
+    rising tone ↗, and nothing for the neutral tone.
+    """
+
+    def test_g2pm_suffix_ends_the_syllable_before(self):
+        # g2pM: 哪儿 na3 r5, 逗趣儿 dou4 qu4 r5, 哪儿呢？ na3 r5 ne5 ？
+        from scriptconv.phonemizers.zh import G2pMPhonemizer
+        p = G2pMPhonemizer(alphabet=Alphabet.IPA, jieba=False)
+        for text, expected in (("哪儿", "na↓ɚ̯"), ("逗趣儿", "tou̯↘tɕʰy↘ɚ̯"),
+                               ("哪儿呢？", "na↓ɚ̯nɤ？")):
+            with self.subTest(text=text):
+                self.assertEqual(p.phonemize_string(text, "zh"), expected)
+
+    def test_g2pm_suffix_in_strict_mode(self):
+        from scriptconv.phonemizers.zh import G2pMPhonemizer
+        p = G2pMPhonemizer(alphabet=Alphabet.IPA, jieba=False)
+        p.strict = True
+        self.assertEqual(p.phonemize_string("哪儿", "zh"), "na↓ɚ̯")
+
+    def test_independent_er_is_a_full_syllable(self):
+        # 儿子 érzi and 女儿 nǚ'ér; the backends give 子 different tones
+        from scriptconv.phonemizers.zh import (G2pMPhonemizer, PypinyinPhonemizer,
+                                               XpinyinPhonemizer)
+        cases = {PypinyinPhonemizer: "aɚ̯↗tsɨ", XpinyinPhonemizer: "aɚ̯↗tsɨ↓",
+                 G2pMPhonemizer: "aɚ̯↗tsɨ"}
+        for cls, erzi in cases.items():
+            p = cls(alphabet=Alphabet.IPA, jieba=False)
+            with self.subTest(backend=cls.__name__):
+                self.assertEqual(p.phonemize_string("儿子", "zh"), erzi)
+                self.assertEqual(p.phonemize_string("女儿", "zh"), "ny↓aɚ̯↗")
+
+
 class TestPinyinUnreadSyllable(unittest.TestCase):
     """A syllable that is not pinyin gives no IPA. It warns, or raises in strict mode."""
 
