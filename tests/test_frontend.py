@@ -615,6 +615,14 @@ class TestInlineBlocks:
         frontend_module._split_blocks(text)
         assert time.perf_counter() - start < 2
 
+    @pytest.mark.timeout(20)
+    @pytest.mark.parametrize("unit", ["ab[[]]", "a [[ ]] "])
+    def test_a_long_text_of_empty_blocks_joins_in_well_under_two_seconds(self, unit):
+        text = unit * 640000
+        start = time.perf_counter()
+        frontend_module._split_blocks_to_read(text)
+        assert time.perf_counter() - start < 2
+
     def test_prepare_keeps_the_block_as_written(self, monkeypatch):
         Recorder(monkeypatch)
         frontend = build(Echo(), stages=Stages(diacritize=True))
