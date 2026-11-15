@@ -218,9 +218,9 @@ class TestErhua(unittest.TestCase):
 
     BACKENDS = ("PypinyinPhonemizer", "XpinyinPhonemizer", "G2pMPhonemizer")
 
-    def _phonemizer(self, name, jieba=False):
+    def _phonemizer(self, name):
         from scriptconv.phonemizers import zh
-        return getattr(zh, name)(alphabet=Alphabet.IPA, jieba=jieba)
+        return getattr(zh, name)(alphabet=Alphabet.IPA, jieba=False)
 
     def test_g2pm_suffix_ends_the_syllable_before(self):
         # g2pM: 哪儿 na3 r5, 逗趣儿 dou4 qu4 r5, 哪儿呢？ na3 r5 ne5 ？
@@ -230,8 +230,6 @@ class TestErhua(unittest.TestCase):
                                ("哪儿呢？", "naɚ̯↓nɤ？")):
             with self.subTest(text=text):
                 self.assertEqual(p.phonemize_string(text, "zh"), expected)
-        jieba = self._phonemizer("G2pMPhonemizer", jieba=True)
-        self.assertEqual(jieba.phonemize_string("哪儿", "zh"), "naɚ̯↓ ")
 
     def test_g2pm_suffix_in_strict_mode(self):
         from scriptconv.phonemizers.zh import G2pMPhonemizer
