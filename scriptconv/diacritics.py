@@ -601,7 +601,8 @@ def replace_stress_mark(text: str, lang: str, before: str = "", after: str = "")
     out = []
     base = None  # where in out the last character that is not a combining mark starts
     for c in text:
-        if c == STRESS_MARK and base is not None and out[base].lower() in vowels:
+        # the first code point of the lowercase form, so that a capital Turkic İ (i + U+0307) counts
+        if c == STRESS_MARK and base is not None and out[base].lower()[:1] in vowels:
             out.insert(base, before)
             base += 1
             out.append(after)

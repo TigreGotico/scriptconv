@@ -208,6 +208,11 @@ after a letter of another script (`café` in Russian text), and after a
 consonant (the NFD Macedonian letters ѓ and ќ). The removal also keeps the
 combining grave (U+0300).
 
+In a language that stressonnx writes in Latin script (`lv`, `sl`, `az-Latn`
+and `uz-Latn`, and bare `az` and `uz`), an NFD acute on a Latin vowel looks
+the same as a stress mark, so the removal also takes it: an NFD `café` in
+such a text becomes `cafe`.
+
 A declaration comes from a probe, not from a guess. The probe reads each word
 of a word list plain and marked, with each backend that loads and each
 language that the backend serves. A language is declared only when the mark

@@ -22,7 +22,9 @@ from scriptconv.phonemizers.registry import PHONEMIZER_REGISTRY
 from scriptconv.version import VERSION_STR
 
 ROOT = Path(__file__).resolve().parent.parent
-FLOOR = Version("0.1.0a1")
+# The published alpha that each extra installs at least; scriptconv-copyleft
+# 0.1.2a1 declares that the espeak-ng binary reads the stress mark in ru and uk.
+FLOOR = {"scriptconv-copyleft": Version("0.1.2a1"), "scriptconv-nonfree": Version("0.1.0a1")}
 
 COPYLEFT = {Phonemizer.ESPEAK, Phonemizer.TRANSPHONE, Phonemizer.MISAKI, Phonemizer.MISAKI_EN,
             Phonemizer.MISAKI_JA, Phonemizer.MISAKI_ZH, Phonemizer.MISAKI_KO,
@@ -62,7 +64,7 @@ def test_the_extra_installs_the_sister_package_at_the_published_alpha(member):
     reqs = [Requirement(r) for r in _extras()[extra]]
     pinned = [r for r in reqs if r.name == sister]
     assert len(pinned) == 1, (extra, [str(r) for r in reqs])
-    assert pinned[0].specifier.contains(FLOOR, prereleases=True)
+    assert pinned[0].specifier.contains(FLOOR[sister], prereleases=True)
     assert not pinned[0].specifier.contains(Version("0.0.9"), prereleases=True)
 
 

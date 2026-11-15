@@ -9,7 +9,10 @@ import unittest
 from typing import Iterator, List
 from unittest.mock import patch
 
-from scriptconv.diacritics import diacritize, replace_stress_mark
+from stressonnx import ALL_LANGS, lang_to_script
+from stressonnx._common import SCRIPT_VOWELS
+
+from scriptconv.diacritics import _STRESS_SCRIPTS, _STRESS_VOWELS, diacritize, replace_stress_mark
 from scriptconv.phonemizers.base import (BasePhonemizer, GraphemePhonemizer,
                                          UnicodeCodepointPhonemizer)
 from scriptconv.phonemizers.enums import Alphabet
@@ -85,6 +88,25 @@ class TestRemoval(unittest.TestCase):
             with self.subTest(lang=lang):
                 self.assertEqual(Recorder().phonemize_string(text, lang), text.replace(ACUTE, ""))
 
+    def test_a_capital_stressed_vowel_loses_the_mark(self):
+        # a capital Turkic İ lowercases to i + U+0307
+        for text, lang in [(f"\u0130{ACUTE}\u015f yax\u015f\u0131{ACUTE}d\u0131r.", "az-Latn"),
+                           (f"\u0130{ACUTE}\u015f yax\u015f\u0131{ACUTE}d\u0131r.", "az"),
+                           (f"\u0401{ACUTE}лка", "ru"), (f"\u016a{ACUTE}dens", "lv"),
+                           (f"Т\u045e{ACUTE}рт", "uz-Cyrl"), (f"\u0531{ACUTE}ր", "hy")]:
+            with self.subTest(lang=lang, text=text):
+                self.assertEqual(Recorder().phonemize_string(text, lang), text.replace(ACUTE, ""))
+
+    def test_the_tables_are_the_stressonnx_tables(self):
+        names = {"Armn": "armenian", "Cyrl": "cyrillic", "Geor": "georgian", "Latn": "latin"}
+        self.assertEqual(set(_STRESS_SCRIPTS), set(ALL_LANGS))
+        for tag, script in _STRESS_SCRIPTS.items():
+            with self.subTest(tag=tag):
+                self.assertEqual(names[script], lang_to_script(tag))
+        for script, vowels in _STRESS_VOWELS.items():
+            with self.subTest(script=script):
+                self.assertEqual(vowels, frozenset(SCRIPT_VOWELS[names[script]]))
+
     def test_declared_language_keeps_the_mark(self):
         marked = f"за{ACUTE}мок"
         self.assertEqual(DeclaresRussian().phonemize_string(marked, "ru"), marked)
@@ -116,7 +138,7 @@ class TestRemoval(unittest.TestCase):
 
     def test_a_static_or_class_text_method_is_refused(self):
         for wrap in (staticmethod, classmethod):
-            with self.subTest(wrap.__name__), self.assertRaises(TypeError):
+            with self.subTest(wrap.__name__), self.assertRaisesRegex(TypeError, "must be an instance method"):
                 type("Static", (BasePhonemizer,), {"phonemize_string": wrap(lambda *args: args[-2])})
 
     def test_replace_writes_around_the_marked_letter(self):
