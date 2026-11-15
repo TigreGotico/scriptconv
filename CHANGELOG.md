@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a96](https://github.com/TigreGotico/scriptconv/tree/0.0.4a96) (2026-11-15)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a95...0.0.4a96)
+
+**Merged pull requests:**
+
+- fix\(frontend\): a block after a sentence token joins with no space [\#259](https://github.com/TigreGotico/scriptconv/pull/259) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a95](https://github.com/TigreGotico/scriptconv/tree/0.0.4a95) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a94...0.0.4a95)
@@ -343,10 +351,6 @@
 ## [0.0.4a51](https://github.com/TigreGotico/scriptconv/tree/0.0.4a51) (2026-11-11)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a50...0.0.4a51)
-
-**Merged pull requests:**
-
-- feat\(phonemizers\): report the engine identity and declare owned stages [\#158](https://github.com/TigreGotico/scriptconv/pull/158) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a50](https://github.com/TigreGotico/scriptconv/tree/0.0.4a50) (2026-11-10)
 
