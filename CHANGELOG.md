@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a93](https://github.com/TigreGotico/scriptconv/tree/0.0.4a93) (2026-11-15)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a92...0.0.4a93)
+
+**Merged pull requests:**
+
+- fix\(deps\): the test extra pulls the normalize extra [\#255](https://github.com/TigreGotico/scriptconv/pull/255) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a92](https://github.com/TigreGotico/scriptconv/tree/0.0.4a92) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a91...0.0.4a92)
@@ -376,10 +384,6 @@
 ## [0.0.4a44](https://github.com/TigreGotico/scriptconv/tree/0.0.4a44) (2026-11-05)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a43...0.0.4a44)
-
-**Merged pull requests:**
-
-- docs: name scriptconv the one stop for text conversion [\#153](https://github.com/TigreGotico/scriptconv/pull/153) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a43](https://github.com/TigreGotico/scriptconv/tree/0.0.4a43) (2026-11-05)
 
