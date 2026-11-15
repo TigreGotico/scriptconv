@@ -7,7 +7,7 @@ name = "scriptconv"
 dynamic = ["version"]
 description = "The one stop for text conversion: a zero-dependency script & phoneme-notation core — ISO-15924 detection & metadata, IPA↔ARPABET/X-SAMPA/Lexique/Kirshenbaum/Cotovía/RFE, Buckwalter↔Arabic, Hangul→jamo, kana — with phonemizer integrations behind optional extras"
 readme = "README.md"
-license = "Apache-2.0 AND MIT AND BSD-2-Clause"
+license = "Apache-2.0 AND MIT AND LicenseRef-CMUdict"
 license-files = [
     "LICENSE",
     "scriptconv/data/LICENSE.cangjie5",

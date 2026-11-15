@@ -251,14 +251,17 @@ copies of the folder `phonemizer/` of `n4ze3m/tiny-voca` at revision
 `e5f9b116`, and `DATA_DIR` names the folder. The backend needs no download and
 works offline. Pass `data_dir=` to read another build from a directory. The
 backend never reads the `DIZIONE_DATA` environment variable. The dictionary,
-alignment table and model come from CMUdict (BSD-2-Clause, in
+alignment table and model come from CMUdict (`LicenseRef-CMUdict`, in
 `built/LICENSE.cmudict`). The homograph weights come from the Wikipedia
-Homograph Data (Apache-2.0, in `built/LICENSE.homograph-data`).
+Homograph Data (Apache-2.0, in `built/LICENSE.homograph-data`), and most of
+their pronunciations come from CMUdict.
 
-dizione reads the text itself, so the backend owns the `normalize` stage.
-The frontend gives it the text as written, with `Dr.` and `$12.99` intact.
-`phonemize_lazy` splits the sentences where dizione ends them, so an
-abbreviation such as `Mrs.` ends no sentence.
+dizione reads the text itself, so the backend owns the `normalize` stage,
+and the frontend runs no normaliser before it. The backend's own methods and
+`tokens()` read the text whole. `phonemize_lazy` ends a sentence where dizione
+does, at `.`, `?` or `!`, and a full stop that dizione reads as part of an
+abbreviation, as in `Mrs.`, ends no sentence. `TextFrontend.phonemize_flat`
+also gives the text whole.
 
 The IPA string has a space between two words and a stress mark directly
 before its vowel, as dizione writes it. It has no control symbol (`<bos>`,
@@ -268,14 +271,25 @@ string, so `DizionePhonemizer.tokens(text)` returns dizione's own
 `Phonemized` object unchanged: the symbols, the ids into
 `dizione.symbols.SYMBOLS` and the stress of each symbol (0, 1 or 2).
 `identity(lang)` puts dizione's build fingerprint in `revision`, so tokens
-from two builds of code, tables or data never mix.
+from two builds of code, tables or data never mix. When overrides take effect,
+from `overrides=` or from `DIZIONE_OVERRIDES`, `revision` is the sha256 of
+the fingerprint and of the overrides.
 
 `overrides=` takes pronunciations that win over every other source, in
 CMUdict notation or as phones with stress marks:
-`DizionePhonemizer(overrides={"kubernetes": "k ˌuː b ɚ n ˈɛ ɾ iː z"})`.
+`DizionePhonemizer(overrides={"kubernetes": "k ˌuː b ɚ n ˈɛ ɾ iː z"})`. A
+phone outside dizione's inventory raises `ValueError`.
 
 Limits:
 
+- `TextFrontend.phonemize` splits the text into sentences with quebra_frases
+  before the backend reads it, so dizione reads each piece alone. When
+  quebra_frases takes the full stop of an abbreviation as a sentence end, the
+  words after it lose their context. `Prof. Close the door.` reads "close" as
+  the verb (`klˈoʊz`), `Jan. 1, 2000` reads "one" and not "first", and
+  `See p. 12.` reads the letter "p" and not "page". `tokens()`, the backend's
+  own methods and `TextFrontend.phonemize_flat` read these texts whole and
+  give `klˈoʊs`, `fˈɜːst` and `pˈeɪdʒ`.
 - dizione reads American English only. A tag must resolve to `en-US`, or to
   a lect of it such as `en-US-x-nyc`. A bare `en` is British English by the
   default-region rule, so it is refused with `UnsupportedLanguageError`, like

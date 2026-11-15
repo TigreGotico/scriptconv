@@ -3,10 +3,11 @@
 The expected IPA comes from CMUdict (``cmudict.dict`` of
 github.com/cmusphinx/cmudict at commit 74790861, the commit dizione's data was
 built from) and the ARPAbet table of dizione's ``convert.py``: ``CONSONANTS``
-and ``FULL_VOWELS``. Stress 1 writes ``ˈ`` and stress 2 writes ``ˌ`` directly
-before the vowel.
+and ``FULL_VOWELS``, and its rule that an unstressed ``ER`` is ``ɚ``. Stress 1
+writes ``ˈ`` and stress 2 writes ``ˌ`` directly before the vowel.
 """
 import hashlib
+import shutil
 
 import pytest
 
@@ -48,6 +49,8 @@ class TestIPA:
         ("singing", "singing S IH1 NG IH0 NG", "sˈɪŋɪŋ"),
         ("12", "twelve T W EH1 L V", "twˈɛlv"),
         ("8", "eight EY1 T", "ˈeɪt"),
+        ("yesterday", "yesterday Y EH1 S T ER0 D EY2", "jˈɛstɚdˌeɪ"),
+        ("afternoon", "afternoon AE2 F T ER0 N UW1 N", "ˌæftɚnˈuːn"),
     ])
     def test_a_word_reads_as_cmudict_writes_it(self, phonemizer, text, cmudict, expected):
         assert phonemizer.phonemize_string(text, "en-US") == expected
@@ -66,6 +69,12 @@ class TestIPA:
     def test_each_sentence_is_one_list(self, phonemizer):
         assert phonemizer.phonemize("Cat. Ship?", "en-US") == [list("kˈæt"), list("ʃˈɪp")]
 
+    def test_a_comma_ends_no_sentence(self, phonemizer):
+        assert phonemizer.phonemize("Cat, ship.", "en-US") == [list("kˈæt ʃˈɪp")]
+
+    def test_the_sentence_marks_are_dizione_s(self, phonemizer):
+        assert phonemizer.phonemize("Cat\u2026 ship.", "en-US") == [list("kˈæt ʃˈɪp")]
+
     def test_an_abbreviation_ends_no_sentence(self, phonemizer):
         assert phonemizer.phonemize("Dr. Ship.", "en-US") == \
             [list(phonemizer.phonemize_string("Doctor Ship.", "en-US"))]
@@ -83,6 +92,19 @@ class TestTokens:
         assert tokens.symbols == ("<bos>", "k", "æ", "t", ",", "ʃ", "ɪ", "p", ".", "<eos>")
         assert tokens.ids == tuple(SYMBOL_TO_ID[s] for s in tokens.symbols)
         assert tokens.stress == (0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+    # Recorded from upstream dizione.phonemize at 8cd889e over the same data.
+    @pytest.mark.parametrize("text, symbols, stress", [
+        # capitals: "AI" is read as two letters
+        ("It is AI.", ("<bos>", "ɪ", "ɾ", "<sp>", "ɪ", "z", "<sp>", "eɪ", "aɪ", ".", "<eos>"),
+         (0, 0, 0, 0, 0, 0, 0, 2, 1, 0, 0)),
+        # "i am" is one unit of data/phrases.txt, with no word break
+        ("I am here.", ("<bos>", "aɪ", "ɐ", "m", "<sp>", "h", "ɪɹ", ".", "<eos>"),
+         (0, 0, 0, 0, 0, 0, 1, 0, 0)),
+    ])
+    def test_tokens_equal_upstream(self, phonemizer, text, symbols, stress):
+        tokens = phonemizer.tokens(text)
+        assert (tokens.symbols, tokens.stress) == (symbols, stress)
 
     @pytest.mark.parametrize("text", ["", "   ", "!!!"])
     def test_text_with_nothing_to_read_is_refused(self, phonemizer, text):
@@ -103,6 +125,36 @@ class TestNormalization:
                                 backend=phonemizer)
         assert frontend.phonemize(written) == phonemizer.phonemize(spoken, "en-US")
 
+    def test_a_normalizer_set_on_the_backend_runs(self, data_dir):
+        backend = get_phonemizer(Phonemizer.DIZIONE, data_dir=data_dir,
+                                 normalizer=lambda text, lang: text.replace("dog", "cat"))
+        assert backend.phonemize("dog", "en-US") == [list("kˈæt")]
+
+
+class TestFrontendSentences:
+    """TextFrontend splits sentences with quebra_frases before the backend reads them.
+
+    dizione then reads each piece alone, so an abbreviation that quebra_frases
+    takes as a sentence end loses the words after it. ``phonemize_flat`` and
+    the backend's own methods read the text whole.
+    """
+
+    @pytest.mark.parametrize("text, pieces, word, split, whole", [
+        ("Prof. Close the door.", ["Prof.", "Close the door."], 1, "klˈoʊz", "klˈoʊs"),
+        ("Jan. 1, 2000", ["Jan.", "1, 2000"], 1, "wˌʌn", "fˈɜːst"),
+        ("See p. 12.", ["See p.", "12."], 1, "pˈiː", "pˈeɪdʒ"),
+    ])
+    def test_the_frontend_reads_each_piece_alone(self, phonemizer, text, pieces, word, split,
+                                                 whole):
+        frontend = TextFrontend(FrontendConfig(lang="en-US"), backend=phonemizer)
+        read = frontend.phonemize(text)
+        assert read == [sentence for piece in pieces
+                        for sentence in phonemizer.phonemize(piece, "en-US")]
+        assert "".join(read[0] + [" "] + read[1]).split(" ")[word] == split
+        flat = "".join(frontend.phonemize_flat(text))
+        assert flat == phonemizer.phonemize_string(text, "en-US")
+        assert flat.split(" ")[word] == whole
+
 
 class TestLanguages:
     @pytest.mark.parametrize("lang, resolved", [
@@ -116,6 +168,8 @@ class TestLanguages:
     def test_every_other_tag_is_refused_and_names_en_us(self, phonemizer, lang):
         with pytest.raises(UnsupportedLanguageError, match="en-US"):
             phonemizer.phonemize_string("cat", lang)
+        with pytest.raises(UnsupportedLanguageError, match="en-US"):
+            phonemizer.phonemize("cat", lang)
 
     @pytest.mark.parametrize("lang", [None, "", "und"])
     def test_a_missing_language_is_its_own_error(self, lang):
@@ -147,6 +201,52 @@ class TestIdentity:
         identity = phonemizer.identity("en-us")
         assert (identity.backend, identity.lang) == ("dizione", "en-US")
         assert identity.revision == dizione.identity(data_dir)["fingerprint"]
+        assert identity.revision == \
+            "f41b6f9dac16c0b3ac492e255fcbebf6b73f737b20a62dfba7576ceb208f9190"
+
+    def test_the_revision_hashes_the_given_data(self, phonemizer, tmp_path):
+        data = tmp_path / "built"
+        shutil.copytree(DATA_DIR, data)
+        with open(data / "g2p.json", "a", encoding="utf-8") as f:
+            f.write("\n")
+        revision = DizionePhonemizer(data_dir=data).identity("en-US").revision
+        assert revision == dizione.identity(data)["fingerprint"]
+        assert revision != phonemizer.identity("en-US").revision
+
+    def test_overrides_change_the_revision(self, phonemizer, data_dir):
+        plain = phonemizer.identity("en-US").revision
+        first = DizionePhonemizer(data_dir=data_dir, overrides={"cat": "K IH1 T", "dog": "D AA1 G"})
+        same = DizionePhonemizer(data_dir=data_dir, overrides={"dog": "D AA1 G", "cat": "K IH1 T"})
+        other = DizionePhonemizer(data_dir=data_dir, overrides={"cat": "K AE1 T"})
+        revisions = {first.identity("en-US").revision, other.identity("en-US").revision, plain}
+        assert len(revisions) == 3
+        assert same.identity("en-US").revision == first.identity("en-US").revision
+
+    def test_a_taught_name_changes_the_revision(self, phonemizer, data_dir):
+        name = DizionePhonemizer(data_dir=data_dir,
+                                 overrides={"tung tung sahur": "T UW1 NG | T UW2 NG | S AA0 HH UH1 R"})
+        assert name.identity("en-US").revision != phonemizer.identity("en-US").revision
+        other = DizionePhonemizer(data_dir=data_dir,
+                                  overrides={"tung tung sahur": "T UW1 NG | T UW1 NG | S AA0 HH UH1 R"})
+        assert other.identity("en-US").revision != name.identity("en-US").revision
+
+    def test_overrides_keep_the_data_in_the_revision(self, data_dir, tmp_path):
+        data = tmp_path / "built"
+        shutil.copytree(DATA_DIR, data)
+        with open(data / "g2p.json", "a", encoding="utf-8") as f:
+            f.write("\n")
+        overrides = {"cat": "K IH1 T"}
+        assert DizionePhonemizer(data_dir=data, overrides=overrides).identity("en-US").revision != \
+            DizionePhonemizer(data_dir=data_dir, overrides=overrides).identity("en-US").revision
+
+    def test_the_overrides_file_of_the_environment_changes_the_revision(self, phonemizer, data_dir,
+                                                                        monkeypatch, tmp_path):
+        table = tmp_path / "overrides.txt"
+        table.write_text("ship  SH AA1 P\n", encoding="utf-8")
+        monkeypatch.setenv("DIZIONE_OVERRIDES", str(table))
+        taught = DizionePhonemizer(data_dir=data_dir)
+        assert taught.phonemize_string("ship", "en-US") == "ʃˈɑːp"
+        assert taught.identity("en-US").revision != phonemizer.identity("en-US").revision
 
     def test_the_token_convention_is_version_4(self):
         assert dizione.VERSION == 4

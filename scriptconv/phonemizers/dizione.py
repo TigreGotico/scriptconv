@@ -10,19 +10,22 @@ own text rules. Its code is vendored under
 
 dizione reads the text itself, so this backend owns the ``normalize`` stage and
 gets the text with its punctuation: ``"Dr. Patel paid $12.99"`` reaches the
-engine as written.
+engine as written. :class:`~scriptconv.frontend.TextFrontend` splits the text
+into sentences before the backend, so its sentences can differ from dizione's.
 """
 import dataclasses
+import hashlib
+import json
 from functools import cached_property
 from pathlib import Path
 from typing import ClassVar, Dict, Iterator, List, Optional, Union
 
 from scriptconv.phonemizers._thirdparty import dizione
 from scriptconv.phonemizers._thirdparty.dizione.engine import Phonemizer as DizioneEngine
+from scriptconv.phonemizers._thirdparty.dizione.homographs import SENTENCE_END
 from scriptconv.phonemizers._thirdparty.dizione.symbols import (
     PHONE_SET,
     STRESS_MARKS,
-    UNK,
     Phonemized,
     tokenize,
 )
@@ -41,9 +44,6 @@ DATA_DIR = Path(dizione.__file__).parent / "built"
 """dizione's built data, shipped in the wheel: the files of ``phonemizer/`` of
 n4ze3m/tiny-voca at revision ``e5f9b11651a4db525fb207a56a91e4df2d1dd387``."""
 
-# The marks after which dizione's token stream starts a new sentence.
-_SENTENCE_MARKS = frozenset({".", "?", "!", "\u2026"})
-
 
 class DizionePhonemizer(BasePhonemizer):
     """dizione: American English text to IPA, and to dizione's own tokens.
@@ -51,8 +51,7 @@ class DizionePhonemizer(BasePhonemizer):
     :meth:`phonemize_string` writes IPA. A stress mark stands directly before
     its vowel, as dizione writes it. A word break is a space. The control
     symbols (``<bos>``, ``<eos>``, ``<pad>``, ``<sp>``) are not written, and
-    neither is punctuation, because ``.`` is the IPA syllable break. A phone
-    from an override that is not in dizione's inventory is written as given.
+    neither is punctuation, because ``.`` is the IPA syllable break.
     :meth:`tokens` returns dizione's own token sequence, with the ids, the
     punctuation and the stress stream.
 
@@ -64,7 +63,7 @@ class DizionePhonemizer(BasePhonemizer):
             dizione's ``Phonemizer(overrides=...)`` takes them: a mapping
             ``{word: pronunciation}``, a path to a table, or the text of a
             table. A pronunciation is CMUdict notation or phones with stress
-            marks.
+            marks. A phone outside dizione's inventory raises ``ValueError``.
     """
 
     owned_stages: ClassVar[frozenset[str]] = frozenset({"normalize"})
@@ -117,8 +116,22 @@ class DizionePhonemizer(BasePhonemizer):
         return dizione.identity(self.data_dir)["fingerprint"]
 
     def identity(self, lang: str) -> PhonemizerIdentity:
-        """What phonemizes *lang*, with dizione's build fingerprint as ``revision``."""
-        return dataclasses.replace(super().identity(lang), revision=self.fingerprint)
+        """What phonemizes *lang*.
+
+        ``revision`` is dizione's build fingerprint. When overrides take effect,
+        from ``overrides=`` or from the file that ``DIZIONE_OVERRIDES`` names,
+        ``revision`` is the sha256 of the fingerprint and of the overrides, so
+        phonemes read with two sets of overrides never mix.
+        """
+        engine = self.engine
+        names = {" ".join(key): engine.names[key] for key in engine.user_names}
+        revision = self.fingerprint
+        if engine.overrides or names:
+            overrides = json.dumps({"words": engine.overrides, "names": names},
+                                   sort_keys=True, ensure_ascii=False)
+            digest = hashlib.sha256(overrides.encode()).hexdigest()
+            revision = hashlib.sha256(f"{revision}\n{digest}".encode()).hexdigest()
+        return dataclasses.replace(super().identity(lang), revision=revision)
 
     def _ipa_sentences(self, text: str) -> List[str]:
         """The IPA of each sentence of *text*, as dizione reads it."""
@@ -128,7 +141,6 @@ class DizionePhonemizer(BasePhonemizer):
         if not any(word for is_mark, words in pieces if not is_mark for word in words):
             return []
         phonemized = tokenize(pieces)
-        unknown = iter(phonemized.unknown)
         sentences: List[str] = []
         words: List[str] = []
         word = ""
@@ -136,13 +148,10 @@ class DizionePhonemizer(BasePhonemizer):
             if symbol in PHONE_SET:
                 word += STRESS_MARKS.get(stress, "") + symbol
                 continue
-            if symbol == UNK:
-                word += next(unknown)
-                continue
             if word:
                 words.append(word)
                 word = ""
-            if symbol in _SENTENCE_MARKS and words:
+            if symbol in SENTENCE_END and words:
                 sentences.append(" ".join(words))
                 words = []
         if words:
@@ -156,8 +165,9 @@ class DizionePhonemizer(BasePhonemizer):
     def phonemize_lazy(self, text: str, lang: str) -> Iterator[List[str]]:
         """The IPA of each sentence of *text*, as a list of characters.
 
-        dizione reads the whole text and splits the sentences itself, so an
-        abbreviation such as ``Mrs.`` ends no sentence.
+        dizione reads the whole text and ends a sentence at ``.``, ``?`` or
+        ``!``, as its homograph rules do. A full stop that dizione reads as part
+        of an abbreviation, as in ``Mrs.``, ends no sentence.
         """
         self.get_lang(lang)
         if not text:
