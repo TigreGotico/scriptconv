@@ -18,6 +18,7 @@ such as ``Mrs.`` ends no sentence.
 import dataclasses
 import hashlib
 import json
+import re
 from functools import cached_property
 from pathlib import Path
 from typing import ClassVar, Dict, Iterator, List, Optional, Tuple, Union
@@ -35,6 +36,8 @@ from scriptconv.phonemizers._thirdparty.dizione.symbols import (
     tokenize,
 )
 from scriptconv.phonemizers.base import (
+    _PARAGRAPH_BREAK,
+    _SEPARATING_MARKS,
     CLAUSE_PUNCTUATION,
     BasePhonemizer,
     MissingLanguageError,
@@ -50,6 +53,18 @@ __all__ = ["DizionePhonemizer", "Phonemized", "DATA_DIR"]
 DATA_DIR = Path(dizione.__file__).parent / "built"
 """dizione's built data, shipped in the wheel: the files of ``phonemizer/`` of
 n4ze3m/tiny-voca at revision ``e5f9b11651a4db525fb207a56a91e4df2d1dd387``."""
+
+# A run of marks that the clause table reads as "!" or "?" between two
+# letters, as in "Sim!Não!": no clause break, but a word break.
+_SEPARATING_RUN = re.compile(
+    r"(?<=[^\W\d_])[" + re.escape("".join(sorted(_SEPARATING_MARKS))) + r"]+(?=[^\W\d_])")
+# The marks that close a quotation or a bracket. They stay with the clause
+# that ends before them, as the clause split of the frontend keeps them.
+_QUOTES = frozenset({'"', "'"})
+_DOUBLE_QUOTE = '"'
+_CLOSING_BRACKET = ")"
+# A sentence mark at the end of a text, with only closing marks after it.
+_ENDS_IN_SENTENCE_MARK = re.compile(r"[.?!][^\w\s]*\s*$")
 
 
 class DizionePhonemizer(BasePhonemizer):
@@ -71,6 +86,18 @@ class DizionePhonemizer(BasePhonemizer):
             ``{word: pronunciation}``, a path to a table, or the text of a
             table. A pronunciation is CMUdict notation or phones with stress
             marks. A phone outside dizione's inventory raises ``ValueError``.
+        tokens: :meth:`phonemize_segments` yields dizione's own tokens, not
+            IPA. Each segment is a clause with its own ``<bos>`` and
+            ``<eos>`` (``bounded``), its punctuation symbols, and the
+            ``ids`` and ``stress`` streams, so that
+            :meth:`TextFrontend.segments <scriptconv.frontend.TextFrontend.segments>`
+            gives a voice the ids and stress of each chunk. The IPA methods
+            do not change.
+
+    A ``!`` or ``?`` between two letters with no space after it, as in
+    ``Sim!Não!``, is no clause mark: dizione reads it as a space, so it gives
+    no symbol (tts-punctuation). The methods read the text that way,
+    :meth:`tokens` too.
     """
 
     owned_stages: ClassVar[frozenset[str]] = frozenset({"normalize"})
@@ -78,11 +105,13 @@ class DizionePhonemizer(BasePhonemizer):
 
     def __init__(self, alphabet: Alphabet = Alphabet.IPA,
                  data_dir: Optional[Union[str, Path]] = None,
-                 overrides: Optional[Union[Dict[str, str], str, Path]] = None):
+                 overrides: Optional[Union[Dict[str, str], str, Path]] = None,
+                 tokens: bool = False):
         _check_alphabet(self, alphabet, [Alphabet.IPA])
         super().__init__(alphabet)
         self.data_dir = Path(data_dir) if data_dir is not None else DATA_DIR
         self.engine = DizioneEngine(self.data_dir, overrides=overrides)
+        self.tokens_mode = tokens
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
@@ -116,7 +145,7 @@ class DizionePhonemizer(BasePhonemizer):
         """
         if not isinstance(text, str) or not text.strip():
             raise ValueError("text must not be empty")
-        return tokenize(self.engine.pieces(text))
+        return tokenize(self.engine.pieces(_SEPARATING_RUN.sub(" ", text)))
 
     def token_segments(self, text: str) -> List[Phonemized]:
         """dizione's token sequence for *text*, cut into sentences.
@@ -133,10 +162,11 @@ class DizionePhonemizer(BasePhonemizer):
             ValueError: If the text is empty or has nothing to pronounce.
         """
         whole = self.tokens(text)
+        closes = self._quote_closes(text, whole.symbols)
         sentences: List[Phonemized] = []
         clauses: List[Phonemized] = []
-        for clause, (_, _, _, ends_sentence) in zip(_token_clauses(whole),
-                                                     _clause_spans(whole.symbols)):
+        for clause, (_, _, _, ends_sentence) in zip(_token_clauses(whole, closes),
+                                                     _clause_spans(whole.symbols, closes)):
             clauses.append(clause)
             if ends_sentence:
                 sentences.append(_join_tokens(clauses))
@@ -166,17 +196,82 @@ class DizionePhonemizer(BasePhonemizer):
             revision = hashlib.sha256(f"{revision}\n{digest}".encode()).hexdigest()
         return dataclasses.replace(super().identity(lang), revision=revision)
 
-    def _clauses(self, text: str) -> Iterator[Segment]:
-        """The IPA of each clause of *text*, as :func:`_clause_spans` cuts dizione's tokens."""
+    def _clauses(self, text: str, tokens: bool = False) -> Iterator[Segment]:
+        """Each clause of *text*, as :func:`_clause_spans` cuts dizione's tokens.
+
+        A clause is IPA with a ``stress`` stream, or with *tokens* dizione's
+        own tokens, bounded, with ``ids`` and ``stress`` streams.
+        """
         if not text.strip():
             return
+        text = _SEPARATING_RUN.sub(" ", text)
         pieces = self.engine.pieces(text)
         if not any(word for is_mark, words in pieces if not is_mark for word in words):
             return
         whole = tokenize(pieces)
-        for start, end, mark, ends_sentence in _clause_spans(whole.symbols):
-            phonemes, stress = _ipa(whole.symbols[start:end], whole.stress[start:end])
-            yield Segment(phonemes, mark, ends_sentence, {"stress": stress})
+        paragraph_ends = self._paragraph_ends(text, pieces)
+        for start, end, mark, ends_sentence in _clause_spans(whole.symbols,
+                                                             self._quote_closes(text, whole.symbols)):
+            ends_paragraph = ends_sentence and any(start <= place < end for place in paragraph_ends)
+            if tokens:
+                yield Segment((BOS, *whole.symbols[start:end], EOS), None, ends_sentence,
+                              {"ids": (whole.ids[0], *whole.ids[start:end], whole.ids[-1]),
+                               "stress": (0, *whole.stress[start:end], 0)},
+                              ends_paragraph, bounded=True)
+            else:
+                phonemes, stress = _ipa(whole.symbols[start:end], whole.stress[start:end])
+                yield Segment(phonemes, mark, ends_sentence, {"stress": stress}, ends_paragraph)
+
+    def _paragraph_ends(self, text: str, pieces: list) -> List[int]:
+        """The places in the token sequence of *pieces* of the sentence marks that a paragraph break follows.
+
+        dizione reads a blank line as a space, so it reports no paragraph.
+        The text as dizione's rules rewrite it keeps each blank line, and
+        each ``.``, ``?`` and ``!`` of it is a mark of *pieces*, in order. A
+        blank line ends a paragraph after the mark before it, when only
+        closing marks stand between the two. A blank line that the rules
+        read away, as in ``Jan.\n\n5``, ends nothing. When the marks of the
+        rewritten text and of *pieces* differ in number, no blank line ends a
+        paragraph.
+        """
+        if not _PARAGRAPH_BREAK.search(text):
+            return []
+        rewritten = self.engine.normalizer.rewrite(text)
+        marks = [index for index, (is_mark, value) in enumerate(pieces)
+                 if is_mark and value in SENTENCE_END]
+        if sum(rewritten.count(mark) for mark in SENTENCE_END) != len(marks):
+            return []
+        places = []
+        for match in _PARAGRAPH_BREAK.finditer(rewritten):
+            before = rewritten[:match.start()]
+            if not _ENDS_IN_SENTENCE_MARK.search(before):
+                continue
+            count = sum(before.count(mark) for mark in SENTENCE_END)
+            try:
+                prefix = tokenize(pieces[:marks[count - 1] + 1])
+            except ValueError:
+                continue
+            places.append(len(prefix.symbols) - 2)
+        return places
+
+    def _quote_closes(self, text: str, symbols: Tuple[str, ...]) -> Optional[List[bool]]:
+        """For each ``"`` of *symbols*, whether it closes a quotation.
+
+        The token sequence holds no spaces, so it cannot tell a closing
+        quotation mark from an opening one. The text as dizione's rules
+        rewrite it can: a ``"`` that follows a space, an opening bracket or
+        the start of the text opens a quotation, and any other closes one.
+        Each ``"`` of the rewritten text is a ``"`` of *symbols*, in order.
+        When the two differ in number, the result is ``None``.
+        """
+        if _DOUBLE_QUOTE not in symbols:
+            return None
+        rewritten = self.engine.normalizer.rewrite(_SEPARATING_RUN.sub(" ", text))
+        places = [index for index, char in enumerate(rewritten) if char == _DOUBLE_QUOTE]
+        if len(places) != symbols.count(_DOUBLE_QUOTE):
+            return None
+        return [index > 0 and not rewritten[index - 1].isspace() and rewritten[index - 1] not in "([{"
+                for index in places]
 
     def _ipa_sentences(self, text: str) -> List[str]:
         """The IPA of each sentence of *text*, as dizione reads it."""
@@ -199,12 +294,15 @@ class DizionePhonemizer(BasePhonemizer):
         after a run of ``, . ? ! ; :`` that follows a sound, and it ends a
         sentence when the run holds ``.``, ``?`` or ``!``, as dizione's
         homograph rules read a sentence. A full stop that dizione reads as part
-        of an abbreviation, as in ``Mrs.``, ends nothing. Each segment has a
-        ``stress`` stream in step with its characters: the stress of the phone
-        that a character writes, and 0 for a space.
+        of an abbreviation, as in ``Mrs.``, ends nothing. A closing quotation
+        mark or bracket after the run stays with the clause. Each segment has
+        a ``stress`` stream in step with its characters: the stress of the
+        phone that a character writes, and 0 for a space. A sentence that a
+        blank line follows ends a paragraph. With ``tokens=True`` the
+        segments are dizione's tokens, as the class describes.
         """
         self.get_lang(lang)
-        yield from self._clauses(text)
+        yield from self._clauses(text, self.tokens_mode)
 
     def phonemize_string(self, text: str, lang: str) -> str:
         self.get_lang(lang)
@@ -226,27 +324,46 @@ class DizionePhonemizer(BasePhonemizer):
             yield list(sentence)
 
 
-def _clause_spans(symbols: Tuple[str, ...]) -> List[Tuple[int, int, Optional[str], bool]]:
+def _clause_spans(symbols: Tuple[str, ...],
+                  closes: Optional[List[bool]] = None) -> List[Tuple[int, int, Optional[str], bool]]:
     """``(start, end, mark, ends_sentence)`` of each clause of a token sequence.
 
     The spans cover the sequence without its ``<bos>`` and ``<eos>``. A clause
     ends after a run of clause marks that follows a sound. Its mark is the
     first mark of the run, as :data:`CLAUSE_PUNCTUATION` reads it, and it ends
-    a sentence when the run holds ``.``, ``?`` or ``!``. Marks after the last
-    sound stay with the last clause, and the last clause ends a sentence.
+    a sentence when the run holds ``.``, ``?`` or ``!``. A closing bracket
+    after the run, or a quotation mark that closes a quotation, stays with the
+    clause. *closes* tells, for each ``"``, whether it closes a quotation;
+    without it, and for ``'``, a quotation mark closes when an odd number of
+    the same mark comes before it. Marks after the last sound stay with the
+    last clause, and the last clause ends a sentence.
     """
     last = len(symbols) - 1
     spans: List[Tuple[int, int, Optional[str], bool]] = []
+    seen = dict.fromkeys(_QUOTES, 0)
+
+    def closing(quote: str) -> bool:
+        if quote == _DOUBLE_QUOTE and closes is not None:
+            return closes[seen[quote]]
+        return seen[quote] % 2 == 1
+
     start, index, sound = 1, 1, False
     while index < last:
         symbol = symbols[index]
         if symbol in PHONE_SET or symbol == UNK:
             sound = True
+        elif symbol in seen:
+            seen[symbol] += 1
         elif sound and symbol in CLAUSE_PUNCTUATION:
             end = index
             while end < last and symbols[end] in CLAUSE_PUNCTUATION:
                 end += 1
             ends_sentence = any(mark in SENTENCE_END for mark in symbols[index:end])
+            while end < last and (symbols[end] == _CLOSING_BRACKET
+                                  or symbols[end] in seen and closing(symbols[end])):
+                if symbols[end] in seen:
+                    seen[symbols[end]] += 1
+                end += 1
             spans.append((start, end, CLAUSE_PUNCTUATION[symbol], ends_sentence))
             start, index, sound = end, end, False
             continue
@@ -259,11 +376,11 @@ def _clause_spans(symbols: Tuple[str, ...]) -> List[Tuple[int, int, Optional[str
     return spans
 
 
-def _token_clauses(whole: Phonemized) -> List[Phonemized]:
+def _token_clauses(whole: Phonemized, closes: Optional[List[bool]] = None) -> List[Phonemized]:
     """*whole* cut at :func:`_clause_spans`, each clause with its own ``<bos>`` and ``<eos>``."""
     unknown = iter(whole.unknown)
     clauses = []
-    for start, end, _, _ in _clause_spans(whole.symbols):
+    for start, end, _, _ in _clause_spans(whole.symbols, closes):
         symbols = (BOS, *whole.symbols[start:end], EOS)
         clauses.append(Phonemized(
             symbols, (whole.ids[0], *whole.ids[start:end], whole.ids[-1]),

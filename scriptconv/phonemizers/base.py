@@ -58,6 +58,8 @@ _SEPARATING_MARKS = frozenset(mark for mark, symbol in CLAUSE_PUNCTUATION.items(
 # reads an ellipsis as a spoken-name pause, which Piper does not keep).
 _CLAUSE_BREAK = re.compile(r"(?:\.\.+|\u2026|[,:;!?|\u060c\u061b\u061f])[^\w\s]*(?=\s)")
 _TRAILING_PUNCTUATION = re.compile(r"[^\w\s]+\s*$")
+# One or more blank lines: a paragraph break.
+_PARAGRAPH_BREAK = re.compile(r"(\n(?:[^\S\n]*\n)+)")
 _LANG_FLAGS = re.compile(r"\([^)]+\)")
 
 
@@ -212,6 +214,15 @@ class Segment:
     """Whether the segment ends a sentence."""
     streams: Mapping[str, Tuple] = dataclasses.field(default_factory=dict)
     """Side streams of the backend, such as stress, each in step with :attr:`phonemes`."""
+    ends_paragraph: bool = False
+    """Whether a paragraph break (one or more blank lines) follows the
+    segment in the text. Only a segment that ends a sentence ends a
+    paragraph."""
+    bounded: bool = False
+    """Whether the first symbol of :attr:`phonemes` is the backend's start
+    symbol and the last its end symbol, as ``<bos>`` and ``<eos>``. Where the
+    frontend joins two bounded segments, the inner end and start symbols go,
+    with their stream values."""
 
 
 class MissingLanguageError(ValueError):

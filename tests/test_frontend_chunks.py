@@ -3,6 +3,8 @@
 The size moves only the cuts: the stage order is the same at every size, and
 the clause symbols join two chunks the same way at every size.
 """
+import re
+
 import pytest
 
 from scriptconv import frontend as frontend_module
@@ -25,16 +27,22 @@ class Echo(BasePhonemizer):
 
 
 class WholeText(Echo):
-    """An owner backend that reads whole text: a segment per word, a sentence at each "."."""
+    """An owner backend that reads whole text: a segment per word, a sentence at each ".".
+
+    A sentence that a blank line follows ends a paragraph.
+    """
 
     owned_stages = frozenset({"normalize"})
     reads_whole_text = True
 
     def phonemize_segments(self, text, lang):
         self.events.append(("segments", text))
-        for word in text.split():
+        for match in re.finditer(r"(\S+)(\s*)", text):
+            word, space = match.groups()
             mark = word[-1] if word[-1] in ".,?" else None
-            yield Segment(tuple(word.rstrip(".,?")), mark, mark in (".", "?"))
+            ends_sentence = mark in (".", "?")
+            yield Segment(tuple(word.rstrip(".,?")), mark, ends_sentence,
+                          ends_paragraph=ends_sentence and space.count("\n") > 1)
 
 
 def build(backend, keep=False, **config):
@@ -124,7 +132,7 @@ class TestStreamingOrder:
 
     @pytest.mark.parametrize("chunk, first", [
         (Chunk.SENTENCE, [("diacritize", "Um, dois."), ("backend", "Um"), ("backend", "dois")]),
-        (Chunk.CLAUSE, [("diacritize", "Um,"), ("backend", "Um")]),
+        (Chunk.CLAUSE, [("diacritize", "Um, "), ("backend", "Um")]),
     ])
     def test_chunk_two_is_read_after_chunk_one_is_yielded(self, monkeypatch, chunk, first):
         events = []

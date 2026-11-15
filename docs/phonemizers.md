@@ -263,8 +263,21 @@ its own output at its own marks. `phonemize_segments(text, lang)` gives one
 segment per clause, with the mark that ends it and a `stress` stream in step
 with its characters. A clause ends after a run of `, . ? ! ; :` that follows a
 sound, and it ends a sentence when the run holds `.`, `?` or `!`. A full stop
-that dizione reads as part of an abbreviation, as in `Mrs.`, ends nothing.
-With `keep_punctuation`, the frontend writes the clause symbol of each mark.
+that dizione reads as part of an abbreviation, as in `Mrs.`, ends nothing. A
+closing bracket after the run, or a quotation mark that closes an open
+quotation, stays with the clause that ends. A `!` or `?` between two letters
+with no space after it, as in `Sim!Não!`, is no clause mark: the backend reads
+it as a space, in `tokens()` too. A sentence that a blank line follows ends a
+paragraph, unless dizione's own rules read the blank line away, as in
+`Jan.\n\n5`. With `keep_punctuation`, the frontend writes the clause symbol of
+each mark.
+
+`DizionePhonemizer(tokens=True)` changes `phonemize_segments` only: each
+segment is then a clause of dizione's own tokens, with its own `<bos>` and
+`<eos>`, and with `ids` and `stress` streams. `TextFrontend.segments` groups
+them into chunks of any size and removes the inner `<eos>` `<bos>` pairs, so
+its sentence chunks equal `token_segments(text)`, and its `NONE` chunk equals
+`tokens(text)`.
 
 The IPA string has a space between two words and a stress mark directly
 before its vowel, as dizione writes it. It has no control symbol (`<bos>`,
@@ -288,10 +301,15 @@ phone outside dizione's inventory raises `ValueError`.
 
 Limits:
 
-- `token_segments` cuts after the marks that end a sentence, so a closing
-  quote after a full stop, as in `"Stop." Then`, starts the next sentence. The
-  token sequence holds no spaces, so a closing quote and an opening quote look
-  the same.
+- The token sequence holds no spaces, so a closing quote and an opening quote
+  look the same. The backend reads each `"` in the text: a `"` after a space
+  opens a quotation, and any other closes one. For `'` it counts the marks,
+  so a `'` that dizione keeps for an elision, as in `rock 'n' roll`, moves
+  that count.
+- dizione ends a sentence after each initial of a name: `J. R. R. Tolkien
+  wrote it.` reads as four sentences. The words are right, but at `SENTENCE`
+  size a voice speaks each initial as its own utterance, with a final fall.
+  Use `PARAGRAPH` or `NONE` size for such text.
 - dizione reads American English only. A tag must resolve to `en-US`, or to
   a lect of it such as `en-US-x-nyc`. A bare `en` is British English by the
   default-region rule, so it is refused with `UnsupportedLanguageError`, like

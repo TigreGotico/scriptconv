@@ -229,12 +229,27 @@ class BaseChinesePinyinPhonemizer(BasePhonemizer):
             ipa_phones.append(pho_str)
         return ipa_phones
 
+    @staticmethod
+    def remove_punctuation(text: str) -> str:
+        """*text* without punctuation, as :meth:`BasePhonemizer.remove_punctuation` writes it.
+
+        A full-width mark, such as ``？`` or ``、``, stands between two words
+        with no space, so it becomes a space: Jieba then cuts the words there,
+        as it does when it reads the mark.
+        """
+        return BasePhonemizer.remove_punctuation("".join(
+            " " if unicodedata.category(char).startswith("P")
+            and unicodedata.east_asian_width(char) in ("W", "F", "H") else char
+            for char in text))
+
     def phonemize_to_list(self, text: str, lang: str) -> List[str]:
         phones: List[str] = []
         lang = self.get_lang(lang)
         if self.jieba:
             import jieba
             for chunk in jieba.cut(text, cut_all=False):
+                if chunk.isspace():
+                    continue  # each word already ends in a space
                 if chunk.isdigit():
                     # NFKC folds full-width digits (e.g. "３") to ASCII so
                     # num2str's DIGITS table never raises KeyError on them

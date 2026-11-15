@@ -917,8 +917,9 @@ class TestBackends:
                 yield ["Z", text]
 
         frontend = build(Lists(), stages=Stages(diacritize=False))
-        assert frontend.phonemize_flat("ab. cd.") == ["L", "ab. cd."]
         assert frontend.phonemize("ab. cd.") == [["Z", "ab."], ["Z", "cd."]]
+        # training reads the sentence path too, not phonemize_to_list
+        assert frontend.phonemize_flat("ab. cd.") == ["Z", "ab.", " ", "Z", "cd."]
 
     def test_with_backend_swaps_the_instance_and_keeps_the_config(self):
         first, second = Echo(), Mute()
