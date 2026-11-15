@@ -1,0 +1,27 @@
+# Names of the letters, for initialisms and single letters.
+a    ˈeɪ
+b    b ˈiː
+c    s ˈiː
+d    d ˈiː
+e    ˈiː
+f    ˈɛ f
+g    dʒ ˈiː
+h    ˈeɪ tʃ
+i    ˈaɪ
+j    dʒ ˈeɪ
+k    k ˈeɪ
+l    ˈɛ l
+m    ˈɛ m
+n    ˈɛ n
+o    ˈoʊ
+p    p ˈiː
+q    k j ˈuː
+r    ˈɑːɹ
+s    ˈɛ s
+t    t ˈiː
+u    j ˈuː
+v    v ˈiː
+w    d ˈʌ b əl j uː
+x    ˈɛ k s
+y    w ˈaɪ
+z    z ˈiː

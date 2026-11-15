@@ -16,8 +16,15 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-EXPRESSION = "Apache-2.0 AND MIT"
-PERMISSIVE = {"Apache-2.0", "MIT"}
+EXPRESSION = "Apache-2.0 AND MIT AND LicenseRef-CMUdict"
+# LicenseRef-CMUdict is the CMUdict licence: BSD-2-Clause with one added
+# sentence and an acknowledgement, so no SPDX identifier matches it.
+PERMISSIVE = {"Apache-2.0", "MIT", "LicenseRef-CMUdict"}
+# Text that each licence notice holds.
+NOTICE_TEXT = {"MIT": ("MIT License",),
+               "Apache-2.0": ("Apache-2.0", "Apache License, Version 2.0"),
+               "LicenseRef-CMUdict": ("Carnegie Mellon University",
+                                      "Redistribution and use in source and binary forms")}
 
 # Every file in these directories is first-party or third-party code, and a
 # third-party file must be listed below with its licence.
@@ -32,15 +39,25 @@ FIRST_PARTY = {
 CANGJIE5 = "scriptconv/data/LICENSE.cangjie5"
 HANGUL_TO_IPA = "scriptconv/phonemizers/_thirdparty/LICENSE.hangul_to_ipa"
 MATOUB = "scriptconv/phonemizers/_vendored/matoub_kab/LICENSE.md"
-# path prefix -> (licence, the notice the wheel carries for it, if any)
+DIZIONE = "scriptconv/phonemizers/_thirdparty/dizione/LICENSE"
+CMUDICT = "scriptconv/phonemizers/_thirdparty/dizione/built/LICENSE.cmudict"
+HOMOGRAPH_DATA = "scriptconv/phonemizers/_thirdparty/dizione/built/LICENSE.homograph-data"
+# path prefix -> (licences, the notice the wheel carries for each licence). The
+# first prefix that matches a file gives its licences. homographs.json takes
+# CMUdict pronunciations for most of its senses.
 THIRD_PARTY = {
-    "scriptconv/data/cangjie5_tc.tsv.gz": ("MIT", CANGJIE5),
-    "scriptconv/phonemizers/_thirdparty/hangul2ipa.py": ("MIT", HANGUL_TO_IPA),
-    "scriptconv/phonemizers/_thirdparty/ko_tables/": ("MIT", HANGUL_TO_IPA),
-    "scriptconv/phonemizers/_thirdparty/shami/": ("Apache-2.0", None),
-    "scriptconv/phonemizers/_thirdparty/vosk_g2p.py": ("Apache-2.0", None),
-    "scriptconv/phonemizers/_thirdparty/zh_num.py": ("Apache-2.0", None),
-    "scriptconv/phonemizers/_vendored/matoub_kab/": ("Apache-2.0", MATOUB),
+    "scriptconv/data/cangjie5_tc.tsv.gz": (("MIT", CANGJIE5),),
+    "scriptconv/phonemizers/_thirdparty/dizione/built/homographs.json":
+        (("Apache-2.0", HOMOGRAPH_DATA), ("LicenseRef-CMUdict", CMUDICT)),
+    "scriptconv/phonemizers/_thirdparty/dizione/built/sources.json": (("Apache-2.0", DIZIONE),),
+    "scriptconv/phonemizers/_thirdparty/dizione/built/": (("LicenseRef-CMUdict", CMUDICT),),
+    "scriptconv/phonemizers/_thirdparty/dizione/": (("Apache-2.0", DIZIONE),),
+    "scriptconv/phonemizers/_thirdparty/hangul2ipa.py": (("MIT", HANGUL_TO_IPA),),
+    "scriptconv/phonemizers/_thirdparty/ko_tables/": (("MIT", HANGUL_TO_IPA),),
+    "scriptconv/phonemizers/_thirdparty/shami/": (("Apache-2.0", None),),
+    "scriptconv/phonemizers/_thirdparty/vosk_g2p.py": (("Apache-2.0", None),),
+    "scriptconv/phonemizers/_thirdparty/zh_num.py": (("Apache-2.0", None),),
+    "scriptconv/phonemizers/_vendored/matoub_kab/": (("Apache-2.0", MATOUB),),
 }
 
 # The text of a restricted licence, in any file.
@@ -89,20 +106,20 @@ def test_the_metadata_declares_the_licence_expression(wheel):
 
 
 def test_every_vendored_file_declares_a_permissive_licence(wheel):
-    notices = {notice for _, notice in THIRD_PARTY.values()}
+    notices = {notice for licences in THIRD_PARTY.values() for _, notice in licences}
     vendored = [n for n in wheel.namelist()
                 if n.startswith(VENDORED) and n not in FIRST_PARTY and n not in notices]
     assert vendored
     assert [n for n in vendored if _third_party(n) is None] == []
-    assert {_third_party(n)[0] for n in vendored} <= PERMISSIVE
+    assert {licence for n in vendored for licence, _ in _third_party(n)} <= PERMISSIVE
 
 
 def test_the_wheel_carries_each_third_party_notice(wheel):
     licences = f"{_dist_info(wheel)}/licenses/"
-    for licence, notice in THIRD_PARTY.values():
+    for licence, notice in (pair for licences in THIRD_PARTY.values() for pair in licences):
         if notice is not None:
             text = _text(wheel, licences + notice)
-            assert ("MIT License" if licence == "MIT" else "Apache-2.0") in text, notice
+            assert any(name in text for name in NOTICE_TEXT[licence]), notice
 
 
 def test_no_file_holds_a_restricted_licence(wheel):

@@ -1,0 +1,130 @@
+# Endings of web addresses and file names, and how to say them. Edit freely.
+#
+# Columns (two or more spaces): the ending without its dot, then
+#   word      said as a word:        example.com -> "example dot com"
+#   letters   read letter by letter: notes.txt   -> "notes dot T X T"
+#
+# A name with a listed ending is always read as a file or an address. An
+# ending that is not listed is read letter by letter as well, but only when
+# the name shows in another way that it is a file (an underscore or a slash),
+# so that a missing space, "the end.Then", is never taken for a file name.
+# Short common words ("it", "in", "me", "us") are left out on purpose.
+
+# web addresses
+com       word
+org       word
+net       word
+gov       word
+info      word
+biz       word
+app       word
+dev       word
+co        word
+edu       letters
+io        letters
+ai        letters
+sh        letters
+ly        letters
+tv        letters
+fm        letters
+gg        letters
+xyz       letters
+uk        letters
+eu        letters
+de        letters
+fr        letters
+es        letters
+nl        letters
+se        letters
+ch        letters
+ca        letters
+au        letters
+jp        letters
+cn        letters
+ru        letters
+br        letters
+
+# documents and data
+pdf       letters
+txt       letters
+csv       letters
+tsv       letters
+doc       word
+docx      letters
+xls       letters
+xlsx      letters
+ppt       letters
+pptx      letters
+odt       letters
+rtf       letters
+tex       letters
+md        letters
+epub      word
+json      word
+yaml      word
+yml       letters
+toml      word
+xml       letters
+html      letters
+htm       letters
+sql       letters
+log       word
+conf      word
+cfg       letters
+ini       letters
+env       letters
+lock      word
+
+# pictures, sound, video
+png       letters
+jpg       letters
+jpeg      word
+gif       word
+svg       letters
+bmp       letters
+tiff      word
+psd       letters
+webp      letters
+heic      letters
+mp3       letters
+mp4       letters
+m4a       letters
+wav       word
+flac      word
+midi      word
+mpeg      word
+mov       letters
+avi       letters
+mkv       letters
+webm      letters
+
+# programs and archives
+exe       letters
+dll       letters
+apk       letters
+dmg       letters
+iso       letters
+zip       word
+tar       word
+gz        letters
+tgz       letters
+rar       letters
+jar       letters
+bin       word
+bat       word
+bak       letters
+tmp       letters
+py        letters
+js        letters
+ts        letters
+jsx       letters
+tsx       letters
+css       letters
+rb        letters
+rs        letters
+cpp       letters
+php       letters
+java      word
+swift     word
+kt        letters
+ipynb     letters

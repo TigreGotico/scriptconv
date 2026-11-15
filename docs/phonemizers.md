@@ -225,6 +225,83 @@ air-gapped host. (`en.py`'s DeepPhonemizer backend similarly fetches its own
 model via the `dp` package, that fetch is DeepPhonemizer's, not scriptconv's,
 but the net effect for a caller is the same, no local path required.)
 
+## dizione, American English
+
+`Phonemizer.DIZIONE` reads American English text into IPA. The engine is
+[dizione](https://github.com/n4ze3m/dizione), Apache-2.0. Its code is vendored
+byte for byte under `scriptconv/phonemizers/_thirdparty/dizione/`, with its
+licence and the upstream commit in `UPSTREAM.md`. dizione looks words up in a
+dictionary built from CMUdict. It picks the reading of a homograph from the
+words around it, and a small model guesses the words that the dictionary does
+not have. Its own text rules read numbers, dates, money, units and
+abbreviations.
+
+```python
+from scriptconv.phonemizers.dizione import DizionePhonemizer
+
+dz = DizionePhonemizer()
+dz.phonemize_string("You read it yesterday.", "en-US")  # 'juː ɹˈɛd ɪt jˈɛstɚdˌeɪ'
+dz.phonemize_string("It costs $12.", "en-US")  # 'ɪt kˈɔsts twˈɛlv dˈɑːlɚz'
+```
+
+The built data (the dictionary, the alignment table, the model and the
+homograph weights, 5.4 MB) ships in the wheel, in `_thirdparty/dizione/built/`,
+the folder where dizione itself looks for it. The files are byte-identical
+copies of the folder `phonemizer/` of `n4ze3m/tiny-voca` at revision
+`e5f9b116`, and `DATA_DIR` names the folder. The backend needs no download and
+works offline. Pass `data_dir=` to read another build from a directory. The
+backend never reads the `DIZIONE_DATA` environment variable. The dictionary,
+alignment table and model come from CMUdict (`LicenseRef-CMUdict`, in
+`built/LICENSE.cmudict`). The homograph weights come from the Wikipedia
+Homograph Data (Apache-2.0, in `built/LICENSE.homograph-data`), and most of
+their pronunciations come from CMUdict.
+
+dizione reads the text itself, so the backend owns the `normalize` stage,
+and the frontend runs no normaliser before it. The backend's own methods and
+`tokens()` read the text whole. `phonemize_lazy` ends a sentence where dizione
+does, at `.`, `?` or `!`, and a full stop that dizione reads as part of an
+abbreviation, as in `Mrs.`, ends no sentence. `TextFrontend.phonemize_flat`
+also gives the text whole.
+
+The IPA string has a space between two words and a stress mark directly
+before its vowel, as dizione writes it. It has no control symbol (`<bos>`,
+`<eos>`, `<pad>`, `<sp>`) and no punctuation, because `.` is the IPA syllable
+break. A TTS engine that reads dizione's token ids needs more than the IPA
+string, so `DizionePhonemizer.tokens(text)` returns dizione's own
+`Phonemized` object unchanged: the symbols, the ids into
+`dizione.symbols.SYMBOLS` and the stress of each symbol (0, 1 or 2).
+`identity(lang)` puts dizione's build fingerprint in `revision`, so tokens
+from two builds of code, tables or data never mix. When overrides take effect,
+from `overrides=` or from `DIZIONE_OVERRIDES`, `revision` is the sha256 of
+the fingerprint and of the overrides.
+
+`overrides=` takes pronunciations that win over every other source, in
+CMUdict notation or as phones with stress marks:
+`DizionePhonemizer(overrides={"kubernetes": "k ˌuː b ɚ n ˈɛ ɾ iː z"})`. A
+phone outside dizione's inventory raises `ValueError`.
+
+Limits:
+
+- `TextFrontend.phonemize` splits the text into sentences with quebra_frases
+  before the backend reads it, so dizione reads each piece alone. When
+  quebra_frases takes the full stop of an abbreviation as a sentence end, the
+  words after it lose their context. `Prof. Close the door.` reads "close" as
+  the verb (`klˈoʊz`), `Jan. 1, 2000` reads "one" and not "first", and
+  `See p. 12.` reads the letter "p" and not "page". `tokens()`, the backend's
+  own methods and `TextFrontend.phonemize_flat` read these texts whole and
+  give `klˈoʊs`, `fˈɜːst` and `pˈeɪdʒ`.
+- dizione reads American English only. A tag must resolve to `en-US`, or to
+  a lect of it such as `en-US-x-nyc`. A bare `en` is British English by the
+  default-region rule, so it is refused with `UnsupportedLanguageError`, like
+  `en-GB` and every other region.
+- dizione also reads the overrides file named by the environment variable
+  `DIZIONE_OVERRIDES`, in every instance. Unset it to get only the overrides
+  that you pass.
+- About one unknown word in three that the model guesses has an error, and
+  foreign names have the most.
+- `keep_punctuation` has no effect: the IPA string has no punctuation, and
+  `tokens()` has all of it.
+
 ## Backends in scriptconv-copyleft and scriptconv-nonfree
 
 A wrapper moves out of scriptconv when its own code or a dependency of its
@@ -418,7 +495,7 @@ fold map. The two front ends share no state, so one process can use both.
 
 Multilingual: espeak (subprocess with espyak fallback), gruut, goruut,
 epitran, transphone, ByT5/Charsiu (ONNX), the misaki family (en/ja/zh/ko/vi).
-Per-language: English (DeepPhonemizer, OpenPhonemizer, g2p_en), Japanese
+Per-language: English (DeepPhonemizer, OpenPhonemizer, g2p_en, dizione), Japanese
 (OpenJTalk, cutlet, pykakasi), Korean (g2pk, KoG2P), Chinese (jieba, g2pM,
 xpinyin, pypinyin), Arabic (arbtok, mantoq), Hebrew (phonikud), Persian,
 Vietnamese (viphoneme, Python below 3.12 only), Portuguese (tugaphone), Galician

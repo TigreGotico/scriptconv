@@ -1,0 +1,76 @@
+# Units written after a number: abbreviation, singular, plural.
+# Columns separated by two or more spaces. Letter case is ignored, except for
+# the units marked "exact" in a fourth column: those are read only in the
+# letter case written here ("5 m" is five meters, "5 M" and "5G" are not units).
+
+km      kilometer            kilometers
+kg      kilogram             kilograms
+cm      centimeter           centimeters
+mm      millimeter           millimeters
+ml      milliliter           milliliters
+mg      milligram            milligrams
+kb      kilobyte             kilobytes
+mb      megabyte             megabytes
+gb      gigabyte             gigabytes
+tb      terabyte             terabytes
+hz      hertz                hertz
+khz     kilohertz            kilohertz
+mhz     megahertz            megahertz
+ghz     gigahertz            gigahertz
+kw      kilowatt             kilowatts
+kwh     kilowatt hour        kilowatt hours
+lb      pound                pounds
+lbs     pound                pounds
+oz      ounce                ounces
+ft      foot                 feet
+mi      mile                 miles
+min     minute               minutes
+mins    minute               minutes
+hr      hour                 hours
+hrs     hour                 hours
+sec     second               seconds
+secs    second               seconds
+ms      millisecond          milliseconds
+mph     mile per hour        miles per hour
+kph     kilometer per hour   kilometers per hour
+km/h    kilometer per hour   kilometers per hour
+°c      degree Celsius       degrees Celsius
+°f      degree Fahrenheit    degrees Fahrenheit
+°       degree               degrees
+m/s     meter per second     meters per second
+yd      yard                 yards
+nm      nanometer            nanometers
+μm      micrometer           micrometers
+μg      microgram            micrograms
+mcg     microgram            micrograms
+mah     milliamp hour        milliamp hours
+hp      horsepower           horsepower
+tsp     teaspoon             teaspoons
+tbsp    tablespoon           tablespoons
+db      decibel              decibels
+kcal    kilocalorie          kilocalories
+px      pixel                pixels
+rpm     revolution per minute    revolutions per minute
+bpm     beat per minute      beats per minute
+fps     frame per second     frames per second
+mpg     mile per gallon      miles per gallon
+psi     pound per square inch    pounds per square inch
+kbps    kilobit per second   kilobits per second
+mbps    megabit per second   megabits per second
+gbps    gigabit per second   gigabits per second
+yr      year                 years
+yrs     year                 years
+wk      week                 weeks
+wks     week                 weeks
+
+# one letter, or easily taken for something else: only in this letter case
+m       meter                meters               exact
+g       gram                 grams                exact
+l       liter                liters               exact
+L       liter                liters               exact
+h       hour                 hours                exact
+V       volt                 volts                exact
+W       watt                 watts                exact
+MW      megawatt             megawatts            exact
+p       penny                pence                exact
+ha      hectare              hectares             exact

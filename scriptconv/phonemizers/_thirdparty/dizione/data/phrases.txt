@@ -1,0 +1,63 @@
+# Function-word groups spoken as one unit: no word boundary inside, and often
+# a weaker form than the words have alone ("for the", "of a", "would have").
+#
+# Written by hand. Which pairs are joined follows the tokens the TTS model was
+# trained on, so that the common cases look the same to it; switch the table
+# off (join_phrases=False) to keep a boundary token between all words.
+#
+# Columns (two or more spaces): words, class, form, final form. Classes as in
+# function_words.txt; p = stress exactly as written. A final "the" or "to"
+# still takes its form before a vowel (ð ɪ, t ʊ). A form written with "|"
+# keeps the word boundaries and only fixes the stress of the pair.
+
+of the          u    ʌ v ð ə
+in the          u    ɪ n ð ə
+on the          u    ɔ n ð ə
+for the         u    f ɚ ð ə
+from the        u    f ɹ ʌ m ð ə
+with the        u    w ɪ ð ð ə
+that the        u    ð æ t ð ə
+was the         u    w ʌ z ð ə
+of a            u    ə v ə
+of an           u    ə v ə n
+for a           u    f ɚ ɹ ə
+for an          u    f ɚ ɹ ə n
+at a            u    æ ɾ ə
+was a           u    w ʌ z ɐ
+to be           uf   t ə b i              t ə b ˈiː
+had to          u    h æ d t ə
+i am            u    aɪ ɐ m
+i shall         ss   aɪ ʃ ˌɐ l
+we shall        ss   w iː ʃ ˌɐ l
+had been        u    h ɐ d b ɪ n
+have been       u    h ɐ v b ɪ n
+has been        p    h ˈæ z b iː n
+would have      u    w ʊ d h ɐ v
+could have      ss   k ˌʊ d ɐ v
+should have     ss   ʃ ˌʊ d ə v
+might have      ss   m ˌaɪ t h ɐ v
+must have       p    m ˈʌ s t ɐ v
+did not         s    d ɪ d n ˌɑː t
+do not          s    d uː n ˌɑː t
+does not        s    d ʌ z n ˌɑː t
+have not        s    h ɐ v n ˌɑː t
+there was       s    ð ɛɹ w ˌʌ z
+there were      s    ð ɛɹ w ˌɜː
+there are       ss   ð ɛ ɹ ˌɑːɹ
+out of          ss   ˌaʊ ɾ ə v
+at once         p    ɐ t w ˈʌ n s
+no one          p    n ˈoʊ w ˈʌ n
+that one        p    ð ˈæ t w ˌʌ n
+this one        p    ð ˈɪ s w ˌʌ n
+that it         ss   ð ˌɐ ɾ ɪ t
+that a          ss   ð ˌæ ɾ ə
+not a           ss   n ˌɑː ɾ ə
+not have        ss   n ˌɑː ɾ ɐ v
+of which        p    ʌ v w ˈɪ tʃ
+in which        ss   ɪ n w ˌɪ tʃ
+
+# stress of a pair, boundary kept
+so much         p    s ˈoʊ | m ˌʌ tʃ
+so far          p    s ˈoʊ | f ˌɑːɹ
+too much        p    t ˈuː | m ʌ tʃ
+no longer       p    n ˌoʊ | l ˈɔ ŋ ɡ ɚ

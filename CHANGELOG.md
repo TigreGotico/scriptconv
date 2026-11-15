@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a99](https://github.com/TigreGotico/scriptconv/tree/0.0.4a99) (2026-11-15)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a98...0.0.4a99)
+
+**Merged pull requests:**
+
+- feat: add the dizione English phonemizer [\#269](https://github.com/TigreGotico/scriptconv/pull/269) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a98](https://github.com/TigreGotico/scriptconv/tree/0.0.4a98) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a97...0.0.4a98)
@@ -387,10 +395,6 @@
 ## [0.0.4a48](https://github.com/TigreGotico/scriptconv/tree/0.0.4a48) (2026-11-10)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a47...0.0.4a48)
-
-**Merged pull requests:**
-
-- fix: route European Portuguese lects to bifonia through linguatag [\#165](https://github.com/TigreGotico/scriptconv/pull/165) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a47](https://github.com/TigreGotico/scriptconv/tree/0.0.4a47) (2026-11-09)
 
