@@ -271,6 +271,8 @@ class TestInlineBlocks:
         ("Olá [[x]], b.", str.upper),
         # an empty block is no word, so the comma still has a space after it
         ("Olá [[x]],[[]] b.", None),
+        # a closing bracket is no word, so the comma after it ends the block clause
+        ("Olá [[x]]), b.", None),
     ])
     def test_the_mark_reads_as_in_plain_text(self, text, casing):
         kept = TextFrontend(FrontendConfig("pt", Phonemizer.GRAPHEMES, keep_punctuation=True,
@@ -278,7 +280,15 @@ class TestInlineBlocks:
         assert kept.phonemize(text) == [list("olá x, "), list("b.")]
         assert kept.phonemize_flat(text) == list("olá x, b.")
 
-    def test_the_stages_read_the_mark_only_when_one_can_follow_the_block(self):
+    @pytest.mark.parametrize("text, lazy, flat", [
+        ("Olá [[x]] sim. [[y]], b.",
+         ["Olá ", " sim.", "a, b.", ", b."], ["Olá ", " sim. ", "a, b.", ", b."]),
+        # a digit gives the clause a word, as a letter does
+        ("Olá [[x]] 2 gatos, b.", ["Olá ", " 2 gatos, b."], ["Olá ", " 2 gatos, b."]),
+        # no text after the block gives no mark
+        ("Olá [[x]]", ["Olá "], ["Olá "]),
+    ])
+    def test_the_stages_read_the_mark_only_when_one_can_follow_the_block(self, text, lazy, flat):
         read = []
 
         def casing(text):
@@ -286,11 +296,11 @@ class TestInlineBlocks:
             return text
         kept = TextFrontend(FrontendConfig("pt", Phonemizer.GRAPHEMES, keep_punctuation=True,
                                            stages=Stages(diacritize=False, casing=casing)))
-        kept.phonemize("Olá [[x]] sim. [[y]], b.")
-        assert read == ["Olá ", " sim.", "a, b.", ", b."]
+        kept.phonemize(text)
+        assert read == lazy
         read.clear()
-        kept.phonemize_flat("Olá [[x]] sim. [[y]], b.")
-        assert read == ["Olá ", " sim. ", "a, b.", ", b."]
+        kept.phonemize_flat(text)
+        assert read == flat
 
     @pytest.mark.parametrize("override", ["phonemize_lazy", "phonemize_to_list"])
     def test_a_backend_with_its_own_output_gets_no_mark(self, override):
