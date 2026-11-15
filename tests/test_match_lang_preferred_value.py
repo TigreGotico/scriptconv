@@ -10,7 +10,6 @@ import unittest
 from linguatag import lang_distance
 
 from scriptconv.phonemizers import BasePhonemizer
-from scriptconv.phonemizers.mul import TransphonePhonemizer
 
 
 class TestPreferredValueTie(unittest.TestCase):
@@ -31,12 +30,6 @@ class TestPreferredValueTie(unittest.TestCase):
             with self.subTest(pool=pool):
                 self.assertEqual(BasePhonemizer.match_lang("apc-SY", pool), "apc")
                 self.assertEqual(BasePhonemizer.match_lang("ajp-JO", pool), "ajp")
-
-    def test_transphone_language_list(self):
-        self.assertIn("ajp", TransphonePhonemizer.TRANSPHONE_LANGS)
-        self.assertIn("enm", TransphonePhonemizer.TRANSPHONE_LANGS)
-        self.assertEqual(TransphonePhonemizer.get_lang("apc-SY"), "apc")
-        self.assertEqual(TransphonePhonemizer.get_lang("yol-IE"), "yol")
 
 
 if __name__ == "__main__":

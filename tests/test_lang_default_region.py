@@ -6,8 +6,7 @@ spoken: ``en`` is British English and ``pt`` is European Portuguese.
 import unittest
 
 from scriptconv.phonemizers import BasePhonemizer
-from scriptconv.phonemizers.mul import (CharsiuPhonemizer, EspeakPhonemizer, GoruutPhonemizer,
-                                        MisakiEnPhonemizer, TransphonePhonemizer)
+from scriptconv.phonemizers.mul import CharsiuPhonemizer, GoruutPhonemizer
 from scriptconv.phonemizers.pt import TugaphonePhonemizer
 
 
@@ -31,12 +30,6 @@ class TestMatchLangDefaultRegion(unittest.TestCase):
 class TestPhonemizerDefaultRegion(unittest.TestCase):
     def test_tugaphone_bare_pt_is_european(self):
         self.assertEqual(TugaphonePhonemizer.get_lang("pt"), "pt-PT")
-
-    def test_misaki_bare_en_is_british(self):
-        self.assertEqual(MisakiEnPhonemizer.get_lang("en"), "en-GB")
-
-    def test_espeak_bare_en_is_british(self):
-        self.assertEqual(EspeakPhonemizer.get_lang("en"), "en-gb")
 
 
 class TestHongKongCantonese(unittest.TestCase):
@@ -62,23 +55,6 @@ class TestHongKongCantonese(unittest.TestCase):
         for tag in self.TAGS:
             with self.subTest(tag=tag):
                 self.assertEqual(GoruutPhonemizer.get_lang(tag), cantonese)
-
-    def test_transphone(self):
-        self.assertIn("yue", TransphonePhonemizer.TRANSPHONE_LANGS)
-        for tag in self.TAGS:
-            with self.subTest(tag=tag):
-                self.assertEqual(TransphonePhonemizer.get_lang(tag), "yue")
-
-    def test_espeak(self):
-        self.assertIn("yue", EspeakPhonemizer.ESPEAK_LANGS)
-        for tag in ["zh-HK", "zh-MO", "zh-Hant-HK", "zh-Hant-MO", "yue-HK"]:
-            with self.subTest(tag=tag):
-                self.assertEqual(EspeakPhonemizer.get_lang(tag), "yue")
-
-    def test_taiwan_stays_mandarin(self):
-        for tag in ["zh-TW", "zh-Hant", "zh-Hant-TW"]:
-            with self.subTest(tag=tag):
-                self.assertEqual(EspeakPhonemizer.get_lang(tag), "cmn")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,3 @@
-import sys
-import unicodedata
 import unittest
 
 from scriptconv.phonemizers import Phonemizer, get_phonemizer_class
@@ -20,52 +18,6 @@ class TestVendoredKorean(unittest.TestCase):
         self.assertTrue(os.path.isfile(os.path.join(tables, "ipa.csv")))
 
 
-class TestG2PKOnPython313(unittest.TestCase):
-    """scriptconv[ko] installs g2pk only below Python 3.13, because
-    python-mecab-ko has wheels up to CPython 3.12 only. On 3.13 and later,
-    pip builds python-mecab-ko from its sdist, which needs mecab-config
-    from an installed MeCab-ko."""
-
-    def _message(self, version_info):
-        from unittest.mock import patch
-        from scriptconv.phonemizers.ko import G2PKPhonemizer
-        with patch.dict(sys.modules, {"g2pk": None}), \
-                patch.object(sys, "version_info", version_info):
-            with self.assertRaises(ImportError) as ctx:
-                G2PKPhonemizer()
-        return str(ctx.exception)
-
-    def test_313_says_to_install_mecab_ko_first_not_the_extra(self):
-        message = self._message((3, 13, 0, "final", 0))
-        self.assertIn("mecab-config", message)
-        self.assertIn("'pip install g2pk'", message)
-        self.assertNotIn("Python 3.12 or older", message)
-        self.assertNotIn("scriptconv[ko]", message)
-
-    def test_312_names_the_extra(self):
-        self.assertIn("scriptconv[ko]", self._message((3, 12, 0, "final", 0)))
-
-
-class TestMisakiKoreanAlphabet(unittest.TestCase):
-    """misaki's KOG2P writes the pronunciation in Hangul, not IPA.
-
-    Wikipedia, "Korean phonology", revision 1374882945, section "Consonant
-    assimilation": a velar stop becomes [ŋ] before a nasal stop, and
-    한국말 is pronounced 한궁말. KOG2P writes conjoining jamo, which is the
-    NFD form of the Hangul syllables.
-    """
-
-    def test_ipa_is_refused(self):
-        with self.assertRaises(ValueError):
-            get_phonemizer(Phonemizer.MISAKI_KO, Alphabet.IPA)
-
-    @unittest.skipIf(sys.version_info >= (3, 13), "misaki declares Requires-Python <3.13")
-    def test_output_is_the_pronunciation_in_hangul(self):
-        from scriptconv.phonemizers.mul import MisakiKoPhonemizer
-        p = MisakiKoPhonemizer()
-        self.assertEqual(p.alphabet, Alphabet.HANGUL)
-        self.assertEqual(p.phonemize_string("한국말", "ko"),
-                         unicodedata.normalize("NFD", "한궁말"))
 
 
 class TestVendoredChinese(unittest.TestCase):
@@ -500,18 +452,6 @@ class TestShamiFrontend(unittest.TestCase):
 
 
 class TestLicensingStubs(unittest.TestCase):
-    def test_mantoq_wrapper_constructs_from_vendored_copy(self):
-        cls = get_phonemizer_class(Phonemizer.MANTOQ)
-        p = cls()
-        out = p.phonemize_string("مرحبا", "ar")
-        self.assertTrue(out)
-        self.assertNotIn("_", out)
-
-    def test_kog2p_wrapper_constructs_from_vendored_copy(self):
-        cls = get_phonemizer_class(Phonemizer.KOG2PK)
-        p = cls()
-        self.assertTrue(callable(p.g2p))
-
     def test_encumbered_licenses_only_inside_quarantine(self):
         import pathlib, re
         root = pathlib.Path("scriptconv")
@@ -524,12 +464,6 @@ class TestLicensingStubs(unittest.TestCase):
                          r"|creativecommons\.org/licenses/by-nc", head):
                 offenders.append(str(f))
         self.assertEqual(offenders, [])
-
-    def test_quarantine_carries_license_notices(self):
-        import pathlib
-        base = pathlib.Path("scriptconv/phonemizers/_vendored")
-        self.assertTrue((base / "mantoq" / "LICENSE.md").is_file())
-        self.assertTrue((base / "kog2p" / "LICENSE.md").is_file())
 
     def test_quarantine_not_imported_at_package_import(self):
         import subprocess, sys

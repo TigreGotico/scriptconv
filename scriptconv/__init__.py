@@ -20,7 +20,9 @@ translit:
     Hiragana ↔ Katakana).
 readings:
     Dictionary-backed respelling (Japanese kanji → kana via the ``ja``
-    extra; Chinese hanzi → pinyin/bopomofo via the ``zh`` extra).
+    extra; Chinese hanzi → pinyin/bopomofo via the ``zh`` extra).  The
+    Japanese names (``tokens``, ``to_hiragana``, ``to_katakana``,
+    ``ReadingToken``) are in scriptconv-copyleft and import on first use.
 cangjie:
     Hanzi → Cangjie5 input codes (shape decomposition, vendored table).
 graph:
@@ -78,11 +80,8 @@ from scriptconv.translit import (
     hira_to_kana,
     kana_to_hira,
 )
+from scriptconv import readings as _readings
 from scriptconv.readings import (
-    ReadingToken,
-    tokens,
-    to_hiragana,
-    to_katakana,
     to_pinyin,
     to_bopomofo,
 )
@@ -148,11 +147,6 @@ __all__ = [
     "decompose_hangul",
     "hira_to_kana",
     "kana_to_hira",
-    # readings (dictionary-backed, needs scriptconv[ja])
-    "ReadingToken",
-    "tokens",
-    "to_hiragana",
-    "to_katakana",
     # conventions (orthographic decorations, orthogonal to script identity)
     "Convention",
     "Transition",
@@ -174,3 +168,10 @@ __all__ = [
     "to_pinyin",
     "to_bopomofo",
 ]
+
+
+def __getattr__(name: str):
+    # the Japanese readings import from scriptconv-copyleft on first use
+    if name in _readings._JAPANESE:
+        return getattr(_readings, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

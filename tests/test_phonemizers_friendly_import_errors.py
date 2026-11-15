@@ -16,6 +16,9 @@ statement raise ``ImportError`` regardless of whether the package is
 actually installed) and asserts the resulting exception is an
 ``ImportError`` whose message contains an install instruction. No optional
 backend needs to be installed to run this, and nothing is skipped.
+
+The wrappers in scriptconv-copyleft and scriptconv-nonfree carry the same
+test in their own package.
 """
 import sys
 import unittest
@@ -33,11 +36,6 @@ def _trigger_gruut(cls):
     list(p._text_to_phonemes("hi", "en"))
 
 
-def _trigger_misaki_en(cls):
-    p = cls()
-    p._get_phonemizer("en-US")
-
-
 def _trigger_jieba(cls):
     p = cls()
     p.phonemize_string("你好", "zh")
@@ -46,21 +44,15 @@ def _trigger_jieba(cls):
 # member -> (module name to blank out in sys.modules, how to trigger the
 # lazy import that consumes it)
 CASES = {
-    Phonemizer.MISAKI: ("misaki", _trigger_misaki_en),
-    Phonemizer.MISAKI_EN: ("misaki", _trigger_misaki_en),
     Phonemizer.GRUUT: ("gruut", _trigger_gruut),
     Phonemizer.GORUUT: ("pygoruut", _trigger_construct),
     Phonemizer.EPITRAN: ("epitran", _trigger_construct),
     Phonemizer.PHONETISAURUS: ("phonetisaurus", _trigger_construct),
-    Phonemizer.TRANSPHONE: ("transphone", _trigger_construct),
     Phonemizer.DEEPPHONEMIZER: ("dp", _trigger_construct),
     Phonemizer.OPENPHONEMIZER: ("openphonemizer", _trigger_construct),
     Phonemizer.G2PEN: ("nltk", _trigger_construct),
     Phonemizer.TUGAPHONE: ("tugaphone", _trigger_construct),
     Phonemizer.CUTLET: ("cutlet", _trigger_construct),
-    Phonemizer.PYKAKASI: ("pykakasi", _trigger_construct),
-    Phonemizer.VIPHONEME: ("viphoneme", _trigger_construct),
-    Phonemizer.G2PK: ("g2pk", _trigger_construct),
     Phonemizer.JIEBA: ("jieba", _trigger_jieba),
 }
 
@@ -69,7 +61,7 @@ class TestLazyBackendImportsAreFriendly(unittest.TestCase):
     def test_all_documented_backends_covered(self):
         # keeps this test list honest if a new Phonemizer member is added
         # backed by one of the wrapper modules touched by this convention
-        self.assertEqual(len(CASES), 16)
+        self.assertEqual(len(CASES), 10)
 
     def _assert_friendly(self, member):
         module_name, trigger = CASES[member]
@@ -80,12 +72,6 @@ class TestLazyBackendImportsAreFriendly(unittest.TestCase):
         msg = str(ctx.exception)
         self.assertIn("pip install", msg, member)
 
-    def test_misaki(self):
-        self._assert_friendly(Phonemizer.MISAKI)
-
-    def test_misaki_en(self):
-        self._assert_friendly(Phonemizer.MISAKI_EN)
-
     def test_gruut(self):
         self._assert_friendly(Phonemizer.GRUUT)
 
@@ -94,9 +80,6 @@ class TestLazyBackendImportsAreFriendly(unittest.TestCase):
 
     def test_epitran(self):
         self._assert_friendly(Phonemizer.EPITRAN)
-
-    def test_transphone(self):
-        self._assert_friendly(Phonemizer.TRANSPHONE)
 
     def test_phonetisaurus(self):
         self._assert_friendly(Phonemizer.PHONETISAURUS)
@@ -115,20 +98,6 @@ class TestLazyBackendImportsAreFriendly(unittest.TestCase):
 
     def test_cutlet(self):
         self._assert_friendly(Phonemizer.CUTLET)
-
-    def test_pykakasi(self):
-        self._assert_friendly(Phonemizer.PYKAKASI)
-
-    def test_viphoneme(self):
-        # Python 3.12 and later gives the reason instead of an install command.
-        with patch("sys.version_info", (3, 11, 9)):
-            self._assert_friendly(Phonemizer.VIPHONEME)
-
-    def test_g2pk(self):
-        # Below Python 3.13 the message names scriptconv[ko]. The 3.13
-        # message is checked in test_phonemizers_cjk_ar.py.
-        with patch("sys.version_info", (3, 12, 9)):
-            self._assert_friendly(Phonemizer.G2PK)
 
     def test_jieba(self):
         self._assert_friendly(Phonemizer.JIEBA)

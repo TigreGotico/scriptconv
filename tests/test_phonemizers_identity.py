@@ -3,18 +3,14 @@ import dataclasses
 import hashlib
 import logging
 import re
-import sys
 import tomllib
 from importlib import metadata
 from pathlib import Path
-from unittest import mock
 
-import espyak.version
 import orthography2ipa
 import pytest
 import tugaphone.version
 from orthography2ipa.exceptions import EngineSourceUnavailable
-from packaging.requirements import Requirement
 
 from scriptconv.phonemizers import (
     BasePhonemizer,
@@ -27,18 +23,14 @@ from scriptconv.phonemizers import (
     UnicodeCodepointPhonemizer,
     UnreadTextError,
     UnsupportedLanguageError,
+    get_phonemizer,
     get_phonemizer_class,
 )
-from scriptconv.phonemizers.africa import AfricaG2PPhonemizer
-from scriptconv.phonemizers.ar import MantoqPhonemizer
 from scriptconv.phonemizers.eu import EuskaphonePhonemizer
-from scriptconv.phonemizers.ghana import GhanaG2PPhonemizer
-from scriptconv.phonemizers.ko import G2PKPhonemizer
-from scriptconv.phonemizers.mul import EpitranPhonemizer, EspeakPhonemizer
+from scriptconv.phonemizers.mul import EpitranPhonemizer
 from scriptconv.phonemizers.o2ipa import Orthography2IPAPhonemizer
 from scriptconv.phonemizers.pt import TugaphonePhonemizer
 from scriptconv.phonemizers.registry import PHONEMIZER_REGISTRY
-from scriptconv.phonemizers.vi import VIPhonemePhonemizer
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -49,8 +41,9 @@ OWNED = {
     Phonemizer.ARBTOK: {"diacritize"},
 }
 
-# Code inside scriptconv, vendored or written here. Everything else names the
-# distribution that its extra installs.
+# Code written or vendored in scriptconv, scriptconv-copyleft or
+# scriptconv-nonfree. Everything else names the distribution that its extra
+# installs.
 IN_TREE = {
     Phonemizer.UNICODE, Phonemizer.GRAPHEMES, Phonemizer.AFRICA_G2P,
     Phonemizer.MATOUB_KAB, Phonemizer.MANTOQ, Phonemizer.HALABI, Phonemizer.IQRA,
@@ -68,8 +61,6 @@ class TestErrors:
             BasePhonemizer.match_lang("fi", ["pt-PT"])
 
     @pytest.mark.parametrize("resolve, lang", [
-        (AfricaG2PPhonemizer.get_lang, "zzz"),
-        (GhanaG2PPhonemizer.get_lang, "zzz"),
         (EuskaphonePhonemizer.get_lang, "pt"),
         (Orthography2IPAPhonemizer.get_lang, "zzz"),
         (EpitranPhonemizer.get_lang, "ja"),
@@ -143,12 +134,16 @@ class TestIdentity:
             backend="tugaphone", distribution="tugaphone",
             version=tugaphone.version.__version__, lang="pt-PT-x-porto", revision=None)
 
-    def test_vendored_code_reports_the_scriptconv_version(self):
-        from scriptconv import version
-        identity = MantoqPhonemizer().identity("ar")
+    @pytest.mark.parametrize("member, lang, distribution", [
+        (Phonemizer.MANTOQ, "ar", "scriptconv-nonfree"),
+        (Phonemizer.AFRICA_G2P, "yor", "scriptconv-nonfree"),
+        (Phonemizer.KOG2PK, "ko", "scriptconv-copyleft"),
+    ])
+    def test_code_vendored_in_a_sister_package_reports_that_package(self, member, lang,
+                                                                     distribution):
+        identity = get_phonemizer(member).identity(lang)
         assert (identity.backend, identity.distribution, identity.version) == \
-            ("mantoq", "scriptconv", metadata.version("scriptconv"))
-        assert identity.version == version.VERSION_STR
+            (member.value, distribution, metadata.version(distribution))
 
     @pytest.mark.parametrize("phonemizer", [GraphemePhonemizer(), UnicodeCodepointPhonemizer()])
     def test_a_backend_with_no_get_lang_keeps_the_language_it_was_given(self, phonemizer):
@@ -168,40 +163,6 @@ class TestIdentity:
             def phonemize_string(self, text, lang):
                 return text
         assert Custom().identity("pt").backend == "Custom"
-
-    # g2pk needs python-mecab-ko, which has no Python 3.13 wheel and needs
-    # mecab-config to build, so the test extra installs g2pk below 3.13 only.
-    @pytest.mark.skipif(sys.version_info >= (3, 13),
-                        reason="python-mecab-ko has no Python 3.13 wheel")
-    def test_g2pk_reports_the_installed_engine(self):
-        assert G2PKPhonemizer().identity("ko") == PhonemizerIdentity(
-            backend="g2pk", distribution="g2pk", version=metadata.version("g2pk"), lang="ko")
-
-    def test_espeak_reports_the_binary_version(self):
-        banner = "eSpeak NG text-to-speech: 1.52.0  Data at: /usr/share/espeak-ng-data\n"
-        with mock.patch.object(EspeakPhonemizer, "_has_binary", return_value=True), \
-                mock.patch.object(EspeakPhonemizer, "_run_espeak_command", return_value=banner):
-            identity = EspeakPhonemizer().identity("pt")
-        assert (identity.distribution, identity.version) == ("espeak-ng", "1.52.0")
-
-    def test_espeak_without_the_binary_reports_the_port(self):
-        with mock.patch.object(EspeakPhonemizer, "_has_binary", return_value=False):
-            identity = EspeakPhonemizer().identity("pt")
-        assert (identity.distribution, identity.version) == ("espyak", espyak.version.VERSION_STR)
-
-    def test_a_preferred_port_that_is_missing_reports_the_binary(self):
-        banner = "eSpeak NG text-to-speech: 1.52.0  Data at: /usr/share/espeak-ng-data"
-        missing = metadata.PackageNotFoundError("espyak")
-        with mock.patch.object(EspeakPhonemizer, "_has_binary", return_value=True), \
-                mock.patch.object(EspeakPhonemizer, "_run_espeak_command", return_value=banner), \
-                mock.patch("scriptconv.phonemizers.mul.metadata.version", side_effect=missing):
-            identity = EspeakPhonemizer(prefer_espyak=True).identity("pt")
-        assert (identity.distribution, identity.version) == ("espeak-ng", "1.52.0")
-
-    def test_the_espyak_port_reports_itself(self):
-        identity = EspeakPhonemizer(prefer_espyak=True).identity("pt")
-        assert (identity.backend, identity.distribution, identity.version) == \
-            ("espeak", "espyak", espyak.version.VERSION_STR)
 
 
 class TestOrthography2IPARevision:
@@ -254,30 +215,6 @@ class TestOrthography2IPARevision:
         assert current.differs_from(upgraded) == ()
 
 
-class TestVietnameseNeedsAnOlderPython:
-    def test_the_error_gives_the_reason(self, monkeypatch):
-        monkeypatch.setitem(sys.modules, "viphoneme", None)
-        monkeypatch.setattr(sys, "version_info", (3, 12, 0))
-        with pytest.raises(ImportError) as refused:
-            VIPhonemePhonemizer()
-        assert "below 3.12" in str(refused.value) and "imp" in str(refused.value)
-        assert "scriptconv[vi]" not in str(refused.value)
-
-    def test_a_python_that_can_load_it_is_told_to_install_it(self, monkeypatch):
-        monkeypatch.setitem(sys.modules, "viphoneme", None)
-        monkeypatch.setattr(sys, "version_info", (3, 11, 9))
-        with pytest.raises(ImportError, match=r"scriptconv\[vi\]"):
-            VIPhonemePhonemizer()
-
-    @pytest.mark.parametrize("python, installed", [("3.11", True), ("3.12", False), ("3.13", False)])
-    def test_the_extra_installs_the_engine_only_where_it_loads(self, python, installed):
-        project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
-        engine = [Requirement(dep) for dep in project["optional-dependencies"]["vi"]
-                  if not dep.startswith("scriptconv")]
-        assert {dep.name for dep in engine} == {"viphoneme", "vinorm", "underthesea", "eng_to_ipa"}
-        assert [dep.marker.evaluate({"python_version": python}) for dep in engine] == \
-            [installed] * len(engine)
-
 
 class TestDeclarations:
     @pytest.mark.parametrize("member", list(Phonemizer))
@@ -290,10 +227,15 @@ class TestDeclarations:
         if member in OUTSIDE_THE_EXTRAS:
             assert declared == OUTSIDE_THE_EXTRAS[member]
             return
-        extra = PHONEMIZER_REGISTRY[member][2]
+        module, _, extra = PHONEMIZER_REGISTRY[member]
         pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
         wanted = {re.split(r"[\[<>=;~ ]", d, maxsplit=1)[0].lower().replace("_", "-")
                   for d in pyproject["project"]["optional-dependencies"][extra]}
+        package = module.partition(".")[0]
+        if package != "scriptconv":
+            # the sister package declares the engine in its own extra
+            assert package.replace("_", "-") in wanted
+            return
         assert declared.lower().replace("_", "-") in wanted
 
     @pytest.mark.parametrize("member", sorted(IN_TREE, key=lambda m: m.value))

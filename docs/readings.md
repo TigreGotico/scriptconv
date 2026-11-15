@@ -16,6 +16,10 @@ install command rather than silently returning unconverted text.
 
 ## Japanese, kanji → kana (`pip install scriptconv[ja]`)
 
+The Japanese functions wrap pykakasi, which is GPL-3.0-or-later, so they are
+in the scriptconv-copyleft package. The `ja` extra installs it, and the names
+below import from it on first use.
+
 ```python
 from scriptconv import to_hiragana, to_katakana
 

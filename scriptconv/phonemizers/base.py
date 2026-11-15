@@ -231,6 +231,12 @@ def _check_alphabet(phonemizer, alphabet: Alphabet,
             f"{[Alphabet(a).value for a in supported]}")
 
 
+# The packages that hold the wrappers under a copyleft or a non-commercial
+# licence. Code vendored there reports the package, not scriptconv.
+_SISTER_DISTRIBUTIONS = {"scriptconv_copyleft": "scriptconv-copyleft",
+                         "scriptconv_nonfree": "scriptconv-nonfree"}
+
+
 class BasePhonemizer(metaclass=abc.ABCMeta):
     keep_punctuation: bool = False
     """Keep clause punctuation (``, . ? ! : ;``) in the phoneme output.
@@ -269,8 +275,10 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
 
     engine_distribution: ClassVar[Optional[str]] = None
     """The distribution that holds the engine. ``None`` means code inside
-    scriptconv. It is declared, because the module of a wrapper class names
-    scriptconv and not the engine that produced the phonemes."""
+    scriptconv, or inside the scriptconv-copyleft or scriptconv-nonfree
+    package that holds the wrapper. It is declared, because the module of a
+    wrapper class names scriptconv and not the engine that produced the
+    phonemes."""
 
     def __init__(self, alphabet: Alphabet = Alphabet.UNICODE,
                  normalizer: Optional[Callable[[str, str], str]] = None):
@@ -448,9 +456,12 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
 
     def _engine_release(self) -> Tuple[str, str]:
         """The distribution that produced the phonemes, and its version."""
-        if self.engine_distribution is None:
-            return "scriptconv", VERSION_STR
-        return self.engine_distribution, metadata.version(self.engine_distribution)
+        if self.engine_distribution is not None:
+            return self.engine_distribution, metadata.version(self.engine_distribution)
+        sister = _SISTER_DISTRIBUTIONS.get(type(self).__module__.partition(".")[0])
+        if sister is not None:
+            return sister, metadata.version(sister)
+        return "scriptconv", VERSION_STR
 
     def identity(self, lang: str) -> PhonemizerIdentity:
         """What phonemizes *lang* here: the engine, its version and the lect.
