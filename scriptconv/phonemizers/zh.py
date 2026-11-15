@@ -1,3 +1,33 @@
+"""Chinese phonemizers: Jieba segmentation, and pinyin backends with IPA output.
+
+The erhua suffix follows Wikipedia, "Standard Chinese phonology", revision
+1384691172. The section "Rhotic coda" says: "Standard Chinese features
+syllables that end with a rhotic coda /ɚ/." Of its second case it says: "In
+syllables in which the rhotic coda is added as a suffix to another morpheme.
+This suffix is represented by the character 儿 […] and in pinyin as r. The
+suffix combines with the final sound of the syllable, and regular but complex
+sound changes occur as a result (described in detail under erhua)." The
+section "Syllables" gives the coda as "one of [n, ŋ, ɚ̯, i̯, u̯]".
+
+So when g2pM reads 儿 after a syllable as ``r5``, that token is the coda ɚ̯
+of the syllable before it, and not a syllable of its own. The coda goes before
+the tone mark, where the output writes the other vocalic codas (爱 ai̯↘, 后
+xou̯↘), and after a nasal coda, which follows the tone mark. The sound changes
+to the rest of the final are not applied. A Latin ``r`` that a backend passes
+through is not pinyin and gives no IPA. A backend that writes the suffix as
+``er`` gives the same token as the independent morpheme 儿 ér, so that suffix
+reads as a full syllable.
+
+g2pM joins its tokens with ``|`` and splits them on ``|``, unless
+``char_split`` is set. So a ``|`` in the text gives no token, and the alignment
+of tokens to characters steps over it. A 儿 after a ``|`` does not follow a
+syllable, so it gets no coda. g2pM also writes a reading of one letter with no
+``|`` around it, so that reading joins the tokens next to it, and the token of
+each character is not known. Its dictionary reads A, P, Q and T as one letter,
+and with ``tone=False`` g2pM reads a, e, o, m and the suffix r as one letter.
+So when the text holds A, P, Q or T, or when ``tone`` is off, no suffix gets
+the coda: it logs a warning, or raises in strict mode.
+"""
 import abc
 import logging
 import re
@@ -16,6 +46,15 @@ LOG = logging.getLogger(__name__)
 # g2pc and g2pM write ü as "u:", as CC-CEDICT does, and xpinyin writes "nue".
 # pinyin_to_ipa reads "ü" and "v", and rejects "u:" and "nue".
 _NUE_LUE = re.compile(r"^([nl])u(?=[eēéěè])")
+
+# The erhua suffix as g2pM spells it, with or without the tone number
+_ERHUA_SUFFIX = re.compile(r"r[1-5]?")
+# The tone mark at the end of a syllable in the IPA output
+_FINAL_TONE = re.compile(r"[˥˦˧˨˩→↗↓↘]*$")
+
+
+class _ErhuaSuffix(str):
+    """A pinyin token ``r`` that g2pM read from the character 儿."""
 
 
 def _standard_pinyin(syllable: str) -> str:
@@ -142,8 +181,10 @@ class BaseChinesePinyinPhonemizer(BasePhonemizer):
         Converts a list of pinyin syllables to IPA.
 
         A token with no letters or digits, such as punctuation, is kept as it
-        is. A syllable that is not pinyin gives no IPA: it logs a warning, or
-        raises :class:`UnreadTextError` when :attr:`strict` is set.
+        is. An erhua suffix that the backend read from 儿 gives the coda ɚ̯ of
+        the syllable before it. A syllable that is not pinyin gives no IPA: it
+        logs a warning, or raises :class:`UnreadTextError` when :attr:`strict`
+        is set.
 
         Args:
             phones (List[str]): List of pinyin syllables or phrases.
@@ -155,6 +196,12 @@ class BaseChinesePinyinPhonemizer(BasePhonemizer):
         for p in phones:
             if p == " ":
                 ipa_phones.append(" ")
+                continue
+            if isinstance(p, _ErhuaSuffix):
+                host = ipa_phones[-1]
+                tone = _FINAL_TONE.search(host).start()
+                ipa_phones[-1] = host[:tone] + "ɚ̯" + host[tone:]
+                ipa_phones.append("")
                 continue
             pho_str = ""
             for sp in p.split():  # G2P might return phrases with multiple syllables
@@ -281,6 +328,8 @@ class G2pMPhonemizer(BaseChinesePinyinPhonemizer):
                 "`pip install scriptconv[zh-phonemizers]`"
             ) from None
         self.g2p = G2pM()
+        self._one_letter = frozenset(char for char, readings in self.g2p.cedict.items()
+                                     if any(len(reading) == 1 for reading in readings))
         self.tone = tone
         self.char_split = char_split
         super().__init__(alphabet, jieba)
@@ -295,7 +344,32 @@ class G2pMPhonemizer(BaseChinesePinyinPhonemizer):
         Returns:
             List[str]: Pinyin tokens.
         """
-        return self.g2p(text, tone=self.tone, char_split=self.char_split)
+        tokens = self.g2p(text, tone=self.tone, char_split=self.char_split)
+        # g2pM writes a reading of one letter with no "|" around it, so it joins
+        # that reading to the tokens next to it. Readings of one letter come
+        # from the characters in _one_letter, and from many more without tones.
+        if not self.tone or not self._one_letter.isdisjoint(text):
+            return tokens
+        # Each other reading is one token. g2pM joins the characters that it
+        # does not read and that follow each other into one token, so a token
+        # that does not start the rest of the text was read from the character
+        # at pos. Unless char_split is set, g2pM joins its tokens with "|" and
+        # splits them on "|": a "|" in the text gives no token, and it gives an
+        # empty token where it follows a reading.
+        pos, after_syllable = 0, False
+        for i, token in enumerate(tokens):
+            while not self.char_split and text.startswith("|", pos):
+                pos += 1
+                after_syllable = False
+            if text.startswith(token, pos):
+                pos += len(token)
+                after_syllable = False
+                continue
+            if after_syllable and text[pos] == "儿" and _ERHUA_SUFFIX.fullmatch(token):
+                tokens[i] = _ErhuaSuffix(token)
+            pos += 1
+            after_syllable = True
+        return tokens
 
 
 class XpinyinPhonemizer(BaseChinesePinyinPhonemizer):

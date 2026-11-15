@@ -200,6 +200,151 @@ class TestPinyinUmlaut(unittest.TestCase):
         self.assertEqual(p.phonemize_string("二", "zh"), "aɚ̯↘")
 
 
+class TestErhua(unittest.TestCase):
+    """The erhua suffix 儿 and the independent morpheme 儿 ér.
+
+    Wikipedia, "Standard Chinese phonology", revision 1384691172, section
+    "Rhotic coda": the suffix is written "in pinyin as r" and "combines with
+    the final sound of the syllable". The section "Syllables" writes that coda
+    as ɚ̯, a vocalic coda, so it goes before the tone mark as i̯ and u̯ do in
+    the output. The independent morpheme ér is [aɚ̯] in China. Initials and
+    finals come from the consonant table and the five vowel table: n [n],
+    -a [a], d [t], -ou [ou̯], q [tɕʰ], -ü [y], -e [ɤ], z [ts], -i after z [ɹ̩],
+    which retone writes ɨ, w [w], -an [an], -en [ən], b [p], f [f], -u [u],
+    j [tɕ], -ia [ja], -eng [əŋ], x [ɕ], -iang [jaŋ], -i [i]. Retone writes the
+    high tone →, the dipping tone ↓, the falling tone ↘, the rising tone ↗, and
+    nothing for the neutral tone. A Latin r in the text is not pinyin.
+    """
+
+    BACKENDS = ("PypinyinPhonemizer", "XpinyinPhonemizer", "G2pMPhonemizer")
+
+    def _phonemizer(self, name):
+        from scriptconv.phonemizers import zh
+        return getattr(zh, name)(alphabet=Alphabet.IPA, jieba=False)
+
+    def test_g2pm_suffix_ends_the_syllable_before(self):
+        # g2pM: 哪儿 na3 r5, 逗趣儿 dou4 qu4 r5, 哪儿呢？ na3 r5 ne5 ？
+        from scriptconv.phonemizers.zh import G2pMPhonemizer
+        p = G2pMPhonemizer(alphabet=Alphabet.IPA, jieba=False)
+        for text, expected in (("哪儿", "naɚ̯↓"), ("逗趣儿", "tou̯↘tɕʰyɚ̯↘"),
+                               ("哪儿呢？", "naɚ̯↓nɤ？")):
+            with self.subTest(text=text):
+                self.assertEqual(p.phonemize_string(text, "zh"), expected)
+
+    def test_g2pm_suffix_in_strict_mode(self):
+        from scriptconv.phonemizers.zh import G2pMPhonemizer
+        p = G2pMPhonemizer(alphabet=Alphabet.IPA, jieba=False)
+        p.strict = True
+        self.assertEqual(p.phonemize_string("哪儿", "zh"), "naɚ̯↓")
+
+    def test_g2pm_pinyin_output_keeps_the_token(self):
+        from scriptconv.phonemizers.zh import G2pMPhonemizer
+        p = G2pMPhonemizer(alphabet=Alphabet.PINYIN, jieba=False)
+        self.assertEqual(p.phonemize_to_list("哪儿", "zh"), ["na3", "r5"])
+
+    def test_latin_r_raises_in_strict_mode(self):
+        from scriptconv.phonemizers import UnreadTextError
+        for name in self.BACKENDS:
+            p = self._phonemizer(name)
+            p.strict = True
+            with self.subTest(backend=name):
+                with self.assertRaises(UnreadTextError) as ctx:
+                    p.phonemize_string("我用r写代码", "zh")
+                self.assertEqual(ctx.exception.unread, ("r",))
+
+    def test_latin_r_with_a_digit_gives_no_ipa(self):
+        # 相 is xiàng in pypinyin and g2pM here, and xiang1 in xpinyin
+        xiang = {"PypinyinPhonemizer": "ɕja↘ŋ", "XpinyinPhonemizer": "ɕja→ŋ",
+                 "G2pMPhonemizer": "ɕja↘ŋ"}
+        for name in self.BACKENDS:
+            p = self._phonemizer(name)
+            with self.subTest(backend=name):
+                with self.assertLogs("scriptconv.phonemizers.zh", "WARNING") as logs:
+                    self.assertEqual(p.phonemize_string("版本r1发布", "zh"), "pa↓npə↓nfa→pu↘")
+                    self.assertEqual(p.phonemize_string("佳能r5相机", "zh"),
+                                     f"tɕja→nə↗ŋ{xiang[name]}tɕi→")
+                self.assertIn("'r1'", logs.output[0])
+                self.assertIn("'r5'", logs.output[1])
+
+    def test_latin_r_after_er_adds_no_coda(self):
+        # 玩儿r: wan2 er2 r in every backend; 哪儿r: g2pM na3 r5 r
+        for name in self.BACKENDS:
+            p = self._phonemizer(name)
+            with self.subTest(backend=name):
+                self.assertEqual(p.phonemize_string("玩儿r", "zh"), "wa↗naɚ̯↗")
+        g2pm = self._phonemizer("G2pMPhonemizer")
+        self.assertEqual(g2pm.phonemize_string("哪儿r", "zh"), "naɚ̯↓")
+
+    def test_independent_er_is_a_full_syllable(self):
+        # 儿子 érzi and 女儿 nǚ'ér; the backends give 子 different tones
+        from scriptconv.phonemizers.zh import (G2pMPhonemizer, PypinyinPhonemizer,
+                                               XpinyinPhonemizer)
+        cases = {PypinyinPhonemizer: "aɚ̯↗tsɨ", XpinyinPhonemizer: "aɚ̯↗tsɨ↓",
+                 G2pMPhonemizer: "aɚ̯↗tsɨ"}
+        for cls, erzi in cases.items():
+            p = cls(alphabet=Alphabet.IPA, jieba=False)
+            with self.subTest(backend=cls.__name__):
+                self.assertEqual(p.phonemize_string("儿子", "zh"), erzi)
+                self.assertEqual(p.phonemize_string("女儿", "zh"), "ny↓aɚ̯↗")
+
+    def _strict_g2pm(self, **kwargs):
+        from scriptconv.phonemizers.zh import G2pMPhonemizer
+        p = G2pMPhonemizer(alphabet=Alphabet.IPA, jieba=False, **kwargs)
+        p.strict = True
+        return p
+
+    def _assert_unread(self, p, text, unread):
+        from scriptconv.phonemizers import UnreadTextError
+        with self.subTest(text=text):
+            with self.assertRaises(UnreadTextError) as ctx:
+                p.phonemize_string(text, "zh")
+            self.assertEqual(ctx.exception.unread, (unread,))
+
+    def test_g2pm_pipe_gives_no_token(self):
+        # g2pM gives 标题|哪儿r biao1 ti2 '' na3 er2 r: the "|" has no token
+        p = self._strict_g2pm()
+        for text in ("标题|哪儿r", "选项A|选项B儿r", "女儿|儿r", "|哪儿r", "|儿r",
+                     "哪||儿儿r", "||儿儿r", "哪儿r|"):
+            self._assert_unread(p, text, "r")
+        self._assert_unread(p, "哪|儿r5", "r5")
+        self.assertEqual(p.phonemize_string("哪儿|", "zh"), "naɚ̯↓")
+        self.assertEqual(p.phonemize_string("哪儿||", "zh"), "naɚ̯↓")
+
+    def test_g2pm_char_split_keeps_the_pipe_token(self):
+        from scriptconv.phonemizers.zh import G2pMPhonemizer
+        pinyin = G2pMPhonemizer(alphabet=Alphabet.PINYIN, jieba=False, char_split=True)
+        self.assertEqual(pinyin.phonemize_to_list("哪|儿", "zh"), ["na3", "|", "er2"])
+        p = self._strict_g2pm(char_split=True)
+        self.assertEqual(p.phonemize_string("哪|儿", "zh"), "na↓|aɚ̯↗")
+        self._assert_unread(p, "标题|哪儿r", "r")
+
+    def test_g2pm_one_letter_reading_gives_no_coda(self):
+        # g2pM reads A as "a" and joins it to the characters next to it: xA儿r
+        # gives xa er2 r, and A 哪儿 gives "a " na3 r5. With tone=False it reads
+        # 饿 as "e": x饿儿r gives xe er r, and 哪儿 gives na r
+        p = self._strict_g2pm()
+        self._assert_unread(p, "xA儿r", "r")
+        self._assert_unread(p, "A 哪儿", "r5")
+        toneless = self._strict_g2pm(tone=False)
+        self._assert_unread(toneless, "x饿儿r", "r")
+        self._assert_unread(toneless, "哪儿", "r")
+
+    def test_g2pm_suffix_after_no_syllable_gives_no_coda(self):
+        # g2pM reads the 儿 of 逗趣 儿呢 after the space as r5
+        self._assert_unread(self._strict_g2pm(), "逗趣 儿呢", "r5")
+
+    def test_g2pm_r_reading_of_another_character_gives_no_coda(self):
+        # The g2pM model picks a class from all its readings, r5 included, for
+        # each character that has more than one reading, such as 了
+        import numpy as np
+        from unittest.mock import patch
+        p = self._strict_g2pm()
+        r5 = next(idx for idx, reading in p.g2p.idx2class.items() if reading == "r5")
+        with patch.object(p.g2p, "predict", lambda inputs, target_idx: np.full(len(target_idx), r5)):
+            self.assertEqual(p.g2p("你了"), ["ni3", "r5"])
+            self._assert_unread(p, "你了", "r5")
+
+
 class TestPinyinUnreadSyllable(unittest.TestCase):
     """A syllable that is not pinyin gives no IPA. It warns, or raises in strict mode."""
 
