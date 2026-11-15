@@ -6,12 +6,17 @@ without requiring the hams-tts package at runtime.
 
 from .frontend import TextFrontend, Utterance, get_default_frontend
 from .phoneme_inventory import (
+    Inventory,
     Lang,
     SYMBOL_TO_ID,
     ID_TO_SYMBOL,
     VOCAB_SIZE,
+    SYMBOL_TO_ID_90,
+    ID_TO_SYMBOL_90,
+    VOCAB_SIZE_90,
     encode,
     decode,
+    get_inventory,
     tokenize_ipa,
 )
 
@@ -19,10 +24,15 @@ __all__ = [
     "TextFrontend",
     "Utterance",
     "get_default_frontend",
+    "get_inventory",
+    "Inventory",
     "Lang",
     "SYMBOL_TO_ID",
     "ID_TO_SYMBOL",
     "VOCAB_SIZE",
+    "SYMBOL_TO_ID_90",
+    "ID_TO_SYMBOL_90",
+    "VOCAB_SIZE_90",
     "encode",
     "decode",
     "tokenize_ipa",
