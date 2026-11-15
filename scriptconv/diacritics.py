@@ -3,9 +3,10 @@
 This module OWNS diacritization — lang→backend routing, lazy/cached backend
 loading (phonikud, text2tashkeel, stressonnx, bifonia), and the overlay-strip
 helpers. :mod:`scriptconv.phonemizers` (``BasePhonemizer`` and subclasses)
-knows nothing about diacritics: phonemization (orthography → sound) and
-diacritization (a text → text graph transform disambiguating pronunciation
-before G2P) are separate concerns.
+runs no diacritizer: phonemization (orthography → sound) and diacritization
+(a text → text graph transform disambiguating pronunciation before G2P) are
+separate concerns. A backend only removes, through
+:func:`replace_stress_mark`, a stress mark that it does not read.
 
 Diacritization (Arabic tashkeel, Hebrew niqqud, East-Slavic/Turkic/Caucasian
 word stress, European-Portuguese homograph sense marks) is, architecturally,
@@ -79,6 +80,7 @@ Georgian letter of that kind:
   Latvian letter, so strip removes the acute.
 """
 import os
+import re
 import tempfile
 import unicodedata
 import urllib.request
@@ -86,7 +88,7 @@ from pathlib import Path
 from typing import Optional
 
 from scriptconv.graph import Edge
-from scriptconv.phonemizers.base import _primary_subtag
+from scriptconv.phonemizers.base import STRESS_MARK, _primary_subtag
 
 #: The lang-contextual node produced by diacritization.  Like ``"text"`` it is
 #: meaningful only with ``lang=`` context and exists only in opted-in graphs.
@@ -402,6 +404,11 @@ def _sense_diacritics_pt(text: str, lang: str) -> str:
     return add_extra_diacritics(text, lang)
 
 
+# The prefix separator that phonikud writes after a Hebrew letter and its marks
+# (phonikud_onnx PREFIX_CHAR, phonikud lexicon PREFIX_DIACRITIC).
+_PREFIX_SEPARATOR = re.compile(r"(?<=[\u0591-\u05f4])\|")
+
+
 def diacritize(text: str, lang: str = "und", diacritizer_model=None,
                waqf: Optional[bool] = None, **kwargs) -> str:
     """Add pronunciation-disambiguating diacritics to *text* for *lang*.
@@ -413,7 +420,9 @@ def diacritize(text: str, lang: str = "und", diacritizer_model=None,
     - Hebrew (``he``) — niqqud via phonikud; ``diacritizer_model`` is the
       phonikud ONNX path (or a zero-arg callable). Optional: when omitted the
       small public phonikud model is auto-downloaded and cached
-      (``$SCRIPTCONV_CACHE``/``$XDG_CACHE_HOME``).
+      (``$SCRIPTCONV_CACHE``/``$XDG_CACHE_HOME``). phonikud writes ``|``
+      after a prefix letter (``שֶׁ|אֵינָם``); the returned text has no such
+      ``|``, because a phonemizer that splits text at ``|`` would cut the word.
     - Arabic (``ar``, every individual Arabic language such as ``arz`` or
       ``apc``, and Hassaniyya ``mey``, in Arabic script) — tashkeel via
       text2tashkeel (``[tashkeel]``); ``diacritizer_model`` is the
@@ -441,7 +450,7 @@ def diacritize(text: str, lang: str = "und", diacritizer_model=None,
                          or kwargs.get("model"))
     family = _diacritizer_family(lang)
     if family == "he":
-        return _phonikud(diacritizer_model).add_diacritics(text)
+        return _PREFIX_SEPARATOR.sub("", _phonikud(diacritizer_model).add_diacritics(text))
     if family == "ar":
         return _tashkeel(diacritizer_model, waqf=bool(waqf)).diacritize(text)
     if family == "stress":
@@ -533,6 +542,38 @@ def strip_diacritics(text: str, lang: str = "und", **_) -> str:
         if composed in native:
             kept[-1] = composed
     return "".join(kept)
+
+
+def replace_stress_mark(text: str, lang: str, before: str = "", after: str = "") -> str:
+    """*text* with each stress mark (U+0301) of a ``STRESS_LANGS`` language rewritten.
+
+    The letter that carries the mark gets *before* in front of it and *after*
+    behind it, in place of the mark, so with neither the mark is removed. A
+    mark after a character that is not a letter is removed. A mark that
+    composes with the letter before it into a letter of the language's
+    alphabet, as in NFD ѓ and ќ, stays as written. The combining grave
+    (U+0300) stays. In any other language an acute is spelling, so *text* is
+    returned unchanged.
+    """
+    primary = _primary_subtag(lang)
+    if primary not in STRESS_LANGS or STRESS_MARK not in text:
+        return text
+    native = _NATIVE_ACCENTED_LETTERS.get(primary, frozenset())
+    out = []
+    letter = None  # where in out the last letter starts
+    for c in text:
+        if c != STRESS_MARK:
+            if not unicodedata.combining(c):
+                letter = len(out) if c.isalpha() else None
+            out.append(c)
+            continue
+        if out and unicodedata.normalize("NFC", out[-1] + c) in native:
+            out.append(c)
+        elif letter is not None:
+            out.insert(letter, before)
+            letter += 1
+            out.append(after)
+    return "".join(out)
 
 
 def register(graph) -> None:
