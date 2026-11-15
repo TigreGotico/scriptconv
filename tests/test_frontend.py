@@ -188,7 +188,7 @@ class TestInlineBlocks:
     def test_an_empty_block_leaves_one_space(self, keep):
         frontend = TextFrontend(FrontendConfig("pt", Phonemizer.GRAPHEMES, keep_punctuation=keep,
                                                stages=Stages(diacritize=False)))
-        assert frontend.phonemize("ab [[]] cd") == [list("ab "), list("cd")]
+        assert frontend.phonemize("ab [[]] cd") == [list("ab cd")]
         assert frontend.phonemize_flat("ab [[]] cd") == list("ab cd")
 
     def test_a_block_after_a_pause_mark_takes_its_space(self):
@@ -217,8 +217,8 @@ class TestInlineBlocks:
         (True, "Espera [[a]]... vamos.", ["espera a", "vamos."], "espera a vamos."),
         (False, "Um [[x]]. Dois; três.", ["um x", "dois", "três"], "um x dois três"),
         (False, "Olá, [[ana]], tudo bem?", ["olá ana", "tudo bem"], "olá ana tudo bem"),
-        # an empty block ends no clause, so it takes no mark
-        (True, "ab [[]]. cd", ["ab ", "cd"], "ab cd"),
+        # an empty block reads as no text, so the full stop ends the clause of "ab"
+        (True, "ab [[]]. cd", ["ab.", "cd"], "ab.cd"),
         # the comma ends the clause of the word after the block, so it stays with that word
         (True, "Olá [[ˈana]]s, tudo bem?", ["olá ˈana", "s, tudo bem?"], "olá ˈana s, tudo bem?"),
         # a mark with a block directly after it ends no clause
@@ -257,6 +257,8 @@ class TestInlineBlocks:
         # a pause mark takes its space all the same
         ("Olá [[x]], ... sim.", "Olá x, ... sim."),
         ("Olá [[x]]:", "Olá x:"),
+        # a mark directly before the block joins it, and the space before the mark stays
+        ("Sim .[[x]] vem.", "Sim .x vem."),
     ])
     def test_a_mark_after_a_block_reads_as_after_a_plain_word(self, text, plain):
         kept = TextFrontend(FrontendConfig("fr", Phonemizer.GRAPHEMES, keep_punctuation=True,

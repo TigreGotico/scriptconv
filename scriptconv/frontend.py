@@ -30,11 +30,8 @@ differences stay:
   only digits to nothing without a normaliser.
 - A block gives one space symbol for a run of whitespace, but the unicode
   backend copies each tab and space.
-- A mark directly before a block gives no symbol and no space. Plain text
-  reads ``!`` or ``?`` between two words as a space, and it keeps a space
-  that comes before the mark.
-- A mark directly after an empty block, as in ``ab [[]]. cd``, gives no
-  symbol, because the text after the block reads alone.
+- A mark directly before a block gives no symbol and no space, but plain
+  text reads ``!`` or ``?`` between two words as a space.
 """
 import copy
 import dataclasses
@@ -63,6 +60,9 @@ LOG = logging.getLogger(__name__)
 
 # The word that stands for a block when the frontend reads the mark after it.
 _BLOCK_WORD = "a"
+# Text that ends in whitespace and then only marks. The marks join the block
+# after them as they join a plain word, and the whitespace stays.
+_SPACE_BEFORE_BLOCK = re.compile(r"\s\W*$")
 
 # linguatag puts "ar" with any region, and each individual Arabic language in
 # Arabic script, at 5 or less from "ar". Those languages diacritize by default.
@@ -161,6 +161,22 @@ def _split_blocks(text: str) -> List[str]:
     return parts
 
 
+def _split_blocks_to_read(text: str) -> List[str]:
+    """*text* split as by :func:`_split_blocks`, with no empty block.
+
+    An empty block, or one of only whitespace, reads as no text, so the text
+    on its two sides joins into one piece.
+    """
+    parts = _split_blocks(text)
+    joined = parts[:1]
+    for block, after in zip(parts[1::2], parts[2::2]):
+        if block[2:-2].strip():
+            joined += [block, after]
+        else:
+            joined[-1] += after
+    return joined
+
+
 class TextFrontend:
     """Text to phonemes through the fixed stage order.
 
@@ -214,9 +230,9 @@ class TextFrontend:
         sentence that gives no phonemes is not yielded.
         """
         stages = self._resolve(stages)
-        parts = _split_blocks(text)
+        parts = _split_blocks_to_read(text)
         if len(parts) == 1:
-            yield from self._sentences(text, stages)
+            yield from self._sentences(parts[0], stages)
             return
         # A block can extend the sentence before it, so that sentence is held
         # until the next part is known.
@@ -249,7 +265,7 @@ class TextFrontend:
         after a sentence that ends in a clause symbol takes no space before it.
         """
         stages = self._resolve(stages)
-        parts = _split_blocks(text)
+        parts = _split_blocks_to_read(text)
         phonemes: List[str] = []
         ends_in_token = False
         for index, part in enumerate(parts):
@@ -331,52 +347,30 @@ class TextFrontend:
     def _add_block(self, phonemes: List[str], parts: List[str], index: int, stages: Stages) -> bool:
         """Append the symbols of the inline block at *index* of a split text to *phonemes*.
 
-        A space, tab or line break before the block in the text, or a space
-        after it, becomes a space symbol, unless *phonemes* is empty or
+        A space, tab or line break before the block in the text, also with
+        marks between it and the block, or a space after the block, becomes a
+        space symbol, unless *phonemes* is empty or
         already ends in a space. :meth:`_before_block` reads what comes before
         the block, and :meth:`_mark_after` reads the clause symbol after it. A
         block whose symbols end in a character that is also a clause symbol,
         with no clause symbol after it, takes a space before the next word,
-        because that character ends no sentence. An empty block holds no
-        word, so only the space and the clause symbol before it change, as
-        before the first word of the text after it. Returns whether *phonemes*
+        because that character ends no sentence. Returns whether *phonemes*
         ends in a clause symbol that joins the next sentence with no space.
         """
-        # The text before the block reaches back over empty blocks to the
-        # last block that holds symbols, or to the start, and the text after
-        # it reaches on to the next such block, or to the end.
-        start = index - 1
-        while start > 1 and not parts[start - 1][2:-2].strip():
-            start -= 2
-        end = index + 1
-        while end + 1 < len(parts) and not parts[end + 1][2:-2].strip():
-            end += 2
-        text = "".join(parts[start:index:2])
-        after = "".join(parts[index + 1:end + 1:2])
-        keeps = self.backend._keeps_punctuation()
+        text, after = parts[index - 1], parts[index + 1]
         symbols = parts[index][2:-2].strip()
-        spaced = text[-1:].isspace()
-        if not symbols:
-            if not (after.strip() or end + 1 < len(parts)):
-                return False
-            # An empty block reads as no text, so the next word is the first
-            # word of the text after it, or the next block.
-            spaced = spaced or after[:1].isspace()
-            text += re.match(r"\W*", after)[0]
-        before = self._before_block(phonemes, text, start > 1)
+        before = self._before_block(phonemes, text, index > 1)
         if before is False:
             phonemes.pop()
-        if spaced and phonemes and phonemes[-1] != " " and not before:
+        if _SPACE_BEFORE_BLOCK.search(text) and phonemes and phonemes[-1] != " " and not before:
             phonemes.append(" ")
-        if not symbols:
-            return keeps and bool(phonemes) and phonemes[-1] in _CLAUSE_TOKENS
         phonemes.extend(symbols)
-        mark = self._mark_after(after, end + 1 < len(parts), stages)
+        mark = self._mark_after(after, index + 2 < len(parts), stages)
         if mark:
             phonemes.extend(mark)
             return True
         if after.startswith(" ") or (
-                keeps and symbols[-1] in _CLAUSE_TOKENS
+                self.backend._keeps_punctuation() and symbols[-1] in _CLAUSE_TOKENS
                 and self.backend.remove_punctuation(after).strip()):
             if phonemes[-1] != " ":
                 phonemes.append(" ")
@@ -420,8 +414,7 @@ class TextFrontend:
         """How a block follows *phonemes* and the *text* before it, read as in the plain text.
 
         *text* reads with a plain word in place of the block, and in front of
-        it when *after_block*, for the block that holds symbols before it. An
-        empty block reads as no text.
+        it when *after_block*, for the block before it.
 
         ``True``: the block starts a sentence after one that ends in a clause
         symbol, so no space comes before it, by the rule of
