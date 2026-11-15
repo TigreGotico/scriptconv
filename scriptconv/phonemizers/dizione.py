@@ -5,9 +5,8 @@ text into phonemes. It looks words up in a dictionary built from CMUdict, picks
 the reading of a homograph from the words around it, guesses unknown words with
 a small model, and reads numbers, dates, money, units and abbreviations by its
 own text rules. Its code is vendored under
-:mod:`scriptconv.phonemizers._thirdparty.dizione`. Its built data (dictionary,
-model and homograph weights) is in the Hugging Face repository
-``TigreGotico/dizione-data``, pinned by revision.
+:mod:`scriptconv.phonemizers._thirdparty.dizione`, and its built data
+(dictionary, model and homograph weights) ships in ``built/`` beside it.
 
 dizione reads the text itself, so this backend owns the ``normalize`` stage and
 gets the text with its punctuation: ``"Dr. Patel paid $12.99"`` reaches the
@@ -30,44 +29,20 @@ from scriptconv.phonemizers._thirdparty.dizione.symbols import (
 from scriptconv.phonemizers.base import (
     BasePhonemizer,
     MissingLanguageError,
-    ModelUnavailableError,
     PhonemizerIdentity,
     UnsupportedLanguageError,
     _check_alphabet,
 )
 from scriptconv.phonemizers.enums import Alphabet
 
-__all__ = ["DizionePhonemizer", "Phonemized", "DATA_REPO", "DATA_REVISION"]
+__all__ = ["DizionePhonemizer", "Phonemized", "DATA_DIR"]
 
-DATA_REPO = "TigreGotico/dizione-data"
-"""The Hugging Face repository that holds dizione's built data."""
-DATA_REVISION = "pending-mirror"
-"""The commit of :data:`DATA_REPO` that this version of scriptconv reads."""
+DATA_DIR = Path(dizione.__file__).parent / "built"
+"""dizione's built data, shipped in the wheel: the files of ``phonemizer/`` of
+n4ze3m/tiny-voca at revision ``e5f9b11651a4db525fb207a56a91e4df2d1dd387``."""
 
 # The marks after which dizione's token stream starts a new sentence.
-_SENTENCE_MARKS = frozenset({".", "?", "!", "…"})
-
-
-def _fetch_data() -> Path:
-    """The local directory of :data:`DATA_REPO` at :data:`DATA_REVISION`.
-
-    Raises:
-        ImportError: If huggingface_hub is not installed.
-        ModelUnavailableError: If the data is not cached and cannot be fetched.
-    """
-    try:
-        from huggingface_hub import snapshot_download
-        from huggingface_hub.errors import LocalEntryNotFoundError
-    except ImportError:
-        raise ImportError(
-            "the dizione data download needs huggingface_hub — install with "
-            "`pip install scriptconv[en-phonemizers]`, or pass data_dir=") from None
-    try:
-        return Path(snapshot_download(DATA_REPO, revision=DATA_REVISION))
-    except LocalEntryNotFoundError as e:
-        raise ModelUnavailableError(
-            f"the dizione data {DATA_REPO}@{DATA_REVISION} is not cached and "
-            "cannot be fetched") from e
+_SENTENCE_MARKS = frozenset({".", "?", "!", "\u2026"})
 
 
 class DizionePhonemizer(BasePhonemizer):
@@ -83,9 +58,8 @@ class DizionePhonemizer(BasePhonemizer):
 
     Args:
         alphabet: must be :attr:`Alphabet.IPA`.
-        data_dir: a directory that holds dizione's built data. ``None`` fetches
-            :data:`DATA_REPO` at :data:`DATA_REVISION` into the Hugging Face
-            cache, or reads it from there.
+        data_dir: a directory that holds dizione's built data. ``None`` reads
+            the data that ships with scriptconv, :data:`DATA_DIR`.
         overrides: pronunciations that win over every other source, as
             dizione's ``Phonemizer(overrides=...)`` takes them: a mapping
             ``{word: pronunciation}``, a path to a table, or the text of a
@@ -100,7 +74,7 @@ class DizionePhonemizer(BasePhonemizer):
                  overrides: Optional[Union[Dict[str, str], str, Path]] = None):
         _check_alphabet(self, alphabet, [Alphabet.IPA])
         super().__init__(alphabet)
-        self.data_dir = Path(data_dir) if data_dir is not None else _fetch_data()
+        self.data_dir = Path(data_dir) if data_dir is not None else DATA_DIR
         self.engine = DizioneEngine(self.data_dir, overrides=overrides)
 
     @classmethod

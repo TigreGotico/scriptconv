@@ -7,12 +7,14 @@ name = "scriptconv"
 dynamic = ["version"]
 description = "The one stop for text conversion: a zero-dependency script & phoneme-notation core — ISO-15924 detection & metadata, IPA↔ARPABET/X-SAMPA/Lexique/Kirshenbaum/Cotovía/RFE, Buckwalter↔Arabic, Hangul→jamo, kana — with phonemizer integrations behind optional extras"
 readme = "README.md"
-license = "Apache-2.0 AND MIT"
+license = "Apache-2.0 AND MIT AND BSD-2-Clause"
 license-files = [
     "LICENSE",
     "scriptconv/data/LICENSE.cangjie5",
     "scriptconv/phonemizers/_thirdparty/LICENSE.hangul_to_ipa",
     "scriptconv/phonemizers/_thirdparty/dizione/LICENSE",
+    "scriptconv/phonemizers/_thirdparty/dizione/built/LICENSE.cmudict",
+    "scriptconv/phonemizers/_thirdparty/dizione/built/LICENSE.homograph-data",
     "scriptconv/phonemizers/_vendored/matoub_kab/LICENSE.md",
 ]
 requires-python = ">=3.11"
@@ -67,10 +69,10 @@ pt = ["scriptconv[phonemizers]", "bifonia>=0.3.0a1"]
 ja-phonemizers = ["scriptconv[phonemizers]", "pyopenjtalk", "cutlet", "unidic-lite", "scriptconv-copyleft[ja-phonemizers]>=0.1.0a1"]
 ko = ["scriptconv[phonemizers]", "scriptconv-copyleft[ko]>=0.1.0a1"]
 zh-phonemizers = ["scriptconv[phonemizers]", "jieba", "pypinyin>=0.50,<1", "xpinyin", "g2pM", "numpy", "pinyin_to_ipa"]
-en-phonemizers = ["scriptconv[phonemizers]", "g2p_en", "openphonemizer", "deep-phonemizer", "requests", "numpy>=1.24,<3", "huggingface_hub>=0.25"]
+en-phonemizers = ["scriptconv[phonemizers]", "g2p_en", "openphonemizer", "deep-phonemizer", "requests", "numpy>=1.24,<3"]
 ar-phonemizers = ["scriptconv[phonemizers]", "arbtok", "scriptconv-nonfree[ar-phonemizers]>=0.1.0a1"]
 shami = ["scriptconv[phonemizers]", "regex"]
-test = ["pytest", "pytest-timeout", "scriptconv-copyleft[espeak,ja]>=0.1.0a1", "scriptconv-nonfree[ar-phonemizers]>=0.1.0a1", "pypinyin>=0.50,<1", "pinyin_to_ipa", "xpinyin", "g2pM", "numpy", "quebra-frases", "linguatag[langcodes]>=0.2.3a1", "scriptconv[normalize]", "ovos-utils>=0.1.0", "regex", "bifonia>=0.3.0a1", "stressonnx>=0.0.3a2", "text2tashkeel>=0.2.0a1", "tugaphone>=1.2.0a1", "huggingface_hub>=0.25", "epitran>=1.26.1", "orthography2ipa>=7.123.0a2", "o2i-lexicons>=0.7.0a1", "euskaphone", "pygoruut", "packaging", "setuptools>=77.0", "tomli; python_version < '3.11'"]
+test = ["pytest", "pytest-timeout", "scriptconv-copyleft[espeak,ja]>=0.1.0a1", "scriptconv-nonfree[ar-phonemizers]>=0.1.0a1", "pypinyin>=0.50,<1", "pinyin_to_ipa", "xpinyin", "g2pM", "numpy", "quebra-frases", "linguatag[langcodes]>=0.2.3a1", "scriptconv[normalize]", "ovos-utils>=0.1.0", "regex", "bifonia>=0.3.0a1", "stressonnx>=0.0.3a2", "text2tashkeel>=0.2.0a1", "tugaphone>=1.2.0a1", "epitran>=1.26.1", "orthography2ipa>=7.123.0a2", "o2i-lexicons>=0.7.0a1", "euskaphone", "pygoruut", "packaging", "setuptools>=77.0", "tomli; python_version < '3.11'"]
 
 [project.urls]
 Homepage = "https://github.com/TigreGotico/scriptconv"
@@ -83,7 +85,7 @@ include = ["scriptconv*"]
 scriptconv = ["py.typed"]
 "scriptconv.data" = ["*.tsv.gz"]
 "scriptconv.phonemizers._thirdparty" = ["ko_tables/*.csv", "ko_tables/*.tsv"]
-"scriptconv.phonemizers._thirdparty.dizione" = ["data/*.txt", "UPSTREAM.md"]
+"scriptconv.phonemizers._thirdparty.dizione" = ["data/*.txt", "built/*", "UPSTREAM.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

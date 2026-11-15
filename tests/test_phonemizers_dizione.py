@@ -6,9 +6,7 @@ built from) and the ARPAbet table of dizione's ``convert.py``: ``CONSONANTS``
 and ``FULL_VOWELS``. Stress 1 writes ``ˈ`` and stress 2 writes ``ˌ`` directly
 before the vowel.
 """
-import os
-import subprocess
-import sys
+import hashlib
 
 import pytest
 
@@ -22,13 +20,12 @@ from scriptconv.phonemizers import (
 )
 from scriptconv.phonemizers._thirdparty import dizione
 from scriptconv.phonemizers._thirdparty.dizione.symbols import SYMBOL_TO_ID, Phonemized
-from scriptconv.phonemizers import dizione as wrapper
-from scriptconv.phonemizers.dizione import DizionePhonemizer
+from scriptconv.phonemizers.dizione import DATA_DIR, DizionePhonemizer
 
 
 @pytest.fixture(scope="module")
 def data_dir():
-    return wrapper._fetch_data()
+    return DATA_DIR
 
 
 @pytest.fixture(scope="module")
@@ -165,25 +162,30 @@ class TestConstruction:
         with pytest.raises(ValueError, match="ipa"):
             DizionePhonemizer(Alphabet.ARPA, data_dir=data_dir)
 
-    def test_no_data_dir_fetches_the_pinned_revision(self, monkeypatch, data_dir):
-        import huggingface_hub
-        calls = []
+    def test_no_data_dir_reads_the_data_in_the_package(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("DIZIONE_DATA", str(tmp_path))
+        phonemizer = DizionePhonemizer()
+        assert phonemizer.data_dir == DATA_DIR
+        assert phonemizer.phonemize_string("cat", "en-US") == "kˈæt"
 
-        def snapshot_download(repo_id, revision=None, **kwargs):
-            calls.append((repo_id, revision))
-            return str(data_dir)
-        monkeypatch.setattr(huggingface_hub, "snapshot_download", snapshot_download)
-        assert DizionePhonemizer().data_dir == data_dir
-        assert calls == [(wrapper.DATA_REPO, wrapper.DATA_REVISION)]
 
-    def test_offline_with_an_empty_cache_raises_model_unavailable(self, tmp_path):
-        env = {**os.environ, "HF_HOME": str(tmp_path), "HF_HUB_OFFLINE": "1"}
-        run = subprocess.run(
-            [sys.executable, "-c",
-             "from scriptconv.phonemizers import ModelUnavailableError\n"
-             "from scriptconv.phonemizers.dizione import DizionePhonemizer\n"
-             "try:\n    DizionePhonemizer()\n"
-             "except ModelUnavailableError as e:\n    print('unavailable:', e)\n"],
-            env=env, capture_output=True, text=True, timeout=120)
-        assert run.returncode == 0, run.stderr
-        assert run.stdout.startswith("unavailable: the dizione data TigreGotico/dizione-data@")
+# sha256 of the files of phonemizer/ of n4ze3m/tiny-voca at revision
+# e5f9b11651a4db525fb207a56a91e4df2d1dd387: the LFS sha256 that the Hub
+# records for g2p.npz, and the files themselves for the rest.
+BUILT = {
+    "LICENSE.cmudict": "bd4ce8e44170a5f9f481310ca85c51de3c4f851a65e679b40e603b143bd3542a",
+    "LICENSE.homograph-data": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "align.json": "864763dbd558a864950266b2c30627f1cad203e75062ee842ee63c653e823b75",
+    "g2p.json": "c518fd839ea0109c0b2b4f778c17506bf0d7653557b8b8c97a4c8dd9883d4432",
+    "g2p.npz": "eb3fd519ff00e72d850928d2fccb968adc36134bca2f3bda09de7e794c2ed01b",
+    "homographs.json": "9c3a96fcdf79fa27d1b3686dc6a507c37e4f754966928608ee9ddb617ba39192",
+    "lexicon.json": "4d67c1f94b86405a5b8766fb13b8cd92a1371204767dd709582a337e8e0ab334",
+    "lexicon.tsv": "3fc930345c6b3cabc533981c4b212fa309eec83913fcdbd42919338270d64b06",
+    "sources.json": "f4c54924d30a5bc0bc1e3d7b058adb924484b3fab8541bc8d8bcecfb028fdbad",
+}
+
+
+def test_the_package_holds_the_pinned_data():
+    found = {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+             for path in DATA_DIR.iterdir() if path.is_file()}
+    assert found == BUILT

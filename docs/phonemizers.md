@@ -245,15 +245,15 @@ dz.phonemize_string("It costs $12.", "en-US")  # 'ɪt kˈɔsts twˈɛlv dˈɑːl
 ```
 
 The built data (the dictionary, the alignment table, the model and the
-homograph weights, 5.4 MB) is not in the wheel. It is in the Hugging Face
-repository `TigreGotico/dizione-data`, a byte-identical copy of the folder
-`phonemizer/` of `n4ze3m/tiny-voca`. The constructor with no `data_dir`
-downloads the revision that `DATA_REVISION` pins into the shared Hugging Face
-cache, or reads it from there. Offline, with nothing cached, it raises
-`ModelUnavailableError`. Pass `data_dir=` to read the files from a directory.
-The dictionary and the model come from CMUdict (BSD-style licence, in
-`LICENSE.cmudict`). The homograph weights come from the Wikipedia Homograph
-Data (Apache-2.0).
+homograph weights, 5.4 MB) ships in the wheel, in `_thirdparty/dizione/built/`,
+the folder where dizione itself looks for it. The files are byte-identical
+copies of the folder `phonemizer/` of `n4ze3m/tiny-voca` at revision
+`e5f9b116`, and `DATA_DIR` names the folder. The backend needs no download and
+works offline. Pass `data_dir=` to read another build from a directory. The
+backend never reads the `DIZIONE_DATA` environment variable. The dictionary,
+alignment table and model come from CMUdict (BSD-2-Clause, in
+`built/LICENSE.cmudict`). The homograph weights come from the Wikipedia
+Homograph Data (Apache-2.0, in `built/LICENSE.homograph-data`).
 
 dizione reads the text itself, so the backend owns the `normalize` stage.
 The frontend gives it the text as written, with `Dr.` and `$12.99` intact.

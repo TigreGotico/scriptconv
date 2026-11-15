@@ -16,8 +16,12 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-EXPRESSION = "Apache-2.0 AND MIT"
-PERMISSIVE = {"Apache-2.0", "MIT"}
+EXPRESSION = "Apache-2.0 AND MIT AND BSD-2-Clause"
+PERMISSIVE = {"Apache-2.0", "MIT", "BSD-2-Clause"}
+# Text that each licence notice holds.
+NOTICE_TEXT = {"MIT": ("MIT License",),
+               "Apache-2.0": ("Apache-2.0", "Apache License, Version 2.0"),
+               "BSD-2-Clause": ("Redistribution and use in source and binary forms",)}
 
 # Every file in these directories is first-party or third-party code, and a
 # third-party file must be listed below with its licence.
@@ -33,9 +37,15 @@ CANGJIE5 = "scriptconv/data/LICENSE.cangjie5"
 HANGUL_TO_IPA = "scriptconv/phonemizers/_thirdparty/LICENSE.hangul_to_ipa"
 MATOUB = "scriptconv/phonemizers/_vendored/matoub_kab/LICENSE.md"
 DIZIONE = "scriptconv/phonemizers/_thirdparty/dizione/LICENSE"
-# path prefix -> (licence, the notice the wheel carries for it, if any)
+CMUDICT = "scriptconv/phonemizers/_thirdparty/dizione/built/LICENSE.cmudict"
+HOMOGRAPH_DATA = "scriptconv/phonemizers/_thirdparty/dizione/built/LICENSE.homograph-data"
+# path prefix -> (licence, the notice the wheel carries for it, if any). The
+# first prefix that matches a file gives its licence.
 THIRD_PARTY = {
     "scriptconv/data/cangjie5_tc.tsv.gz": ("MIT", CANGJIE5),
+    "scriptconv/phonemizers/_thirdparty/dizione/built/homographs.json": ("Apache-2.0", HOMOGRAPH_DATA),
+    "scriptconv/phonemizers/_thirdparty/dizione/built/sources.json": ("Apache-2.0", DIZIONE),
+    "scriptconv/phonemizers/_thirdparty/dizione/built/": ("BSD-2-Clause", CMUDICT),
     "scriptconv/phonemizers/_thirdparty/dizione/": ("Apache-2.0", DIZIONE),
     "scriptconv/phonemizers/_thirdparty/hangul2ipa.py": ("MIT", HANGUL_TO_IPA),
     "scriptconv/phonemizers/_thirdparty/ko_tables/": ("MIT", HANGUL_TO_IPA),
@@ -104,9 +114,7 @@ def test_the_wheel_carries_each_third_party_notice(wheel):
     for licence, notice in THIRD_PARTY.values():
         if notice is not None:
             text = _text(wheel, licences + notice)
-            names = (("MIT License",) if licence == "MIT"
-                     else ("Apache-2.0", "Apache License, Version 2.0"))
-            assert any(name in text for name in names), notice
+            assert any(name in text for name in NOTICE_TEXT[licence]), notice
 
 
 def test_no_file_holds_a_restricted_licence(wheel):
