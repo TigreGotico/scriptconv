@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a91](https://github.com/TigreGotico/scriptconv/tree/0.0.4a91) (2026-11-15)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a90...0.0.4a91)
+
+**Merged pull requests:**
+
+- test\(frontend\): pin the mark after a block for digits, end blocks and closing brackets [\#250](https://github.com/TigreGotico/scriptconv/pull/250) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a90](https://github.com/TigreGotico/scriptconv/tree/0.0.4a90) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a89...0.0.4a90)
