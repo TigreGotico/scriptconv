@@ -703,6 +703,11 @@ class TestSpokenNormalizer:
                                                stages=Stages(diacritize=False)))
         assert frontend.phonemize("I have 5 cats.") == [list("I have five cats")]
 
+    def test_the_hook_reads_a_portuguese_date(self):
+        frontend = TextFrontend(FrontendConfig("pt-PT", Phonemizer.UNICODE, normalizer=spoken_normalizer(),
+                                               stages=Stages(diacritize=False)))
+        assert frontend.phonemize("Chego a 12/05/2020.") == [list("Chego a doze de maio de dois mil e vinte")]
+
     def test_a_missing_extra_names_it(self, monkeypatch):
         monkeypatch.setitem(sys.modules, "text2spoken", None)
         with pytest.raises(ImportError, match=r"scriptconv\[normalize\]"):
