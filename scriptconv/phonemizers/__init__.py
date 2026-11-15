@@ -9,7 +9,6 @@ non-commercial licence are in the scriptconv-copyleft and scriptconv-nonfree
 packages (see :mod:`scriptconv.phonemizers._moved`); the registry imports
 them from there.
 """
-from scriptconv.phonemizers._moved import deprecated_getattr
 from scriptconv.phonemizers.enums import Alphabet, Phonemizer
 from scriptconv.phonemizers.base import (
     BasePhonemizer,
@@ -60,5 +59,3 @@ __all__ = [
     "phonemize",
     "register",
 ]
-
-__getattr__ = deprecated_getattr(__name__)

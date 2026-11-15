@@ -100,17 +100,6 @@ def test_an_old_import_path_warns_once_and_gives_the_moved_class(module, name, m
     assert deprecations[0].filename == __file__
 
 
-def test_the_package_attributes_give_the_espeak_and_transphone_classes(monkeypatch):
-    import scriptconv.phonemizers as P
-    from scriptconv_copyleft.phonemizers import mul
-    for name in ("EspeakPhonemizer", "TransphonePhonemizer"):
-        monkeypatch.delitem(P.__dict__, name, raising=False)
-    with pytest.warns(DeprecationWarning):
-        assert getattr(P, "EspeakPhonemizer") is mul.EspeakPhonemizer
-    with pytest.warns(DeprecationWarning):
-        assert getattr(P, "TransphonePhonemizer") is mul.TransphonePhonemizer
-
-
 @pytest.mark.parametrize("module, name", OLD_PATHS)
 def test_an_old_import_path_without_the_sister_package_names_the_extra(module, name, monkeypatch):
     old = importlib.import_module(module)

@@ -25,10 +25,6 @@ _MUL = f"{COPYLEFT}.mul"
 
 #: old module -> moved name -> (new module, the scriptconv extra that installs it)
 MOVED: Dict[str, Dict[str, Tuple[str, str]]] = {
-    "scriptconv.phonemizers": {
-        "EspeakPhonemizer": (_MUL, "espeak"),
-        "TransphonePhonemizer": (_MUL, "transphone"),
-    },
     "scriptconv.phonemizers.mul": {
         "EspeakPhonemizer": (_MUL, "espeak"),
         "EspeakError": (_MUL, "espeak"),

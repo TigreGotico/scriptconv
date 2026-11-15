@@ -227,8 +227,9 @@ but the net effect for a caller is the same, no local path required.)
 
 ## Backends in scriptconv-copyleft and scriptconv-nonfree
 
-A wrapper moves out of scriptconv when its own code, a dependency of its
-engine, or a binary it runs is under a copyleft or a non-commercial licence.
+A wrapper moves out of scriptconv when its own code or a dependency of its
+engine is under a copyleft or a non-commercial licence. A wrapper that only
+starts a separate program stays: Shami starts the espeak-ng command.
 Two sister packages hold those wrappers, and their vendored code, under the
 licences of that code:
 
