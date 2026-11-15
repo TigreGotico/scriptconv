@@ -378,6 +378,42 @@ of these is true:
 The exit status is 2 for a usage error, such as a missing file, a wrong
 header, an unknown backend or an unknown stage.
 
+## Shami: the 88- and 90-symbol inventories
+
+The Shami front end for Levantine Arabic and English is vendored from
+Al-aminI/hams-levantine-tts under Apache-2.0. Upstream has two symbol
+inventories, and the ids of a model come from one of them. The caller states
+the inventory with the `inventory` parameter of `ShamiPhonemizer` or of the
+vendored `TextFrontend`. The value is the symbol count of the model.
+
+| `inventory` | Source commit | Symbols |
+| --- | --- | --- |
+| `88` (default) | d7a3602 | The single-speaker inventory. |
+| `90` | 80d79d0 | The 88 symbols, then `sil` (id 88) and `brk` (id 89). |
+
+With `inventory=90` the front end reads pauses from punctuation. A run of
+`, ; :` becomes `sil`, and a run that holds `. ! … —` becomes `brk`. The front
+end removes these marks before G2P, so the next word can match the lexicon.
+
+The espeak reduced vowel `ᵻ` becomes `ə` in the 90 inventory and `<unk>` in the
+88 inventory. The upstream tokeniser also reads the IPA letters `s i l` and
+`b r k` as the pause symbols. The 90 inventory keeps this behaviour, so its ids
+match upstream. Any other value of `inventory` raises `ValueError`.
+
+```python
+from scriptconv.phonemizers.shami import ShamiPhonemizer, SYMBOL_TO_ID_90
+
+phonemizer = ShamiPhonemizer(inventory=90)
+phonemes, lang_ids = phonemizer.phonemize_with_language_ids("شو، هلق.", "ar")
+# phonemes[0] holds 'sil' after the comma and 'brk' after the full stop
+ids = [SYMBOL_TO_ID_90[p] for p in phonemes[0]]
+```
+
+`SYMBOL_TO_ID`, `ID_TO_SYMBOL`, `VOCAB_SIZE`, `tokenize_ipa` and `encode` hold
+the 88-symbol tables. `SYMBOL_TO_ID_90`, `ID_TO_SYMBOL_90` and `VOCAB_SIZE_90`
+hold the 90-symbol tables, and `get_inventory(90)` gives the tokeniser and the
+fold map. The two front ends share no state, so one process can use both.
+
 ## The backend catalog
 
 Multilingual: espeak (subprocess with espyak fallback), gruut, goruut,
