@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a90](https://github.com/TigreGotico/scriptconv/tree/0.0.4a90) (2026-11-15)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a89...0.0.4a90)
+
+**Merged pull requests:**
+
+- fix\(deps\): the normalize extra pulls the eu extra of text2spoken [\#251](https://github.com/TigreGotico/scriptconv/pull/251) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a89](https://github.com/TigreGotico/scriptconv/tree/0.0.4a89) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a88...0.0.4a89)
@@ -384,10 +392,6 @@
 ## [0.0.4a40](https://github.com/TigreGotico/scriptconv/tree/0.0.4a40) (2026-11-04)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a39...0.0.4a40)
-
-**Merged pull requests:**
-
-- fix: build the British misaki G2P with british=True [\#146](https://github.com/TigreGotico/scriptconv/pull/146) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a39](https://github.com/TigreGotico/scriptconv/tree/0.0.4a39) (2026-11-04)
 
