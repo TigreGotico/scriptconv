@@ -1,0 +1,57 @@
+# Pronunciations of homograph senses, where matching Google's sense list to
+# CMUdict does not give the right one. Written by hand.
+#
+# The build takes every sense of the Wikipedia Homograph Data (wordids.tsv),
+# picks the CMUdict entry closest to the pronunciation given there, and then
+# applies this table. Most rows are senses CMUdict does not list separately
+# (it has one entry for both "implement"s), or typing slips in the source.
+# Columns: word, sense, pronunciation (CMUdict notation or phones).
+
+abuses        vrb              AH0 B Y UW1 Z IH0 Z
+analyses      vrb              AE1 N AH0 L AY2 Z IH0 Z
+august        adj              AO0 G AH1 S T
+august        august           AO1 G AH0 S T
+august        nam              AW1 G UH2 S T
+axes          nou-vrb          AE1 K S IH0 Z
+blessed       adj              B L EH1 S IH0 D
+conduct       vrb              K AH0 N D AH1 K T
+conglomerate  vrb              K AH0 N G L AA1 M ER0 EY2 T
+conjugate     adj-nou          K AA1 N JH AH0 G AH0 T
+deviate       nou              D IY1 V IY0 AH0 T
+diagnoses     vrb              D AY2 AH0 G N OW1 S IH0 Z
+document      nou              D AA1 K Y AH0 M AH0 N T
+document      vrb              D AA1 K Y AH0 M EH2 N T
+elaborate     adj              IH0 L AE1 B ER0 AH0 T
+entrance      vrb              IH0 N T R AE1 N S
+export        vrb              IH0 K S P AO1 R T
+expose        nou              EH2 K S P OW0 Z EY1
+fragment      vrb              F R AE0 G M EH1 N T
+frequent      vrb              F R IY0 K W EH1 N T
+graduate      adj-nou          G R AE1 JH UW0 AH0 T
+house         vrb              HH AW1 Z
+implement     vrb              IH1 M P L AH0 M EH2 N T
+increment     vrb              IH1 N K R AH0 M EH2 N T
+initiate      nou              IH0 N IH1 SH IY0 AH0 T
+instrument    vrb              IH1 N S T R AH0 M EH2 N T
+intrigue      nou-vrb          IH0 N T R IY1 G
+isolate       nou              AY1 S AH0 L AH0 T
+jesus         es               HH EY0 S UW1 S
+minute        minute           m ˈɪ n ɪ t
+mobile        geo              M OW0 B IY1 L
+mobile        nou-art          M OW1 B IY2 L
+moderate      vrb              M AA1 D ER0 EY2 T
+mouth         vrb              M AW1 DH
+nestle        nam              N EH1 S L IY0
+ornament      vrb              AO1 R N AH0 M EH2 N T
+perfect       adj              P ER1 F EH0 K T
+pasty         adj              P EY1 S T IY0
+pasty         nou              P AE1 S T IY0
+pigment       vrb              P IH0 G M EH1 N T
+precipitate   adj-nou          P R IH0 S IH1 P IH0 T AH0 T
+recount       vrb              R IH0 K AW1 N T
+refuse        nou              R EH1 F Y UW2 S
+rerelease     rerelease        R IY1 R IH0 L IY2 S
+rerelease     vrb              R IY2 R IH0 L IY1 S
+rodeo         geo              R OW0 D EY1 OW0
+row           2                R AW1
+supplement    vrb              S AH1 P L AH0 M EH2 N T

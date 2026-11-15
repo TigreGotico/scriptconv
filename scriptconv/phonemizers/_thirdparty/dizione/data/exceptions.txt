@@ -1,0 +1,250 @@
+# Pronunciations that win over the dictionary. Written by hand.
+#
+# Two kinds of entry: words CMUdict lacks (names, recent words) and words where
+# its first pronunciation is not the usual one in running speech. Either
+# CMUdict notation (the conversion rules then apply) or phones with stress marks.
+# Columns: word, pronunciation (two or more spaces between them).
+#
+# This is the place to teach a new word: add a line. A name of several words
+# whose rhythm matters takes one pronunciation per word, separated by "|"
+# (see "tung tung tung sahur" below); the stress written there is kept.
+# CMUdict notation in short: AA father, AE cat, AH cut (AH0 the "a" of sofa),
+# AO law, AW cow, AY my, EH bed, ER her, EY day, IH sit, IY see, OW go, OY boy,
+# UH book, UW boot; after a vowel 1 = main stress, 2 = lesser stress, 0 = none;
+# consonants B CH D DH (this) F G HH JH (joy) K L M N NG P R S SH T TH (thin)
+# V W Y Z ZH (vision).
+
+# usual pronunciation differs from CMUdict's first entry
+every         EH1 V R IY0
+because       B IH0 K AH1 Z
+really        ɹ ˈiə l i
+real          ɹ ˈiː ə l
+thirty        TH ER1 T IY0
+houses        HH AW1 Z AH0 Z
+enough        ɪ n ˈʌ f
+minutes       m ˈɪ n ɪ t s
+email         IY1 M EY2 L
+emails        IY1 M EY2 L Z
+monday        M AH1 N D EY2
+tuesday       T UW1 Z D EY2
+wednesday     W EH1 N Z D EY2
+thursday      TH ER1 Z D EY2
+friday        F R AY1 D EY2
+saturday      S AE1 T ER0 D EY2
+sunday        S AH1 N D EY2
+yesterday     Y EH1 S T ER0 D EY2
+didn't        d ˈɪ d n t
+wasn't        w ˈʌ z n̩ t
+cannot        K AE0 N AA1 T
+different     D IH1 F R AH0 N T
+difference    D IH1 F R AH0 N S
+differences   D IH1 F R AH0 N S AH0 Z
+sometimes     S AH1 M T AY2 M Z
+downtown      D AW1 N T AW2 N
+putting       P UH1 T IH0 NG
+women         w ˈɪ m ɪ n
+maybe         m ˈeɪ b iː
+herself       h ɜː s ˈɛ l f
+yourself      j oːɹ s ˈɛ l f
+yours         j ˈoːɹ z
+direct        d ᵻ ɹ ˈɛ k t
+directly      d ᵻ ɹ ˈɛ k t l i
+direction     d ᵻ ɹ ˈɛ k ʃ ə n
+directions    d ᵻ ɹ ˈɛ k ʃ ə n z
+director      d ᵻ ɹ ˈɛ k t ɚ
+schedule      S K EH1 JH UW0 L
+schedules     S K EH1 JH UW0 L Z
+scheduled     S K EH1 JH UW0 L D
+conference    K AA1 N F R AH0 N S
+conferences   K AA1 N F R AH0 N S AH0 Z
+polished      P AA1 L IH0 SH T
+polishing     P AA1 L IH0 SH IH0 NG
+polishes      P AA1 L IH0 SH IH0 Z
+address       AH0 D R EH1 S
+addresses     AH0 D R EH1 S IH0 Z
+government    G AH1 V ER0 N M AH0 N T
+governments   G AH1 V ER0 N M AH0 N T S
+
+# recent words CMUdict lacks
+wifi          W AY1 F AY2
+wi            W AY1
+covid         K OW1 V IH0 D
+emoji         IH0 M OW1 JH IY0
+emojis        IH0 M OW1 JH IY0 Z
+selfie        S EH1 L F IY0
+selfies       S EH1 L F IY0 Z
+blog          B L AO1 G
+blogs         B L AO1 G Z
+podcast       P AA1 D K AE2 S T
+podcasts      P AA1 D K AE2 S T S
+smartphone    S M AA1 R T F OW2 N
+smartphones   S M AA1 R T F OW2 N Z
+bluetooth     B L UW1 T UW2 TH
+hashtag       HH AE1 SH T AE2 G
+hashtags      HH AE1 SH T AE2 G Z
+login         L AO1 G IH2 N
+username      Y UW1 Z ER0 N EY2 M
+meme          M IY1 M
+memes         M IY1 M Z
+gif           G IH1 F
+jpeg          JH EY1 P EH2 G
+json          JH EY1 S AH0 N
+linux         L IH1 N AH0 K S
+github        G IH1 T HH AH2 B
+chatbot       CH AE1 T B AA2 T
+chatbots      CH AE1 T B AA2 T S
+webcam        W EH1 B K AE2 M
+touchscreen   T AH1 CH S K R IY2 N
+netflix       N EH1 T F L IH0 K S
+spotify       S P AA1 T IH0 F AY2
+instagram     IH1 N S T AH0 G R AE2 M
+tiktok        T IH1 K T AA2 K
+whatsapp      W AH1 T S AE2 P
+youtube       Y UW1 T UW2 B
+iphone        AY1 F OW2 N
+ipad          AY1 P AE2 D
+android       AE1 N D R OY2 D
+google        G UW1 G AH0 L
+uber          UW1 B ER0
+tesla         T EH1 S L AH0
+okay          OW2 K EY1
+
+# names and rare words the dictionary lacks or has wrong
+emmaleigh     EH1 M AH0 L IY0
+hermione      HH ER0 M AY1 AH0 N IY0
+persephone    P ER0 S EH1 F AH0 N IY0
+coeliac       S IY1 L IY0 AE2 K
+celiac        S IY1 L IY0 AE2 K
+scabies       S K EY1 B IY0 Z
+lyssavirus    L IH1 S AH0 V AY2 R AH0 S
+provirus      P R OW0 V AY1 R AH0 S
+bobsleigh     B AA1 B S L EY2
+
+# sounds people write: said as the sound, not letter by letter
+# ("sh", "shh", "hm", "hmm" and "mm" are in the dictionary; the text rules
+# read a hiss and a snore, "Ss!" and "Zzz": "ss" is also two letters)
+tsk           T IH1 S K
+psst          P S T
+pfft          P F T
+hmph          HH AH1 M F
+psh           P SH
+pssh          P SH
+
+# words the text rules say: units, file names
+milliamp      M IH1 L IY0 AE2 M P
+kilocalorie   K IH1 L AH0 K AE2 L ER0 IY0
+kilocalories  K IH1 L AH0 K AE2 L ER0 IY0 Z
+gigabit       G IH1 G AH0 B IH2 T
+gigabits      G IH1 G AH0 B IH2 T S
+megabits      M EH1 G AH0 B IH2 T S
+kilobits      K IH1 L AH0 B IH2 T S
+nginx         EH1 N JH AH0 N EH2 K S
+conf          K AA1 N F
+yaml          Y AE1 M AH0 L
+toml          T AA1 M AH0 L
+mpeg          EH1 M P EH2 G
+flac          F L AE1 K
+epub          IY1 P AH2 B
+
+# internet slang
+skibidi       S K IH1 B IH0 D IY0
+rizz          R IH1 Z
+rizzler       R IH1 Z L ER0
+rizzed        R IH1 Z D
+gyatt         G Y AE1 T
+gyat          G Y AE1 T
+fanum         F AE1 N AH0 M
+delulu        D IH0 L UW1 L UW0
+solulu        S AH0 L UW1 L UW0
+bussin        B AH1 S IH0 N
+sussy         S AH1 S IY0
+yeet          Y IY1 T
+simp          S IH1 M P
+bruh          B R AH1
+brainrot      B R EY1 N R AA2 T
+doomscroll    D UW1 M S K R OW2 L
+doomscrolling  D UW1 M S K R OW2 L IH0 NG
+mewing        M Y UW1 IH0 NG
+mog           M AA1 G
+mogging       M AA1 G IH0 NG
+mogged        M AA1 G D
+looksmaxxing  L UH1 K S M AE2 K S IH0 NG
+looksmaxing   L UH1 K S M AE2 K S IH0 NG
+crashout      K R AE1 SH AW2 T
+goated        G OW1 T IH0 D
+unc           AH1 NG K
+huzz          HH AH1 Z
+bruzz         B R AH1 Z
+labubu        L AH0 B UW1 B UW0
+matcha        M AA1 CH AH0
+clanker       K L AE1 NG K ER0
+gurt          G ER1 T
+pookie        P UH1 K IY0
+bestie        B EH1 S T IY0
+lowkey        L OW1 K IY2
+highkey       HH AY1 K IY2
+finna         F IH1 N AH0
+boutta        B AW1 T AH0
+tryna         T R AY1 N AH0
+imma          AY1 M AH0
+fomo          F OW1 M OW0
+uwu           UW1 W UW0
+bae           B EY1
+poggers       P AA1 G ER0 Z
+kek           K EH1 K
+noob          N UW1 B
+stonks        S T AA1 NG K S
+chungus       CH AH1 NG G AH0 S
+amogus        AH0 M OW1 G AH0 S
+griddy        G R IH1 D IY0
+blud          B L AH1 D
+opps          AA1 P S
+ragebait      R EY1 JH B EY2 T
+parasocial    P EH2 R AH0 S OW1 SH AH0 L
+brr           B ER1
+
+# meme names
+tung          T UW1 NG
+sahur         S AA0 HH UH1 R
+tung tung tung sahur  T UW1 NG | T UW2 NG | T UW2 NG | S AA0 HH UH1 R
+tralalero     T R AA2 L AH0 L EH1 R OW0
+tralala       T R AA2 L AH0 L AA1
+tralaleritos  T R AA2 L AH0 L EH0 R IY1 T OW0 S
+bombardiro    B AA2 M B AA0 R D IY1 R OW0
+crocodilo     K R AA2 K AH0 D IY1 L OW0
+cappuccina    K AE2 P AH0 CH IY1 N AH0
+ballerino     B AE2 L ER0 IY1 N OW0
+patapim       P AA2 T AH0 P IY1 M
+lirili        L IH2 R IY0 L IY1
+larila        L AA2 R IY0 L AA1
+chimpanzini   CH IH2 M P AE0 N Z IY1 N IY0
+bananini      B AE2 N AH0 N IY1 N IY0
+trippi        T R IH1 P IY0
+troppi        T R AA1 P IY0
+assassino     AE2 S AH0 S IY1 N OW0
+vaca          V AA1 K AH0
+saturno       S AH0 T ER1 N OW0
+saturnita     S AE2 T ER0 N IY1 T AH0
+boneca        B OW0 N EH1 K AH0
+ambalabu      AA2 M B AH0 L AH0 B UW1
+camelo        K AH0 M EH1 L OW0
+bombombini    B AA2 M B AA0 M B IY1 N IY0
+gusini        G UW0 Z IY1 N IY0
+trulimero     T R UW2 L IH0 M EH1 R OW0
+trulicina     T R UW2 L IH0 CH IY1 N AH0
+glorbo        G L AO1 R B OW0
+fruttodrillo  F R UW2 T OW0 D R IH1 L OW0
+burbaloni     B ER2 B AH0 L OW1 N IY0
+luliloli      L UW2 L IY0 L OW1 L IY0
+baraboom      B AA2 R AH0 B UW1 M
+girafa        JH IH0 R AA1 F AH0
+celestre      CH EH0 L EH1 S T R EY0
+orangutini    AO0 R AE2 NG AH0 T IY1 N IY0
+ananasini     AA2 N AH0 N AH0 S IY1 N IY0
+udin          UW1 D IH0 N
+espressona    EH2 S P R EH0 S OW1 N AH0
+cocofanto     K OW2 K OW0 F AA1 N T OW0
+elefanto      EH2 L AH0 F AA1 N T OW0
+toasterino    T OW2 S T ER0 IY1 N OW0
+garama        G AH0 R AA1 M AH0
+madundung     M AA0 D UW1 N D UW0 NG

@@ -1,0 +1,111 @@
+# Chat spellings and what to say for them. Edit freely.
+#
+# Columns (two or more spaces): the token as typed (any letter case), then
+#   words to say            btw -> by the way
+#   *LETTERS                read letter by letter: lol -> L O L
+#   -                       say nothing
+# A third column, "alone", keeps a spelling for replies: it is read this way
+# only when it is a clause by itself ("k", "k, thanks", "see you, k?"). Next
+# to a word or a figure it is what was typed: in "the value of k" and "8 k"
+# the letter K.
+# Emoticons such as :) and :)) and emoji are removed before this table is used;
+# they are never read and never make a pause.
+
+lol       *LOL
+lmao      *LMAO
+rofl      *ROFL
+omg       *OMG
+omfg      *OMG
+wtf       *WTF
+wth       what the heck
+idk       I don't know
+idc       I don't care
+btw       by the way
+imo       in my opinion
+imho      in my humble opinion
+tbh       to be honest
+brb       be right back
+bbl       be back later
+ttyl      talk to you later
+gtg       got to go
+g2g       got to go
+afaik     as far as I know
+iirc      if I recall correctly
+fyi       *FYI
+faq       *FAQ
+diy       *DIY
+aka       *AKA
+eta       *ETA
+tba       *TBA
+tbd       *TBD
+rsvp      *RSVP
+asap      *ASAP
+smh       *SMH
+irl       in real life
+dm        *DM
+dms       *DM s
+thx       thanks
+tnx       thanks
+ty        thank you
+tysm      thank you so much
+yw        you're welcome
+np        no problem
+pls       please
+plz       please
+ppl       people
+msg       message
+msgs      messages
+pic       pic
+pics      pics
+u         you
+ur        your
+r         are
+k         okay      alone
+kk        okay
+ok        okay
+nvm       never mind
+bc        because
+cuz       because
+coz       because
+tho       though
+thru      through
+w/        with
+w/o       without
+b4        before
+gr8       great
+l8r       later
+2day      today
+2moro     tomorrow
+2nite     tonight
+rn        right now
+jk        just kidding
+ikr       I know right
+omw       on my way
+hbu       how about you
+wyd       what are you doing
+fr        for real
+ngl       not gonna lie
+icl       I can't lie
+istg      I swear to god
+idek      I don't even know
+tbf       to be fair
+iykyk     if you know you know
+wsg       what's good
+gng       gang
+pov       *POV
+fyp       *FYP
+afk       *AFK
+npc       *NPC
+gg        *GG
+haha      ha ha
+hahaha    ha ha ha
+hahahaha  ha ha ha
+hehe      heh heh
+xd        -
+xoxo      -
+n/a       not applicable
+
+# keys of the keyboard
+ctrl      control
+cmd       command
+esc       escape

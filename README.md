@@ -415,11 +415,19 @@ Set `SCRIPTCONV_PHONETISAURUS_MODEL` to a trained FST to run it.
 
 ## Licensing
 
-The scriptconv wheel is `Apache-2.0 AND MIT`. The code of scriptconv is
-Apache-2.0. Two vendored tables are MIT, and the wheel carries their notices:
-the Cangjie5 code table (`scriptconv/data/LICENSE.cangjie5`) and the
-Hangul-to-IPA converter of stannam/hangul_to_ipa with its tables
-(`scriptconv/phonemizers/_thirdparty/LICENSE.hangul_to_ipa`).
+The scriptconv wheel is `Apache-2.0 AND MIT AND LicenseRef-CMUdict`. The code of
+scriptconv is Apache-2.0. Two vendored tables are MIT, and the wheel carries
+their notices: the Cangjie5 code table (`scriptconv/data/LICENSE.cangjie5`) and
+the Hangul-to-IPA converter of stannam/hangul_to_ipa with its tables
+(`scriptconv/phonemizers/_thirdparty/LICENSE.hangul_to_ipa`). The dizione
+English phonemizer is Apache-2.0, and its built data ships in
+`scriptconv/phonemizers/_thirdparty/dizione/built/`. The dictionary,
+alignment table and model of that data come from CMUdict, under the CMUdict
+licence (`LICENSE.cmudict`). That licence is BSD-2-Clause with one added
+sentence and an acknowledgement, so it has no SPDX identifier and the wheel
+names it `LicenseRef-CMUdict`. The homograph weights come from the Wikipedia
+Homograph Data, Apache-2.0 (`LICENSE.homograph-data`), and most of their
+pronunciations come from CMUdict.
 
 The phonemizer wrappers whose code, engine or dependencies are under a
 copyleft or a non-commercial licence are in two sister packages:
