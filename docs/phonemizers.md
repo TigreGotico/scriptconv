@@ -469,13 +469,17 @@ vendored `TextFrontend`. The value is the symbol count of the model.
 | `90` | 80d79d0 | The 88 symbols, then `sil` (id 88) and `brk` (id 89). |
 
 With `inventory=90` the front end reads pauses from punctuation. A run of
-`, ; :` becomes `sil`, and a run that holds `. ! … —` becomes `brk`. The front
-end removes these marks before G2P, so the next word can match the lexicon.
+`, ; :` becomes `sil`, and a run that holds `. ! … —` becomes `brk`. Each mark of
+a spaced run such as `. . .` gives its own `brk`. At a switch between Arabic and
+English, a pause takes the place of the word boundary. The front end
+removes these marks before G2P, so the next word can match the lexicon. A
+question mark, `?` or `؟`, gives no pause and stays on the word.
 
 The espeak reduced vowel `ᵻ` becomes `ə` in the 90 inventory and `<unk>` in the
 88 inventory. The upstream tokeniser also reads the IPA letters `s i l` and
 `b r k` as the pause symbols. The 90 inventory keeps this behaviour, so its ids
-match upstream. Any other value of `inventory` raises `ValueError`.
+match upstream. Any other value of `inventory` raises `ValueError`, also
+`88.0`, `True` and `"88"`.
 
 ```python
 from scriptconv.phonemizers.shami import ShamiPhonemizer, SYMBOL_TO_ID_90

@@ -242,14 +242,14 @@ def get_inventory(size: int) -> Inventory:
     """The inventory with *size* symbols: 88 (single speaker) or 90 (with pauses).
 
     Raises:
-        ValueError: If no inventory has *size* symbols.
+        ValueError: If *size* is not the int 88 or 90. ``88.0``, ``True`` and
+            ``"88"`` are refused.
     """
-    try:
-        return INVENTORIES[size]
-    except (KeyError, TypeError):
+    if type(size) is not int or size not in INVENTORIES:
         raise ValueError(
-            f"no Shami inventory has {size!r} symbols; use one of {sorted(INVENTORIES)}"
-        ) from None
+            f"no Shami inventory has {size!r} symbols; use the int 88 or 90"
+        )
+    return INVENTORIES[size]
 
 
 SYMBOL_TO_ID = INVENTORY_88.symbol_to_id

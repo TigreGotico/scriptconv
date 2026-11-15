@@ -9,6 +9,7 @@ The lexicon entries used below are ``شو`` -> ``ʃuː`` and ``هلق`` -> ``hal
 """
 import pytest
 
+from scriptconv.phonemizers._thirdparty.shami import espeak, frontend
 from scriptconv.phonemizers._thirdparty.shami import (
     ID_TO_SYMBOL_90,
     SYMBOL_TO_ID,
@@ -37,11 +38,11 @@ def test_the_90_inventory_appends_sil_and_brk_after_the_88():
     assert "sil" not in SYMBOL_TO_ID and "brk" not in SYMBOL_TO_ID
 
 
-@pytest.mark.parametrize("size", [0, 87, 89, 91, None, "90", [90]])
+@pytest.mark.parametrize("size", [0, 87, 89, 91, None, "90", "88", [90], 88.0, 90.0, True])
 def test_an_inventory_other_than_88_or_90_is_refused(size):
-    with pytest.raises(ValueError, match="88, 90"):
+    with pytest.raises(ValueError, match="the int 88 or 90"):
         TextFrontend(diacritizer_backend="passthrough", inventory=size)
-    with pytest.raises(ValueError, match="88, 90"):
+    with pytest.raises(ValueError, match="the int 88 or 90"):
         ShamiPhonemizer(diacritizer_backend="passthrough", inventory=size)
 
 
@@ -108,3 +109,67 @@ def test_the_90_tokeniser_reads_the_ipa_letters_sil_as_the_pause_symbol():
         "<bos>", "s", "i", "l", "s", "i", "l", "e", "<eos>"]
     assert TextFrontend(diacritizer_backend="passthrough", inventory=90).process(word).symbols == [
         "<bos>", "sil", "sil", "e", "<eos>"]
+
+
+# Each row below is the output of upstream 80d79d0, run from a clone with the same
+# stubs, for the same text: symbols, then language ids.
+_EN = 2
+UPSTREAM_PAUSE_ROWS = [
+    # A pause takes the place of the word boundary before the next span.
+    ("شو, delay", ["<bos>", "ʃ", "uː", "sil", "d", "ɛ", "l", "æ", "j", "<eos>"],
+     [0, AR, AR, NEUTRAL, _EN, _EN, _EN, _EN, _EN, 0]),
+    ("شو، hello", ["<bos>", "ʃ", "uː", "sil", "h", "ɛ", "l", "l", "ɒ", "<eos>"],
+     [0, AR, AR, NEUTRAL, _EN, _EN, _EN, _EN, _EN, 0]),
+    # An ellipsis and an em dash are sentence pauses.
+    ("شو… هلق", ["<bos>", "ʃ", "uː", "brk", " ", "h", "a", "l", "l", "a", "ʔ", "<eos>"],
+     [0, AR, AR, NEUTRAL, NEUTRAL] + [AR] * 6 + [0]),
+    ("شو — هلق", ["<bos>", "ʃ", "uː", "brk", " ", "h", "a", "l", "l", "a", "ʔ", "<eos>"],
+     [0, AR, AR, NEUTRAL, NEUTRAL] + [AR] * 6 + [0]),
+    ("شو—هلق", ["<bos>", "ʃ", "uː", "brk", " ", "h", "a", "l", "l", "a", "ʔ", "<eos>"],
+     [0, AR, AR, NEUTRAL, NEUTRAL] + [AR] * 6 + [0]),
+    # A question mark is no pause, and it stays on the word.
+    ("شو؟ هلق", ["<bos>", "ʃ", "w", " ", "h", "a", "l", "l", "a", "ʔ", "<eos>"],
+     [0, AR, AR, NEUTRAL] + [AR] * 6 + [0]),
+    ("شو? هلق", ["<bos>", "ʃ", "w", " ", "h", "a", "l", "l", "a", "ʔ", "<eos>"],
+     [0, AR, AR, NEUTRAL] + [AR] * 6 + [0]),
+    # The blank chunks between pauses emit nothing.
+    ("شو. . . هلق", ["<bos>", "ʃ", "uː", "brk", "brk", "brk", " ", "h", "a", "l", "l", "a", "ʔ", "<eos>"],
+     [0, AR, AR, NEUTRAL, NEUTRAL, NEUTRAL, NEUTRAL] + [AR] * 6 + [0]),
+    (". . .", ["<bos>", "brk", "brk", "brk", "<eos>"], [0, NEUTRAL, NEUTRAL, NEUTRAL, 0]),
+]
+
+
+@pytest.mark.parametrize("text, symbols, lang_ids", UPSTREAM_PAUSE_ROWS)
+def test_the_90_pauses_match_upstream(monkeypatch, text, symbols, lang_ids):
+    monkeypatch.setattr(espeak, "_ESPEAK", None)
+    utterance = TextFrontend(diacritizer_backend="passthrough", inventory=90).process(text)
+    assert utterance.symbols == symbols
+    assert utterance.language_ids == lang_ids
+    assert utterance.phoneme_ids == [SYMBOL_TO_ID_90[s] for s in symbols]
+
+
+_STUB_IPA = {"delay": "dᵻlˈeɪ", "roses": "ɹˈoʊzᵻz", "كتاب": "kᵻtaːb"}
+
+
+def _stub_espeak(monkeypatch):
+    """espeak-ng that writes the reduced vowel ``ᵻ``, with no binary needed."""
+    monkeypatch.setattr(espeak, "_ESPEAK", "/stub/espeak-ng")
+    monkeypatch.setattr(espeak, "phonemize", lambda text, voice="en-us": " ".join(
+        _STUB_IPA.get(word, word) for word in text.split()))
+
+
+def test_english_spans_use_the_90_inventory(monkeypatch):
+    _stub_espeak(monkeypatch)
+    utterance = TextFrontend(diacritizer_backend="passthrough", inventory=90).process("delay, roses.")
+    assert utterance.symbols == [
+        "<bos>", "d", "ə", "l", "ˈ", "e͡ɪ", "sil", " ", "ɹ", "ˈ", "o͡ʊ", "z", "ə", "z", "brk", "<eos>"]
+    assert utterance.language_ids == [0] + [_EN] * 5 + [NEUTRAL, NEUTRAL] + [_EN] * 6 + [NEUTRAL, 0]
+
+
+def test_the_espeak_arabic_path_uses_the_90_inventory(monkeypatch):
+    _stub_espeak(monkeypatch)
+    monkeypatch.setattr(frontend, "get_diacritizer", lambda backend: None)
+    utterance = TextFrontend(inventory=90).process("كتاب, كتاب.")
+    assert utterance.symbols == [
+        "<bos>", "k", "ə", "t", "aː", "b", "sil", " ", "k", "ə", "t", "aː", "b", "brk", "<eos>"]
+    assert utterance.language_ids == [0] + [AR] * 5 + [NEUTRAL, NEUTRAL] + [AR] * 5 + [NEUTRAL, 0]
