@@ -334,7 +334,10 @@ class TextFrontend:
         if not self.backend._keeps_punctuation():
             return None
         # A letter or digit first gives the clause a word, and no text gives
-        # it no mark, so the stages need not run.
+        # it no mark, so the stages need not run. This assumes that no stage
+        # deletes every letter and digit before the mark, that no stage adds
+        # a mark in front of the first letter or digit, and that no stage adds
+        # a mark to text that holds only words.
         first = parts[index + 1].lstrip()[:1]
         if not first or first.isalnum():
             return None
