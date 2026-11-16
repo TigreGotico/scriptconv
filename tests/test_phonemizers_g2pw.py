@@ -17,6 +17,7 @@ import gzip
 import io
 import json
 import logging
+import re
 import subprocess
 import tarfile
 import sys
@@ -57,9 +58,10 @@ REFERENCE = {
     "他们很快乐，音乐也很好听。": [
         ["t", "a", "1", "m", "en", "5", "h", "en", "3", "k", "uai", "4", "l", "e", "4", "，", "y", "in",
          "1", "y", "ue", "4", "y", "e", "3", "h", "en", "3", "h", "ao", "3", "t", "ing", "1", "。"]],
-    # a lowercase Latin letter that is a symbol stays, H is not a symbol
+    # The reference keeps the lowercase letters as symbols: e l l o, w o r l d.
+    # Latin letters are unread text here, and the space and comma stay.
     "Hello world, 你好！": [
-        ["e", "l", "l", "o", " ", "w", "o", "r", "l", "d", ",", " ", "n", "i", "3", "h", "ao", "3", "！"]],
+        [" ", ",", " ", "n", "i", "3", "h", "ao", "3", "！"]],
     # a syllable with no initial takes Ø
     "爱好和平的人们。": [
         ["Ø", "ai", "4", "h", "ao", "4", "h", "e", "2", "p", "ing", "2", "d", "e", "5", "r", "en", "2",
@@ -77,9 +79,36 @@ def test_each_sentence_gives_the_reference_symbols(g2pw, text):
     assert g2pw.phonemize(text, "zh") == REFERENCE[text]
 
 
+def _is_without_letters(reference: list, output: list, letters: str) -> bool:
+    """Whether *output* is *reference* with the symbols of *letters* taken out, in their order.
+
+    The reference writes each lowercase ASCII letter of the text as a symbol of
+    its own, and the backend reads Latin letters as unread text. A letter such
+    as ``a`` is also a final, so the test tries every way to take the letters
+    out of the reference.
+    """
+    reachable = {(0, 0)}
+    for symbol in reference:
+        following = set()
+        for kept, taken in reachable:
+            if kept < len(output) and output[kept] == symbol:
+                following.add((kept + 1, taken))
+            if taken < len(letters) and letters[taken] == symbol:
+                following.add((kept, taken + 1))
+        reachable = following
+    return (len(output), len(letters)) in reachable
+
+
 @pytest.mark.parametrize("row", SAMPLE, ids=[row["id"] for row in SAMPLE])
 def test_the_flores_sample_gives_the_reference_symbols(g2pw, row):
-    assert g2pw.phonemize(row["text"], "zh") == row["symbols"]
+    output = g2pw.phonemize(row["text"], "zh")
+    letters = "".join(re.findall("[a-z]", row["text"]))
+    if not letters:
+        assert output == row["symbols"]
+    else:
+        assert len(output) <= len(row["symbols"])
+        assert _is_without_letters([s for sentence in row["symbols"] for s in sentence],
+                                   [s for sentence in output for s in sentence], letters)
 
 
 def test_the_sample_is_flores_sentences_with_no_digit():
@@ -156,7 +185,7 @@ def test_a_capital_dotted_i_before_a_polyphone_reads_the_polyphone(g2pw, caplog)
 
 
 @pytest.mark.parametrize("sentence, unread", [
-    ("İstanbul的银行。", ("İ",)),
+    ("İstanbul的银行。", ("İstanbul",)),
     ("A4纸很好。", ("A4",)),
     ("ПРИВЕТ你好。", ("ПРИВЕТ",)),
 ])
@@ -168,6 +197,45 @@ def test_a_letter_with_no_symbol_raises_in_strict_mode(g2pw, sentence, unread):
     finally:
         g2pw.strict = False
     assert error.value.unread == unread
+
+
+@pytest.mark.parametrize("sentence", ["ibm公司。", "IBM公司。", "iBm公司。"])
+def test_a_latin_word_of_any_case_is_unread(g2pw, caplog, sentence):
+    with caplog.at_level(logging.WARNING, logger="scriptconv.phonemizers.g2pw"):
+        assert g2pw.phonemize(sentence, "zh") == [["g", "ong", "1", "s", "i", "1", "。"]]
+    assert [record.getMessage() for record in caplog.records] == [
+        f"g2pW gives no symbol for {sentence[:3]!r} in {sentence!r}"]
+    g2pw.strict = True
+    try:
+        with pytest.raises(UnreadTextError) as error:
+            g2pw.phonemize(sentence, "zh")
+    finally:
+        g2pw.strict = False
+    assert error.value.unread == (sentence[:3],)
+
+
+@pytest.mark.parametrize("sentence, runs", [
+    ("ABC，3个。", "'ABC', '3'"),
+    ("Ⅻ月。", "'Ⅻ'"),
+    ("½个。", "'½'"),
+])
+def test_a_run_with_a_number_adds_the_note_on_normalisation(g2pw, caplog, sentence, runs):
+    with caplog.at_level(logging.WARNING, logger="scriptconv.phonemizers.g2pw"):
+        g2pw.phonemize(sentence, "zh")
+    assert [record.getMessage() for record in caplog.records] == [
+        f"g2pW gives no symbol for {runs} in {sentence!r}; numbers belong to the normalisation stage"]
+
+
+def test_a_combining_mark_is_dropped_without_a_warning(g2pw, caplog):
+    sentence = "你好\u0301。"
+    with caplog.at_level(logging.WARNING, logger="scriptconv.phonemizers.g2pw"):
+        assert g2pw.phonemize(sentence, "zh") == [["n", "i", "3", "h", "ao", "3", "。"]]
+    assert caplog.records == []
+    g2pw.strict = True
+    try:
+        assert g2pw.phonemize(sentence, "zh") == [["n", "i", "3", "h", "ao", "3", "。"]]
+    finally:
+        g2pw.strict = False
 
 
 def test_punctuation_with_no_symbol_is_dropped_without_a_warning(g2pw, caplog):

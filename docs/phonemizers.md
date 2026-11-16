@@ -337,9 +337,11 @@ g2pw.phonemize("我要去行走。", "zh")
 
 The backend does not read digits, and a digit gives no symbol. Numbers,
 dates and units belong to the normalisation stage, which runs before the
-backend. A letter that has no reading and is not a symbol, such as `İ`, `A` or
-a Cyrillic letter, also gives no symbol. The backend logs a warning that
-names each run of these characters:
+backend. Another number, such as `Ⅻ` or `½`, gives no symbol either, and nor
+does a letter that has no reading: a Latin letter of either case (`ibm` and
+`IBM` alike), `İ`, or a Cyrillic letter. The backend logs a warning that names
+each run of these characters, and adds the note on the normalisation stage
+when a run holds a number:
 
 ```python
 g2pw.phonemize("他跑了3000米，花了15分钟。", "zh")
@@ -693,18 +695,22 @@ import. The check is `scriptconv.phonemizers.openjtalk_engine.require_pyopenjtal
 The pyopenjtalk-plus wheel holds the OpenJTalk dictionary, so the first use
 needs no network.
 
-pyopenjtalk reads the variable `OPEN_JTALK_DICT_DIR` when it imports, and uses
-that dictionary in place of the bundled one. The readings then change while
-the identity still names pyopenjtalk-plus. So the backend also refuses, with an
-`ImportError`, a value of `OPEN_JTALK_DICT_DIR` that does not resolve to the
-bundled dictionary:
+pyopenjtalk reads the variable `OPEN_JTALK_DICT_DIR` when it imports, and opens
+that dictionary in place of the bundled one at its first reading. The readings
+then change while the identity still names pyopenjtalk-plus. So the backend
+also refuses, with an `ImportError`, any value of `OPEN_JTALK_DICT_DIR` but the
+absolute path of the bundled dictionary. The check compares the text of the
+path, because pyopenjtalk opens the value later: a relative path, or a link to
+the bundled dictionary, can point at another dictionary by then, so both are
+refused.
 
 ```python
 # OPEN_JTALK_DICT_DIR=/usr/share/open_jtalk/dic python
 get_phonemizer(Phonemizer.OPENJTALK)
 # ImportError: The OpenJTalk phonemizer reads the dictionary of pyopenjtalk-plus, but
-# OPEN_JTALK_DICT_DIR names the dictionary /usr/share/open_jtalk/dic. Unset
-# OPEN_JTALK_DICT_DIR, then start Python again.
+# OPEN_JTALK_DICT_DIR is '/usr/share/open_jtalk/dic', not
+# '.../site-packages/pyopenjtalk/dictionary'. Unset OPEN_JTALK_DICT_DIR, then start
+# Python again.
 ```
 
 See [ovos.md](ovos.md) for using this layer from OVOS through

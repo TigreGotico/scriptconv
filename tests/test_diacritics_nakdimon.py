@@ -18,14 +18,16 @@ import sys
 import urllib.error
 from io import BytesIO
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
+import numpy as np
 import pytest
 
 from scriptconv import diacritics
 from scriptconv.diacritics import diacritize, strip_diacritics
 from scriptconv.phonemizers import ModelUnavailableError
-from scriptconv.phonemizers._thirdparty.nakdimon import remove_niqqud
+from scriptconv.phonemizers._thirdparty.nakdimon import Nakdimon, remove_niqqud
 
 SAMPLE = [json.loads(line) for line in
           (Path(__file__).parent / "data" / "nakdimon_parity_he.jsonl").read_text(encoding="utf-8").splitlines()
@@ -52,6 +54,43 @@ def test_the_marks_keep_the_letters(row):
 def test_the_model_reads_the_letters_without_their_marks(row):
     """The model gives the reference niqqud for text that already holds it."""
     assert diacritics._nakdimon_model().predict(row["niqqud"]) == row["niqqud"]
+
+
+def test_empty_text_stays_empty():
+    assert diacritize("", "he", diacritizer_model="nakdimon") == ""
+
+
+class _Session:
+    """An ONNX session that records its input and predicts no mark."""
+
+    def __init__(self, input_type):
+        self.input_type = input_type
+        self.inputs = []
+
+    def get_inputs(self):
+        return [SimpleNamespace(name="x", type=self.input_type)]
+
+    def run(self, _outputs, feed):
+        self.inputs.append(feed["x"])
+        length = feed["x"].shape[1]
+        return [np.zeros((1, length, size)) for size in (16, 3, 4)]
+
+
+@pytest.mark.parametrize("input_type, dtype", [("tensor(float)", np.float32), ("tensor(int32)", np.int32)])
+def test_the_letter_ids_take_the_input_type_of_the_model(input_type, dtype):
+    """The pinned model reads int32 ids, and Piper's export of it reads float ids."""
+    session = _Session(input_type)
+    assert Nakdimon(session).predict("שלום") == "שלום"
+    assert [x.dtype for x in session.inputs] == [dtype]
+
+
+@pytest.mark.parametrize("separator", ["\n", "\t"])
+def test_a_line_break_or_a_tab_reads_as_a_space(separator):
+    """Nakdimon's ``normalize`` gives the model a space for a line break or a tab, and the text keeps it."""
+    session = _Session("tensor(int32)")
+    assert Nakdimon(session).predict(f"שלום{separator}עולם") == f"שלום{separator}עולם"
+    Nakdimon(session).predict("שלום עולם")
+    assert session.inputs[0].tolist() == session.inputs[1].tolist()
 
 
 # The dotted sentences of Piper's Hebrew tests, then words that Nakdimon

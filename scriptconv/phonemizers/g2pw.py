@@ -20,9 +20,9 @@ d76f335d9eb5dea5ef6d7d70b2d6114e6303fa08, by Michael Hansen, whose header
 states "This code is Apache 2.0 licensed".
 
 The backend does not read digits. Numbers, dates and units are the
-normalisation stage, which the caller runs before the backend. A digit, or a
-letter that has no reading and is not a symbol, such as ``İ`` or ``A``, gives
-no symbol: the backend logs a warning that names each run of such characters,
+normalisation stage, which the caller runs before the backend. A digit or
+another number, such as ``Ⅻ``, or a letter that has no reading, such as a
+Latin letter of either case or ``İ``, gives no symbol: the backend logs a warning that names each run of such characters,
 or raises :class:`~scriptconv.phonemizers.base.UnreadTextError` when
 :attr:`~scriptconv.phonemizers.base.BasePhonemizer.strict` is set.
 
@@ -90,8 +90,9 @@ SYMBOLS = (
 )
 
 # A character with no reading stays when it is one symbol of the inventory
-# and not a digit: a digit with no reading is unread text, not a tone.
-_KEPT = frozenset(symbol for symbol in SYMBOLS if len(symbol) == 1 and not symbol.isdigit())
+# and not a letter or a digit: a Latin letter with no reading is unread
+# text, not an initial or a final, and a digit is not a tone.
+_KEPT = frozenset(symbol for symbol in SYMBOLS if len(symbol) == 1 and not symbol.isalnum())
 _QUOTES = re.compile('[“”"]')
 _SYLLABLE = re.compile(r"^([a-züv:]+?)([1-5])$")
 _PINYIN = re.compile(r"^([a-zvü]+?)([1-5])$")
@@ -240,8 +241,7 @@ class G2PWPhonemizer(BasePhonemizer):
     def _sentence_symbols(self, sentence: str) -> List[str]:
         """The symbols of one sentence.
 
-        A digit, or a letter with no reading that is not a symbol, gives no
-        symbol. The backend logs a warning that names each run of these
+        A number, or a letter with no reading, gives no symbol. The backend logs a warning that names each run of these
         characters, or raises :class:`UnreadTextError` in strict mode.
         """
         symbols: List[str] = []
@@ -266,7 +266,7 @@ class G2PWPhonemizer(BasePhonemizer):
             symbols += [initial or "Ø", final, tone]
         if unread:
             message = f"g2pW gives no symbol for {', '.join(map(repr, unread))} in {sentence!r}"
-            if any(char.isdigit() for char in "".join(unread)):
+            if any(unicodedata.category(char)[0] == "N" for char in "".join(unread)):
                 message += "; numbers belong to the normalisation stage"
             if self.strict:
                 raise UnreadTextError(message, tuple(unread))

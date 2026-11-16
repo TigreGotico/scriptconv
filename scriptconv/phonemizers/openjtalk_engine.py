@@ -10,7 +10,8 @@ only on pyopenjtalk-plus with onnxruntime and the dictionary that
 pyopenjtalk-plus bundles, so that the version of pyopenjtalk-plus in its
 identity fixes its output. pyopenjtalk reads the variable
 ``OPEN_JTALK_DICT_DIR`` when it imports, and uses that dictionary in place of
-its own, so the backend refuses a value that is not the bundled dictionary.
+its own, so the backend refuses any value but the absolute path of the
+bundled dictionary.
 """
 import base64
 import hashlib
@@ -60,7 +61,9 @@ def require_pyopenjtalk_plus(backend: str, requirement: str) -> ModuleType:
         ImportError: If onnxruntime does not import, if no ``pyopenjtalk``
             module imports, if another distribution installed the module, or
             if ``OPEN_JTALK_DICT_DIR``, in the environment or as the module
-            read it at import, names another dictionary.
+            read it at import, is set to any path but the absolute path of
+            the bundled dictionary. A relative path or a link to the bundled
+            dictionary is refused too.
     """
     try:
         import onnxruntime  # noqa: F401
@@ -82,12 +85,14 @@ def require_pyopenjtalk_plus(backend: str, requirement: str) -> ModuleType:
             f"'pip install --force-reinstall pyopenjtalk-plus[onnxruntime]', or install "
             f"'{requirement}' in a new environment."
         )
-    bundled = (Path(pyopenjtalk.__file__).parent / "dictionary").resolve()
+    # pyopenjtalk opens the raw value at its first reading, maybe after a
+    # change of directory or link, so the value is compared as text.
+    bundled = os.path.join(os.path.dirname(os.path.abspath(pyopenjtalk.__file__)), "dictionary")
     for dict_dir in (os.environ.get(DICT_DIR_VARIABLE), os.fsdecode(pyopenjtalk.OPEN_JTALK_DICT_DIR)):
-        if dict_dir is not None and Path(dict_dir).resolve() != bundled:
+        if dict_dir is not None and os.path.normpath(dict_dir) != os.path.normpath(bundled):
             raise ImportError(
                 f"{backend} reads the dictionary of pyopenjtalk-plus, but {DICT_DIR_VARIABLE} "
-                f"names the dictionary {dict_dir}. Unset {DICT_DIR_VARIABLE}, then start "
+                f"is {dict_dir!r}, not {bundled!r}. Unset {DICT_DIR_VARIABLE}, then start "
                 f"Python again."
             )
     return pyopenjtalk

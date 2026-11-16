@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parent.parent
 VERSIONS = {"pyopenjtalk": "0.4.1", "pyopenjtalk-plus": "0.4.1.post10"}
 ORDERS = [["pyopenjtalk", "pyopenjtalk-plus"], ["pyopenjtalk-plus", "pyopenjtalk"]]
 ALPHABETS = [Alphabet.HEPBURN, Alphabet.KANA]
-BUNDLED = Path(pyopenjtalk.__file__).parent / "dictionary"
+BUNDLED = Path(os.path.dirname(os.path.abspath(pyopenjtalk.__file__))) / "dictionary"
 
 
 @pytest.fixture(autouse=True)
@@ -181,43 +181,81 @@ def foreign_dictionary(tmp_path):
     return directory
 
 
-def _build_in_a_new_process(dictionary) -> str:
-    """Builds the backend in a new Python with ``OPEN_JTALK_DICT_DIR`` set, as pyopenjtalk reads it at import."""
-    code = ("from scriptconv.phonemizers import Alphabet, Phonemizer, get_phonemizer\n"
+def _build_in_a_new_process(dictionary, cwd=None, before: str = "") -> str:
+    """Builds the backend in a new Python with ``OPEN_JTALK_DICT_DIR`` set, as pyopenjtalk reads it at import.
+
+    *before* runs first in that Python, and the backend reads 何時ですか when it builds.
+    """
+    code = (before + "from scriptconv.phonemizers import Alphabet, Phonemizer, get_phonemizer\n"
             "try:\n"
             "    print(get_phonemizer(Phonemizer.OPENJTALK, Alphabet.KANA).phonemize_string('何時ですか', 'ja'))\n"
             "except ImportError as e:\n"
             "    print(e)\n")
-    env = {**os.environ, "OPEN_JTALK_DICT_DIR": str(dictionary), "PYTHONPATH": str(ROOT)}
-    result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, check=True)
+    env = {**os.environ, "OPEN_JTALK_DICT_DIR": str(dictionary), "PYTHONPATH": str(ROOT),
+           "BUNDLED_DICTIONARY": str(BUNDLED)}
+    result = subprocess.run([sys.executable, "-P", "-c", code], env=env, cwd=cwd, capture_output=True, text=True,
+                            check=True)
     return result.stdout.strip()
 
 
+def _refusal(value) -> str:
+    return ("The OpenJTalk phonemizer reads the dictionary of pyopenjtalk-plus, but OPEN_JTALK_DICT_DIR "
+            f"is {str(value)!r}, not {str(BUNDLED)!r}. Unset OPEN_JTALK_DICT_DIR, then start Python again.")
+
+
 def test_refuses_another_dictionary_from_the_environment(foreign_dictionary):
-    assert _build_in_a_new_process(foreign_dictionary) == (
-        "The OpenJTalk phonemizer reads the dictionary of pyopenjtalk-plus, but OPEN_JTALK_DICT_DIR "
-        f"names the dictionary {foreign_dictionary}. Unset OPEN_JTALK_DICT_DIR, then start Python again."
-    )
+    assert _build_in_a_new_process(foreign_dictionary) == _refusal(foreign_dictionary)
 
 
-def test_reads_with_the_bundled_dictionary_named_in_the_environment(tmp_path):
+@pytest.mark.parametrize("spelling", ["", "/", "/../dictionary"])
+def test_reads_with_the_absolute_path_of_the_bundled_dictionary(spelling):
+    assert _build_in_a_new_process(f"{BUNDLED}{spelling}") == "ナンジデスカ"
+
+
+@pytest.mark.parametrize("value", ["dictionary", "./dictionary"])
+def test_refuses_a_relative_path_to_the_bundled_dictionary(value):
+    """pyopenjtalk opens a relative path from the directory of the first reading, which can change."""
+    assert _build_in_a_new_process(value, cwd=BUNDLED.parent) == _refusal(value)
+
+
+def test_refuses_a_link_to_the_bundled_dictionary(tmp_path):
+    """The link can point at another dictionary by the time pyopenjtalk opens it."""
     link = tmp_path / "dictionary"
     link.symlink_to(BUNDLED)
-    assert _build_in_a_new_process(BUNDLED) == "ナンジデスカ"
-    assert _build_in_a_new_process(link) == "ナンジデスカ"
+    assert _build_in_a_new_process(link) == _refusal(link)
+
+
+def test_refuses_a_link_re_pointed_to_the_bundled_dictionary_after_the_import(foreign_dictionary, tmp_path):
+    """pyopenjtalk took the link while it named another dictionary, and keeps that value."""
+    link = tmp_path / "dictionary"
+    link.symlink_to(foreign_dictionary)
+    before = ("import os, pyopenjtalk\n"
+              "os.remove(os.environ['OPEN_JTALK_DICT_DIR'])\n"
+              "os.symlink(os.environ['BUNDLED_DICTIONARY'], os.environ['OPEN_JTALK_DICT_DIR'])\n")
+    assert _build_in_a_new_process(link, before=before) == _refusal(link)
 
 
 @pytest.mark.parametrize("alphabet", ALPHABETS)
 def test_refuses_the_variable_set_after_the_import(foreign_dictionary, monkeypatch, alphabet):
     monkeypatch.setenv("OPEN_JTALK_DICT_DIR", str(foreign_dictionary))
-    with pytest.raises(ImportError, match=r"OPEN_JTALK_DICT_DIR names the dictionary .*open_jtalk_dic\. Unset"):
+    with pytest.raises(ImportError) as refusal:
         OpenJTaklPhonemizer(alphabet)
+    assert str(refusal.value) == _refusal(foreign_dictionary)
+
+
+def test_refuses_an_empty_value(monkeypatch):
+    """pyopenjtalk takes an empty value as a path, and the first reading fails."""
+    monkeypatch.setenv("OPEN_JTALK_DICT_DIR", "")
+    with pytest.raises(ImportError) as refusal:
+        OpenJTaklPhonemizer()
+    assert str(refusal.value) == _refusal("")
 
 
 def test_refuses_the_dictionary_that_the_module_read_at_import(foreign_dictionary, monkeypatch):
     monkeypatch.setattr(pyopenjtalk, "OPEN_JTALK_DICT_DIR", str(foreign_dictionary).encode())
-    with pytest.raises(ImportError, match=r"OPEN_JTALK_DICT_DIR names the dictionary .*open_jtalk_dic\. Unset"):
+    with pytest.raises(ImportError) as refusal:
         OpenJTaklPhonemizer()
+    assert str(refusal.value) == _refusal(foreign_dictionary)
 
 
 def _extras():
