@@ -46,10 +46,10 @@ OWNED = {
 # scriptconv-nonfree. Everything else names the distribution that its extra
 # installs.
 IN_TREE = {
-    Phonemizer.UNICODE, Phonemizer.GRAPHEMES, Phonemizer.AFRICA_G2P,
-    Phonemizer.MATOUB_KAB, Phonemizer.MANTOQ, Phonemizer.HALABI, Phonemizer.IQRA,
-    Phonemizer.KOG2PK, Phonemizer.SHAMI, Phonemizer.VOSK, Phonemizer.BYT5,
-    Phonemizer.CHARSIU, Phonemizer.DIZIONE, Phonemizer.G2PW,
+    Phonemizer.UNICODE, Phonemizer.GRAPHEMES, Phonemizer.MATOUB_KAB,
+    Phonemizer.MANTOQ, Phonemizer.HALABI, Phonemizer.IQRA, Phonemizer.KOG2PK,
+    Phonemizer.SHAMI, Phonemizer.VOSK, Phonemizer.BYT5, Phonemizer.CHARSIU,
+    Phonemizer.DIZIONE, Phonemizer.G2PW,
 }
 # An engine that no extra can name: a binary, and a distribution the zh extra
 # does not list.
@@ -137,7 +137,6 @@ class TestIdentity:
 
     @pytest.mark.parametrize("member, lang, distribution", [
         (Phonemizer.MANTOQ, "ar", "scriptconv-nonfree"),
-        (Phonemizer.AFRICA_G2P, "yor", "scriptconv-nonfree"),
         (Phonemizer.KOG2PK, "ko", "scriptconv-copyleft"),
     ])
     def test_code_vendored_in_a_sister_package_reports_that_package(self, member, lang,
