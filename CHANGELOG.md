@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a107](https://github.com/TigreGotico/scriptconv/tree/0.0.4a107) (2026-11-16)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a106...0.0.4a107)
+
+**Merged pull requests:**
+
+- fix: normalize extra pulls text2spoken fr [\#285](https://github.com/TigreGotico/scriptconv/pull/285) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a106](https://github.com/TigreGotico/scriptconv/tree/0.0.4a106) (2026-11-16)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a105...0.0.4a106)
@@ -387,11 +395,6 @@
 ## [0.0.4a55](https://github.com/TigreGotico/scriptconv/tree/0.0.4a55) (2026-11-12)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a54...0.0.4a55)
-
-**Merged pull requests:**
-
-- fix\(fa\): set floors that let the fa extra resolve to a working set [\#183](https://github.com/TigreGotico/scriptconv/pull/183) ([JarbasAl](https://github.com/JarbasAl))
-- fix\(transphone\): install pip with the transphone extra [\#182](https://github.com/TigreGotico/scriptconv/pull/182) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a54](https://github.com/TigreGotico/scriptconv/tree/0.0.4a54) (2026-11-12)
 
