@@ -34,8 +34,10 @@ order:
    the sentences of a chunk by one rule.
 
 A sentence split on raw text cuts at full stops that belong to the reading.
-With `text2spoken` as the hook, `Mrs. Smith arrived.` reads as `Missus Smith
-arrived.`, but `Mrs.` alone stays `Mrs.`, so the split runs after the hook. Step 5 stays lazy, so a long text starts to speak before its last
+With `text2spoken` as the hook, `Prof. Smith arrived.` reads as `Professor
+Smith arrived.`. Read sentence by sentence after a split that cuts after
+`Prof.`, it reads as `Professor. Smith arrived.`, so the split runs after the
+hook. Step 5 stays lazy, so a long text starts to speak before its last
 sentence is read.
 
 Each stage, the hook, casing and the diacritizer, reads its text without the

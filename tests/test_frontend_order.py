@@ -5,6 +5,8 @@ casing, then the sentence split of the normalised text, then for each
 sentence, lazily, the diacritizer and the backend. A backend that owns
 ``normalize`` and reads whole text gets the whole text.
 """
+import re
+
 import pytest
 
 from scriptconv import frontend as frontend_module
@@ -43,18 +45,26 @@ def tokens_ipa(phonemized):
 
 
 class TestTheHookReadsTheWholeText:
-    def test_a_reading_that_needs_the_word_after_a_raw_sentence_end(self):
-        # quebra_frases ends a sentence after "Mrs.". text2spoken reads a title
-        # of its "titles" table, "Mrs.": "Missus", only before a capital letter,
-        # so it reads "Mrs." only when it sees the name after it.
-        assert frontend_module._sentence_tokenize("Mrs. Smith arrived.") == ["Mrs.", "Smith arrived."]
+    @pytest.mark.parametrize("split", ["quebra_frases", "every full stop"])
+    def test_a_reading_that_needs_the_word_after_a_raw_sentence_end(self, split, monkeypatch):
+        # text2spoken reads a title before a capitalised name with no full stop,
+        # as in its row "Ask Prof. Jones." -> "Ask Professor Jones.", and a
+        # "Prof." that ends a sentence with one, as in "Ask the Prof." -> "Ask the
+        # Professor.". A split that cuts after "Prof." gives the second reading.
+        # The stand-in split cuts after every full stop, so the test holds where
+        # a version of quebra_frases does not cut there.
+        if split == "every full stop":
+            monkeypatch.setattr(frontend_module, "_sentence_tokenize", lambda text: re.split(r"(?<=\.)\s+", text))
+        text = "Prof. Smith arrived."
+        sentences = frontend_module._sentence_tokenize(text)
+        assert len(sentences) > 1
         hook = spoken_normalizer()
-        assert hook("Mrs.", "en") == "Mrs."
-        assert hook("Mrs. Smith arrived.", "en") == "Missus Smith arrived."
+        assert " ".join(hook(sentence, "en") for sentence in sentences) == "Professor. Smith arrived."
+        assert hook(text, "en") == "Professor Smith arrived."
         frontend = TextFrontend(FrontendConfig("en", normalizer=hook, stages=Stages(diacritize=False)),
                                 Echo())
-        assert frontend.phonemize("Mrs. Smith arrived.") == [list("Missus Smith arrived")]
-        assert frontend.phonemize_flat("Mrs. Smith arrived.") == list("Missus Smith arrived")
+        assert frontend.phonemize(text) == [list("Professor Smith arrived")]
+        assert frontend.phonemize_flat(text) == list("Professor Smith arrived")
 
     def test_the_whole_text_is_normalised_before_the_first_sentence_is_read(self, monkeypatch):
         events = []
