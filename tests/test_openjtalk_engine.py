@@ -198,18 +198,48 @@ def _build_in_a_new_process(dictionary, cwd=None, before: str = "") -> str:
     return result.stdout.strip()
 
 
-def _refusal(value) -> str:
+def _refusal(value, bundled=BUNDLED) -> str:
     return ("The OpenJTalk phonemizer reads the dictionary of pyopenjtalk-plus, but OPEN_JTALK_DICT_DIR "
-            f"is {str(value)!r}, not {str(BUNDLED)!r}. Unset OPEN_JTALK_DICT_DIR, then start Python again.")
+            f"is {str(value)!r}, not {str(bundled)!r}. Unset OPEN_JTALK_DICT_DIR, then start Python again.")
 
 
 def test_refuses_another_dictionary_from_the_environment(foreign_dictionary):
     assert _build_in_a_new_process(foreign_dictionary) == _refusal(foreign_dictionary)
 
 
-@pytest.mark.parametrize("spelling", ["", "/", "/../dictionary"])
+@pytest.mark.parametrize("spelling", ["", "/"])
 def test_reads_with_the_absolute_path_of_the_bundled_dictionary(spelling):
     assert _build_in_a_new_process(f"{BUNDLED}{spelling}") == "ナンジデスカ"
+
+
+def test_refuses_the_bundled_dictionary_through_a_parent_directory():
+    """A value with a ``..`` component is refused, even when it names the bundled dictionary."""
+    value = f"{BUNDLED}/../dictionary"
+    assert _build_in_a_new_process(value) == _refusal(value)
+
+
+@pytest.mark.parametrize("source", ["environment", "module"])
+def test_refuses_a_parent_directory_after_a_link(both_installed, foreign_dictionary, tmp_path, monkeypatch, source):
+    """The system follows ``evil`` before it applies ``..``, so the value names the foreign dictionary.
+
+    As text, the value normalises to the bundled dictionary.
+    """
+    both_installed("pyopenjtalk-plus", ORDERS[0])
+    bundled = tmp_path / "pyopenjtalk" / "dictionary"
+    (tmp_path / "fake" / "sub").mkdir(parents=True)
+    (tmp_path / "fake" / "pyopenjtalk").mkdir()
+    (tmp_path / "fake" / "pyopenjtalk" / "dictionary").symlink_to(foreign_dictionary)
+    (tmp_path / "evil").symlink_to(tmp_path / "fake" / "sub")
+    value = f"{tmp_path}/evil/../pyopenjtalk/dictionary"
+    assert os.path.normpath(value) == str(bundled)
+    assert os.path.realpath(value) == str(foreign_dictionary.resolve())
+    if source == "environment":
+        monkeypatch.setenv("OPEN_JTALK_DICT_DIR", value)
+    else:
+        monkeypatch.setattr(pyopenjtalk, "OPEN_JTALK_DICT_DIR", value.encode())
+    with pytest.raises(ImportError) as refusal:
+        OpenJTaklPhonemizer()
+    assert str(refusal.value) == _refusal(value, bundled)
 
 
 @pytest.mark.parametrize("value", ["dictionary", "./dictionary"])

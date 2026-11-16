@@ -702,7 +702,9 @@ also refuses, with an `ImportError`, any value of `OPEN_JTALK_DICT_DIR` but the
 absolute path of the bundled dictionary. The check compares the text of the
 path, because pyopenjtalk opens the value later: a relative path, or a link to
 the bundled dictionary, can point at another dictionary by then, so both are
-refused.
+refused. A path with a `..` component is refused too, because the system
+applies `..` after it follows a link, so `/a/link/../b` can name a directory
+that `/a/b` does not.
 
 ```python
 # OPEN_JTALK_DICT_DIR=/usr/share/open_jtalk/dic python

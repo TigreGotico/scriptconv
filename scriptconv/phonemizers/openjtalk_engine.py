@@ -62,8 +62,8 @@ def require_pyopenjtalk_plus(backend: str, requirement: str) -> ModuleType:
             module imports, if another distribution installed the module, or
             if ``OPEN_JTALK_DICT_DIR``, in the environment or as the module
             read it at import, is set to any path but the absolute path of
-            the bundled dictionary. A relative path or a link to the bundled
-            dictionary is refused too.
+            the bundled dictionary. A relative path, a path with a ``..``
+            component, or a link to the bundled dictionary is refused too.
     """
     try:
         import onnxruntime  # noqa: F401
@@ -86,10 +86,13 @@ def require_pyopenjtalk_plus(backend: str, requirement: str) -> ModuleType:
             f"'{requirement}' in a new environment."
         )
     # pyopenjtalk opens the raw value at its first reading, maybe after a
-    # change of directory or link, so the value is compared as text.
+    # change of directory or link, so the value is compared as text. normpath
+    # removes ".." as text, but the kernel applies ".." after it follows a
+    # link, so a value with a ".." component is refused.
     bundled = os.path.join(os.path.dirname(os.path.abspath(pyopenjtalk.__file__)), "dictionary")
     for dict_dir in (os.environ.get(DICT_DIR_VARIABLE), os.fsdecode(pyopenjtalk.OPEN_JTALK_DICT_DIR)):
-        if dict_dir is not None and os.path.normpath(dict_dir) != os.path.normpath(bundled):
+        if dict_dir is not None and (os.path.normpath(dict_dir) != os.path.normpath(bundled)
+                                     or ".." in dict_dir.split(os.sep)):
             raise ImportError(
                 f"{backend} reads the dictionary of pyopenjtalk-plus, but {DICT_DIR_VARIABLE} "
                 f"is {dict_dir!r}, not {bundled!r}. Unset {DICT_DIR_VARIABLE}, then start "

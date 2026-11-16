@@ -214,6 +214,13 @@ def test_a_latin_word_of_any_case_is_unread(g2pw, caplog, sentence):
     assert error.value.unread == (sentence[:3],)
 
 
+def test_the_symbol_of_no_initial_in_the_text_is_unread(g2pw, caplog):
+    """``Ø`` marks a syllable with no initial in the output, but in the text it is a letter with no reading."""
+    with caplog.at_level(logging.WARNING, logger="scriptconv.phonemizers.g2pw"):
+        assert g2pw.phonemize("Ø公司。", "zh") == [["g", "ong", "1", "s", "i", "1", "。"]]
+    assert [record.getMessage() for record in caplog.records] == ["g2pW gives no symbol for 'Ø' in 'Ø公司。'"]
+
+
 @pytest.mark.parametrize("sentence, runs", [
     ("ABC，3个。", "'ABC', '3'"),
     ("Ⅻ月。", "'Ⅻ'"),
