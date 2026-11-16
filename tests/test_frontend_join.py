@@ -569,7 +569,7 @@ class TestDizioneTokensAndBlocks:
     @pytest.mark.parametrize("keep", [True, False])
     @pytest.mark.parametrize("text", ["Wait [[QZ]].);5 go.", "Wait [[QZ]]!):D go.", 'Wait [[QZ]]"):go now.',
                                       "Wait [[QZ]]:')) go now.", "Wait [[QZ]]:']] go now.", "Wait [[QZ]]);'* go.",
-                                      "Wait [[QZ]]):'* go.", "Wait [[QZ]];') ' go."])
+                                      "Wait [[QZ]]):'* go.", "Wait [[QZ]];') ' go.", "Wait [[QZ]]. );5 go."])
     def test_no_mark_of_the_run_after_a_block_starts_the_next_chunk(self, backend, text, keep):
         # dizione reads a tail such as ");" or ":'))" at the end of a text as an emoticon, and with the next word as marks
         frontend = TextFrontend(FrontendConfig("en-US", keep_punctuation=keep), backend)

@@ -35,7 +35,8 @@ order:
 
 A sentence split on raw text cuts at full stops that belong to the reading.
 With `text2spoken` as the hook, `Prof. Smith arrived.` reads as `Professor
-Smith arrived.`, but `Prof.` alone stays `Prof.`, so the split runs after the
+Smith arrived.`. Read sentence by sentence after a split that cuts after
+`Prof.`, it reads as `Professor. Smith arrived.`, so the split runs after the
 hook. Step 5 stays lazy, so a long text starts to speak before its last
 sentence is read.
 
@@ -195,6 +196,9 @@ Where a word follows, that run ends before a quote, an apostrophe, `¡`, `¿`
 or an ellipsis, also in a compatibility form such as `＂` or `︙`. dizione
 starts a clause with such a mark after whitespace, so `Wait [[ab]]. " go now.`
 gives `<bos> w eɪ t <sp> a b . <eos>` and `<bos> " ɡ oʊ <sp> n aʊ . <eos>`.
+dizione reads `x. :')) go` with `. )`, so `Wait [[ab]]. :')) go now.` starts
+its next chunk with `)`, the mark after the apostrophe. A run also ends before
+`-` and `^`, so in `Wait [[ab]])-:go now.` the `:` starts the next chunk.
 
 This has a limit. A backend can keep such a mark with the word before it.
 dizione does so after `)`, after `"` and `…`, and at `sentence` size after
