@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a106](https://github.com/TigreGotico/scriptconv/tree/0.0.4a106) (2026-11-16)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a105...0.0.4a106)
+
+**Merged pull requests:**
+
+- fix: test extra needs text2spoken 0.0.2a55 [\#282](https://github.com/TigreGotico/scriptconv/pull/282) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a105](https://github.com/TigreGotico/scriptconv/tree/0.0.4a105) (2026-11-16)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a104...0.0.4a105)
@@ -183,7 +191,6 @@
 **Merged pull requests:**
 
 - fix\(phonemizers\): stop transphone pip installs, correct the ko errors and alphabet [\#198](https://github.com/TigreGotico/scriptconv/pull/198) ([JarbasAl](https://github.com/JarbasAl))
-- fix\(zh\): install numpy for g2pM, and say how g2pc installs [\#181](https://github.com/TigreGotico/scriptconv/pull/181) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a81](https://github.com/TigreGotico/scriptconv/tree/0.0.4a81) (2026-11-14)
 
@@ -385,7 +392,6 @@
 
 - fix\(fa\): set floors that let the fa extra resolve to a working set [\#183](https://github.com/TigreGotico/scriptconv/pull/183) ([JarbasAl](https://github.com/JarbasAl))
 - fix\(transphone\): install pip with the transphone extra [\#182](https://github.com/TigreGotico/scriptconv/pull/182) ([JarbasAl](https://github.com/JarbasAl))
-- fix\(ja\): install a MeCab dictionary with the ja-phonemizers extra [\#180](https://github.com/TigreGotico/scriptconv/pull/180) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a54](https://github.com/TigreGotico/scriptconv/tree/0.0.4a54) (2026-11-12)
 
