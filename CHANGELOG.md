@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a102](https://github.com/TigreGotico/scriptconv/tree/0.0.4a102) (2026-11-16)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a101...0.0.4a102)
+
+**Merged pull requests:**
+
+- chore\(deps\): install africa-g2p through scriptconv-nonfree\[africa\] [\#276](https://github.com/TigreGotico/scriptconv/pull/276) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a101](https://github.com/TigreGotico/scriptconv/tree/0.0.4a101) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a100...0.0.4a101)
@@ -367,10 +375,6 @@
 ## [0.0.4a54](https://github.com/TigreGotico/scriptconv/tree/0.0.4a54) (2026-11-12)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a53...0.0.4a54)
-
-**Merged pull requests:**
-
-- feat: add TextFrontend, the text frontend a voice runs [\#173](https://github.com/TigreGotico/scriptconv/pull/173) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a53](https://github.com/TigreGotico/scriptconv/tree/0.0.4a53) (2026-11-12)
 
