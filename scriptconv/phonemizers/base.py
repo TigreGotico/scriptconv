@@ -27,7 +27,7 @@ import re
 import string
 import unicodedata
 from importlib import metadata
-from typing import Callable, ClassVar, Iterable, Iterator, List, Optional, Tuple, Literal, Union
+from typing import Callable, ClassVar, Iterable, Iterator, List, Mapping, Optional, Tuple, Literal, Union
 
 from scriptconv.phonemizers.enums import Alphabet
 from scriptconv.version import VERSION_STR
@@ -60,6 +60,8 @@ _SEPARATING_MARKS = frozenset(mark for mark, symbol in CLAUSE_PUNCTUATION.items(
 # reads an ellipsis as a spoken-name pause, which Piper does not keep).
 _CLAUSE_BREAK = re.compile(r"(?:\.\.+|\u2026|[,:;!?|\u060c\u061b\u061f])[^\w\s]*(?=\s)")
 _TRAILING_PUNCTUATION = re.compile(r"[^\w\s]+\s*$")
+# One or more blank lines: a paragraph break.
+_PARAGRAPH_BREAK = re.compile(r"(\n(?:[^\S\n]*\n)+)")
 _LANG_FLAGS = re.compile(r"\([^)]+\)")
 # The stress mark that the diacritize stage (stressonnx) writes after a stressed vowel.
 STRESS_MARK = "\u0301"
@@ -184,6 +186,9 @@ class PhonemizerIdentity:
     """The resolved lect, ``"pt-PT-x-porto"``."""
     revision: Optional[str] = None
     """The orthography2ipa spec revision, when the backend has one."""
+    frontend: Optional[int] = None
+    """The version of the stage order of :class:`~scriptconv.frontend.TextFrontend`.
+    ``None`` for a backend called directly."""
 
     def differs_from(self, other: "PhonemizerIdentity") -> Tuple[str, ...]:
         """Names of the fields that differ from *other*, ``revision`` first.
@@ -197,6 +202,37 @@ class PhonemizerIdentity:
                  if getattr(self, field.name) != getattr(other, field.name)
                  and not (same_spec and field.name == "version")]
         return tuple(sorted(names, key=lambda name: name != "revision"))
+
+
+@dataclasses.dataclass(frozen=True)
+class Segment:
+    """One sentence or clause of a text that a backend reads whole.
+
+    :meth:`BasePhonemizer.phonemize_segments` yields these in reading order.
+    """
+
+    phonemes: Tuple[str, ...]
+    """The output symbols, as :meth:`BasePhonemizer.phonemize_lazy` yields them."""
+    mark: Optional[str] = None
+    """The clause symbol that ends the segment, a value of
+    :data:`CLAUSE_PUNCTUATION`, or ``None``. The frontend appends it when it
+    keeps punctuation. A bounded segment holds its marks among its own
+    symbols, so the frontend appends nothing to it, and the mark tells only
+    that the segment ends at a mark."""
+    ends_sentence: bool = True
+    """Whether the segment ends a sentence."""
+    streams: Mapping[str, Tuple] = dataclasses.field(default_factory=dict)
+    """Side streams of the backend, such as stress, each in step with :attr:`phonemes`."""
+    ends_paragraph: bool = False
+    """Whether a paragraph break (one or more blank lines) follows the
+    segment in the text. Only a segment that ends a sentence ends a
+    paragraph."""
+    bounded: bool = False
+    """Whether the first symbol of :attr:`phonemes` is the backend's start
+    symbol and the last its end symbol, as ``<bos>`` and ``<eos>``. Where the
+    frontend joins two bounded segments, the inner end and start symbols go,
+    with their stream values. A segment with no mark then takes the
+    backend's :meth:`~BasePhonemizer.word_break` before the next one."""
 
 
 class MissingLanguageError(ValueError):
@@ -304,6 +340,14 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
     A stage that runs only with an optional dependency is not owned.
     """
 
+    reads_whole_text: ClassVar[bool] = False
+    """The backend reads the whole text and reports its own sentence and clause
+    marks through :meth:`phonemize_segments`.
+
+    :class:`~scriptconv.frontend.TextFrontend` then does not cut the text into
+    sentences for it. Only a backend that owns ``normalize`` sets it.
+    """
+
     engine_distribution: ClassVar[Optional[str]] = None
     """The distribution that holds the engine. ``None`` means code inside
     scriptconv, or inside the scriptconv-copyleft or scriptconv-nonfree
@@ -397,6 +441,49 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
             yield from (phonemes for phonemes, _ in self._punctuated_sentences(text, lang))
         else:
             yield from self._bare_sentences(text, lang)
+
+    def phonemize_segments(self, text: str, lang: str) -> Iterator[Segment]:
+        """The segments of *text* in reading order, read in one pass.
+
+        A backend that sets :attr:`reads_whole_text` overrides this method and
+        cuts its own output at its own sentence and clause marks. The segment
+        text holds no punctuation: the mark that ends a segment is in
+        :attr:`Segment.mark`.
+
+        For any other backend, :class:`~scriptconv.frontend.TextFrontend`
+        calls this method on each sentence or clause, and a segment is a
+        sentence of :meth:`phonemize_lazy`. A backend with side streams, or
+        with its own start and end symbols, overrides it to give them.
+
+        Raises:
+            NotImplementedError: If the backend reads whole text and does not
+                override this method.
+        """
+        if self.reads_whole_text:
+            raise NotImplementedError(f"{type(self).__name__} reads whole text and gives no segments")
+        for phonemes in self.phonemize_lazy(text, lang):
+            yield Segment(tuple(phonemes))
+
+    def word_break(self) -> Segment:
+        """The symbol that separates two words in this backend's output, with its stream values.
+
+        :class:`~scriptconv.frontend.TextFrontend` writes it where it joins
+        two pieces with no clause symbol between them, and around an inline
+        block. A stream that the segment lacks takes 0.
+        """
+        return Segment((" ",))
+
+    def mark_symbols(self, marks: str) -> Optional[Segment]:
+        """The symbols that this backend writes for *marks* after a word, with their stream values, or ``None``.
+
+        This is the backend's mark table. *marks* is a run of closing marks,
+        such as ``.``, ``...`` or ``?!``, or a quote that opens the next word,
+        with the whitespace before them in the text, if any.
+        :class:`~scriptconv.frontend.TextFrontend` reads it for the marks
+        after an inline block, and writes the symbols of the table after the
+        block. ``None`` declares no table.
+        """
+        return None
 
     def _bare_sentences(self, text: str, lang: str) -> Iterator[List[str]]:
         """Per-chunk phonemes, with the punctuation removed before the backend."""

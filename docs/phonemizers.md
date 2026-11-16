@@ -391,11 +391,38 @@ Homograph Data (Apache-2.0, in `built/LICENSE.homograph-data`), and most of
 their pronunciations come from CMUdict.
 
 dizione reads the text itself, so the backend owns the `normalize` stage,
-and the frontend runs no normaliser before it. The backend's own methods and
-`tokens()` read the text whole. `phonemize_lazy` ends a sentence where dizione
-does, at `.`, `?` or `!`, and a full stop that dizione reads as part of an
-abbreviation, as in `Mrs.`, ends no sentence. `TextFrontend.phonemize_flat`
-also gives the text whole.
+and the frontend runs no normaliser before it. The backend reads whole text
+(`reads_whole_text`): `TextFrontend` gives it the whole text, and dizione cuts
+its own output at its own marks. `phonemize_segments(text, lang)` gives one
+segment per clause, with the mark that ends it and a `stress` stream in step
+with its characters. A clause ends after a run of `, . ? ! ; :` that follows a
+sound, and it ends a sentence when the run holds `.`, `?` or `!`. A full stop
+that dizione reads as part of an abbreviation, as in `Mrs.`, ends nothing. A
+closing bracket after the run, or a quotation mark that closes an open
+quotation, stays with the clause that ends, and so does a clause mark after
+it, as in `"Stop." .`, so no clause starts with a mark. A `!` or `?` between two letters
+with no space after it, as in `Sim!Não!`, is no clause mark: the backend reads
+it as a space, in `tokens()` too. A sentence that a blank line follows ends a
+paragraph, unless dizione's own rules read the blank line away, as in
+`Jan.\n\n5`. dizione reads a blank line as a space, so a blank line after
+`:`, `;`, an ellipsis or a title ends no paragraph. With `keep_punctuation`,
+the frontend writes the clause symbol of each mark.
+
+`DizionePhonemizer(tokens=True)` changes `phonemize_segments` only: each
+segment is then a clause of dizione's own tokens, with its own `<bos>` and
+`<eos>`, its marks, and `ids` and `stress` streams. `TextFrontend.segments`
+groups them into chunks of any size and removes the inner `<eos>` `<bos>`
+pairs, so its sentence chunks equal `token_segments(text)`, and its `NONE`
+chunk equals `tokens(text)`. An inline block goes inside the chunk's `<bos>`
+and `<eos>`, with dizione's `<sp>` as its word break, as dizione reads a word
+in the place of the block. `mark_symbols(marks)` gives the tokens that dizione
+writes for a run of marks after a word, with their ids and stress: `…` for
+`...`, `"` for `»`, and a repeated mark once. They are the tokens after the
+word in dizione's own read of a word and the marks, because dizione reads
+some runs alone as an emoticon: `;*` alone gives no token, and after a word it
+gives `;`. The frontend writes them after a block, so `Wait [[ab]].` ends in
+`a b . <eos>`, as `Wait cat.` ends in `k æ t . <eos>`. Without `tokens=True`
+it returns `None`.
 
 The IPA string has a space between two words and a stress mark directly
 before its vowel, as dizione writes it. It has no control symbol (`<bos>`,
@@ -404,6 +431,9 @@ break. A TTS engine that reads dizione's token ids needs more than the IPA
 string, so `DizionePhonemizer.tokens(text)` returns dizione's own
 `Phonemized` object unchanged: the symbols, the ids into
 `dizione.symbols.SYMBOLS` and the stress of each symbol (0, 1 or 2).
+`token_segments(text)` gives the same sequence cut into sentences, each with
+its own `<bos>` and `<eos>`. Joined, with each inner `<eos>` `<bos>` pair and
+its ids and stress removed, the sentences are `tokens(text)`.
 `identity(lang)` puts dizione's build fingerprint in `revision`, so tokens
 from two builds of code, tables or data never mix. When overrides take effect,
 from `overrides=` or from `DIZIONE_OVERRIDES`, `revision` is the sha256 of
@@ -416,14 +446,15 @@ phone outside dizione's inventory raises `ValueError`.
 
 Limits:
 
-- `TextFrontend.phonemize` splits the text into sentences with quebra_frases
-  before the backend reads it, so dizione reads each piece alone. When
-  quebra_frases takes the full stop of an abbreviation as a sentence end, the
-  words after it lose their context. `Prof. Close the door.` reads "close" as
-  the verb (`klˈoʊz`), `Jan. 1, 2000` reads "one" and not "first", and
-  `See p. 12.` reads the letter "p" and not "page". `tokens()`, the backend's
-  own methods and `TextFrontend.phonemize_flat` read these texts whole and
-  give `klˈoʊs`, `fˈɜːst` and `pˈeɪdʒ`.
+- The token sequence holds no spaces, so a closing quote and an opening quote
+  look the same. The backend reads each `"` in the text: a `"` after a space
+  opens a quotation, and any other closes one. For `'` it counts the marks,
+  so a `'` that dizione keeps for an elision, as in `rock 'n' roll`, moves
+  that count.
+- dizione ends a sentence after each initial of a name: `J. R. R. Tolkien
+  wrote it.` reads as four sentences. The words are right, but at `SENTENCE`
+  size a voice speaks each initial as its own utterance, with a final fall.
+  Use `PARAGRAPH` or `NONE` size for such text.
 - dizione reads American English only. A tag must resolve to `en-US`, or to
   a lect of it such as `en-US-x-nyc`. A bare `en` is British English by the
   default-region rule, so it is refused with `UnsupportedLanguageError`, like
@@ -661,6 +692,13 @@ phonemes, lang_ids = phonemizer.phonemize_with_language_ids("شو، هلق.", "a
 # phonemes[0] holds 'sil' after the comma and 'brk' after the full stop
 ids = [SYMBOL_TO_ID_90[p] for p in phonemes[0]]
 ```
+
+`ShamiPhonemizer.phonemize_segments` gives one segment per sentence, with its
+`<bos>` and `<eos>` (`bounded`) and the `language_ids` stream. Through
+`TextFrontend.segments`, each chunk at every size has one `<bos>` and one
+`<eos>`, and its language ids stay in step with its symbols. Where two
+sentences join, a space with the language id 3 (`NEUTRAL`) comes between them,
+as the front end writes it between two words.
 
 `SYMBOL_TO_ID`, `ID_TO_SYMBOL`, `VOCAB_SIZE`, `tokenize_ipa` and `encode` hold
 the 88-symbol tables. `SYMBOL_TO_ID_90`, `ID_TO_SYMBOL_90` and `VOCAB_SIZE_90`
