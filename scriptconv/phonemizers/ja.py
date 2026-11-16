@@ -1,14 +1,22 @@
 from scriptconv.phonemizers._moved import deprecated_getattr
 from scriptconv.phonemizers.base import BasePhonemizer, _check_alphabet
 from scriptconv.phonemizers.enums import Alphabet
+from scriptconv.phonemizers.openjtalk_engine import ENGINE_DISTRIBUTION, require_pyopenjtalk_plus
 
 
 class OpenJTaklPhonemizer(BasePhonemizer):
-    engine_distribution = "pyopenjtalk"
+    """Japanese readings from OpenJTalk, in Hepburn romaji or kana.
+
+    The engine is pyopenjtalk-plus with onnxruntime. The backend refuses an
+    install where another distribution owns the ``pyopenjtalk`` module, or
+    where onnxruntime does not import, because those give other readings
+    (:mod:`scriptconv.phonemizers.openjtalk_engine`).
+    """
+    engine_distribution = ENGINE_DISTRIBUTION
 
     def __init__(self, alphabet=Alphabet.HEPBURN):
         _check_alphabet(self, alphabet, [Alphabet.HEPBURN, Alphabet.KANA])
-        import pyopenjtalk
+        pyopenjtalk = require_pyopenjtalk_plus("The OpenJTalk phonemizer", "scriptconv[ja-phonemizers]")
         self.g2p = pyopenjtalk.g2p
         super().__init__(alphabet)
 
