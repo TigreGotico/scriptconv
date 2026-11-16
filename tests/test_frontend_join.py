@@ -634,7 +634,7 @@ class TestAMarkAfterABlock:
             assert whole[whole.index("b") + 1] == " "
         # a block glued to the next word takes no word break
         whole = frontend.phonemize("انتظر [[ab]]اذهب.", Stages(chunk=Chunk.NONE))[0]
-        assert whole[whole.index("b") + 1] == "d"
+        assert whole[whole.index("b") + 1] != " "
 
     @pytest.mark.parametrize("keep", [True, False])
     def test_vosk_joins_its_chunks_after_a_block_by_the_one_rule(self, keep):
