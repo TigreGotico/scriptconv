@@ -525,10 +525,29 @@ class TestDizioneTokensAndBlocks:
                                       "Hello [[QZ]], world.", "[[QZ]] Hello there.",
                                       "[[QZ]]. Hello there.", "[[QZ]], hello there.", "[[QZ]]? Hello there.",
                                       "Hi. [[QZ]]. Hello there.", "Hi. [[QZ]], hello there.",
-                                      "Wait [[QZ]]\nGo.", "[[QZ]] [[QZ]]. Hello there.", "[[QZ]]\n[[QZ]] Hello there."])
+                                      "Wait [[QZ]]\nGo.", "[[QZ]] [[QZ]]. Hello there.", "[[QZ]]\n[[QZ]] Hello there.",
+                                      "Wait [[QZ]]... go now.", "[[QZ]]... go now.", "Wait [[QZ]]...\n\ngo now.",
+                                      "Wait [[QZ]] . go now.", "Wait [[QZ]]\t?! go now.", "[[QZ]]. [[QZ]] go now.",
+                                      "Wait [[QZ]] !go now.", 'Wait [[QZ]] ."go now."'])
     def test_the_none_chunk_is_dizione_read_with_the_block_in_place(self, backend, text, keep):
         frontend = TextFrontend(FrontendConfig("en-US", keep_punctuation=keep), backend)
         assert _ids(frontend, text, Chunk.NONE, "ids") == [self._with_block(backend, text)]
+
+    @pytest.mark.parametrize("keep", [True, False])
+    @pytest.mark.parametrize("text", [text for mark in (".", ",", "?", "!", ";", ":", "…", "...", "?!", "!»", "),", '."')
+                                      for text in (f"Wait [[QZ]]{mark}", f"Wait [[QZ]]{mark} [[QZ]] go now.")])
+    def test_a_mark_with_no_word_after_it_is_written_from_dizione_table(self, backend, text, keep):
+        # dizione reads no word after the mark, so the frontend writes it from dizione's mark table
+        frontend = TextFrontend(FrontendConfig("en-US", keep_punctuation=keep), backend)
+        assert _ids(frontend, text, Chunk.NONE, "ids") == [self._with_block(backend, text)]
+
+    def test_dizione_mark_table_is_what_dizione_writes_after_a_word(self, backend):
+        for marks in (".", "...", "…", "?!", "!»", "),", '."', "”", "。", "!!", ")).", '!»”'):
+            whole = backend.tokens("x" + marks)
+            table = backend.mark_symbols(marks)
+            assert (list(table.phonemes), list(table.streams["ids"]), list(table.streams["stress"])) == (
+                list(whole.symbols[4:-1]), list(whole.ids[4:-1]), list(whole.stress[4:-1]))
+        assert DizionePhonemizer().mark_symbols(".") is None
 
     @pytest.mark.parametrize("chunk", SIZES)
     def test_a_block_before_the_first_text_at_each_size(self, backend, chunk):
@@ -566,18 +585,21 @@ class TestDizioneTokensAndBlocks:
 
 
 class TestAMarkAfterABlock:
-    """A mark right after a block closes the block's sentence, so it goes with the block's chunk.
+    """A closing mark after a block, right after it or after whitespace, closes the block's sentence.
 
-    tts-punctuation puts a closing mark with the sentence that it ends, so no
-    chunk starts with a closing mark, at any size and for any backend.
+    So the mark goes with the block's chunk, as tts-punctuation puts a closing
+    mark with the sentence that it ends, and no chunk starts with a mark that
+    closes a block's sentence, at any size and for any backend.
     """
 
-    MARKS = (".", ",", "?", '"', "،")
-    CASES = [("graphemes", "en-US", None, "Wait [[ab]]. Go. Wait [[ab]], go now. He said \"wait [[ab]].\" Go."),
-             ("orthography2ipa", "en-US", None, "Wait [[ab]]? Go. [[ab]]. Go now."),
-             ("dizione", "en-US", None, "Wait [[ab]]. Go. Wait [[ab]], go now. He said \"wait [[ab]].\" Go."),
-             ("shami", "ar", None, "انتظر [[ab]]. اذهب. [[ab]]، اذهب الآن."),
-             ("vosk", "ru-RU", "vosk", "Жди [[ab]]. Иди. Жди [[ab]], иди.")]
+    MARKS = (".", ",", "?", '"', "،", "…")
+    CASES = [("graphemes", "en-US", None, "Wait [[ab]]. Go. Wait [[ab]], go now. He said \"wait [[ab]].\" Go. "
+                                          "Wait [[ab]] . Go. Wait [[ab]]... go."),
+             ("orthography2ipa", "en-US", None, "Wait [[ab]]? Go. [[ab]]. Go now. Wait [[ab]] ? Go."),
+             ("dizione", "en-US", None, "Wait [[ab]]. Go. Wait [[ab]], go now. He said \"wait [[ab]].\" Go. "
+                                        "Wait [[ab]] . Go. Wait [[ab]]... go."),
+             ("shami", "ar", None, "انتظر [[ab]]. اذهب. [[ab]]، اذهب الآن. انتظر [[ab]] . اذهب."),
+             ("vosk", "ru-RU", "vosk", "Жди [[ab]]. Иди. Жди [[ab]], иди. Жди [[ab]] . Иди. Жди [[ab]] !Иди.")]
 
     @staticmethod
     def _frontend(name, lang, alphabet, keep):
@@ -619,6 +641,21 @@ class TestAMarkAfterABlock:
         assert first[-len(tail) - 3:] == ["a", "b", *tail, "<eos>"]
         assert rest[0][1] not in self.MARKS
 
+    @pytest.mark.parametrize("keep", [True, False])
+    @pytest.mark.parametrize("chunk", [Chunk.SENTENCE, Chunk.CLAUSE, Chunk.PARAGRAPH])
+    @pytest.mark.parametrize("text", ["Wait [[ab]]... Go.", "Wait [[ab]]...\n\nGo.", "Wait [[ab]] . Go.",
+                                      "Wait [[ab]]\n\n. Go.", "Wait [[ab]] ?!\n\nGo.", "Wait [[ab]] !Go."])
+    def test_no_dizione_token_chunk_starts_with_a_closing_mark(self, text, chunk, keep):
+        frontend = TextFrontend(FrontendConfig("en-US", keep_punctuation=keep), DizionePhonemizer(tokens=True))
+        assert [c[:3] for c in frontend.phonemize(text, Stages(chunk=chunk)) if c[1] in (".", "?", "!", "…")] == []
+
+    @pytest.mark.parametrize("chunk", [Chunk.SENTENCE, Chunk.PARAGRAPH])
+    def test_a_quote_that_opens_the_next_word_stays_with_it(self, chunk):
+        frontend = TextFrontend(FrontendConfig("en-US"), DizionePhonemizer(tokens=True))
+        first, second = frontend.phonemize('Wait [[ab]]\n\n"Go," he said.', Stages(chunk=chunk))
+        assert first[-3:] == ["a", "b", "<eos>"]
+        assert second[:3] == ["<bos>", '"', "ɡ"]
+
     @pytest.mark.parametrize("chunk", [Chunk.SENTENCE, Chunk.CLAUSE])
     def test_an_opening_quote_after_the_mark_starts_the_next_chunk(self, chunk):
         frontend = TextFrontend(FrontendConfig("en-US"), DizionePhonemizer(tokens=True))
@@ -632,9 +669,11 @@ class TestAMarkAfterABlock:
         for text in ("انتظر [[ab]]. اذهب.", "[[ab]]، اذهب الآن.", "انتظر [[ab]]\nاذهب."):
             whole = frontend.phonemize(text, Stages(chunk=Chunk.NONE))[0]
             assert whole[whole.index("b") + 1] == " "
-        # a block glued to the next word takes no word break
+        # a block glued to the next word takes no word break: the word's own first symbol follows it
         whole = frontend.phonemize("انتظر [[ab]]اذهب.", Stages(chunk=Chunk.NONE))[0]
-        assert whole[whole.index("b") + 1] != " "
+        word = frontend.phonemize("اذهب.", Stages(chunk=Chunk.NONE))[0]
+        assert word[0] == "<bos>"
+        assert whole[whole.index("b") + 1] == word[1]
 
     @pytest.mark.parametrize("keep", [True, False])
     def test_vosk_joins_its_chunks_after_a_block_by_the_one_rule(self, keep):

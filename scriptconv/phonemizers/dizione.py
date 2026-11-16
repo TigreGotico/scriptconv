@@ -17,6 +17,7 @@ such as ``Mrs.`` ends no sentence.
 """
 import dataclasses
 import hashlib
+import itertools
 import json
 import re
 from functools import cached_property
@@ -272,6 +273,20 @@ class DizionePhonemizer(BasePhonemizer):
         if self.tokens_mode:
             return Segment((SP,), streams={"ids": (SYMBOL_TO_ID[SP],), "stress": (0,)})
         return Segment((" ",), streams={"stress": (0,)})
+
+    def mark_symbols(self, marks: str) -> Optional[Segment]:
+        """dizione's tokens for *marks* after a word with ``tokens=True``, else ``None``.
+
+        dizione reads ``...`` as ``…`` and a closing ``»`` or ``”`` as ``"``,
+        and it writes a repeated mark once. Without ``tokens=True`` the
+        frontend writes the clause symbols, so dizione has no table.
+        """
+        if not self.tokens_mode:
+            return None
+        symbols = tuple(mark for mark, _ in itertools.groupby(
+            value for is_mark, value in self.engine.pieces(marks) if is_mark))
+        return Segment(symbols, streams={"ids": tuple(SYMBOL_TO_ID[mark] for mark in symbols),
+                                         "stress": (0,) * len(symbols)})
 
     def phonemize_string(self, text: str, lang: str) -> str:
         self.get_lang(lang)

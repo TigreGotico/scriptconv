@@ -27,9 +27,12 @@ sentences in one run (``dense``), with a blank line after each
 (``dense+blank``), and each in quotes as well (``dense+quote+blank``). The
 script reports the median and the maximum of the runs, and the largest size
 at which the maximum of every shape stays under 100 ms, and so does every
-smaller size. ``WHOLE_TEXT_LIMIT`` is at or below that size in every run at a
-1-minute load of 16 or less on a 24-core machine, so a read at the limit keeps
-a margin under 100 ms. ``scripts/time_owner_backends.txt`` holds the output.
+smaller size. A server reads the same backend many times in one process, with
+no collection before the clock, and that steady mode can be slower than a
+fresh backend. ``WHOLE_TEXT_LIMIT`` is the largest size at which every run of
+this script and every run of the steady mode stays under 100 ms, each started
+at a 1-minute load of 8 or less on a 24-core machine.
+``scripts/time_owner_backends.txt`` holds the output.
 
 usage: python scripts/time_owner_backends.py PROSE_DIR
 

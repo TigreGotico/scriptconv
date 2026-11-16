@@ -88,12 +88,13 @@ frontend = TextFrontend(FrontendConfig("en-US"), DizionePhonemizer(tokens=True))
 ```
 
 A whole-text read has a size limit, `FrontendConfig.whole_text_limit`. Its
-default is `WHOLE_TEXT_LIMIT`, 2,000 characters, and `None` turns it off. Above the limit, the
+default is `WHOLE_TEXT_LIMIT`, 1,750 characters, and `None` turns it off. Above the limit, the
 frontend first cuts the text at its paragraph breaks (one or more blank
 lines), and never at a guessed sentence end. A paragraph break then ends a
 sentence. The limit keeps one read of the slowest whole-text backend under
 100 ms, from the timing of `scripts/time_owner_backends.py` on prose and on a
-text dense in dates and prices. Its output is in
+text dense in dates and prices, both with a new backend per call and with one
+backend read again and again, as a server reads it. Its output is in
 `scripts/time_owner_backends.txt`. The limit bounds the read only: a full
 garbage collection of the process can fall inside one call and add to it.
 
@@ -171,11 +172,17 @@ frontend reads no mark around the block. Its word break, such as dizione's
 and the chunk does not end in a mark, and after the block where the text has
 whitespace or a mark. A word break never comes right before the end symbol:
 the text after a block starts a new sentence, so a sentence chunk that ends in
-a block ends in the block's symbols. A mark right after a block closes the
-block's sentence, so the symbol that the backend writes for it goes with the
-block, in place of the word break, and the next chunk starts with a word. A
-block before the first text takes the start and end symbols of the text after
-it. A text that holds only blocks gives no start and end symbols,
+a block ends in the block's symbols. A closing mark after a block, right
+after it or after whitespace, closes the block's sentence, so the symbol that
+the backend writes for it goes with the block, in place of the word break,
+and the next chunk starts with a word. The backend's mark table,
+`mark_symbols(marks)`, tells which symbols it writes for the marks, such as
+dizione's `…` for `...`. Where the backend reads no word after the marks,
+before the next block or at the end of the text, it writes no symbol for
+them, and the frontend writes the symbols of the table: `Wait [[ab]].` gives
+`a b . <eos>` in dizione's token mode. A backend with no table gives no mark
+there. A block before the first text takes the start and end symbols of the
+text after it. A text that holds only blocks gives no start and end symbols,
 because the backend reads no text.
 
 A backend can still cut inside a chunk that is too long for its own limit.
@@ -251,8 +258,9 @@ owns the stage still runs it, because it needs the marks to read the text.
 
 A chunk that gives no phonemes is not in the output. A block adds its symbols
 to the sentence before it, and the text after a block starts a new sentence. A
-mark right after a block goes with the block, so no chunk starts with a
-closing mark. A block before the first text is a chunk of its own at
+closing mark after a block, right after it or after whitespace, goes with the
+block, so no chunk starts with a mark that closes a block's sentence. A quote
+that opens the next word is not such a mark. A block before the first text is a chunk of its own at
 `sentence` and `clause` size, and it starts the chunk after it at `paragraph`
 and `none` size. A space next to a block in the text becomes a space symbol:
 

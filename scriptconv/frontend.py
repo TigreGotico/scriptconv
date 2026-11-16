@@ -91,9 +91,10 @@ normalisation."""
 
 # scripts/time_owner_backends.py, output in scripts/time_owner_backends.txt: one dizione call on English text
 # dense in dates and prices, also with a blank line and quotes after each sentence, stays under 100 ms up to
-# 2,000 characters (at most 46 ms in two runs). Prose reads faster. The limit bounds the read; a full garbage
-# collection of the process can add to one call.
-WHOLE_TEXT_LIMIT = 2_000
+# 1,750 characters, both with a new backend per call (at most 61.9 ms in two runs) and with one backend read
+# again and again (at most 79.3 ms in 11 runs). At 2,000 characters one run of the second kind took 100.5 ms.
+# Prose reads faster. The limit bounds the read; a full garbage collection of the process can add to one call.
+WHOLE_TEXT_LIMIT = 1_750
 """The default of :attr:`FrontendConfig.whole_text_limit`."""
 
 # The word that stands for a block when the frontend reads the mark after it.
@@ -101,6 +102,8 @@ _BLOCK_WORD = "a"
 # Text that ends in whitespace and then only marks. The marks join the block
 # after them as they join a plain word, and the whitespace stays.
 _SPACE_BEFORE_BLOCK = re.compile(r"\s\W*$")
+# Marks of the categories that close (Po) that can also open a word.
+_OPENING_MARKS = frozenset("\"'¡¿")
 # The text before the first letter or digit: whitespace and marks.
 _WORDLESS_START = re.compile(r"[\W_]*")
 
@@ -328,6 +331,23 @@ def _leading_marks(text: str) -> str:
     return text[:count]
 
 
+def _closing_marks(after: str) -> str:
+    """The closing marks in the text *after* a block that close the block's sentence.
+
+    They come right after the block, or after whitespace. After whitespace, a
+    run of marks glued to the next word ends before its first mark that can
+    open a word, such as the quotation mark of ``[[ab]] "Go"``.
+    """
+    marks = _leading_marks(after)
+    rest = after.lstrip()
+    if marks or rest == after:
+        return marks
+    marks = _leading_marks(rest)
+    if rest[len(marks):len(marks) + 1].strip():
+        marks = marks[:next((i for i, char in enumerate(marks) if char in _OPENING_MARKS), len(marks))]
+    return marks
+
+
 def _first_bounds(reads: List[Iterator[_Piece]], start: int) -> Optional[Tuple[Segment, Segment]]:
     """The bounds of the first piece in *reads* from index *start* on, the text parts after a block.
 
@@ -471,9 +491,11 @@ class TextFrontend:
 
         A block's symbols join the chunk before the block, and the text after
         a block starts a new sentence, but a new paragraph only after a
-        paragraph break. A mark right after a block closes the
-        block's sentence, so it goes with the block's chunk, and no chunk
-        starts with a closing mark. A block that starts a sentence after a
+        paragraph break. A closing mark after a block, right after it or
+        after whitespace, closes the block's sentence, so it goes with the
+        block's chunk, and no chunk starts with such a mark. Where no word
+        follows the mark, a backend with a mark table gets the mark from it
+        (see :meth:`_take_marks`). A block that starts a sentence after a
         sentence that ends in a clause symbol follows that symbol with no
         space. A block before the first text is a chunk of its own at
         ``sentence`` and ``clause`` size, with the marks right after it, and
@@ -606,11 +628,15 @@ class TextFrontend:
         text_read, marks, gap = False, "", ""
         for index, part in enumerate(parts):
             if index % 2:
+                if marks:
+                    # no word follows the marks after the block before
+                    self._take_marks(held, None, marks)
+                    marks = ""
                 if not text_read and held.bounds is None:
                     # a block before the first text has the bounds of the text after it
                     held.bounds = _first_bounds(reads, index + 1)
                 self._add_block(held, parts, index, stages)
-                marks = _leading_marks(parts[index + 1])
+                marks = _closing_marks(parts[index + 1])
                 continue
             after_block = index > 0
             for piece in reads[index]:
@@ -629,33 +655,50 @@ class TextFrontend:
                     yield held
                 held = piece
             gap = gap + part if after_block else part[len(part.rstrip()):]
+        if marks:
+            self._take_marks(held, None, marks)
         if held.phonemes:
             yield held
 
-    def _take_marks(self, held: _Piece, piece: _Piece, marks: str) -> None:
+    def _take_marks(self, held: _Piece, piece: Optional[_Piece], marks: str) -> None:
         """Move the symbols at the start of *piece* that write *marks* to the end of *held*.
 
-        *held* ends in a block, and *marks* are the marks right after the
-        block in the text. Such a mark closes the block's sentence, so it goes
-        with the block, as tts-punctuation puts a closing mark with the
-        sentence that it ends, and no chunk starts with a closing mark. A
-        backend that drops the marks writes no such symbols, and then *held*
-        keeps its word break.
+        *held* ends in a block, and *marks* are the closing marks after the
+        block in the text (see :func:`_closing_marks`). Such a mark closes the
+        block's sentence, so it goes with the block, in place of the word
+        break before it, as tts-punctuation puts a closing mark with the
+        sentence that it ends. A backend with a mark table
+        (:meth:`~scriptconv.phonemizers.base.BasePhonemizer.mark_symbols`)
+        writes the symbols of its table. Where *piece* does not start with
+        them, or *piece* is ``None`` because no word follows the marks before
+        the next block or the end of the text, the frontend writes them from
+        the table. A backend with no table writes symbols whose characters
+        are all in *marks*. A backend that drops the marks writes no such
+        symbols, and then *held* keeps its word break.
         """
-        count = next((i for i, symbol in enumerate(piece.phonemes) if not set(symbol) <= set(marks)),
-                     len(piece.phonemes))
-        if not count:
+        phonemes = piece.phonemes if piece is not None else []
+        table = self.backend.mark_symbols(marks)
+        if table is None:
+            count = next((i for i, symbol in enumerate(phonemes) if not set(symbol) <= set(marks)), len(phonemes))
+        else:
+            count = len(table.phonemes) if phonemes[:len(table.phonemes)] == list(table.phonemes) else 0
+        if count:
+            symbols, streams = phonemes[:count], {name: values[:count] for name, values in piece.streams.items()}
+        elif table is not None and table.phonemes:
+            symbols, streams = list(table.phonemes), table.streams
+        else:
             return
         space = list(self._space.phonemes)
         if held.phonemes[-len(space):] == space:
             for _ in space:
                 held.pop()
-        held.add(piece.phonemes[:count], {name: values[:count] for name, values in piece.streams.items()})
-        if piece.phonemes[count:count + len(space)] == space:
-            count += len(space)
-        del piece.phonemes[:count]
-        for values in piece.streams.values():
-            del values[:count]
+        held.add(symbols, streams)
+        if count:
+            if phonemes[count:count + len(space)] == space:
+                count += len(space)
+            del phonemes[:count]
+            for values in piece.streams.values():
+                del values[:count]
         held.ends_in_token = held.bounds is not None or (
             self._keeps_punctuation() and held.phonemes[-1] in _CLAUSE_TOKENS)
 

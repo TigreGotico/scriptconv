@@ -471,6 +471,17 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         """
         return Segment((" ",))
 
+    def mark_symbols(self, marks: str) -> Optional[Segment]:
+        """The symbols that this backend writes for *marks* after a word, with their stream values, or ``None``.
+
+        This is the backend's mark table. *marks* is a run of closing marks,
+        such as ``.``, ``...`` or ``?!``. :class:`~scriptconv.frontend.TextFrontend`
+        reads it for the marks after an inline block: it finds the symbols
+        that the backend writes for them, and it writes them itself where the
+        backend reads no word after the block. ``None`` declares no table.
+        """
+        return None
+
     def _bare_sentences(self, text: str, lang: str) -> Iterator[List[str]]:
         """Per-chunk phonemes, with the punctuation removed before the backend."""
         for chunk, punct, eos in self.chunk_text(text):
