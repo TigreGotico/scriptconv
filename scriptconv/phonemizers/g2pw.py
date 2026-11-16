@@ -20,9 +20,10 @@ d76f335d9eb5dea5ef6d7d70b2d6114e6303fa08, by Michael Hansen, whose header
 states "This code is Apache 2.0 licensed".
 
 The backend does not read digits. Numbers, dates and units are the
-normalisation stage, which the caller runs before the backend. A digit gives
-no symbol: the backend logs a warning that names it, or raises
-:class:`~scriptconv.phonemizers.base.UnreadTextError` when
+normalisation stage, which the caller runs before the backend. A digit, or a
+letter that has no reading and is not a symbol, such as ``İ`` or ``A``, gives
+no symbol: the backend logs a warning that names each run of such characters,
+or raises :class:`~scriptconv.phonemizers.base.UnreadTextError` when
 :attr:`~scriptconv.phonemizers.base.BasePhonemizer.strict` is set.
 
 The model files come from the Hugging Face Hub at a fixed revision, into the
@@ -45,6 +46,7 @@ import logging
 import os
 import re
 import tarfile
+import unicodedata
 from typing import Iterator, List, Optional, Tuple
 
 from quebra_frases import sentence_tokenize
@@ -238,17 +240,23 @@ class G2PWPhonemizer(BasePhonemizer):
     def _sentence_symbols(self, sentence: str) -> List[str]:
         """The symbols of one sentence.
 
-        A digit gives no symbol. The backend logs a warning that names the
-        digits, or raises :class:`UnreadTextError` in strict mode.
+        A digit, or a letter with no reading that is not a symbol, gives no
+        symbol. The backend logs a warning that names each run of these
+        characters, or raises :class:`UnreadTextError` in strict mode.
         """
         symbols: List[str] = []
         unread: List[str] = []
-        for syllable, char in zip(self.converter(sentence)[0], sentence):
+        last_unread_index = -2
+        for index, (syllable, char) in enumerate(zip(self.converter(sentence)[0], sentence)):
             if syllable is None:
                 if char in _KEPT:
                     symbols.append(char)
-                elif char.isdigit():
-                    unread.append(char)
+                elif unicodedata.category(char)[0] in "LN":
+                    if index == last_unread_index + 1:
+                        unread[-1] += char
+                    else:
+                        unread.append(char)
+                    last_unread_index = index
                 continue
             syllable = _normalize_syllable(syllable)
             initial, final, tone = _split_syllable(syllable)
@@ -257,8 +265,9 @@ class G2PWPhonemizer(BasePhonemizer):
                 continue
             symbols += [initial or "Ø", final, tone]
         if unread:
-            message = (f"g2pW reads no digit, so {''.join(unread)!r} of {sentence!r} gives no "
-                       "symbol; numbers belong to the normalisation stage")
+            message = f"g2pW gives no symbol for {', '.join(map(repr, unread))} in {sentence!r}"
+            if any(char.isdigit() for char in "".join(unread)):
+                message += "; numbers belong to the normalisation stage"
             if self.strict:
                 raise UnreadTextError(message, tuple(unread))
             LOG.warning(message)

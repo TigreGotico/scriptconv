@@ -462,7 +462,7 @@ def _nakdimon(text: str) -> str:
             "install with `pip install scriptconv[he]`") from None
     if remove_niqqud(text) != text:
         return text
-    return _nakdimon_model().diacritize(text)
+    return _nakdimon_model().predict(text)
 
 
 def _tashkeel(model: Optional[str] = None, waqf: bool = False):

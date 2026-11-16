@@ -116,11 +116,64 @@ def test_a_dropped_digit_raises_in_strict_mode(g2pw):
     assert error.value.unread == ("3",)
 
 
-def test_a_capital_dotted_i_before_a_polyphone_reads_the_polyphone(g2pw):
+def test_a_full_width_digit_is_unread(g2pw, caplog):
+    with caplog.at_level(logging.WARNING, logger="scriptconv.phonemizers.g2pw"):
+        assert g2pw.phonemize("我有３个苹果。", "zh") == [APPLES]
+    assert [record.getMessage() for record in caplog.records] == [
+        "g2pW gives no symbol for '３' in '我有３个苹果。'; numbers belong to the normalisation stage"]
+    g2pw.strict = True
+    try:
+        with pytest.raises(UnreadTextError) as error:
+            g2pw.phonemize("我有３个苹果。", "zh")
+    finally:
+        g2pw.strict = False
+    assert error.value.unread == ("３",)
+
+
+def test_each_number_is_named_on_its_own(g2pw, caplog):
+    sentence = "他跑了3000米，花了15分钟。"
+    with caplog.at_level(logging.WARNING, logger="scriptconv.phonemizers.g2pw"):
+        g2pw.phonemize(sentence, "zh")
+    assert [record.getMessage() for record in caplog.records] == [
+        f"g2pW gives no symbol for '3000', '15' in {sentence!r}; numbers belong to the normalisation stage"]
+    g2pw.strict = True
+    try:
+        with pytest.raises(UnreadTextError) as error:
+            g2pw.phonemize(sentence, "zh")
+    finally:
+        g2pw.strict = False
+    assert error.value.unread == ("3000", "15")
+
+
+def test_a_capital_dotted_i_before_a_polyphone_reads_the_polyphone(g2pw, caplog):
     # str.lower() writes İ as two code points. The reference reads "i行长来了。" as
     # i x ing 2 zh ang 3 l ai 2 l e 5 。, and İ is not a symbol.
-    assert g2pw.phonemize("İ行长来了。", "zh") == [
-        ["x", "ing", "2", "zh", "ang", "3", "l", "ai", "2", "l", "e", "5", "。"]]
+    with caplog.at_level(logging.WARNING, logger="scriptconv.phonemizers.g2pw"):
+        assert g2pw.phonemize("İ行长来了。", "zh") == [
+            ["x", "ing", "2", "zh", "ang", "3", "l", "ai", "2", "l", "e", "5", "。"]]
+    assert [record.getMessage() for record in caplog.records] == [
+        "g2pW gives no symbol for 'İ' in 'İ行长来了。'"]
+
+
+@pytest.mark.parametrize("sentence, unread", [
+    ("İstanbul的银行。", ("İ",)),
+    ("A4纸很好。", ("A4",)),
+    ("ПРИВЕТ你好。", ("ПРИВЕТ",)),
+])
+def test_a_letter_with_no_symbol_raises_in_strict_mode(g2pw, sentence, unread):
+    g2pw.strict = True
+    try:
+        with pytest.raises(UnreadTextError) as error:
+            g2pw.phonemize(sentence, "zh")
+    finally:
+        g2pw.strict = False
+    assert error.value.unread == unread
+
+
+def test_punctuation_with_no_symbol_is_dropped_without_a_warning(g2pw, caplog):
+    with caplog.at_level(logging.WARNING, logger="scriptconv.phonemizers.g2pw"):
+        g2pw.phonemize("《红楼梦》很好。", "zh")
+    assert caplog.records == []
 
 
 def test_double_quotes_are_removed_before_the_model(g2pw):

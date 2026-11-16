@@ -2,11 +2,14 @@
 
 pyopenjtalk and pyopenjtalk-plus both install the ``pyopenjtalk`` module, with
 other dictionaries and accent rules. The backend checks which distribution
-owns the module before it reads, and the extras install pyopenjtalk-plus only.
+owns the module and which dictionary it reads before it reads, and the extras
+install pyopenjtalk-plus only.
 """
 import base64
 import hashlib
+import os
 import re
+import subprocess
 import sys
 import tomllib
 from importlib import metadata
@@ -24,6 +27,13 @@ from scriptconv.phonemizers.openjtalk_engine import module_distribution
 ROOT = Path(__file__).resolve().parent.parent
 VERSIONS = {"pyopenjtalk": "0.4.1", "pyopenjtalk-plus": "0.4.1.post10"}
 ORDERS = [["pyopenjtalk", "pyopenjtalk-plus"], ["pyopenjtalk-plus", "pyopenjtalk"]]
+ALPHABETS = [Alphabet.HEPBURN, Alphabet.KANA]
+BUNDLED = Path(pyopenjtalk.__file__).parent / "dictionary"
+
+
+@pytest.fixture(autouse=True)
+def no_dictionary_variable(monkeypatch):
+    monkeypatch.delenv("OPEN_JTALK_DICT_DIR", raising=False)
 
 
 def _record_hash(content: bytes) -> SimpleNamespace:
@@ -48,6 +58,7 @@ def both_installed(tmp_path, monkeypatch):
                                                               locate=lambda: module_file)])
                  for name in VERSIONS}
         monkeypatch.setattr(pyopenjtalk, "__file__", str(module_file))
+        monkeypatch.setattr(pyopenjtalk, "OPEN_JTALK_DICT_DIR", str(module_file.parent / "dictionary").encode())
         monkeypatch.setattr(metadata, "packages_distributions", lambda: {"pyopenjtalk": order})
         monkeypatch.setattr(metadata, "distribution", dists.__getitem__)
         monkeypatch.setattr(metadata, "version", VERSIONS.__getitem__)
@@ -98,11 +109,12 @@ def test_a_module_with_no_file_has_no_owner():
     assert module_distribution("pyopenjtalk", None) is None
 
 
+@pytest.mark.parametrize("alphabet", ALPHABETS)
 @pytest.mark.parametrize("order", ORDERS)
-def test_refuses_the_pyopenjtalk_module(both_installed, order):
+def test_refuses_the_pyopenjtalk_module(both_installed, order, alphabet):
     both_installed("pyopenjtalk", order)
     with pytest.raises(ImportError) as refusal:
-        OpenJTaklPhonemizer()
+        OpenJTaklPhonemizer(alphabet)
     assert str(refusal.value) == (
         "The OpenJTalk phonemizer needs pyopenjtalk-plus, but the installed pyopenjtalk module comes "
         "from pyopenjtalk. Run 'pip uninstall pyopenjtalk', then "
@@ -157,6 +169,55 @@ def test_the_dictionary_comes_with_the_wheel():
     package = Path(pyopenjtalk.__file__).parent
     assert dictionary.is_relative_to(package)
     assert (dictionary / "sys.dic").is_file()
+
+
+@pytest.fixture
+def foreign_dictionary(tmp_path):
+    """A working dictionary at another path: a directory of links to the bundled files."""
+    directory = tmp_path / "open_jtalk_dic"
+    directory.mkdir()
+    for file in BUNDLED.iterdir():
+        (directory / file.name).symlink_to(file)
+    return directory
+
+
+def _build_in_a_new_process(dictionary) -> str:
+    """Builds the backend in a new Python with ``OPEN_JTALK_DICT_DIR`` set, as pyopenjtalk reads it at import."""
+    code = ("from scriptconv.phonemizers import Alphabet, Phonemizer, get_phonemizer\n"
+            "try:\n"
+            "    print(get_phonemizer(Phonemizer.OPENJTALK, Alphabet.KANA).phonemize_string('何時ですか', 'ja'))\n"
+            "except ImportError as e:\n"
+            "    print(e)\n")
+    env = {**os.environ, "OPEN_JTALK_DICT_DIR": str(dictionary), "PYTHONPATH": str(ROOT)}
+    result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, check=True)
+    return result.stdout.strip()
+
+
+def test_refuses_another_dictionary_from_the_environment(foreign_dictionary):
+    assert _build_in_a_new_process(foreign_dictionary) == (
+        "The OpenJTalk phonemizer reads the dictionary of pyopenjtalk-plus, but OPEN_JTALK_DICT_DIR "
+        f"names the dictionary {foreign_dictionary}. Unset OPEN_JTALK_DICT_DIR, then start Python again."
+    )
+
+
+def test_reads_with_the_bundled_dictionary_named_in_the_environment(tmp_path):
+    link = tmp_path / "dictionary"
+    link.symlink_to(BUNDLED)
+    assert _build_in_a_new_process(BUNDLED) == "ナンジデスカ"
+    assert _build_in_a_new_process(link) == "ナンジデスカ"
+
+
+@pytest.mark.parametrize("alphabet", ALPHABETS)
+def test_refuses_the_variable_set_after_the_import(foreign_dictionary, monkeypatch, alphabet):
+    monkeypatch.setenv("OPEN_JTALK_DICT_DIR", str(foreign_dictionary))
+    with pytest.raises(ImportError, match=r"OPEN_JTALK_DICT_DIR names the dictionary .*open_jtalk_dic\. Unset"):
+        OpenJTaklPhonemizer(alphabet)
+
+
+def test_refuses_the_dictionary_that_the_module_read_at_import(foreign_dictionary, monkeypatch):
+    monkeypatch.setattr(pyopenjtalk, "OPEN_JTALK_DICT_DIR", str(foreign_dictionary).encode())
+    with pytest.raises(ImportError, match=r"OPEN_JTALK_DICT_DIR names the dictionary .*open_jtalk_dic\. Unset"):
+        OpenJTaklPhonemizer()
 
 
 def _extras():

@@ -48,6 +48,12 @@ def test_the_marks_keep_the_letters(row):
     assert strip_diacritics(marked, "he") == row["text"]
 
 
+@pytest.mark.parametrize("row", SAMPLE[:3], ids=[row["id"] for row in SAMPLE[:3]])
+def test_the_model_reads_the_letters_without_their_marks(row):
+    """The model gives the reference niqqud for text that already holds it."""
+    assert diacritics._nakdimon_model().predict(row["niqqud"]) == row["niqqud"]
+
+
 # The dotted sentences of Piper's Hebrew tests, then words that Nakdimon
 # reads another way when their marks are removed: שָׁלֹם gives שָׁלֵם, and
 # qamats qatan (U+05C7) is a mark that Nakdimon never writes.

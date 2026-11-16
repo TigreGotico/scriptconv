@@ -6,17 +6,22 @@ Two distributions install the ``pyopenjtalk`` module: pyopenjtalk
 under BSD-3-Clause). Their dictionaries and accent rules differ, so their
 readings differ. pyopenjtalk-plus without onnxruntime turns off its model for
 the reading of 何, so 何時 becomes なにじ. A backend that calls OpenJTalk runs
-only on pyopenjtalk-plus with onnxruntime, so that the version of
-pyopenjtalk-plus in its identity fixes its output.
+only on pyopenjtalk-plus with onnxruntime and the dictionary that
+pyopenjtalk-plus bundles, so that the version of pyopenjtalk-plus in its
+identity fixes its output. pyopenjtalk reads the variable
+``OPEN_JTALK_DICT_DIR`` when it imports, and uses that dictionary in place of
+its own, so the backend refuses a value that is not the bundled dictionary.
 """
 import base64
 import hashlib
+import os
 from importlib import metadata
 from pathlib import Path
 from types import ModuleType
 from typing import Optional
 
 ENGINE_DISTRIBUTION = "pyopenjtalk-plus"
+DICT_DIR_VARIABLE = "OPEN_JTALK_DICT_DIR"
 
 
 def module_distribution(module: str, module_file: Optional[str]) -> Optional[str]:
@@ -41,7 +46,7 @@ def module_distribution(module: str, module_file: Optional[str]) -> Optional[str
 
 
 def require_pyopenjtalk_plus(backend: str, requirement: str) -> ModuleType:
-    """The ``pyopenjtalk`` module, if pyopenjtalk-plus installed it and onnxruntime imports.
+    """The ``pyopenjtalk`` module of pyopenjtalk-plus, with onnxruntime and the bundled dictionary.
 
     onnxruntime is imported first: pyopenjtalk-plus imports it while
     ``pyopenjtalk`` imports, and catches only ``ImportError`` there.
@@ -53,7 +58,9 @@ def require_pyopenjtalk_plus(backend: str, requirement: str) -> ModuleType:
 
     Raises:
         ImportError: If onnxruntime does not import, if no ``pyopenjtalk``
-            module imports, or if another distribution installed the module.
+            module imports, if another distribution installed the module, or
+            if ``OPEN_JTALK_DICT_DIR``, in the environment or as the module
+            read it at import, names another dictionary.
     """
     try:
         import onnxruntime  # noqa: F401
@@ -75,4 +82,12 @@ def require_pyopenjtalk_plus(backend: str, requirement: str) -> ModuleType:
             f"'pip install --force-reinstall pyopenjtalk-plus[onnxruntime]', or install "
             f"'{requirement}' in a new environment."
         )
+    bundled = (Path(pyopenjtalk.__file__).parent / "dictionary").resolve()
+    for dict_dir in (os.environ.get(DICT_DIR_VARIABLE), os.fsdecode(pyopenjtalk.OPEN_JTALK_DICT_DIR)):
+        if dict_dir is not None and Path(dict_dir).resolve() != bundled:
+            raise ImportError(
+                f"{backend} reads the dictionary of pyopenjtalk-plus, but {DICT_DIR_VARIABLE} "
+                f"names the dictionary {dict_dir}. Unset {DICT_DIR_VARIABLE}, then start "
+                f"Python again."
+            )
     return pyopenjtalk

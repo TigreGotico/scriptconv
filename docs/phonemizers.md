@@ -132,10 +132,8 @@ diacritizer_model="nakdimon")` uses Nakdimon instead (Gershuni and Pinter,
 "Restoring Hebrew Diacritics Without a Dictionary", Findings of NAACL 2022).
 Nakdimon predicts a vowel point, a dagesh and a shin or sin dot for each
 letter. Text that already holds a vowel point, a dagesh or a shin or sin dot
-stays as written. The code comes from Nakdimon, and some lines follow the
-Nakdimon port of Piper (`src/piper/hebrew/__init__.py` of
-github.com/OHF-Voice/piper1-gpl at `d76f335`), which ships Nakdimon's MIT
-licence with it. The code and the model are under the MIT licence:
+stays as written. The code comes from Nakdimon. The code and the model are
+under the MIT licence:
 
 | File | Source | Revision | Size | Licence |
 |---|---|---|---|---|
@@ -339,9 +337,19 @@ g2pw.phonemize("我要去行走。", "zh")
 
 The backend does not read digits, and a digit gives no symbol. Numbers,
 dates and units belong to the normalisation stage, which runs before the
-backend. A digit that reaches the backend is logged in a warning that names
-it. With `strict=True` (`FrontendConfig.strict`, or the backend's `strict`
-field), the backend raises `UnreadTextError` instead.
+backend. A letter that has no reading and is not a symbol, such as `İ`, `A` or
+a Cyrillic letter, also gives no symbol. The backend logs a warning that
+names each run of these characters:
+
+```python
+g2pw.phonemize("他跑了3000米，花了15分钟。", "zh")
+# WARNING g2pW gives no symbol for '3000', '15' in '他跑了3000米，花了15分钟。'; numbers belong to the normalisation stage
+```
+
+With `strict=True` (`FrontendConfig.strict`, or the backend's `strict`
+field), the backend raises `UnreadTextError` instead, and its `unread` field
+holds the runs, here `('3000', '15')`. Punctuation that is not a symbol, such
+as `《》`, gives no symbol and no warning.
 
 | File | Source | Revision | Size | Licence |
 |---|---|---|---|---|
@@ -684,6 +692,20 @@ fix, an install where pyopenjtalk owns the module or where onnxruntime does not
 import. The check is `scriptconv.phonemizers.openjtalk_engine.require_pyopenjtalk_plus`.
 The pyopenjtalk-plus wheel holds the OpenJTalk dictionary, so the first use
 needs no network.
+
+pyopenjtalk reads the variable `OPEN_JTALK_DICT_DIR` when it imports, and uses
+that dictionary in place of the bundled one. The readings then change while
+the identity still names pyopenjtalk-plus. So the backend also refuses, with an
+`ImportError`, a value of `OPEN_JTALK_DICT_DIR` that does not resolve to the
+bundled dictionary:
+
+```python
+# OPEN_JTALK_DICT_DIR=/usr/share/open_jtalk/dic python
+get_phonemizer(Phonemizer.OPENJTALK)
+# ImportError: The OpenJTalk phonemizer reads the dictionary of pyopenjtalk-plus, but
+# OPEN_JTALK_DICT_DIR names the dictionary /usr/share/open_jtalk/dic. Unset
+# OPEN_JTALK_DICT_DIR, then start Python again.
+```
 
 See [ovos.md](ovos.md) for using this layer from OVOS through
 `ovos-scriptconv-g2p-plugin`.
