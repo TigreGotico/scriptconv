@@ -475,10 +475,11 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         """The symbols that this backend writes for *marks* after a word, with their stream values, or ``None``.
 
         This is the backend's mark table. *marks* is a run of closing marks,
-        such as ``.``, ``...`` or ``?!``. :class:`~scriptconv.frontend.TextFrontend`
-        reads it for the marks after an inline block: it finds the symbols
-        that the backend writes for them, and it writes them itself where the
-        backend reads no word after the block. ``None`` declares no table.
+        such as ``.``, ``...`` or ``?!``, or a quote that opens the next word,
+        with the whitespace before them in the text, if any.
+        :class:`~scriptconv.frontend.TextFrontend` reads it for the marks
+        after an inline block, and writes the symbols of the table after the
+        block. ``None`` declares no table.
         """
         return None
 

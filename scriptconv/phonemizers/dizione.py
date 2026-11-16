@@ -17,7 +17,6 @@ such as ``Mrs.`` ends no sentence.
 """
 import dataclasses
 import hashlib
-import itertools
 import json
 import re
 from functools import cached_property
@@ -66,6 +65,8 @@ _SEPARATING_RUN = re.compile(
 _QUOTES = frozenset({'"', "'"})
 _DOUBLE_QUOTE = '"'
 _CLOSING_BRACKET = ")"
+# The word before the marks when dizione reads its mark table.
+_MARK_WORD = "x"
 # A sentence mark at the end of a text, with only closing marks after it.
 _ENDS_IN_SENTENCE_MARK = re.compile(r"[.?!][^\w\s]*\s*$")
 
@@ -277,16 +278,23 @@ class DizionePhonemizer(BasePhonemizer):
     def mark_symbols(self, marks: str) -> Optional[Segment]:
         """dizione's tokens for *marks* after a word with ``tokens=True``, else ``None``.
 
-        dizione reads ``...`` as ``…`` and a closing ``»`` or ``”`` as ``"``,
-        and it writes a repeated mark once. Without ``tokens=True`` the
-        frontend writes the clause symbols, so dizione has no table.
+        They are the tokens after the word in dizione's own read of the word
+        and the marks, so dizione reads ``...`` as ``…``, a closing ``»`` or
+        ``”`` as ``"``, and a repeated mark once. dizione reads some runs
+        alone as an emoticon, so the marks are not read alone. Without
+        ``tokens=True`` the frontend writes the clause symbols, so dizione
+        has no table.
         """
         if not self.tokens_mode:
             return None
-        symbols = tuple(mark for mark, _ in itertools.groupby(
-            value for is_mark, value in self.engine.pieces(marks) if is_mark))
-        return Segment(symbols, streams={"ids": tuple(SYMBOL_TO_ID[mark] for mark in symbols),
-                                         "stress": (0,) * len(symbols)})
+        start = self._mark_word_length
+        read = self.tokens(_MARK_WORD + marks)
+        return Segment(read.symbols[start:-1], streams={"ids": read.ids[start:-1], "stress": read.stress[start:-1]})
+
+    @cached_property
+    def _mark_word_length(self) -> int:
+        """The number of tokens before the marks in dizione's read of the word of the mark table and the marks."""
+        return len(self.tokens(_MARK_WORD).symbols) - 1
 
     def phonemize_string(self, text: str, lang: str) -> str:
         self.get_lang(lang)

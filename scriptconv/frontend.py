@@ -102,8 +102,9 @@ _BLOCK_WORD = "a"
 # Text that ends in whitespace and then only marks. The marks join the block
 # after them as they join a plain word, and the whitespace stays.
 _SPACE_BEFORE_BLOCK = re.compile(r"\s\W*$")
-# Marks of the categories that close (Po) that can also open a word.
-_OPENING_MARKS = frozenset("\"'¡¿")
+# The quotes and apostrophes that can open a word besides the categories of
+# opening and closing quotes (Pi, Pf).
+_OPENING_MARKS = frozenset("\"'\u2019\u2018\u201a\u201e\u00ab\u00bb\u2039\u203a\u00a1\u00bf")
 # The text before the first letter or digit: whitespace and marks.
 _WORDLESS_START = re.compile(r"[\W_]*")
 
@@ -324,28 +325,48 @@ class _Piece:
             values.pop()
 
 
-def _leading_marks(text: str) -> str:
-    """The marks that end or close at the start of *text*, such as ``.``, ``,``, ``?``, a closing quote or bracket."""
-    count = next((i for i, char in enumerate(text) if unicodedata.category(char) not in ("Po", "Pe", "Pf")),
-                 len(text))
+def _leading_marks(text: str, reads_as_word: Callable[[str], bool] = lambda char: False) -> str:
+    """The run of closing marks at the start of *text*.
+
+    A closing mark is ``|`` or a mark of the categories that end or close
+    (Po, Pe, Pf), such as ``.``, ``…``, ``?``, a closing quote or bracket. A
+    symbol that the backend reads as a word, such as dizione's ``%``
+    ("percent"), is no mark: *reads_as_word* tells it, and the run ends
+    before it.
+    """
+    count = next((i for i, char in enumerate(text) if (char != "|" and unicodedata.category(char) not in (
+        "Po", "Pe", "Pf")) or reads_as_word(char)), len(text))
     return text[:count]
 
 
-def _closing_marks(after: str) -> str:
-    """The closing marks in the text *after* a block that close the block's sentence.
+def _opens_word(char: str) -> bool:
+    """Whether *char* is a quote or apostrophe that can open a word."""
+    return char in _OPENING_MARKS or unicodedata.category(char) in ("Pi", "Pf")
 
-    They come right after the block, or after whitespace. After whitespace, a
-    run of marks glued to the next word ends before its first mark that can
-    open a word, such as the quotation mark of ``[[ab]] "Go"``.
+
+def _marks_after(after: str, reads_as_word: Callable[[str], bool]) -> Tuple[str, str]:
+    """The closing marks in the text *after* a block, and the quotes after them that open the next word.
+
+    The closing marks close the block's sentence. They come right after the
+    block, or after whitespace, and then they keep the whitespace before
+    them, as a backend can read marks after whitespace in another way. A
+    symbol that the backend reads as a word ends them: *reads_as_word* tells
+    it (see :func:`_leading_marks`). After whitespace, a run of marks glued
+    to the next word ends before its first quote or apostrophe: that quote,
+    and the quotes after it, open the word, as in ``[[ab]] "Go"`` or
+    ``[[ab]] ’tis``.
     """
-    marks = _leading_marks(after)
+    marks = _leading_marks(after, reads_as_word)
     rest = after.lstrip()
     if marks or rest == after:
-        return marks
-    marks = _leading_marks(rest)
+        return marks, ""
+    gap, marks = after[:len(after) - len(rest)], _leading_marks(rest, reads_as_word)
+    quotes = ""
     if rest[len(marks):len(marks) + 1].strip():
-        marks = marks[:next((i for i, char in enumerate(marks) if char in _OPENING_MARKS), len(marks))]
-    return marks
+        cut = next((i for i, char in enumerate(marks) if _opens_word(char)), len(marks))
+        marks, quotes = marks[:cut], rest[cut:]
+        quotes = quotes[:next((i for i, char in enumerate(quotes) if not _opens_word(char)), len(quotes))]
+    return gap + marks if marks else "", quotes
 
 
 def _first_bounds(reads: List[Iterator[_Piece]], start: int) -> Optional[Tuple[Segment, Segment]]:
@@ -493,11 +514,13 @@ class TextFrontend:
         a block starts a new sentence, but a new paragraph only after a
         paragraph break. A closing mark after a block, right after it or
         after whitespace, closes the block's sentence, so it goes with the
-        block's chunk, and no chunk starts with such a mark. Where no word
-        follows the mark, a backend with a mark table gets the mark from it
-        (see :meth:`_take_marks`). A block that starts a sentence after a
-        sentence that ends in a clause symbol follows that symbol with no
-        space. A block before the first text is a chunk of its own at
+        block's chunk, and no chunk starts with such a mark. A symbol that the
+        backend reads as a word, such as ``%``, is no such mark, and a quote
+        after whitespace that opens the next word stays with that word (see
+        :func:`_marks_after`). A backend with a mark table gets the marks from
+        it, also where no word follows them (see :meth:`_take_marks`). A
+        block that starts a sentence after a sentence that ends in a clause
+        symbol follows that symbol with no space. A block before the first text is a chunk of its own at
         ``sentence`` and ``clause`` size, with the marks right after it, and
         it starts the chunk after it at ``paragraph`` and ``none`` size. A
         chunk of bounded segments has one start and one end symbol, with the
@@ -625,7 +648,7 @@ class TextFrontend:
         # A block can extend the piece before it, so that piece is held
         # until the next part is known.
         held = _Piece([])
-        text_read, marks, gap = False, "", ""
+        text_read, marks, quotes, gap = False, "", "", ""
         for index, part in enumerate(parts):
             if index % 2:
                 if marks:
@@ -636,7 +659,7 @@ class TextFrontend:
                     # a block before the first text has the bounds of the text after it
                     held.bounds = _first_bounds(reads, index + 1)
                 self._add_block(held, parts, index, stages)
-                marks = _closing_marks(parts[index + 1])
+                marks, quotes = _marks_after(parts[index + 1], self._reads_as_word)
                 continue
             after_block = index > 0
             for piece in reads[index]:
@@ -646,6 +669,9 @@ class TextFrontend:
                     held.ends_paragraph = bool(_PARAGRAPH_BREAK.search(gap + _WORDLESS_START.match(part)[0]))
                     after_block = False
                 text_read = True
+                if quotes:
+                    self._open_with_quotes(held, piece, quotes)
+                    quotes = ""
                 if marks:
                     self._take_marks(held, piece, marks)
                     marks = ""
@@ -664,29 +690,33 @@ class TextFrontend:
         """Move the symbols at the start of *piece* that write *marks* to the end of *held*.
 
         *held* ends in a block, and *marks* are the closing marks after the
-        block in the text (see :func:`_closing_marks`). Such a mark closes the
+        block in the text (see :func:`_marks_after`). Such a mark closes the
         block's sentence, so it goes with the block, in place of the word
         break before it, as tts-punctuation puts a closing mark with the
         sentence that it ends. A backend with a mark table
         (:meth:`~scriptconv.phonemizers.base.BasePhonemizer.mark_symbols`)
-        writes the symbols of its table. Where *piece* does not start with
-        them, or *piece* is ``None`` because no word follows the marks before
-        the next block or the end of the text, the frontend writes them from
-        the table. A backend with no table writes symbols whose characters
-        are all in *marks*. A backend that drops the marks writes no such
-        symbols, and then *held* keeps its word break.
+        writes the symbols of its table for the marks after a word, and the
+        symbols of the table at the start of *piece* are its read of the marks
+        alone. The frontend writes the table, and removes those symbols from
+        *piece*. *piece* is ``None`` where no word follows the marks before
+        the next block or the end of the text. A backend with no table writes
+        symbols whose characters are all in *marks*. A backend that drops the
+        marks writes no such symbols, and then *held* keeps its word break.
         """
         phonemes = piece.phonemes if piece is not None else []
         table = self.backend.mark_symbols(marks)
         if table is None:
-            count = next((i for i, symbol in enumerate(phonemes) if not set(symbol) <= set(marks)), len(phonemes))
+            count = next((i for i, symbol in enumerate(phonemes) if not set(symbol) <= set(marks.lstrip())),
+                         len(phonemes))
+            symbols = phonemes[:count]
+            streams = {name: values[:count] for name, values in piece.streams.items()} if count else {}
         else:
-            count = len(table.phonemes) if phonemes[:len(table.phonemes)] == list(table.phonemes) else 0
-        if count:
-            symbols, streams = phonemes[:count], {name: values[:count] for name, values in piece.streams.items()}
-        elif table is not None and table.phonemes:
             symbols, streams = list(table.phonemes), table.streams
-        else:
+            # the backend can read the marks alone as only some of the symbols of its
+            # table, as dizione drops ";*" alone as an emoticon
+            count = len(symbols) if phonemes[:len(symbols)] == symbols else next(
+                (i for i, symbol in enumerate(phonemes) if symbol not in symbols), len(phonemes))
+        if not symbols:
             return
         space = list(self._space.phonemes)
         if held.phonemes[-len(space):] == space:
@@ -701,6 +731,36 @@ class TextFrontend:
                 del values[:count]
         held.ends_in_token = held.bounds is not None or (
             self._keeps_punctuation() and held.phonemes[-1] in _CLAUSE_TOKENS)
+
+    def _reads_as_word(self, char: str) -> bool:
+        """Whether the backend's mark table shows that it reads *char* as a word.
+
+        The table then holds the backend's word break, as dizione writes
+        ``<sp> p ɚ s ɛ n t`` for ``%`` after a word. For a backend with no
+        table, :meth:`_take_marks` moves only symbols whose characters are in
+        the marks, never a word.
+        """
+        table = self.backend.mark_symbols(char)
+        return table is not None and not set(table.phonemes).isdisjoint(self._space.phonemes)
+
+    def _open_with_quotes(self, held: _Piece, piece: _Piece, quotes: str) -> None:
+        """Remove the word break at the end of *held* where *piece* starts with the symbols that write *quotes*.
+
+        *held* ends in a block, and *quotes* open the word after it (see
+        :func:`_marks_after`). A backend with a mark table writes those
+        symbols right after the word before them, with no word break, as
+        dizione writes ``ɛ k s " ɡ oʊ`` for ``x "go``. A backend that drops
+        the quotes, as dizione drops the apostrophe of ``’tis``, keeps the
+        word break.
+        """
+        table = self.backend.mark_symbols(quotes)
+        if table is None or not table.phonemes or piece.phonemes[:len(table.phonemes)] != list(table.phonemes):
+            return
+        space = list(self._space.phonemes)
+        if held.phonemes[-len(space):] == space:
+            for _ in space:
+                held.pop()
+            held.ends_in_token = True
 
     def _text_pieces(self, text: str, stages: Stages, clauses: bool) -> Iterator[_Piece]:
         """Steps 2 to 5 on text with no block, one piece per sentence, or per clause with *clauses*."""

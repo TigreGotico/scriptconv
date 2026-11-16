@@ -333,11 +333,13 @@ pairs, so its sentence chunks equal `token_segments(text)`, and its `NONE`
 chunk equals `tokens(text)`. An inline block goes inside the chunk's `<bos>`
 and `<eos>`, with dizione's `<sp>` as its word break, as dizione reads a word
 in the place of the block. `mark_symbols(marks)` gives the tokens that dizione
-writes for a run of marks after a word, with their ids and a stress of 0: `…`
-for `...`, `"` for `»`, and a repeated mark once. The frontend writes them
-after a block that no word follows, so `Wait [[ab]].` ends in `a b . <eos>`,
-as `Wait cat.` ends in `k æ t . <eos>`. Without `tokens=True` it returns
-`None`.
+writes for a run of marks after a word, with their ids and stress: `…` for
+`...`, `"` for `»`, and a repeated mark once. They are the tokens after the
+word in dizione's own read of a word and the marks, because dizione reads
+some runs alone as an emoticon: `;*` alone gives no token, and after a word it
+gives `;`. The frontend writes them after a block, so `Wait [[ab]].` ends in
+`a b . <eos>`, as `Wait cat.` ends in `k æ t . <eos>`. Without `tokens=True`
+it returns `None`.
 
 The IPA string has a space between two words and a stress mark directly
 before its vowel, as dizione writes it. It has no control symbol (`<bos>`,

@@ -175,15 +175,28 @@ the text after a block starts a new sentence, so a sentence chunk that ends in
 a block ends in the block's symbols. A closing mark after a block, right
 after it or after whitespace, closes the block's sentence, so the symbol that
 the backend writes for it goes with the block, in place of the word break,
-and the next chunk starts with a word. The backend's mark table,
-`mark_symbols(marks)`, tells which symbols it writes for the marks, such as
-dizione's `…` for `...`. Where the backend reads no word after the marks,
-before the next block or at the end of the text, it writes no symbol for
-them, and the frontend writes the symbols of the table: `Wait [[ab]].` gives
-`a b . <eos>` in dizione's token mode. A backend with no table gives no mark
-there. A block before the first text takes the start and end symbols of the
-text after it. A text that holds only blocks gives no start and end symbols,
-because the backend reads no text.
+and the next chunk starts with a word. A block before the first text takes
+the start and end symbols of the text after it. A text that holds only blocks
+gives no start and end symbols, because the backend reads no text.
+
+A closing mark is `|` or a mark of the Unicode categories that end or close
+(Po, Pe, Pf), such as `.`, `…`, `?`, `)` or `”`. A symbol that the backend's
+mark table shows as a word is not a mark, and the run of marks stops before
+it: dizione's token mode reads `%`, `&`, `@` and `§` as words, while vosk
+writes `%` as a mark. After whitespace, a quote or apostrophe glued to the
+next word opens that word and stays with it, as in `[[ab]] "Go"` or
+`[[ab]] ’tis`.
+
+The backend's mark table, `mark_symbols(marks)`, tells which symbols it writes
+for the marks after a word, such as dizione's `…` for `...`. The frontend
+writes the symbols of the table, and it removes the symbols that the backend
+wrote for the marks at the start of the next chunk. So where the backend reads
+no word after the marks, before the next block or at the end of the text, the
+marks are not lost: `Wait [[ab]].` gives `a b . <eos>` in dizione's token
+mode. A backend with no table gives no mark there. The table also writes a
+quote that opens the next word in place of the word break, as the backend
+does after a word: `Wait [[ab]] "Go."` gives `a b " ɡ oʊ` in dizione's token
+mode.
 
 A backend can still cut inside a chunk that is too long for its own limit.
 
@@ -260,7 +273,8 @@ A chunk that gives no phonemes is not in the output. A block adds its symbols
 to the sentence before it, and the text after a block starts a new sentence. A
 closing mark after a block, right after it or after whitespace, goes with the
 block, so no chunk starts with a mark that closes a block's sentence. A quote
-that opens the next word is not such a mark. A block before the first text is a chunk of its own at
+that opens the next word, and a symbol that the backend reads as a word, such
+as dizione's `%`, are not such marks. A block before the first text is a chunk of its own at
 `sentence` and `clause` size, and it starts the chunk after it at `paragraph`
 and `none` size. A space next to a block in the text becomes a space symbol:
 

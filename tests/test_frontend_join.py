@@ -24,6 +24,7 @@ from scriptconv.phonemizers import (
     Segment,
     UnicodeCodepointPhonemizer,
 )
+from scriptconv.phonemizers._thirdparty.dizione.symbols import SYMBOL_TO_ID
 from scriptconv.phonemizers.base import join_sentences
 from scriptconv.phonemizers.dizione import DizionePhonemizer
 from scriptconv.phonemizers.enums import Phonemizer
@@ -528,25 +529,54 @@ class TestDizioneTokensAndBlocks:
                                       "Wait [[QZ]]\nGo.", "[[QZ]] [[QZ]]. Hello there.", "[[QZ]]\n[[QZ]] Hello there.",
                                       "Wait [[QZ]]... go now.", "[[QZ]]... go now.", "Wait [[QZ]]...\n\ngo now.",
                                       "Wait [[QZ]] . go now.", "Wait [[QZ]]\t?! go now.", "[[QZ]]. [[QZ]] go now.",
-                                      "Wait [[QZ]] !go now.", 'Wait [[QZ]] ."go now."'])
+                                      "Wait [[QZ]] !go now.", 'Wait [[QZ]] ."go now."', "Wait [[QZ]]| go now.",
+                                      "Wait [[QZ]]\u203c go now.", "Wait [[QZ]]*. go now.", "Wait [[QZ]] ;* go now.",
+                                      'He said "wait [[QZ]];*" Go.', "He left (see [[QZ]]); then came back.",
+                                      'Wait [[QZ]]". "go now."'])
     def test_the_none_chunk_is_dizione_read_with_the_block_in_place(self, backend, text, keep):
         frontend = TextFrontend(FrontendConfig("en-US", keep_punctuation=keep), backend)
         assert _ids(frontend, text, Chunk.NONE, "ids") == [self._with_block(backend, text)]
 
     @pytest.mark.parametrize("keep", [True, False])
-    @pytest.mark.parametrize("text", [text for mark in (".", ",", "?", "!", ";", ":", "…", "...", "?!", "!»", "),", '."')
+    @pytest.mark.parametrize("text", ["Wait [[QZ]]%. go now.", "Wait [[QZ]] %, go now.", 'He said "wait [[QZ]]&" Go.',
+                                      'He said "wait [[QZ]].%" Go.', "Wait [[QZ]]\u00a7. go now.", "Wait [[QZ]]%."])
+    def test_a_symbol_that_dizione_reads_as_a_word_ends_the_marks(self, backend, text, keep):
+        frontend = TextFrontend(FrontendConfig("en-US", keep_punctuation=keep), backend)
+        assert _ids(frontend, text, Chunk.NONE, "ids") == [self._with_block(backend, text)]
+
+    @pytest.mark.parametrize("keep", [True, False])
+    @pytest.mark.parametrize("text", ["Wait [[QZ]] \u2019tis fine.", "He left [[QZ]] \u2019cause it rained.",
+                                      "They met in [[QZ]] \u201990s style.", "He said [[QZ]] 'go home.'",
+                                      'Wait [[QZ]] "go," he said.', "Er sagte [[QZ]] \u00bbGeh nach Hause\u00ab.",
+                                      "Han sa [[QZ]] \u201dG\u00e5 hem\u201d.", 'Wait [[QZ]] " go now.',
+                                      'Wait [[QZ]] \u2039"go now."'])
+    def test_a_quote_after_whitespace_reads_as_dizione_reads_it(self, backend, text, keep):
+        frontend = TextFrontend(FrontendConfig("en-US", keep_punctuation=keep), backend)
+        assert _ids(frontend, text, Chunk.NONE, "ids") == [self._with_block(backend, text)]
+
+    @pytest.mark.parametrize("keep", [True, False])
+    @pytest.mark.parametrize("text", [text for mark in (".", ",", "?", "!", ";", ":", "…", "...", "?!", "!»", "),",
+                                                        '."', ");", "):", "|", "\u203c")
                                       for text in (f"Wait [[QZ]]{mark}", f"Wait [[QZ]]{mark} [[QZ]] go now.")])
     def test_a_mark_with_no_word_after_it_is_written_from_dizione_table(self, backend, text, keep):
         # dizione reads no word after the mark, so the frontend writes it from dizione's mark table
         frontend = TextFrontend(FrontendConfig("en-US", keep_punctuation=keep), backend)
         assert _ids(frontend, text, Chunk.NONE, "ids") == [self._with_block(backend, text)]
 
-    def test_dizione_mark_table_is_what_dizione_writes_after_a_word(self, backend):
-        for marks in (".", "...", "…", "?!", "!»", "),", '."', "”", "。", "!!", ")).", '!»”'):
-            whole = backend.tokens("x" + marks)
-            table = backend.mark_symbols(marks)
-            assert (list(table.phonemes), list(table.streams["ids"]), list(table.streams["stress"])) == (
-                list(whole.symbols[4:-1]), list(whole.ids[4:-1]), list(whole.stress[4:-1]))
+    @pytest.mark.parametrize("marks, symbols", [(".", ["."]), ("...", ["…"]), ("?!", ["?", "!"]), ("!»", ["!", '"']),
+                                                ("),", [")", ","]), ('."', [".", '"']), ("!!", ["!"]), ("。", []),
+                                                ("\u203c", ["!"]), ("*.", ["."]), (");", [")", ";"]),
+                                                ("]:", [")", ":"]), (";*", [";"]), (":/", [":"])])
+    def test_dizione_mark_table_is_what_dizione_writes_after_a_word(self, backend, marks, symbols):
+        # dizione drops ";*" and ":/" alone as emoticons, but not after a word
+        table = backend.mark_symbols(marks)
+        assert list(table.phonemes) == symbols
+        assert list(table.streams["ids"]) == [SYMBOL_TO_ID[symbol] for symbol in symbols]
+        assert list(table.streams["stress"]) == [0] * len(symbols)
+        between = list(backend.tokens(f"go{marks} now").symbols)
+        assert between[between.index("oʊ") + 1:between.index("n")] in (symbols, symbols + ["<sp>"])
+
+    def test_dizione_has_no_mark_table_without_tokens(self):
         assert DizionePhonemizer().mark_symbols(".") is None
 
     @pytest.mark.parametrize("chunk", SIZES)
@@ -633,7 +663,7 @@ class TestAMarkAfterABlock:
     @pytest.mark.parametrize("chunk", [Chunk.SENTENCE, Chunk.CLAUSE])
     @pytest.mark.parametrize("text, tail", [("Wait [[ab]]. Go.", ["."]), ("Wait [[ab]], go now.", [","]),
                                             ("Wait [[ab]]? Go.", ["?"]), ("[[ab]]. Go now.", ["."]),
-                                            ('He said "wait [[ab]]." Go.', [".", '"']),
+                                            ('He said "wait [[ab]]." Go.', [".", '"']), ('Wait [[ab]] " Go.', ['"']),
                                             ("He asked (why [[ab]]?) and left.", ["?", ")"])])
     def test_a_bounded_backend_writes_the_mark_inside_the_block_chunk(self, text, tail, chunk, keep):
         frontend = TextFrontend(FrontendConfig("en-US", keep_punctuation=keep), DizionePhonemizer(tokens=True))
@@ -649,12 +679,25 @@ class TestAMarkAfterABlock:
         frontend = TextFrontend(FrontendConfig("en-US", keep_punctuation=keep), DizionePhonemizer(tokens=True))
         assert [c[:3] for c in frontend.phonemize(text, Stages(chunk=chunk)) if c[1] in (".", "?", "!", "…")] == []
 
-    @pytest.mark.parametrize("chunk", [Chunk.SENTENCE, Chunk.PARAGRAPH])
-    def test_a_quote_that_opens_the_next_word_stays_with_it(self, chunk):
+    @pytest.mark.parametrize("chunk", [Chunk.SENTENCE, Chunk.CLAUSE, Chunk.PARAGRAPH])
+    @pytest.mark.parametrize("text, start", [('Wait [[ab]]\n\n"Go," he said.', ['"', "ɡ"]),
+                                             ("Wait [[ab]]\n\n\u2019tis fine.", ["t", "ɪ"]),
+                                             ("Wait [[ab]]\n\n'Go,' he said.", ["'", "ɡ"]),
+                                             ("Er sagte [[ab]]\n\n\u00bbGeh!\u00ab", ['"', "dʒ"]),
+                                             ("Han sa [[ab]]\n\n\u201dG\u00e5!\u201d", ['"', "ɡ"])])
+    def test_a_quote_that_opens_the_next_word_stays_with_it(self, text, start, chunk):
         frontend = TextFrontend(FrontendConfig("en-US"), DizionePhonemizer(tokens=True))
-        first, second = frontend.phonemize('Wait [[ab]]\n\n"Go," he said.', Stages(chunk=chunk))
+        first, second, *_ = frontend.phonemize(text, Stages(chunk=chunk))
         assert first[-3:] == ["a", "b", "<eos>"]
-        assert second[:3] == ["<bos>", '"', "ɡ"]
+        assert second[:3] == ["<bos>", *start]
+
+    @pytest.mark.parametrize("chunk", [Chunk.SENTENCE, Chunk.CLAUSE])
+    def test_a_symbol_word_after_a_block_starts_the_next_chunk(self, chunk):
+        # dizione reads "%" as the word "percent", so it is no mark of the block's sentence
+        frontend = TextFrontend(FrontendConfig("en-US"), DizionePhonemizer(tokens=True))
+        first, second, *_ = frontend.phonemize("Wait [[ab]]%. Go now.", Stages(chunk=chunk))
+        assert first[-3:] == ["a", "b", "<eos>"]
+        assert second[:3] == ["<bos>", "p", "ɚ"]
 
     @pytest.mark.parametrize("chunk", [Chunk.SENTENCE, Chunk.CLAUSE])
     def test_an_opening_quote_after_the_mark_starts_the_next_chunk(self, chunk):
@@ -674,6 +717,13 @@ class TestAMarkAfterABlock:
         word = frontend.phonemize("اذهب.", Stages(chunk=Chunk.NONE))[0]
         assert word[0] == "<bos>"
         assert whole[whole.index("b") + 1] == word[1]
+
+    @pytest.mark.parametrize("text", ["Жди [[ab]]% иди.", "Жди [[ab]] % иди.", "Жди [[ab]]%"])
+    def test_a_symbol_that_the_backend_writes_as_a_mark_goes_with_the_block(self, text):
+        # vosk writes "%" as a mark, where dizione reads it as the word "percent"
+        first, *rest = self._frontend("vosk", "ru-RU", "vosk", True).phonemize(text)
+        assert "".join(first).endswith("ab%")
+        assert [chunk for chunk in rest if chunk[0] == "%"] == []
 
     @pytest.mark.parametrize("keep", [True, False])
     def test_vosk_joins_its_chunks_after_a_block_by_the_one_rule(self, keep):
