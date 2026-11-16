@@ -195,6 +195,9 @@ Where a word follows, that run ends before a quote, an apostrophe, `¡`, `¿`
 or an ellipsis, also in a compatibility form such as `＂` or `︙`. dizione
 starts a clause with such a mark after whitespace, so `Wait [[ab]]. " go now.`
 gives `<bos> w eɪ t <sp> a b . <eos>` and `<bos> " ɡ oʊ <sp> n aʊ . <eos>`.
+dizione reads `x. :')) go` with `. )`, so `Wait [[ab]]. :')) go now.` starts
+its next chunk with `)`, the mark after the apostrophe. A run also ends before
+`-` and `^`, so in `Wait [[ab]])-:go now.` the `:` starts the next chunk.
 
 This has a limit. A backend can keep such a mark with the word before it.
 dizione does so after `)`, after `"` and `…`, and at `sentence` size after
