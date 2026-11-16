@@ -80,6 +80,8 @@ class Phonemizer(str, Enum):
     PYPINYIN = "pypinyin" # chinese
     XPINYIN = "xpinyin" # chinese
     JIEBA = "jieba" # chinese  (not a real phonemizer!)
+    F5TTS_CHAR = "f5tts_char"  # the text as written, one token per character (Habibi-TTS, SILMA TTS)
+    F5TTS_PINYIN = "f5tts_pinyin"  # F5-TTS convert_char_to_pinyin: hanzi as pinyin syllables, other characters as written
     VOSK = "vosk"  # russian  (no ipa!)
     SHAMI = "shami"  # Levantine Arabic / English code-switching (ShamiVITS)
     ARBTOK = "arbtok"  # arabic (dialect-aware, undiacritized text; o2i lattice)

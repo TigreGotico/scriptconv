@@ -75,6 +75,8 @@ PHONEMIZER_REGISTRY: Dict[Phonemizer, Tuple[str, str, Optional[str]]] = {
     _P.G2PK: (f"{COPYLEFT}.ko", "G2PKPhonemizer", "ko"),
     _P.KOG2PK: (f"{COPYLEFT}.ko", "KoG2PPhonemizer", "ko"),
     _P.JIEBA: (f"{_BASE}.zh", "JiebaPhonemizer", "zh-phonemizers"),
+    _P.F5TTS_CHAR: (f"{_BASE}.f5tts", "F5TTSCharPhonemizer", None),
+    _P.F5TTS_PINYIN: (f"{_BASE}.f5tts", "F5TTSPinyinPhonemizer", "zh-phonemizers"),
     _P.G2PC: (f"{_BASE}.zh", "G2pCPhonemizer", "zh-phonemizers"),
     _P.G2PM: (f"{_BASE}.zh", "G2pMPhonemizer", "zh-phonemizers"),
     _P.G2PW: (f"{_BASE}.g2pw", "G2PWPhonemizer", "zh-phonemizers"),

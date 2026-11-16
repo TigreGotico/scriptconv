@@ -241,6 +241,7 @@ python scripts/probe_stress_marks.py words.tsv --out cells.tsv
 | `vosk` | `ru` |
 | `graphemes` | every language, as text: `stress_notation="acute"` keeps U+0301, `"plus"` writes `+` before the stressed vowel (`прив+ет`), `"none"` removes it |
 | `unicode` | every language, as a codepoint |
+| `f5tts_char`, `f5tts_pinyin` | every language, as a character of the text |
 | every other backend in scriptconv | none |
 
 A backend in scriptconv-copyleft or scriptconv-nonfree declares its own
@@ -705,13 +706,48 @@ the 88-symbol tables. `SYMBOL_TO_ID_90`, `ID_TO_SYMBOL_90` and `VOCAB_SIZE_90`
 hold the 90-symbol tables, and `get_inventory(90)` gives the tokeniser and the
 fold map. The two front ends share no state, so one process can use both.
 
+## F5-TTS text tokens
+
+An F5-TTS voice reads the tokens that the inference code of its project gives,
+from a vocabulary of characters. Two backends give those tokens. Each reads a
+whole sentence with its capitals, quotes and every mark, so the frontend adds
+no clause symbol and `keep_punctuation` changes nothing.
+
+`Phonemizer.F5TTS_PINYIN` gives the tokens of `convert_char_to_pinyin` in
+`src/f5_tts/model/utils.py` of SWivid/F5-TTS at commit `600e5fd`, which F5-TTS
+v1 Base and its fine-tunes read. rjieba cuts the text into words. Each hanzi
+gives a space and its pinyin syllable in the TONE3 style of pypinyin, with tone
+sandhi. A syllable in the neutral tone has no digit, as `men` below shows.
+Every other character stays as itself. `;` becomes `,`, and curly
+quotes become straight quotes. A word of more than one ASCII character follows
+a space, unless the token before it is a space, `:`, `'` or `"`. Install it
+with `pip install scriptconv[zh-phonemizers]`.
+
+`Phonemizer.F5TTS_CHAR` gives one token for each character. Habibi-TTS
+(SWivid/Habibi-TTS at `9274498`) and SILMA TTS (silma-ai/silma-tts at
+`2816b5a`) pass the text to the model as it is, so their voices read these
+tokens.
+
+```python
+from scriptconv.phonemizers import Alphabet, Phonemizer, get_phonemizer
+
+f5 = get_phonemizer(Phonemizer.F5TTS_PINYIN, Alphabet.UNICODE)
+f5.phonemize_to_list("我们用iPhone打电话。", "zh")
+# [' ', 'wo3', ' ', 'men', ' ', 'yong4', ' ', 'i', 'P', 'h', 'o', 'n', 'e', ' ', 'da3', ' ', 'dian4', ' ', 'hua4', '。']
+```
+
+`tests/data/f5tts_parity.jsonl` holds the tokens of the upstream functions for
+151 texts, and the tests compare both backends with them. The port of
+`convert_char_to_pinyin` carries the MIT licence of F5-TTS in
+`scriptconv/phonemizers/_thirdparty/LICENSE.f5tts`.
+
 ## The backend catalog
 
 Multilingual: espeak (subprocess with espyak fallback), gruut, goruut,
 epitran, transphone, ByT5/Charsiu (ONNX), the misaki family (en/ja/zh/ko/vi).
 Per-language: English (DeepPhonemizer, OpenPhonemizer, g2p_en, dizione), Japanese
 (OpenJTalk, cutlet, pykakasi), Korean (g2pk, KoG2P), Chinese (jieba, g2pM,
-xpinyin, pypinyin, g2pW), Arabic (arbtok, mantoq), Hebrew (phonikud), Persian,
+xpinyin, pypinyin, g2pW), F5-TTS voices (`f5tts_char`, `f5tts_pinyin`), Arabic (arbtok, mantoq), Hebrew (phonikud), Persian,
 Vietnamese (viphoneme, Python below 3.12 only), Portuguese (tugaphone), Galician
 (Cotovía), Russian (vosk, the vosk-tts inventory, `Alphabet.VOSK`, with the
 voice's pronunciation dictionary passed as `phonemizer_model`), Basque
