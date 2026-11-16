@@ -50,16 +50,16 @@ class TestTheHookReadsTheWholeText:
         # text2spoken reads a title before a capitalised name with no full stop,
         # as in its row "Ask Prof. Jones." -> "Ask Professor Jones.", and a
         # "Prof." that ends a sentence with one, as in "Ask the Prof." -> "Ask the
-        # Professor.". A split that cuts after "Prof." gives the second reading.
-        # The stand-in split cuts after every full stop, so the test holds where
-        # a version of quebra_frases does not cut there.
+        # Professor.". The stand-in split cuts after "Prof.", so there a hook that
+        # reads each sentence alone gives the second reading. The quebra_frases
+        # run asserts only the reading, wherever that version cuts.
+        text = "Prof. Smith arrived."
+        hook = spoken_normalizer()
         if split == "every full stop":
             monkeypatch.setattr(frontend_module, "_sentence_tokenize", lambda text: re.split(r"(?<=\.)\s+", text))
-        text = "Prof. Smith arrived."
-        sentences = frontend_module._sentence_tokenize(text)
-        assert len(sentences) > 1
-        hook = spoken_normalizer()
-        assert " ".join(hook(sentence, "en") for sentence in sentences) == "Professor. Smith arrived."
+            sentences = frontend_module._sentence_tokenize(text)
+            assert sentences == ["Prof.", "Smith arrived."]
+            assert " ".join(hook(sentence, "en") for sentence in sentences) == "Professor. Smith arrived."
         assert hook(text, "en") == "Professor Smith arrived."
         frontend = TextFrontend(FrontendConfig("en", normalizer=hook, stages=Stages(diacritize=False)),
                                 Echo())
