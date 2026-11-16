@@ -368,9 +368,10 @@ def _clause_spans(symbols: Tuple[str, ...],
     The spans cover the sequence without its ``<bos>`` and ``<eos>``. A clause
     ends after a run of clause marks that follows a sound. Its mark is the
     first mark of the run, as :data:`CLAUSE_PUNCTUATION` reads it, and it ends
-    a sentence when the run holds ``.``, ``?`` or ``!``. A closing bracket
-    after the run, or a quotation mark that closes a quotation, stays with the
-    clause. *closes* tells, for each ``"``, whether it closes a quotation;
+    a sentence when the run holds ``.``, ``?`` or ``!``. A closing bracket, or
+    a quotation mark that closes a quotation, is part of the run, so a clause
+    mark after it stays with the clause too, and no clause starts with a
+    closing mark. *closes* tells, for each ``"``, whether it closes a quotation;
     without it, and for ``'``, a quotation mark closes when an odd number of
     the same mark comes before it. Marks after the last sound stay with the
     last clause, and the last clause ends a sentence.
@@ -393,14 +394,12 @@ def _clause_spans(symbols: Tuple[str, ...],
             seen[symbol] += 1
         elif sound and symbol in CLAUSE_PUNCTUATION:
             end = index
-            while end < last and symbols[end] in CLAUSE_PUNCTUATION:
-                end += 1
-            ends_sentence = any(mark in SENTENCE_END for mark in symbols[index:end])
-            while end < last and (symbols[end] == _CLOSING_BRACKET
+            while end < last and (symbols[end] in CLAUSE_PUNCTUATION or symbols[end] == _CLOSING_BRACKET
                                   or symbols[end] in seen and closing(symbols[end])):
                 if symbols[end] in seen:
                     seen[symbols[end]] += 1
                 end += 1
+            ends_sentence = any(mark in SENTENCE_END for mark in symbols[index:end])
             spans.append((start, end, CLAUSE_PUNCTUATION[symbol], ends_sentence))
             start, index, sound = end, end, False
             continue

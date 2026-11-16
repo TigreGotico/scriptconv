@@ -91,10 +91,11 @@ A whole-text read has a size limit, `FrontendConfig.whole_text_limit`. Its
 default is `WHOLE_TEXT_LIMIT`, 2,000 characters, and `None` turns it off. Above the limit, the
 frontend first cuts the text at its paragraph breaks (one or more blank
 lines), and never at a guessed sentence end. A paragraph break then ends a
-sentence. The limit keeps one call of the slowest whole-text backend under
+sentence. The limit keeps one read of the slowest whole-text backend under
 100 ms, from the timing of `scripts/time_owner_backends.py` on prose and on a
 text dense in dates and prices. Its output is in
-`scripts/time_owner_backends.txt`.
+`scripts/time_owner_backends.txt`. The limit bounds the read only: a full
+garbage collection of the process can fall inside one call and add to it.
 
 An owner of `normalize` that cannot report its marks keeps
 `reads_whole_text = False`. The frontend then cuts the text into sentences as
@@ -138,7 +139,8 @@ text at each blank line before it cuts sentences. So a blank line ends a
 paragraph, and a sentence, whatever comes before it: a title with no mark, a
 `!`, a `:`, a `;`, an ellipsis, or a closing quote or bracket. The hook reads
 the whole text before the cut, so a mark that belongs to the reading reads as
-in the whole text.
+in the whole text. An inline block ends no paragraph: the paragraph runs on
+across it to the next blank line.
 
 dizione reads whole text, and it reads a blank line as a space. It ends a
 paragraph only at a `.`, `?` or `!` that a blank line follows. After a `:`, a
@@ -167,9 +169,13 @@ and end symbols. The backend writes the marks of such a chunk, so the
 frontend reads no mark around the block. Its word break, such as dizione's
 `<sp>` in token mode, comes before the block where the text has whitespace
 and the chunk does not end in a mark, and after the block where the text has
-a space. A word break never comes right before the end symbol: the text after
-a block starts a new sentence, so a sentence chunk that ends in a block ends
-in the block's symbols. A text that holds only blocks gives no start and end symbols,
+whitespace or a mark. A word break never comes right before the end symbol:
+the text after a block starts a new sentence, so a sentence chunk that ends in
+a block ends in the block's symbols. A mark right after a block closes the
+block's sentence, so the symbol that the backend writes for it goes with the
+block, in place of the word break, and the next chunk starts with a word. A
+block before the first text takes the start and end symbols of the text after
+it. A text that holds only blocks gives no start and end symbols,
 because the backend reads no text.
 
 A backend can still cut inside a chunk that is too long for its own limit.
@@ -245,7 +251,10 @@ owns the stage still runs it, because it needs the marks to read the text.
 
 A chunk that gives no phonemes is not in the output. A block adds its symbols
 to the sentence before it, and the text after a block starts a new sentence. A
-space next to a block in the text becomes a space symbol:
+mark right after a block goes with the block, so no chunk starts with a
+closing mark. A block before the first text is a chunk of its own at
+`sentence` and `clause` size, and it starts the chunk after it at `paragraph`
+and `none` size. A space next to a block in the text becomes a space symbol:
 
 ```python
 frontend = TextFrontend(FrontendConfig("en", Phonemizer.UNICODE))

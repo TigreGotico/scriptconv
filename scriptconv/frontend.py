@@ -56,8 +56,10 @@ import copy
 import dataclasses
 import enum
 import importlib.util
+import itertools
 import logging
 import re
+import unicodedata
 from typing import Callable, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Tuple
 
 from scriptconv.diacritics import _DIACRITIZER_PACKAGES, _diacritizer_family, diacritize
@@ -88,8 +90,9 @@ to the stages raises it. Version 1 cut the raw text into sentences before
 normalisation."""
 
 # scripts/time_owner_backends.py, output in scripts/time_owner_backends.txt: one dizione call on English text
-# dense in dates and prices, also with a blank line and quotes after each sentence, stays under 100 ms in every
-# run of two up to 2,000 characters (at most 84 ms), and goes over at 2,250 in one. Prose reads faster.
+# dense in dates and prices, also with a blank line and quotes after each sentence, stays under 100 ms up to
+# 2,000 characters (at most 46 ms in two runs). Prose reads faster. The limit bounds the read; a full garbage
+# collection of the process can add to one call.
 WHOLE_TEXT_LIMIT = 2_000
 """The default of :attr:`FrontendConfig.whole_text_limit`."""
 
@@ -98,6 +101,8 @@ _BLOCK_WORD = "a"
 # Text that ends in whitespace and then only marks. The marks join the block
 # after them as they join a plain word, and the whitespace stays.
 _SPACE_BEFORE_BLOCK = re.compile(r"\s\W*$")
+# The text before the first letter or digit: whitespace and marks.
+_WORDLESS_START = re.compile(r"[\W_]*")
 
 # linguatag puts "ar" with any region, and each individual Arabic language in
 # Arabic script, at 5 or less from "ar". Those languages diacritize by default.
@@ -316,6 +321,26 @@ class _Piece:
             values.pop()
 
 
+def _leading_marks(text: str) -> str:
+    """The marks that end or close at the start of *text*, such as ``.``, ``,``, ``?``, a closing quote or bracket."""
+    count = next((i for i, char in enumerate(text) if unicodedata.category(char) not in ("Po", "Pe", "Pf")),
+                 len(text))
+    return text[:count]
+
+
+def _first_bounds(reads: List[Iterator[_Piece]], start: int) -> Optional[Tuple[Segment, Segment]]:
+    """The bounds of the first piece in *reads* from index *start* on, the text parts after a block.
+
+    The piece read to find them stays first in its part.
+    """
+    for index in range(start, len(reads), 2):
+        first = next(reads[index], None)
+        if first is not None:
+            reads[index] = itertools.chain([first], reads[index])
+            return first.bounds
+    return None
+
+
 def _join(pieces: Iterable[_Piece], space: Segment) -> _Piece:
     """*pieces* joined into one by the rules of tts-punctuation.
 
@@ -445,9 +470,14 @@ class TextFrontend:
         paragraph ends.
 
         A block's symbols join the chunk before the block, and the text after
-        a block starts a new sentence. A block that starts a sentence after a
+        a block starts a new sentence, but a new paragraph only after a
+        paragraph break. A mark right after a block closes the
+        block's sentence, so it goes with the block's chunk, and no chunk
+        starts with a closing mark. A block that starts a sentence after a
         sentence that ends in a clause symbol follows that symbol with no
-        space. A block before the first text joins the chunk after it. A
+        space. A block before the first text is a chunk of its own at
+        ``sentence`` and ``clause`` size, with the marks right after it, and
+        it starts the chunk after it at ``paragraph`` and ``none`` size. A
         chunk of bounded segments has one start and one end symbol, with the
         block's symbols between them. A chunk that gives no phonemes is not
         yielded.
@@ -568,21 +598,66 @@ class TextFrontend:
         if len(parts) == 1:
             yield from self._text_pieces(parts[0], stages, clauses)
             return
+        reads = [self._text_pieces(part, stages, clauses) if index % 2 == 0 else iter(())
+                 for index, part in enumerate(parts)]
         # A block can extend the piece before it, so that piece is held
         # until the next part is known.
         held = _Piece([])
+        text_read, marks, gap = False, "", ""
         for index, part in enumerate(parts):
             if index % 2:
-                self._add_block(held, parts, index, stages)
-                continue
-            for piece in self._text_pieces(part, stages, clauses):
-                if held.phonemes:
+                if not text_read and held.bounds is None:
                     # a block before the first text has the bounds of the text after it
-                    held.bounds = held.bounds or piece.bounds
+                    held.bounds = _first_bounds(reads, index + 1)
+                self._add_block(held, parts, index, stages)
+                marks = _leading_marks(parts[index + 1])
+                continue
+            after_block = index > 0
+            for piece in reads[index]:
+                if after_block:
+                    # the piece that ends in a block ends a paragraph where a
+                    # paragraph break comes before the next word, and nowhere else
+                    held.ends_paragraph = bool(_PARAGRAPH_BREAK.search(gap + _WORDLESS_START.match(part)[0]))
+                    after_block = False
+                text_read = True
+                if marks:
+                    self._take_marks(held, piece, marks)
+                    marks = ""
+                    if not piece.phonemes:
+                        continue
+                if held.phonemes:
                     yield held
                 held = piece
+            gap = gap + part if after_block else part[len(part.rstrip()):]
         if held.phonemes:
             yield held
+
+    def _take_marks(self, held: _Piece, piece: _Piece, marks: str) -> None:
+        """Move the symbols at the start of *piece* that write *marks* to the end of *held*.
+
+        *held* ends in a block, and *marks* are the marks right after the
+        block in the text. Such a mark closes the block's sentence, so it goes
+        with the block, as tts-punctuation puts a closing mark with the
+        sentence that it ends, and no chunk starts with a closing mark. A
+        backend that drops the marks writes no such symbols, and then *held*
+        keeps its word break.
+        """
+        count = next((i for i, symbol in enumerate(piece.phonemes) if not set(symbol) <= set(marks)),
+                     len(piece.phonemes))
+        if not count:
+            return
+        space = list(self._space.phonemes)
+        if held.phonemes[-len(space):] == space:
+            for _ in space:
+                held.pop()
+        held.add(piece.phonemes[:count], {name: values[:count] for name, values in piece.streams.items()})
+        if piece.phonemes[count:count + len(space)] == space:
+            count += len(space)
+        del piece.phonemes[:count]
+        for values in piece.streams.values():
+            del values[:count]
+        held.ends_in_token = held.bounds is not None or (
+            self._keeps_punctuation() and held.phonemes[-1] in _CLAUSE_TOKENS)
 
     def _text_pieces(self, text: str, stages: Stages, clauses: bool) -> Iterator[_Piece]:
         """Steps 2 to 5 on text with no block, one piece per sentence, or per clause with *clauses*."""
@@ -727,10 +802,13 @@ class TextFrontend:
         mark follows the block.
 
         The block's symbols go inside the start and end symbols of a bounded
-        piece. The backend writes the marks of a bounded piece itself, so the
-        frontend reads no mark around the block: a word break comes before
-        the block where the text has whitespace and the piece does not end in
-        a mark, and after it where the text has a space.
+        piece. A block before the first text takes the bounds of the text
+        after it. The backend writes the marks of a bounded piece itself, so
+        the frontend reads no mark around the block: a word break comes
+        before the block where the text has whitespace and the piece does not
+        end in a mark, and after it where the text has whitespace or a mark.
+        :meth:`_take_marks` replaces that word break with the symbols that the
+        backend writes for the mark.
         """
         text, after = parts[index - 1], parts[index + 1]
         symbols = parts[index][2:-2].strip()
@@ -740,7 +818,7 @@ class TextFrontend:
             if _SPACE_BEFORE_BLOCK.search(text) and phonemes and phonemes[-1] != space[0] and not piece.ends_in_token:
                 piece.add(space, space_streams)
             piece.add(symbols)
-            piece.ends_in_token = not after.startswith(" ")
+            piece.ends_in_token = not after[:1].isspace() and not _leading_marks(after)
             if not piece.ends_in_token:
                 piece.add(space, space_streams)
             return

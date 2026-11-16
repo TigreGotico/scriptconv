@@ -316,7 +316,8 @@ with its characters. A clause ends after a run of `, . ? ! ; :` that follows a
 sound, and it ends a sentence when the run holds `.`, `?` or `!`. A full stop
 that dizione reads as part of an abbreviation, as in `Mrs.`, ends nothing. A
 closing bracket after the run, or a quotation mark that closes an open
-quotation, stays with the clause that ends. A `!` or `?` between two letters
+quotation, stays with the clause that ends, and so does a clause mark after
+it, as in `"Stop." .`, so no clause starts with a mark. A `!` or `?` between two letters
 with no space after it, as in `Sim!Não!`, is no clause mark: the backend reads
 it as a space, in `tokens()` too. A sentence that a blank line follows ends a
 paragraph, unless dizione's own rules read the blank line away, as in

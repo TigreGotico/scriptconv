@@ -10,11 +10,11 @@ skipped.
 Each backend reads 10,000 characters of plain prose in its language: one call,
 in one process, the median of 5 runs. Each run builds a new backend and
 warms it with one short sentence, so word caches start empty and lazy models
-are loaded before the clock starts. The garbage collector runs before the
-clock starts and is off while it runs, as in ``timeit``: each run builds a
-new backend, so a full collection of the earlier backends would otherwise
-fall inside some timed reads and add up to about 130 ms to each. A
-``reads_whole_text`` backend runs
+are loaded before the clock starts. The garbage collector runs once before
+the clock starts and stays on during the read, as in a process that serves
+the frontend, so a collection that the read itself sets off is in the time.
+A full collection of a process that holds many other objects can still add
+to one call. A ``reads_whole_text`` backend runs
 ``phonemize_segments``. Any other backend runs ``phonemize_to_list``, its
 whole-text path.
 
@@ -27,9 +27,9 @@ sentences in one run (``dense``), with a blank line after each
 (``dense+blank``), and each in quotes as well (``dense+quote+blank``). The
 script reports the median and the maximum of the runs, and the largest size
 at which the maximum of every shape stays under 100 ms, and so does every
-smaller size. ``WHOLE_TEXT_LIMIT`` is that size, from runs at a 1-minute load
-of 16 or less on a 24-core machine. ``scripts/time_owner_backends.txt`` holds
-the output.
+smaller size. ``WHOLE_TEXT_LIMIT`` is at or below that size in every run at a
+1-minute load of 16 or less on a 24-core machine, so a read at the limit keeps
+a margin under 100 ms. ``scripts/time_owner_backends.txt`` holds the output.
 
 usage: python scripts/time_owner_backends.py PROSE_DIR
 
@@ -86,11 +86,9 @@ def time_backend(cls, lang, text, warm_up):
                 return backend.phonemize_to_list(text, lang)
         read(warm_up)
         gc.collect()
-        gc.disable()
         start = time.perf_counter()
         read(text)
         times.append((time.perf_counter() - start) * 1000)
-        gc.enable()
     return times
 
 
