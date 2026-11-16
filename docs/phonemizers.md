@@ -393,17 +393,25 @@ same rule tables. `identity()` gives the africa-g2p version for
 Each africa-g2p rule table records its source in a `confidence` field. The
 values `omniglot`, `high`, `medium` and `hand-verified` mean a transcription
 of an Omniglot chart or of Hartell (ed.), *Alphabets of Africa* (UNESCO,
-1993). Every other value is a draft. In africa-g2p 0.3.5, 352 tables are
-`llm-draft` and 5 are `tts-reviewed`, a chart that an LLM corrected (Dagbani,
-Ewe, Fante, Ga and Twi). Both backends refuse a language whose table is a
-draft with `UnsupportedLanguageError`, and the message names the table, its
-`confidence` and the africa-g2p version. `allow_draft_rules=True` on the
-constructor, or as a keyword of `get_phonemizer`, accepts the drafts:
+1993). Both backends serve these tables by default.
+
+They also serve the 5 `tts-reviewed` tables of africa-g2p 0.3.5 by default:
+Dagbani, Ewe, Fante, Ga and Twi. Each is an Omniglot chart with corrections
+that an LLM proposed, and no native speaker has checked the corrections. The
+corrected Ewe table measures closer to WikiPron Ewe than the chart it
+replaces: phoneme error rate 0.4690 against 0.4948 on 247 words.
+
+Every other value is a draft. In africa-g2p 0.3.5, 352 tables are
+`llm-draft`: an LLM drafted them from corpus text, and no chart backs them.
+Both backends refuse a draft table with `UnsupportedLanguageError`, and the
+message names the table, its `confidence` and the africa-g2p version.
+`allow_draft_rules=True` on the constructor, or as a keyword of
+`get_phonemizer`, accepts the drafts:
 
 ```python
 from scriptconv.phonemizers import Phonemizer, get_phonemizer
 
-get_phonemizer(Phonemizer.GHANA_G2P, allow_draft_rules=True).phonemize_string("Akwaaba", "twi")
+get_phonemizer(Phonemizer.AFRICA_G2P, allow_draft_rules=True).phonemize_string("aba", "aab")
 ```
 
 The code of africa-g2p is Apache-2.0. Its rule tables have no licence grant,
