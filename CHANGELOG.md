@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a103](https://github.com/TigreGotico/scriptconv/tree/0.0.4a103) (2026-11-16)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a102...0.0.4a103)
+
+**Merged pull requests:**
+
+- feat: g2pW Chinese backend, Nakdimon Hebrew diacritizer, OpenJTalk on pyopenjtalk-plus [\#274](https://github.com/TigreGotico/scriptconv/pull/274) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a102](https://github.com/TigreGotico/scriptconv/tree/0.0.4a102) (2026-11-16)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a101...0.0.4a102)
@@ -380,17 +388,9 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a52...0.0.4a53)
 
-**Merged pull requests:**
-
-- fix\(diacritics\): route every Arabic lect to tashkeel and pass waqf [\#175](https://github.com/TigreGotico/scriptconv/pull/175) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [0.0.4a52](https://github.com/TigreGotico/scriptconv/tree/0.0.4a52) (2026-11-12)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a51...0.0.4a52)
-
-**Merged pull requests:**
-
-- feat\(testing\): sentence gate that scores each stage against orthography2ipa [\#174](https://github.com/TigreGotico/scriptconv/pull/174) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a51](https://github.com/TigreGotico/scriptconv/tree/0.0.4a51) (2026-11-11)
 
