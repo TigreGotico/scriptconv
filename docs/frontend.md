@@ -39,6 +39,11 @@ Smith arrived.`, but `Prof.` alone stays `Prof.`, so the split runs after the
 hook. Step 5 stays lazy, so a long text starts to speak before its last
 sentence is read.
 
+Each stage, the hook, casing and the diacritizer, reads its text without the
+whitespace at the edges, and the frontend puts that whitespace back around
+the result. So a diacritizer that marks the last letter of `عندي ` before a
+block marks the `ي`, not the space after it.
+
 A backend can own a stage. It then runs that stage itself, and the frontend
 skips it. A backend can own `normalize`, `diacritize` or both. Tugaphone and
 Arbtok own `diacritize`, and dizione owns `normalize`. The normalisation hook

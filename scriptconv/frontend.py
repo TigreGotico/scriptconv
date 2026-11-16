@@ -5,6 +5,8 @@
 1. Split out inline ``[[phonemes]]`` blocks. No stage reads the text inside a
    block, and its symbols reach the output as written.
 2. Run the normalisation hook on the whole text, if the caller set one.
+   Every stage reads its text without the whitespace at its edges, and that
+   whitespace goes back around the result.
 3. Apply casing, if the call sets a casing function.
 4. Cut the normalised text into sentences, or into clauses at ``clause``
    size.
@@ -870,9 +872,16 @@ class TextFrontend:
 
     def _stage(self, name: str, stages: Stages, function: Callable[..., str],
                text: str, *args, **kwargs) -> str:
-        """*function* on *text*. A failure continues with *text*, or raises in strict mode."""
+        """*function* on *text* without the whitespace at its edges, with that whitespace put back around the result.
+
+        Text of only whitespace goes through as it is. A failure continues
+        with *text*, or raises in strict mode.
+        """
+        start, end = len(text) - len(text.lstrip()), len(text.rstrip())
+        if start == len(text):
+            return text
         try:
-            return function(text, *args, **kwargs)
+            return text[:start] + function(text[start:end], *args, **kwargs) + text[end:]
         except Exception as e:
             if self.config.strict:
                 raise StageError(f"{name} failed for lang={stages.lang!r}: {e}") from e

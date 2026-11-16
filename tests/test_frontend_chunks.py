@@ -132,7 +132,7 @@ class TestStreamingOrder:
 
     @pytest.mark.parametrize("chunk, first", [
         (Chunk.SENTENCE, [("diacritize", "Um, dois."), ("backend", "Um"), ("backend", "dois")]),
-        (Chunk.CLAUSE, [("diacritize", "Um, "), ("backend", "Um")]),
+        (Chunk.CLAUSE, [("diacritize", "Um,"), ("backend", "Um")]),
     ])
     def test_chunk_two_is_read_after_chunk_one_is_yielded(self, monkeypatch, chunk, first):
         events = []

@@ -191,7 +191,7 @@ class TestInlineBlocks:
         frontend = build(Echo(), normalizer=lambda text, lang: text.upper(),
                          stages=Stages(diacritize=True))
         assert frontend.phonemize("ab [[xy]] cd. ef.") == [
-            list("dAB") + [" ", "x", "y", " "], list("d CD"), list("dEF")]
+            list("dAB") + [" ", "x", "y", " "], list("dCD"), list("dEF")]
         assert all("xy" not in entry[1] and "[" not in entry[1] for entry in stages.log)
 
     def test_a_block_joins_the_sentence_before_it(self):
@@ -207,8 +207,8 @@ class TestInlineBlocks:
         stages = Recorder(monkeypatch)
         frontend = build(Echo(), normalizer=stages.normalize, stages=Stages(diacritize=False))
         assert frontend.phonemize_flat("ab [[xy]] cd") == (
-            list("nab") + [" ", "x", "y", " "] + list("n cd"))
-        assert [entry[1] for entry in stages.log] == ["ab ", " cd"]
+            list("nab") + [" ", "x", "y", " "] + list("ncd"))
+        assert [entry[1] for entry in stages.log] == ["ab", "cd"]
 
     # A synthesis sentence never starts with a space. The flat stream is the
     # sentences joined: no space after a sentence that ends in a clause symbol
@@ -327,11 +327,11 @@ class TestInlineBlocks:
 
     @pytest.mark.parametrize("text, lazy, flat", [
         ("Olá [[x]] sim. [[y]], b.",
-         ["Olá ", " sim. ", "a, b.", ", b."], ["Olá ", " sim. ", "a, b.", ", b."]),
+         ["Olá", "sim.", "a, b.", ", b."], ["Olá", "sim.", "a, b.", ", b."]),
         # a digit gives the clause a word, as a letter does
-        ("Olá [[x]] 2 gatos, b.", ["Olá ", " 2 gatos, b."], ["Olá ", " 2 gatos, b."]),
+        ("Olá [[x]] 2 gatos, b.", ["Olá", "2 gatos, b."], ["Olá", "2 gatos, b."]),
         # no text after the block gives no mark
-        ("Olá [[x]]", ["Olá "], ["Olá "]),
+        ("Olá [[x]]", ["Olá"], ["Olá"]),
     ])
     def test_the_stages_read_the_mark_only_when_one_can_follow_the_block(self, text, lazy, flat):
         read = []
