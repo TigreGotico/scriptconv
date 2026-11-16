@@ -13,7 +13,11 @@ takes ``Ø``. The final writes ü as ``v``, as the g2pW reading table
 split into an initial and a final of :data:`SYMBOLS`. ``n`` and ``ê`` give
 one symbol, the syllable with its tone digit, such as ``n2``. ``hm``, ``hng``
 and ``ng`` give three symbols, ``h m``, ``h ng`` or ``n g`` and the tone
-digit, and ``m``, ``ng`` and ``g`` are not finals.
+digit, and ``m``, ``ng`` and ``g`` are not finals. This symbol set and split
+are those of ``src/piper/phonemize_chinese.py`` of
+https://github.com/OHF-Voice/piper1-gpl at commit
+d76f335d9eb5dea5ef6d7d70b2d6114e6303fa08, by Michael Hansen, whose header
+states "This code is Apache 2.0 licensed".
 
 The backend does not read digits. Numbers, dates and units are the
 normalisation stage, which the caller runs before the backend. A digit gives

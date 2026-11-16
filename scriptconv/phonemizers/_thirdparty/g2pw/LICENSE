@@ -1,6 +1,10 @@
 The g2pW converter and the three tables in this directory come from
 https://github.com/GitYCC/g2pW at commit
-b9328ce8129c4717a70f16a2688542a0197541dd, under this licence:
+b9328ce8129c4717a70f16a2688542a0197541dd. Parts of the converter follow
+src/piper/g2pw_onnx.py by Michael Hansen, at commit
+d76f335d9eb5dea5ef6d7d70b2d6114e6303fa08 (the module docstring names the
+repository), which states "Ported from g2pW, Copyright (c) 2022 Yi-Chang Chen,
+Apache License 2.0." Both are under this licence:
 
                                  Apache License
                            Version 2.0, January 2004

@@ -24,6 +24,14 @@ The changes from g2pW:
   character that lowercases to two code points, such as İ, moves every
   character after it, so the model reads the wrong one.
 
+The numpy batches, the one-pass label tables of
+:func:`get_phoneme_labels` and :func:`get_char_phoneme_labels`, and the
+prediction loop of :meth:`G2PWConverter._predict` follow
+``src/piper/g2pw_onnx.py`` of https://github.com/OHF-Voice/piper1-gpl at
+commit d76f335d9eb5dea5ef6d7d70b2d6114e6303fa08, by Michael Hansen, which
+states: "Ported from g2pW, Copyright (c) 2022 Yi-Chang Chen, Apache License
+2.0."
+
 The three tables in this directory are the files of ``g2pw/`` at the same
 commit, unchanged: ``char_bopomofo_dict.json``,
 ``bopomofo_to_pinyin_wo_tune_dict.json`` and

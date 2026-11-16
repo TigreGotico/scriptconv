@@ -132,7 +132,10 @@ diacritizer_model="nakdimon")` uses Nakdimon instead (Gershuni and Pinter,
 "Restoring Hebrew Diacritics Without a Dictionary", Findings of NAACL 2022).
 Nakdimon predicts a vowel point, a dagesh and a shin or sin dot for each
 letter. Text that already holds a vowel point, a dagesh or a shin or sin dot
-stays as written. The code and the model are under the MIT licence:
+stays as written. The code comes from Nakdimon, and some lines follow the
+Nakdimon port of Piper (`src/piper/hebrew/__init__.py` of
+github.com/OHF-Voice/piper1-gpl at `d76f335`), which ships Nakdimon's MIT
+licence with it. The code and the model are under the MIT licence:
 
 | File | Source | Revision | Size | Licence |
 |---|---|---|---|---|
@@ -308,7 +311,10 @@ Weighted Softmax BERT for Polyphone Disambiguation in Mandarin", INTERSPEECH
 2022). A BERT model reads each polyphonic character in the context of its
 sentence, and tables give the reading of the other characters. The model runs
 on onnxruntime, with no torch. Simplified and traditional characters both
-read. Install the backend with `pip install scriptconv[zh-phonemizers]`.
+read. The converter comes from g2pW, and its numpy batches and prediction
+loop follow Piper's torch-free port (`src/piper/g2pw_onnx.py` of
+github.com/OHF-Voice/piper1-gpl at `d76f335`, Apache-2.0 as its header
+states). Install the backend with `pip install scriptconv[zh-phonemizers]`.
 
 The output alphabet is `Alphabet.PINYIN`. A syllable gives three symbols:
 the initial, the final and the tone digit 1 to 5. A syllable with no initial
@@ -630,6 +636,16 @@ parallel per-phoneme language-ID stream), and orthography2ipa for its
 data-driven language specs. Trivial built-ins that need no extra:
 `GraphemePhonemizer` (normalized characters) and `UnicodeCodepointPhonemizer`
 (codepoints as phonemes).
+
+The OpenJTalk backend runs on pyopenjtalk-plus with onnxruntime, which the
+`ja-phonemizers` extra installs. pyopenjtalk installs the same `pyopenjtalk`
+module with another dictionary and other accent rules, and pyopenjtalk-plus
+without onnxruntime reads 何時 as なにじ. So the backend reads the RECORD of
+each installed distribution and refuses, with an `ImportError` that names the
+fix, an install where pyopenjtalk owns the module or where onnxruntime does not
+import. The check is `scriptconv.phonemizers.openjtalk_engine.require_pyopenjtalk_plus`.
+The pyopenjtalk-plus wheel holds the OpenJTalk dictionary, so the first use
+needs no network.
 
 See [ovos.md](ovos.md) for using this layer from OVOS through
 `ovos-scriptconv-g2p-plugin`.

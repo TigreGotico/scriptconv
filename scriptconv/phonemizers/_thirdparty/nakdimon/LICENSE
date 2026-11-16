@@ -1,6 +1,10 @@
 The Nakdimon character tables and output merge in this directory come from
 https://github.com/elazarg/nakdimon at commit
-5b73cdd6a43ad465faabc8c1118933592df356c8, under this licence:
+5b73cdd6a43ad465faabc8c1118933592df356c8. Parts follow the port in
+src/piper/hebrew/__init__.py by Michael Hansen, at commit
+d76f335d9eb5dea5ef6d7d70b2d6114e6303fa08 (the module docstring names the
+repository), which ships this licence in the same directory. Both are under
+this licence:
 
 MIT License
 

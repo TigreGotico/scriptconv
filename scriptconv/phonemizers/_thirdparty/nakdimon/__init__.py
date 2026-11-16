@@ -15,6 +15,12 @@ file. Unlike ``nakdimon/predict.py``, the model reads the whole text as one
 sequence, with no padding and no split into lines. Upstream ``normalize`` also
 maps each final letter to its regular form, after the test for a valid
 letter; the final letters are valid letters, so that map is left out.
+
+The loop of :meth:`Nakdimon.diacritize` over the letters and the tuple form of
+the tests in :func:`normalize` follow the port in ``src/piper/hebrew/__init__.py``
+of https://github.com/OHF-Voice/piper1-gpl at commit
+d76f335d9eb5dea5ef6d7d70b2d6114e6303fa08, by Michael Hansen, which its
+directory ships under the same MIT License.
 """
 import re
 from typing import List
