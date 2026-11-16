@@ -107,6 +107,8 @@ _SPACE_BEFORE_BLOCK = re.compile(r"\s\W*$")
 _OPENING_MARKS = frozenset("\"'\u2019\u2018\u201a\u201e\u00ab\u00bb\u2039\u203a\u00a1\u00bf")
 # The text before the first letter or digit: whitespace and marks.
 _WORDLESS_START = re.compile(r"[\W_]*")
+# The text after the closing marks that follow a block, up to the end of the next word.
+_FOLLOWING = re.compile(r"\S*\s*\S*")
 
 # linguatag puts "ar" with any region, and each individual Arabic language in
 # Arabic script, at 5 or less from "ar". Those languages diacritize by default.
@@ -355,18 +357,43 @@ def _marks_after(after: str, reads_as_word: Callable[[str], bool]) -> Tuple[str,
     to the next word ends before its first quote or apostrophe: that quote,
     and the quotes after it, open the word, as in ``[[ab]] "Go"`` or
     ``[[ab]] ’tis``.
+
+    A run of marks after whitespace that follows the marks closes the
+    sentence too, as in ``[[ab]]) ; go`` or ``[[ab]]) ;go``. Where a word
+    follows, that run ends before a quote, an apostrophe or an ellipsis
+    (:func:`_starts_text`). The marks are the start of *after*, with the
+    whitespace between the runs.
     """
     marks = _leading_marks(after, reads_as_word)
     rest = after.lstrip()
-    if marks or rest == after:
-        return marks, ""
-    gap, marks = after[:len(after) - len(rest)], _leading_marks(rest, reads_as_word)
-    quotes = ""
-    if rest[len(marks):len(marks) + 1].strip():
-        cut = next((i for i, char in enumerate(marks) if _opens_word(char)), len(marks))
-        marks, quotes = marks[:cut], rest[cut:]
-        quotes = quotes[:next((i for i, char in enumerate(quotes) if not _opens_word(char)), len(quotes))]
-    return gap + marks if marks else "", quotes
+    if not marks and rest != after:
+        gap, marks = after[:len(after) - len(rest)], _leading_marks(rest, reads_as_word)
+        if rest[len(marks):len(marks) + 1].strip():
+            cut = next((i for i, char in enumerate(marks) if _opens_word(char)), len(marks))
+            marks, quotes = marks[:cut], rest[cut:]
+            quotes = quotes[:next((i for i, char in enumerate(quotes) if not _opens_word(char)), len(quotes))]
+            return gap + marks if marks else "", quotes
+        marks = gap + marks if marks else ""
+    while marks:
+        rest = after[len(marks):].lstrip()
+        run = _leading_marks(rest, reads_as_word) if rest != after[len(marks):] else ""
+        if _WORDLESS_START.match(rest)[0] != rest:
+            run = run[:next((i for i, char in enumerate(run) if _starts_text(char)), len(run))]
+        if not run:
+            break
+        marks = after[:len(after) - len(rest) + len(run)]
+    return marks, ""
+
+
+def _starts_text(char: str) -> bool:
+    """Whether *char*, after whitespace that follows a run of marks, starts the text after it.
+
+    It is a quote, an apostrophe or an ellipsis, also in a compatibility
+    form such as ``＂`` or ``︙``. dizione starts a clause with it in
+    ``x. " go`` and ``x, … go``.
+    """
+    form = unicodedata.normalize("NFKC", char)
+    return _opens_word(form[:1]) or form == "..."
 
 
 def _first_bounds(reads: List[Iterator[_Piece]], start: int) -> Optional[Tuple[Segment, Segment]]:
@@ -648,18 +675,19 @@ class TextFrontend:
         # A block can extend the piece before it, so that piece is held
         # until the next part is known.
         held = _Piece([])
-        text_read, marks, quotes, gap = False, "", "", ""
+        text_read, marks, quotes, following, gap = False, "", "", "", ""
         for index, part in enumerate(parts):
             if index % 2:
                 if marks:
                     # no word follows the marks after the block before
-                    self._take_marks(held, None, marks)
+                    self._take_marks(held, None, marks, following)
                     marks = ""
                 if not text_read and held.bounds is None:
                     # a block before the first text has the bounds of the text after it
                     held.bounds = _first_bounds(reads, index + 1)
                 self._add_block(held, parts, index, stages)
                 marks, quotes = _marks_after(parts[index + 1], self._reads_as_word)
+                following = _FOLLOWING.match(parts[index + 1], len(marks))[0]
                 continue
             after_block = index > 0
             for piece in reads[index]:
@@ -673,7 +701,7 @@ class TextFrontend:
                     self._open_with_quotes(held, piece, quotes)
                     quotes = ""
                 if marks:
-                    self._take_marks(held, piece, marks)
+                    self._take_marks(held, piece, marks, following)
                     marks = ""
                     if not piece.phonemes:
                         continue
@@ -682,11 +710,11 @@ class TextFrontend:
                 held = piece
             gap = gap + part if after_block else part[len(part.rstrip()):]
         if marks:
-            self._take_marks(held, None, marks)
+            self._take_marks(held, None, marks, following)
         if held.phonemes:
             yield held
 
-    def _take_marks(self, held: _Piece, piece: Optional[_Piece], marks: str) -> None:
+    def _take_marks(self, held: _Piece, piece: Optional[_Piece], marks: str, following: str) -> None:
         """Move the symbols at the start of *piece* that write *marks* to the end of *held*.
 
         *held* ends in a block, and *marks* are the closing marks after the
@@ -698,24 +726,39 @@ class TextFrontend:
         writes the symbols of its table for the marks after a word, and the
         symbols of the table at the start of *piece* are its read of the marks
         alone. The frontend writes the table, and removes those symbols from
-        *piece*. *piece* is ``None`` where no word follows the marks before
-        the next block or the end of the text. A backend with no table writes
-        symbols whose characters are all in *marks*. A backend that drops the
-        marks writes no such symbols, and then *held* keeps its word break.
+        *piece*. Where *piece* does not start with the table, the backend read
+        the marks alone in another way, or the marks belong to the text after
+        them. The frontend then writes only the start of the table that the
+        backend also writes for the marks with *following*, the text after
+        them up to the end of the next word. dizione reads ``;* go`` alone
+        with no mark, but ``x;* go`` with ``;``. It reads ``x .5``, ``x != y``
+        and ``x:( go`` with no mark, as the decimal point, the operator and
+        the emoticon belong to the text after the block. *piece* is ``None``
+        where no word follows the marks before the next block or the end of
+        the text. A backend with no table writes symbols whose characters are
+        all in *marks*. A backend that drops the marks writes no such symbols,
+        and then *held* keeps its word break.
         """
         phonemes = piece.phonemes if piece is not None else []
         table = self.backend.mark_symbols(marks)
         if table is None:
             count = next((i for i, symbol in enumerate(phonemes) if not set(symbol) <= set(marks.lstrip())),
                          len(phonemes))
+            # whitespace between two runs of marks stays, and whitespace after them goes
+            while count and not phonemes[count - 1].strip():
+                count -= 1
             symbols = phonemes[:count]
             streams = {name: values[:count] for name, values in piece.streams.items()} if count else {}
         else:
             symbols, streams = list(table.phonemes), table.streams
-            # the backend can read the marks alone as only some of the symbols of its
-            # table, as dizione drops ";*" alone as an emoticon
-            count = len(symbols) if phonemes[:len(symbols)] == symbols else next(
-                (i for i, symbol in enumerate(phonemes) if symbol not in symbols), len(phonemes))
+            if phonemes[:len(symbols)] == symbols:
+                count = len(symbols)
+            else:
+                read = self.backend.mark_symbols(marks + following).phonemes
+                size = next((i for i, (symbol, other) in enumerate(zip(symbols, read)) if symbol != other),
+                            min(len(symbols), len(read)))
+                count = next((i for i, symbol in enumerate(phonemes) if symbol not in symbols), len(phonemes))
+                symbols, streams = symbols[:size], {name: values[:size] for name, values in streams.items()}
         if not symbols:
             return
         space = list(self._space.phonemes)

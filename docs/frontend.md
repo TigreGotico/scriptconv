@@ -187,6 +187,23 @@ writes `%` as a mark. After whitespace, a quote or apostrophe glued to the
 next word opens that word and stays with it, as in `[[ab]] "Go"` or
 `[[ab]] ’tis`.
 
+A second run of marks after whitespace also closes the block's sentence, as
+in `Wait [[ab]]) ; go now.` or `Wait [[ab]]) ;go now.`. It goes with the block
+too: dizione's token mode gives `<bos> w eɪ t <sp> a b ) ; <eos>` and
+`<bos> ɡ oʊ <sp> n aʊ . <eos>`, as it reads `Wait x) ; go now.` with `x`.
+Where a word follows, that run ends before a quote, an apostrophe or an
+ellipsis, also in a compatibility form such as `＂` or `︙`. dizione starts a
+clause with such a mark after whitespace, so `Wait [[ab]]. " go now.` gives
+`<bos> w eɪ t <sp> a b . <eos>` and `<bos> " ɡ oʊ <sp> n aʊ . <eos>`.
+
+This has a limit. A backend can keep such a quote or ellipsis with the word
+before it. dizione does so after `)`, after `"` and `…`, and at `sentence`
+size after `,`, `;` and `:`. vosk does so after any mark that ends no
+sentence. In each of these cases the mark still starts the next chunk,
+because the frontend does not know the backend's own cut. Where a block
+follows the marks and no word comes between them, the quote or ellipsis goes
+with the block before, so that no backend loses it.
+
 The backend's mark table, `mark_symbols(marks)`, tells which symbols it writes
 for the marks after a word, such as dizione's `…` for `...`. The frontend
 writes the symbols of the table, and it removes the symbols that the backend
@@ -197,6 +214,19 @@ mode. A backend with no table gives no mark there. The table also writes a
 quote that opens the next word in place of the word break, as the backend
 does after a word: `Wait [[ab]] "Go."` gives `a b " ɡ oʊ` in dizione's token
 mode.
+
+The next chunk can start with other symbols than the table's. Then the
+backend read the marks alone in another way, or the marks belong to the text
+after them. The frontend asks the table again, for the marks with the text
+after them up to the end of the next word. It writes only the symbols at the
+start of both reads, and it removes the symbols of the table from the start
+of the next chunk. dizione drops `;*` alone as an emoticon, but it reads
+`x;* go` with `;`, so `Wait [[ab]];* go now.` ends its first chunk in
+`a b ; <eos>`. dizione reads `x .5`, `x != y` and `x:( go` with no mark,
+because the decimal point, the operator and the emoticon belong to the text
+after them. So `The rate fell by [[ab]] .5 percent.` gives
+`<bos> ð ə <sp> ɹ eɪ t <sp> f ɛ l <sp> b aɪ <sp> a b <eos>` and
+`<bos> p ɔɪ n t <sp> f aɪ v <sp> p ɚ s ɛ n t . <eos>`.
 
 A backend can still cut inside a chunk that is too long for its own limit.
 
@@ -274,7 +304,8 @@ to the sentence before it, and the text after a block starts a new sentence. A
 closing mark after a block, right after it or after whitespace, goes with the
 block, so no chunk starts with a mark that closes a block's sentence. A quote
 that opens the next word, and a symbol that the backend reads as a word, such
-as dizione's `%`, are not such marks. A block before the first text is a chunk of its own at
+as dizione's `%`, are not such marks. Neither is a quote, an apostrophe or an
+ellipsis after whitespace that follows the marks, with a word after it. A block before the first text is a chunk of its own at
 `sentence` and `clause` size, and it starts the chunk after it at `paragraph`
 and `none` size. A space next to a block in the text becomes a space symbol:
 
