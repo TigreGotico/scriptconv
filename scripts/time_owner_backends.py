@@ -10,23 +10,32 @@ skipped.
 Each backend reads 10,000 characters of plain prose in its language: one call,
 in one process, the median of 5 runs. Each run builds a new backend and
 warms it with one short sentence, so word caches start empty and lazy models
-are loaded before the clock starts. A ``reads_whole_text`` backend runs
+are loaded before the clock starts. The garbage collector runs before the
+clock starts and is off while it runs, as in ``timeit``: each run builds a
+new backend, so a full collection of the earlier backends would otherwise
+fall inside some timed reads and add up to about 130 ms to each. A
+``reads_whole_text`` backend runs
 ``phonemize_segments``. Any other backend runs ``phonemize_to_list``, its
 whole-text path.
 
 A text dense in dates, prices and abbreviations costs more per character
-than prose, and the cost does not grow in a straight line. So each
-``reads_whole_text`` backend also reads the prose and a dense English text at
-each of :data:`SIZES` characters. The time of dense text varies by a
-quarter from run to run, so the script reports the largest size at which
-the median of both texts stays under 75 ms, a quarter under the target, and
-so does every smaller size. Run the script several times on an idle machine:
-``WHOLE_TEXT_LIMIT`` is the smallest size that a run reports.
+than prose, and the cost does not grow in a straight line. A blank line or a
+quotation mark costs more again, because the backend maps each one to its
+place in the output. So each ``reads_whole_text`` backend also reads three
+shapes of a dense English text at each of :data:`SIZES` characters: the
+sentences in one run (``dense``), with a blank line after each
+(``dense+blank``), and each in quotes as well (``dense+quote+blank``). The
+script reports the median and the maximum of the runs, and the largest size
+at which the maximum of every shape stays under 100 ms, and so does every
+smaller size. ``WHOLE_TEXT_LIMIT`` is that size, from runs at a 1-minute load
+of 16 or less on a 24-core machine. ``scripts/time_owner_backends.txt`` holds
+the output.
 
 usage: python scripts/time_owner_backends.py PROSE_DIR
 
 PROSE_DIR holds ``en.txt``, ``pt.txt``, ``eu.txt`` and ``ar.txt``.
 """
+import gc
 import random
 import statistics
 import sys
@@ -39,8 +48,7 @@ from scriptconv.phonemizers.registry import get_phonemizer_class
 RUNS = 5
 CHARS = 10_000
 TARGET_MS = 100
-HEADROOM = 0.75
-SIZES = (6000, 5000, 4000, 3500, 3000, 2500)
+SIZES = range(1000, 4001, 250)
 
 _DENSE_PARTS = ("On Jan. 5, 2024 Dr. Smith paid $1,250.50 for 3.5 kg at 4:30 p.m.",
                 "See p. 12 and No. 5; the est. time is 2.5 hrs.",
@@ -49,8 +57,11 @@ _DENSE_PARTS = ("On Jan. 5, 2024 Dr. Smith paid $1,250.50 for 3.5 kg at 4:30 p.m
                 "Mr. and Mrs. Jones met Prof. Lee at 10:15 a.m.",
                 "Room 4B, Bldg. 7, Apt. 12 costs 1,200 EUR/mo.")
 _RANDOM = random.Random(1)
-DENSE = " ".join(_RANDOM.choice(_DENSE_PARTS) for _ in range(400))
-"""English text dense in dates, prices and abbreviations."""
+_PICKS = [_RANDOM.choice(_DENSE_PARTS) for _ in range(400)]
+SHAPES = {"dense": " ".join(_PICKS),
+          "dense+blank": "\n\n".join(_PICKS),
+          "dense+quote+blank": "\n\n".join(f'"{part}"' for part in _PICKS)}
+"""English text dense in dates, prices and abbreviations, in three shapes."""
 
 # backend -> (language tag, prose file, warm-up sentence)
 BACKENDS = {
@@ -74,9 +85,12 @@ def time_backend(cls, lang, text, warm_up):
             def read(text):
                 return backend.phonemize_to_list(text, lang)
         read(warm_up)
+        gc.collect()
+        gc.disable()
         start = time.perf_counter()
         read(text)
         times.append((time.perf_counter() - start) * 1000)
+        gc.enable()
     return times
 
 
@@ -107,18 +121,17 @@ def main(prose_dir):
         cls = next((cls for name, cls, *_ in rows if name == member.value), None)
         if cls is None or not cls.reads_whole_text:
             continue
-        texts = {"prose": (prose_dir / f"{prose}.txt").read_text(encoding="utf-8"), "dense": DENSE}
+        print(f"| {member.value} | Characters | " + " | ".join(f"{shape} median, max ms" for shape in SHAPES) + " |")
+        print("| --- | --- |" + " --- |" * len(SHAPES))
         fits, smaller_fit = None, True
-        for size in sorted(SIZES):
-            medians = {name: statistics.median(time_backend(cls, lang, text[:size], warm_up))
-                       for name, text in texts.items()}
-            print(f"{member.value} {size} characters: "
-                  + ", ".join(f"{name} {median:.1f} ms" for name, median in medians.items()))
-            smaller_fit = smaller_fit and max(medians.values()) < HEADROOM * TARGET_MS
+        for size in SIZES:
+            times = {shape: time_backend(cls, lang, text[:size], warm_up) for shape, text in SHAPES.items()}
+            print(f"| | {size} | " + " | ".join(f"{statistics.median(runs):.1f}, {max(runs):.1f}"
+                                               for runs in times.values()) + " |")
+            smaller_fit = smaller_fit and max(map(max, times.values())) < TARGET_MS
             if smaller_fit:
                 fits = size
-        print(f"{member.value}: largest size under {HEADROOM * TARGET_MS:.0f} ms for prose and dense "
-              f"text: {fits}")
+        print(f"{member.value}: largest size with every run of every shape under {TARGET_MS} ms: {fits}")
 
 
 if __name__ == "__main__":

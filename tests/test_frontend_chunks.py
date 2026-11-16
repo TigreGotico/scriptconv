@@ -181,8 +181,16 @@ class TestWholeTextLimit:
 class TestWholeTextBackends:
     def test_the_base_class_does_not_read_whole_text(self):
         assert BasePhonemizer.reads_whole_text is False
+        backend = GraphemePhonemizer()
+        assert [segment.phonemes for segment in backend.phonemize_segments("Um dois. Três.", "xx")] == [
+            tuple(sentence) for sentence in backend.phonemize_lazy("Um dois. Três.", "xx")]
+
+    def test_a_whole_text_backend_gives_its_own_segments(self):
+        class Whole(GraphemePhonemizer):
+            reads_whole_text = True
+
         with pytest.raises(NotImplementedError):
-            next(GraphemePhonemizer().phonemize_segments("a", "xx"))
+            next(Whole().phonemize_segments("a", "xx"))
 
     def test_a_segment_is_frozen(self):
         segment = Segment(("a",), ".", True, {"stress": (0,)})

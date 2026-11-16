@@ -21,7 +21,7 @@ import json
 import re
 from functools import cached_property
 from pathlib import Path
-from typing import ClassVar, Dict, Iterator, List, Optional, Tuple, Union
+from typing import ClassVar, Dict, Iterator, List, Optional, Set, Tuple, Union
 
 from scriptconv.phonemizers._thirdparty import dizione
 from scriptconv.phonemizers._thirdparty.dizione.engine import Phonemizer as DizioneEngine
@@ -30,7 +30,9 @@ from scriptconv.phonemizers._thirdparty.dizione.symbols import (
     BOS,
     EOS,
     PHONE_SET,
+    SP,
     STRESS_MARKS,
+    SYMBOL_TO_ID,
     UNK,
     Phonemized,
     tokenize,
@@ -88,8 +90,8 @@ class DizionePhonemizer(BasePhonemizer):
             marks. A phone outside dizione's inventory raises ``ValueError``.
         tokens: :meth:`phonemize_segments` yields dizione's own tokens, not
             IPA. Each segment is a clause with its own ``<bos>`` and
-            ``<eos>`` (``bounded``), its punctuation symbols, and the
-            ``ids`` and ``stress`` streams, so that
+            ``<eos>`` (``bounded``), its punctuation symbols, its mark, and
+            the ``ids`` and ``stress`` streams, so that
             :meth:`TextFrontend.segments <scriptconv.frontend.TextFrontend.segments>`
             gives a voice the ids and stress of each chunk. The IPA methods
             do not change.
@@ -162,7 +164,7 @@ class DizionePhonemizer(BasePhonemizer):
             ValueError: If the text is empty or has nothing to pronounce.
         """
         whole = self.tokens(text)
-        closes = self._quote_closes(text, whole.symbols)
+        closes = _quote_closes(self._rewrite(_SEPARATING_RUN.sub(" ", text), whole.symbols), whole.symbols)
         sentences: List[Phonemized] = []
         clauses: List[Phonemized] = []
         for clause, (_, _, _, ends_sentence) in zip(_token_clauses(whole, closes),
@@ -209,12 +211,13 @@ class DizionePhonemizer(BasePhonemizer):
         if not any(word for is_mark, words in pieces if not is_mark for word in words):
             return
         whole = tokenize(pieces)
-        paragraph_ends = self._paragraph_ends(text, pieces)
+        rewritten = self._rewrite(text, whole.symbols)
+        paragraph_ends = _paragraph_ends(rewritten, pieces, whole.symbols)
         for start, end, mark, ends_sentence in _clause_spans(whole.symbols,
-                                                             self._quote_closes(text, whole.symbols)):
-            ends_paragraph = ends_sentence and any(start <= place < end for place in paragraph_ends)
+                                                             _quote_closes(rewritten, whole.symbols)):
+            ends_paragraph = ends_sentence and any(place in paragraph_ends for place in range(start, end))
             if tokens:
-                yield Segment((BOS, *whole.symbols[start:end], EOS), None, ends_sentence,
+                yield Segment((BOS, *whole.symbols[start:end], EOS), mark, ends_sentence,
                               {"ids": (whole.ids[0], *whole.ids[start:end], whole.ids[-1]),
                                "stress": (0, *whole.stress[start:end], 0)},
                               ends_paragraph, bounded=True)
@@ -222,56 +225,16 @@ class DizionePhonemizer(BasePhonemizer):
                 phonemes, stress = _ipa(whole.symbols[start:end], whole.stress[start:end])
                 yield Segment(phonemes, mark, ends_sentence, {"stress": stress}, ends_paragraph)
 
-    def _paragraph_ends(self, text: str, pieces: list) -> List[int]:
-        """The places in the token sequence of *pieces* of the sentence marks that a paragraph break follows.
+    def _rewrite(self, text: str, symbols: Tuple[str, ...]) -> str:
+        """*text* as dizione's rules rewrite it, when its token sequence *symbols* needs it, else ``""``.
 
-        dizione reads a blank line as a space, so it reports no paragraph.
-        The text as dizione's rules rewrite it keeps each blank line, and
-        each ``.``, ``?`` and ``!`` of it is a mark of *pieces*, in order. A
-        blank line ends a paragraph after the mark before it, when only
-        closing marks stand between the two. A blank line that the rules
-        read away, as in ``Jan.\n\n5``, ends nothing. When the marks of the
-        rewritten text and of *pieces* differ in number, no blank line ends a
-        paragraph.
+        The tokens hold no whitespace, so they show neither a blank line nor
+        which way a ``"`` faces. The rewritten text shows both, and one
+        rewrite serves :func:`_paragraph_ends` and :func:`_quote_closes`.
         """
-        if not _PARAGRAPH_BREAK.search(text):
-            return []
-        rewritten = self.engine.normalizer.rewrite(text)
-        marks = [index for index, (is_mark, value) in enumerate(pieces)
-                 if is_mark and value in SENTENCE_END]
-        if sum(rewritten.count(mark) for mark in SENTENCE_END) != len(marks):
-            return []
-        places = []
-        for match in _PARAGRAPH_BREAK.finditer(rewritten):
-            before = rewritten[:match.start()]
-            if not _ENDS_IN_SENTENCE_MARK.search(before):
-                continue
-            count = sum(before.count(mark) for mark in SENTENCE_END)
-            try:
-                prefix = tokenize(pieces[:marks[count - 1] + 1])
-            except ValueError:
-                continue
-            places.append(len(prefix.symbols) - 2)
-        return places
-
-    def _quote_closes(self, text: str, symbols: Tuple[str, ...]) -> Optional[List[bool]]:
-        """For each ``"`` of *symbols*, whether it closes a quotation.
-
-        The token sequence holds no spaces, so it cannot tell a closing
-        quotation mark from an opening one. The text as dizione's rules
-        rewrite it can: a ``"`` that follows a space, an opening bracket or
-        the start of the text opens a quotation, and any other closes one.
-        Each ``"`` of the rewritten text is a ``"`` of *symbols*, in order.
-        When the two differ in number, the result is ``None``.
-        """
-        if _DOUBLE_QUOTE not in symbols:
-            return None
-        rewritten = self.engine.normalizer.rewrite(_SEPARATING_RUN.sub(" ", text))
-        places = [index for index, char in enumerate(rewritten) if char == _DOUBLE_QUOTE]
-        if len(places) != symbols.count(_DOUBLE_QUOTE):
-            return None
-        return [index > 0 and not rewritten[index - 1].isspace() and rewritten[index - 1] not in "([{"
-                for index in places]
+        if _PARAGRAPH_BREAK.search(text) or _DOUBLE_QUOTE in symbols:
+            return self.engine.normalizer.rewrite(text)
+        return ""
 
     def _ipa_sentences(self, text: str) -> List[str]:
         """The IPA of each sentence of *text*, as dizione reads it."""
@@ -304,6 +267,12 @@ class DizionePhonemizer(BasePhonemizer):
         self.get_lang(lang)
         yield from self._clauses(text, self.tokens_mode)
 
+    def word_break(self) -> Segment:
+        """``<sp>`` with its id with ``tokens=True``, else a space."""
+        if self.tokens_mode:
+            return Segment((SP,), streams={"ids": (SYMBOL_TO_ID[SP],), "stress": (0,)})
+        return Segment((" ",), streams={"stress": (0,)})
+
     def phonemize_string(self, text: str, lang: str) -> str:
         self.get_lang(lang)
         return " ".join(self._ipa_sentences(text))
@@ -322,6 +291,74 @@ class DizionePhonemizer(BasePhonemizer):
             text = self.normalizer(text, lang)
         for sentence in self._ipa_sentences(text):
             yield list(sentence)
+
+
+def _paragraph_ends(rewritten: str, pieces: list, symbols: Tuple[str, ...]) -> Set[int]:
+    """The places in *symbols* of the sentence marks that a paragraph break follows.
+
+    dizione reads a blank line as a space, so it reports no paragraph. The
+    *rewritten* text keeps each blank line, and each ``.``, ``?`` and ``!`` of
+    it is a sentence mark of *pieces*, in order. A blank line ends a paragraph
+    after the mark before it, when only closing marks stand between the two
+    and a sound comes before the mark. A blank line that the rules read away,
+    as in ``Jan.\n\n5``, ends nothing. When the marks of the rewritten text
+    and of *pieces* differ in number, no blank line ends a paragraph. One pass
+    over the text maps every blank line to its mark.
+    """
+    if not _PARAGRAPH_BREAK.search(rewritten):
+        return set()
+    places = _sentence_mark_places(pieces, symbols)
+    if sum(rewritten.count(mark) for mark in SENTENCE_END) != len(places):
+        return set()
+    first_sound = next(index for index, symbol in enumerate(symbols) if symbol in PHONE_SET or symbol == UNK)
+    ends = set()
+    count = position = 0
+    for match in _PARAGRAPH_BREAK.finditer(rewritten):
+        count += sum(rewritten.count(mark, position, match.start()) for mark in SENTENCE_END)
+        if count and places[count - 1] > first_sound and \
+                _ENDS_IN_SENTENCE_MARK.search(rewritten, position, match.start()):
+            ends.add(places[count - 1])
+        position = match.start()
+    return ends
+
+
+def _sentence_mark_places(pieces: list, symbols: Tuple[str, ...]) -> List[int]:
+    """The place in *symbols*, the token sequence of *pieces*, of each ``.``, ``?`` and ``!`` of *pieces*.
+
+    ``tokenize`` writes a mark that repeats the symbol before it once, so
+    such a mark shares the place of the mark before it.
+    """
+    found = (index for index, symbol in enumerate(symbols) if symbol in SENTENCE_END)
+    places: List[int] = []
+    previous = None
+    for is_mark, value in pieces:
+        if not is_mark:
+            if value:
+                previous = None
+            continue
+        if value in SENTENCE_END:
+            places.append(places[-1] if value == previous else next(found))
+        previous = value
+    return places
+
+
+def _quote_closes(rewritten: str, symbols: Tuple[str, ...]) -> Optional[List[bool]]:
+    """For each ``"`` of *symbols*, whether it closes a quotation.
+
+    The token sequence holds no spaces, so it cannot tell a closing quotation
+    mark from an opening one. The text as dizione's rules rewrite it,
+    *rewritten*, can: a ``"`` that follows a space, an opening bracket or the
+    start of the text opens a quotation, and any other closes one. Each ``"``
+    of the rewritten text is a ``"`` of *symbols*, in order. When the two
+    differ in number, the result is ``None``.
+    """
+    if _DOUBLE_QUOTE not in symbols:
+        return None
+    places = [index for index, char in enumerate(rewritten) if char == _DOUBLE_QUOTE]
+    if len(places) != symbols.count(_DOUBLE_QUOTE):
+        return None
+    return [index > 0 and not rewritten[index - 1].isspace() and rewritten[index - 1] not in "([{"
+            for index in places]
 
 
 def _clause_spans(symbols: Tuple[str, ...],

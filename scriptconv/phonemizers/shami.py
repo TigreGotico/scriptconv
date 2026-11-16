@@ -14,8 +14,9 @@ from typing import Iterator, List, Tuple
 from quebra_frases import sentence_tokenize
 
 from scriptconv.phonemizers.enums import Alphabet
-from scriptconv.phonemizers.base import BasePhonemizer, PhonemizedChunks
+from scriptconv.phonemizers.base import BasePhonemizer, PhonemizedChunks, Segment
 from scriptconv.phonemizers._thirdparty.shami import (
+    Lang,
     TextFrontend,
     SYMBOL_TO_ID,
     ID_TO_SYMBOL,
@@ -90,6 +91,22 @@ class ShamiPhonemizer(BasePhonemizer):
         """
         for phonemes, _ in self.phonemize_with_language_ids_lazy(text, lang):
             yield phonemes
+
+    def phonemize_segments(self, text: str, lang: str) -> Iterator[Segment]:
+        """One segment per sentence of *text*, with the ``language_ids`` stream.
+
+        Each sentence starts with ``<bos>`` and ends with ``<eos>``
+        (``bounded``), so where :class:`~scriptconv.frontend.TextFrontend`
+        joins two sentences, the inner pair goes with its language ids and a
+        word break takes its place, as the front-end reads the two sentences
+        in one call.
+        """
+        for phonemes, lang_ids in self.phonemize_with_language_ids_lazy(text, lang):
+            yield Segment(tuple(phonemes), streams={"language_ids": tuple(lang_ids)}, bounded=True)
+
+    def word_break(self) -> Segment:
+        """A space, with the language id that the front-end gives a space."""
+        return Segment((" ",), streams={"language_ids": (int(Lang.NEUTRAL),)})
 
     def phonemize_with_language_ids(
         self, text: str, lang: str

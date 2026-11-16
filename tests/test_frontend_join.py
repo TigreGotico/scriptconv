@@ -27,6 +27,7 @@ from scriptconv.phonemizers import (
 from scriptconv.phonemizers.base import join_sentences
 from scriptconv.phonemizers.dizione import DizionePhonemizer
 from scriptconv.phonemizers.enums import Phonemizer
+from scriptconv.phonemizers.shami import ShamiPhonemizer
 
 SIZES = [Chunk.SENTENCE, Chunk.CLAUSE, Chunk.PARAGRAPH, Chunk.NONE]
 
@@ -81,7 +82,7 @@ class Bounded(WholeText):
 
     def phonemize_segments(self, text, lang):
         for segment in super().phonemize_segments(text, lang):
-            yield Segment(("<s>", *segment.phonemes, *(segment.mark or ""), "</s>"), None,
+            yield Segment(("<s>", *segment.phonemes, *(segment.mark or ""), "</s>"), segment.mark,
                           segment.ends_sentence,
                           {"level": (9, *segment.streams["level"], *(0,) * len(segment.mark or ""), 9)},
                           segment.ends_paragraph, bounded=True)
@@ -129,8 +130,11 @@ class TestParagraphsAfterTheRead:
         hook = spoken_normalizer()
         frontend = TextFrontend(FrontendConfig("en", normalizer=hook, stages=Stages(diacritize=False)),
                                 GraphemePhonemizer())
-        assert frontend.phonemize("Prof.\n\nSmith arrived.", Stages(chunk=Chunk.PARAGRAPH)) == \
-            frontend.phonemize("Prof.\n\nSmith arrived.", Stages(chunk=Chunk.NONE))
+        text = "Prof.\n\nSmith arrived."
+        paragraphs = hook(text, "en").split("\n\n")
+        assert len(paragraphs) == 2
+        assert frontend.phonemize(text, Stages(chunk=Chunk.PARAGRAPH)) == [
+            GraphemePhonemizer().phonemize_to_list(paragraph, "en") for paragraph in paragraphs]
 
 
 class TestClausesJoinAsTheSentence:
@@ -211,7 +215,6 @@ class TestTrainingReadsTheSentencePath:
     CASES = [("pypinyin", "zh-CN", None, "我很好. 猫在睡觉! 你好, 我们回家了"),
              ("xpinyin", "zh-CN", None, "我很好. 猫在睡觉! 你好, 我们回家了"),
              ("g2pm", "zh-CN", None, "我很好. 猫在睡觉! 你好, 我们回家了"),
-             ("shami", "ar", None, "مرحبا بك. كيف حالك؟ أنا بخير"),
              ("vosk", "ru-RU", "vosk", "Кот спит.\n\nМы пошли домой! Дом большой, иди сюда")]
 
     @pytest.mark.parametrize("keep", [True, False])
@@ -365,3 +368,241 @@ class TestWholeTextLimitEdges:
         frontend = TextFrontend(FrontendConfig("xx", whole_text_limit=len(text) - extra), backend)
         frontend.phonemize(text)
         assert len(backend.read) == reads
+
+
+class TestParagraphsAtBlankLines:
+    """A paragraph chunk is the text between blank-line breaks, whatever ends the paragraph."""
+
+    BODY = {"en-US": ("Come here", "Open the door now. We went home."),
+            "pt-PT": ("Vem cá", "Abre a porta agora. Fomos para casa."),
+            "es-ES": ("Ven aquí", "Abre la puerta ahora. Fuimos a casa."),
+            "ru-RU": ("Иди сюда", "Открой дверь сейчас. Мы пошли домой.")}
+    ENDINGS = ["!", "?", ".", "", ":", "…", "...", ";", "!»", '?"', ".)"]
+    BACKENDS = [("graphemes", "en-US", None), ("orthography2ipa", "en-US", None),
+                ("orthography2ipa", "pt-PT", None), ("graphemes", "pt-PT", None),
+                ("orthography2ipa", "es-ES", None), ("orthography2ipa", "ru-RU", None),
+                ("vosk", "ru-RU", "vosk")]
+
+    @pytest.mark.parametrize("ending", ENDINGS)
+    @pytest.mark.parametrize("name, lang, alphabet", BACKENDS)
+    def test_each_paragraph_is_a_chunk(self, name, lang, alphabet, ending):
+        frontend = TextFrontend(FrontendConfig(
+            lang, Phonemizer(name), alphabet=Alphabet(alphabet) if alphabet else Alphabet.IPA,
+            stages=Stages(diacritize=False)))
+        first, second = self.BODY[lang]
+        paragraphs = [first + ending, second]
+        # the backend's own read of each paragraph alone
+        expected = [frontend.backend.phonemize_to_list(paragraph, lang) for paragraph in paragraphs]
+        text = "\n\n".join(paragraphs)
+        assert frontend.phonemize(text, Stages(chunk=Chunk.PARAGRAPH)) == expected
+        sentences = frontend.phonemize(text)
+        assert sentences[0] == expected[0]
+        assert frontend.phonemize_flat(text) == join_sentences(sentences, keep_punctuation=False)
+
+
+def _ids(frontend, text, chunk, stream):
+    """The symbols and the *stream* of each chunk of *text*."""
+    return [(list(segment.phonemes), list(segment.streams[stream]))
+            for segment in frontend.segments(text, Stages(chunk=chunk))]
+
+
+def _joined_by_the_contract(chunks, space, space_id):
+    """Bounded *chunks* joined: the inner end and start symbols go with their ids, and a word break comes between."""
+    symbols, ids = [chunks[0][0][0]], [chunks[0][1][0]]
+    for number, (chunk_symbols, chunk_ids) in enumerate(chunks):
+        if number:
+            symbols.append(space)
+            ids.append(space_id)
+        symbols += chunk_symbols[1:-1]
+        ids += chunk_ids[1:-1]
+    return symbols + [chunks[-1][0][-1]], ids + [chunks[-1][1][-1]]
+
+
+class TestShamiBounds:
+    """Shami: a joined chunk has one ``<bos>`` and one ``<eos>``, and the language ids stay in step."""
+
+    TEXT = "ذهب الولد إلى المدرسة، وكتب الدرس. ثم عاد إلى البيت.\n\nنام مبكرا."
+
+    @pytest.fixture(scope="class")
+    def frontend(self):
+        return TextFrontend(FrontendConfig("ar", Phonemizer("shami"), stages=Stages(diacritize=False)))
+
+    @pytest.fixture(scope="class")
+    def space_id(self):
+        # the language id that Shami's own front-end gives a space between two words
+        utterance = ShamiPhonemizer().frontend.process("نام مبكرا")
+        return utterance.language_ids[utterance.symbols.index(" ")]
+
+    def test_each_clause_chunk_is_one_call_with_one_pair(self, frontend):
+        for symbols, ids in _ids(frontend, self.TEXT, Chunk.CLAUSE, "language_ids"):
+            assert (symbols[0], symbols[-1]) == ("<bos>", "<eos>")
+            assert symbols.count("<bos>") == symbols.count("<eos>") == 1
+            assert len(ids) == len(symbols)
+
+    @pytest.mark.parametrize("chunk", [Chunk.NONE, Chunk.PARAGRAPH])
+    def test_a_joined_chunk_is_its_clauses_joined_by_the_contract(self, frontend, space_id, chunk):
+        clauses = _ids(frontend, self.TEXT, Chunk.CLAUSE, "language_ids")
+        # the first paragraph holds the first three clauses
+        groups = [clauses] if chunk == Chunk.NONE else [clauses[:3], clauses[3:]]
+        assert _ids(frontend, self.TEXT, chunk, "language_ids") == [
+            _joined_by_the_contract(group, " ", space_id) for group in groups]
+
+    def test_flat_is_the_none_chunk_and_shamis_own_read(self, frontend):
+        flat = frontend.phonemize_flat(self.TEXT)
+        assert flat.count("<bos>") == flat.count("<eos>") == 1
+        assert [flat] == frontend.phonemize(self.TEXT, Stages(chunk=Chunk.NONE))
+        assert flat == ShamiPhonemizer().frontend.process(self.TEXT).symbols
+
+    @pytest.mark.parametrize("chunk", SIZES)
+    def test_a_block_sits_inside_the_pair_with_no_space_at_either_end(self, frontend, chunk):
+        # a block ends the sentence chunk before it, so the word break after the block meets the <eos>
+        for symbols, ids in _ids(frontend, "البيت [[ab]] كبير. كيف حالك؟", chunk, "language_ids"):
+            assert symbols.count("<bos>") == symbols.count("<eos>") == 1
+            assert " " not in (symbols[1], symbols[-2])
+            assert len(ids) == len(symbols)
+
+
+class TestDizioneTokensAndBlocks:
+    """dizione ``tokens=True``: a block sits inside the chunk's ``<bos>`` and ``<eos>``, next to ``<sp>``."""
+
+    @pytest.fixture(scope="class")
+    def backend(self):
+        return DizionePhonemizer(tokens=True)
+
+    @staticmethod
+    def _with_block(backend, text):
+        """dizione's tokens of *text* with the word "x" in place of the block, the block's symbols written in."""
+        whole = backend.tokens(text.replace("[[QZ]]", "x"))
+        place = next(i for i in range(len(whole.symbols)) if whole.symbols[i:i + 3] == ("ɛ", "k", "s"))
+        return ([*whole.symbols[:place], "Q", "Z", *whole.symbols[place + 3:]],
+                [*whole.ids[:place], 0, 0, *whole.ids[place + 3:]])
+
+    @pytest.mark.parametrize("keep", [True, False])
+    @pytest.mark.parametrize("text", ["Hello [[QZ]] world. Bye now.", "Hi. [[QZ]] there, you. Bye.",
+                                      "Hello [[QZ]], world.", "[[QZ]] Hello there."])
+    def test_the_none_chunk_is_dizione_read_with_the_block_in_place(self, backend, text, keep):
+        frontend = TextFrontend(FrontendConfig("en-US", keep_punctuation=keep), backend)
+        assert _ids(frontend, text, Chunk.NONE, "ids") == [self._with_block(backend, text)]
+
+    @pytest.mark.parametrize("keep", [True, False])
+    @pytest.mark.parametrize("chunk", SIZES)
+    def test_every_chunk_has_one_pair_and_the_block_inside(self, backend, chunk, keep):
+        frontend = TextFrontend(FrontendConfig("en-US", keep_punctuation=keep), backend)
+        text = "Hello [[QZ]] world. Bye now.\n\nHi. [[QZ]] there, you."
+        chunks = _ids(frontend, text, chunk, "ids")
+        for symbols, ids in chunks:
+            assert (symbols[0], symbols[-1]) == ("<bos>", "<eos>")
+            assert symbols.count("<bos>") == symbols.count("<eos>") == 1
+            assert " " not in symbols
+            assert "<sp>" not in (symbols[1], symbols[-2])
+            assert len(ids) == len(symbols)
+        flat = [symbol for symbols, _ in chunks for symbol in symbols]
+        assert flat.count("Q") == 2
+        # the word break after each block is dizione's own, with its id
+        for symbols, ids in chunks:
+            for place in (i for i, symbol in enumerate(symbols) if symbol == "Z"):
+                if symbols[place + 1] != "<eos>":
+                    assert (symbols[place + 1], ids[place + 1]) == ("<sp>", backend.tokens("a b").ids[2])
+
+
+class TestRulesOfTheFix:
+    """Rules of the fix that change real output, each held by a test."""
+
+    @pytest.mark.parametrize("name", ["pypinyin", "xpinyin", "g2pm"])
+    def test_spaces_around_a_latin_word_in_zh_change_nothing(self, name):
+        frontend = TextFrontend(FrontendConfig("zh-CN", Phonemizer(name), stages=Stages(diacritize=False)))
+        backend = frontend.backend
+        spaced = backend.phonemize_to_list("我爱 Python 和 C++。", "zh")
+        assert spaced == backend.phonemize_to_list("我爱Python和C++。", "zh")
+        assert frontend.phonemize_flat("我爱 Python 和 C++。") == frontend.phonemize_flat("我爱Python和C++。")
+
+    @pytest.mark.parametrize("chunk", [Chunk.SENTENCE, Chunk.PARAGRAPH])
+    def test_each_cut_above_the_limit_ends_a_sentence_and_a_paragraph(self, chunk):
+        text = "Um dois\n\nTrês quatro"
+        backend = WholeText()
+        frontend = TextFrontend(FrontendConfig("xx", whole_text_limit=5), backend)
+        assert ["".join(c) for c in frontend.phonemize(text, Stages(chunk=chunk))] == ["Um dois", "Três quatro"]
+        assert backend.read == ["Um dois", "Três quatro"]
+
+    def test_dizione_reads_each_cut_above_the_limit_as_its_own_paragraph(self, dizione):
+        text = "Chapter one\n\nThe cat sat"
+        frontend = TextFrontend(FrontendConfig("en-US", whole_text_limit=5), dizione)
+        alone = TextFrontend(FrontendConfig("en-US"), dizione)
+        assert frontend.phonemize(text, Stages(chunk=Chunk.PARAGRAPH)) == [
+            alone.phonemize_flat("Chapter one"), alone.phonemize_flat("The cat sat")]
+
+    @pytest.mark.parametrize("chunk", SIZES)
+    def test_a_block_keeps_the_bounds_of_its_chunk(self, chunk):
+        frontend = TextFrontend(FrontendConfig("xx"), Bounded())
+        segments = list(frontend.segments("[[q]] Um, dois [[q]] três.", Stages(chunk=chunk)))
+        assert all(s.bounded and s.phonemes[0] == "<s>" and s.phonemes[-1] == "</s>" for s in segments)
+        assert sum(s.phonemes.count("<s>") for s in segments) == len(segments)
+        assert sum(s.phonemes.count("q") for s in segments) == 2
+
+
+class TestDizioneReadsOnce:
+    """dizione rewrites a text once for its paragraphs and quotes, and tokenizes it once."""
+
+    def test_one_rewrite_and_one_tokenize_per_call(self, dizione, monkeypatch):
+        import scriptconv.phonemizers.dizione as module
+        calls = {"rewrite": 0, "tokenize": 0}
+        rewrite, tokenize = dizione.engine.normalizer.rewrite, module.tokenize
+
+        def counted(name, function):
+            def call(*args, **kwargs):
+                calls[name] += 1
+                return function(*args, **kwargs)
+            return call
+
+        text = "\n\n".join(f'"Sentence number {n}." He left.' for n in range(20))
+        expected = list(dizione.phonemize_segments(text, "en-US"))
+        monkeypatch.setattr(dizione.engine.normalizer, "rewrite", counted("rewrite", rewrite))
+        monkeypatch.setattr(module, "tokenize", counted("tokenize", tokenize))
+        assert list(dizione.phonemize_segments(text, "en-US")) == expected
+        # engine.pieces rewrites the text once itself
+        assert calls == {"rewrite": 2, "tokenize": 1}
+        assert sum(segment.ends_paragraph for segment in expected) == 19
+
+
+class TestDizioneParagraphEnds:
+    """Where dizione's blank lines end a paragraph: after the sentence mark right before them."""
+
+    @staticmethod
+    def _ends(dizione, text):
+        return [segment.ends_paragraph for segment in dizione.phonemize_segments(text, "en-US")]
+
+    def test_a_repeated_mark_ends_the_paragraph_once(self, dizione):
+        assert self._ends(dizione, "Wait!! Go.\n\nNext one.") == [False, True, False]
+
+    def test_a_blank_line_ends_no_paragraph_at_an_earlier_mark(self, dizione):
+        # the blank line follows "Title", so "Hi." ends no paragraph
+        assert self._ends(dizione, "Hi. Title\n\nBody here.")[0] is False
+
+    def test_a_mark_before_the_first_sound_ends_no_paragraph(self, dizione):
+        assert self._ends(dizione, "?\n\nHi. Bye.\n\nOk.") == [False, True, False]
+
+    def test_marks_that_differ_in_number_end_no_paragraph(self, dizione):
+        from scriptconv.phonemizers._thirdparty.dizione.symbols import tokenize
+        from scriptconv.phonemizers.dizione import _paragraph_ends
+        text = "Go.\n\nOk."
+        pieces = dizione.engine.pieces(text)
+        symbols = tokenize(pieces).symbols
+        rewritten = dizione.engine.normalizer.rewrite(text)
+        assert _paragraph_ends(rewritten, pieces, symbols) == {symbols.index(".")}
+        # a rewritten text with one more mark than the tokens maps no blank line
+        assert _paragraph_ends("Hi. " + rewritten, pieces, symbols) == set()
+
+
+class TestDiacritizerChunks:
+    def test_the_diacritizer_reads_each_sentence_alone_across_a_blank_line(self, monkeypatch):
+        import scriptconv.frontend as frontend_module
+        read = []
+
+        def diacritize(text, lang, diacritizer_model=None):
+            read.append(text)
+            return text
+
+        monkeypatch.setattr(frontend_module, "diacritize", diacritize)
+        frontend = TextFrontend(FrontendConfig("en-US", Phonemizer("graphemes"), stages=Stages(diacritize=True)))
+        assert frontend.prepare("Come here!\n\nOpen the door.") == "Come here!\n\nOpen the door."
+        assert read == ["Come here!", "Open the door."]

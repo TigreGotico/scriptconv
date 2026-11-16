@@ -216,7 +216,9 @@ class Segment:
     mark: Optional[str] = None
     """The clause symbol that ends the segment, a value of
     :data:`CLAUSE_PUNCTUATION`, or ``None``. The frontend appends it when it
-    keeps punctuation."""
+    keeps punctuation. A bounded segment holds its marks among its own
+    symbols, so the frontend appends nothing to it, and the mark tells only
+    that the segment ends at a mark."""
     ends_sentence: bool = True
     """Whether the segment ends a sentence."""
     streams: Mapping[str, Tuple] = dataclasses.field(default_factory=dict)
@@ -229,7 +231,8 @@ class Segment:
     """Whether the first symbol of :attr:`phonemes` is the backend's start
     symbol and the last its end symbol, as ``<bos>`` and ``<eos>``. Where the
     frontend joins two bounded segments, the inner end and start symbols go,
-    with their stream values."""
+    with their stream values. A segment with no mark then takes the
+    backend's :meth:`~BasePhonemizer.word_break` before the next one."""
 
 
 class MissingLanguageError(ValueError):
@@ -440,14 +443,33 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
     def phonemize_segments(self, text: str, lang: str) -> Iterator[Segment]:
         """The segments of *text* in reading order, read in one pass.
 
-        A backend that sets :attr:`reads_whole_text` cuts its own output at
-        its own sentence and clause marks. The segment text holds no
-        punctuation: the mark that ends a segment is in :attr:`Segment.mark`.
+        A backend that sets :attr:`reads_whole_text` overrides this method and
+        cuts its own output at its own sentence and clause marks. The segment
+        text holds no punctuation: the mark that ends a segment is in
+        :attr:`Segment.mark`.
+
+        For any other backend, :class:`~scriptconv.frontend.TextFrontend`
+        calls this method on each sentence or clause, and a segment is a
+        sentence of :meth:`phonemize_lazy`. A backend with side streams, or
+        with its own start and end symbols, overrides it to give them.
 
         Raises:
-            NotImplementedError: If the backend does not read whole text.
+            NotImplementedError: If the backend reads whole text and does not
+                override this method.
         """
-        raise NotImplementedError(f"{type(self).__name__} does not read whole text")
+        if self.reads_whole_text:
+            raise NotImplementedError(f"{type(self).__name__} reads whole text and gives no segments")
+        for phonemes in self.phonemize_lazy(text, lang):
+            yield Segment(tuple(phonemes))
+
+    def word_break(self) -> Segment:
+        """The symbol that separates two words in this backend's output, with its stream values.
+
+        :class:`~scriptconv.frontend.TextFrontend` writes it where it joins
+        two pieces with no clause symbol between them, and around an inline
+        block. A stream that the segment lacks takes 0.
+        """
+        return Segment((" ",))
 
     def _bare_sentences(self, text: str, lang: str) -> Iterator[List[str]]:
         """Per-chunk phonemes, with the punctuation removed before the backend."""

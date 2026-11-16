@@ -320,15 +320,18 @@ quotation, stays with the clause that ends. A `!` or `?` between two letters
 with no space after it, as in `Sim!Não!`, is no clause mark: the backend reads
 it as a space, in `tokens()` too. A sentence that a blank line follows ends a
 paragraph, unless dizione's own rules read the blank line away, as in
-`Jan.\n\n5`. With `keep_punctuation`, the frontend writes the clause symbol of
-each mark.
+`Jan.\n\n5`. dizione reads a blank line as a space, so a blank line after
+`:`, `;`, an ellipsis or a title ends no paragraph. With `keep_punctuation`,
+the frontend writes the clause symbol of each mark.
 
 `DizionePhonemizer(tokens=True)` changes `phonemize_segments` only: each
 segment is then a clause of dizione's own tokens, with its own `<bos>` and
-`<eos>`, and with `ids` and `stress` streams. `TextFrontend.segments` groups
-them into chunks of any size and removes the inner `<eos>` `<bos>` pairs, so
-its sentence chunks equal `token_segments(text)`, and its `NONE` chunk equals
-`tokens(text)`.
+`<eos>`, its marks, and `ids` and `stress` streams. `TextFrontend.segments`
+groups them into chunks of any size and removes the inner `<eos>` `<bos>`
+pairs, so its sentence chunks equal `token_segments(text)`, and its `NONE`
+chunk equals `tokens(text)`. An inline block goes inside the chunk's `<bos>`
+and `<eos>`, with dizione's `<sp>` as its word break, as dizione reads a word
+in the place of the block.
 
 The IPA string has a space between two words and a stress mark directly
 before its vowel, as dizione writes it. It has no control symbol (`<bos>`,
@@ -560,6 +563,13 @@ phonemes, lang_ids = phonemizer.phonemize_with_language_ids("شو، هلق.", "a
 # phonemes[0] holds 'sil' after the comma and 'brk' after the full stop
 ids = [SYMBOL_TO_ID_90[p] for p in phonemes[0]]
 ```
+
+`ShamiPhonemizer.phonemize_segments` gives one segment per sentence, with its
+`<bos>` and `<eos>` (`bounded`) and the `language_ids` stream. Through
+`TextFrontend.segments`, each chunk at every size has one `<bos>` and one
+`<eos>`, and its language ids stay in step with its symbols. Where two
+sentences join, a space with the language id 3 (`NEUTRAL`) comes between them,
+as the front end writes it between two words.
 
 `SYMBOL_TO_ID`, `ID_TO_SYMBOL`, `VOCAB_SIZE`, `tokenize_ipa` and `encode` hold
 the 88-symbol tables. `SYMBOL_TO_ID_90`, `ID_TO_SYMBOL_90` and `VOCAB_SIZE_90`

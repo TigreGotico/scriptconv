@@ -85,9 +85,10 @@ FRONTEND_VERSION = 2
 to the stages raises it. Version 1 cut the raw text into sentences before
 normalisation."""
 
-# scripts/time_owner_backends.py: dizione reads 3,500 characters of English text dense in dates and prices
-# in 50 to 74 ms, and 4,000 in 83 to 96 ms (medians of 5); prose reads faster.
-WHOLE_TEXT_LIMIT = 3_500
+# scripts/time_owner_backends.py, output in scripts/time_owner_backends.txt: one dizione call on English text
+# dense in dates and prices, also with a blank line and quotes after each sentence, stays under 100 ms in every
+# run of two up to 2,000 characters (at most 84 ms), and goes over at 2,250 in one. Prose reads faster.
+WHOLE_TEXT_LIMIT = 2_000
 """The default of :attr:`FrontendConfig.whole_text_limit`."""
 
 # The word that stands for a block when the frontend reads the mark after it.
@@ -242,21 +243,14 @@ def _clauses(sentence: str) -> List[str]:
     return clauses
 
 
-def _paragraph_ends(text: str, sentences: List[str]) -> List[bool]:
-    """For each of *sentences*, found in order in *text*, whether a paragraph break follows it.
+def _paragraph_sentences(text: str) -> List[List[str]]:
+    """The sentences of each paragraph of *text*.
 
-    The break is in the whitespace between the words of the sentence and the
-    words of the next one. The last sentence ends a paragraph.
+    The cut at the blank lines comes first, so a paragraph break ends a
+    sentence also where the sentence split sees none, as after a title or
+    a ``!``.
     """
-    spans = []
-    position = 0
-    for sentence in sentences:
-        start = text.find(sentence, position)
-        position = start + len(sentence)
-        spans.append((start + len(sentence) - len(sentence.lstrip()),
-                      start + len(sentence.rstrip())))
-    return [bool(_PARAGRAPH_BREAK.search(text[end:next_start]))
-            for (_, end), (next_start, _) in zip(spans, spans[1:])] + [True] * bool(spans)
+    return [_sentence_tokenize(paragraph) for paragraph in _paragraphs(text) if paragraph.strip()]
 
 
 @dataclasses.dataclass
@@ -266,13 +260,43 @@ class _Piece:
     phonemes: List[str]
     ends_in_token: bool = False
     """Whether :attr:`phonemes` ends in a clause symbol, which joins the next
-    piece with no space."""
+    piece with no space. A bounded piece that ends in a block with no
+    whitespace after it in the text joins the next piece with no space too."""
     ends_sentence: bool = True
     ends_paragraph: bool = False
     streams: Dict[str, List] = dataclasses.field(default_factory=dict)
     """The backend's side streams, in step with :attr:`phonemes`."""
-    bounded: bool = False
-    """See :attr:`~scriptconv.phonemizers.base.Segment.bounded`."""
+    bounds: Optional[Tuple[Segment, Segment]] = None
+    """The backend's start and end symbols, with their stream values, for a
+    piece of bounded segments. :attr:`phonemes` holds neither: :meth:`closed`
+    writes them around a chunk, so a join or a block works inside them."""
+
+    @classmethod
+    def of(cls, segment: Segment) -> "_Piece":
+        """*segment* as a piece, without its start and end symbols when it is bounded."""
+        streams = segment.streams
+        if not segment.bounded:
+            return cls(list(segment.phonemes), ends_sentence=segment.ends_sentence,
+                       streams={name: list(values) for name, values in streams.items()})
+        start = Segment(segment.phonemes[:1], streams={name: values[:1] for name, values in streams.items()})
+        end = Segment(segment.phonemes[-1:], streams={name: values[-1:] for name, values in streams.items()})
+        return cls(list(segment.phonemes[1:-1]), ends_sentence=segment.ends_sentence,
+                   streams={name: list(values[1:-1]) for name, values in streams.items()}, bounds=(start, end))
+
+    def closed(self, space: Segment) -> "_Piece":
+        """The piece with its start and end symbols written around it. A *space* before the end symbol goes."""
+        if self.bounds is None:
+            return self
+        start, end = self.bounds
+        size = len(self.phonemes)
+        if size and self.phonemes[-len(space.phonemes):] == list(space.phonemes):
+            size -= len(space.phonemes)
+        body = {name: values[:size] for name, values in self.streams.items()}
+        piece = dataclasses.replace(self, phonemes=[], streams={})
+        for symbols, streams in ((start.phonemes, start.streams), (self.phonemes[:size], body),
+                                 (end.phonemes, end.streams)):
+            piece.add(symbols, streams)
+        return piece
 
     def add(self, symbols: Sequence[str], streams: Optional[Mapping[str, Sequence]] = None) -> None:
         """Append *symbols*, with the values of *streams*. A stream that *streams* lacks takes 0."""
@@ -290,32 +314,25 @@ class _Piece:
             values.pop()
 
 
-def _join(pieces: Iterable[_Piece]) -> _Piece:
+def _join(pieces: Iterable[_Piece], space: Segment) -> _Piece:
     """*pieces* joined into one by the rules of tts-punctuation.
 
-    A piece that ends in a clause symbol or in a space joins the next piece
-    with no space, and any other piece takes one space before the next, as
-    :func:`~scriptconv.phonemizers.base.join_sentences` joins sentences. Where
-    two bounded pieces join, the end symbol of the first and the start symbol
-    of the second go, with their stream values, and no space comes between
-    them. A space that the join adds takes 0 in every stream. Every
-    :class:`Chunk` size and :meth:`TextFrontend.phonemize_flat` join by this
-    function.
+    A piece that ends in a clause symbol or in the word break *space* joins
+    the next piece with no space, and any other piece takes *space* before
+    the next, as :func:`~scriptconv.phonemizers.base.join_sentences` joins
+    sentences. The start and end symbols of bounded pieces stay out of the
+    join, so where two of them join, the inner end and start symbols go with
+    their stream values. Every :class:`Chunk` size and
+    :meth:`TextFrontend.phonemize_flat` join by this function.
     """
     joined = _Piece([])
     for piece in pieces:
         if not piece.phonemes:
             continue
-        symbols, streams = piece.phonemes, piece.streams
-        if not joined.phonemes:
-            joined.bounded = piece.bounded
-        elif joined.bounded and piece.bounded:
-            joined.pop()
-            symbols, streams = symbols[1:], {name: values[1:] for name, values in streams.items()}
-        elif not (joined.ends_in_token or joined.phonemes[-1] == " "):
-            joined.add([" "])
-        joined.bounded = joined.bounded and piece.bounded
-        joined.add(symbols, streams)
+        if joined.phonemes and not (joined.ends_in_token or joined.phonemes[-1] == space.phonemes[0]):
+            joined.add(space.phonemes, space.streams)
+        joined.add(piece.phonemes, piece.streams)
+        joined.bounds = joined.bounds or piece.bounds
         joined.ends_in_token = piece.ends_in_token
         joined.ends_sentence = piece.ends_sentence
         joined.ends_paragraph = piece.ends_paragraph
@@ -393,6 +410,7 @@ class TextFrontend:
             backend.strict = config.strict
         self.config = config
         self.backend = backend
+        self._space = backend.word_break()
         stages = self._resolve(None)
         # The Grapheme and Unicode backends take any language and have no get_lang.
         if hasattr(backend, "get_lang"):
@@ -418,15 +436,19 @@ class TextFrontend:
         sentences of a paragraph, or every sentence. The sentences of a chunk
         join by the rule of :meth:`phonemize_flat`. A clause that ends in a
         clause symbol, with another clause after it in its sentence, takes a
-        space after the symbol, as inside the sentence. A paragraph ends at a
-        sentence that a paragraph break follows. A sentence that holds a
-        paragraph break, as a title with no full stop, stays whole in the
-        paragraph where it starts.
+        space after the symbol, as inside the sentence. The frontend cuts the
+        read text at its paragraph breaks before it cuts sentences, so a
+        paragraph break also ends a sentence, as after a title with no full
+        stop or after a ``!``. A ``reads_whole_text`` backend reports its own
+        paragraph ends.
 
         A block's symbols join the chunk before the block, and the text after
         a block starts a new sentence. A block that starts a sentence after a
         sentence that ends in a clause symbol follows that symbol with no
-        space. A chunk that gives no phonemes is not yielded.
+        space. A block before the first text joins the chunk after it. A
+        chunk of bounded segments has one start and one end symbol, with the
+        block's symbols between them. A chunk that gives no phonemes is not
+        yielded.
         """
         for chunk in self._chunk_pieces(text, self._resolve(stages)):
             yield chunk.phonemes
@@ -438,18 +460,19 @@ class TextFrontend:
     def segments(self, text: str, stages: Optional[Stages] = None) -> Iterator[Segment]:
         """The chunks of :meth:`phonemize_lazy`, each with the backend's side streams.
 
-        The streams of a ``reads_whole_text`` backend, such as dizione's
-        stress, stay in step with the symbols at every size. A symbol that
-        the frontend adds, such as a clause symbol, a space or a block's
-        symbol, takes 0 in every stream. Where two bounded segments of the
-        backend join, the inner end and start symbols go with their stream
-        values. Each chunk is a :class:`~scriptconv.phonemizers.base.Segment`
+        The streams of the backend, such as dizione's stress or Shami's
+        language ids, stay in step with the symbols at every size. A word
+        break that the frontend adds takes the values of the backend's
+        :meth:`~scriptconv.phonemizers.base.BasePhonemizer.word_break`, and a
+        clause symbol or a block's symbol takes 0 in every stream. Where two
+        bounded segments of the backend join, the inner end and start symbols
+        go with their stream values. Each chunk is a :class:`~scriptconv.phonemizers.base.Segment`
         whose symbols hold the clause symbols, so its ``mark`` is ``None``.
         """
         for chunk in self._chunk_pieces(text, self._resolve(stages)):
             yield Segment(tuple(chunk.phonemes), None, chunk.ends_sentence,
                           {name: tuple(values) for name, values in chunk.streams.items()},
-                          chunk.ends_paragraph, chunk.bounded)
+                          chunk.ends_paragraph, chunk.bounds is not None)
 
     def phonemize_flat(self, text: str, stages: Optional[Stages] = None) -> List[str]:
         """Phonemes of *text* as one list, for training.
@@ -459,12 +482,11 @@ class TextFrontend:
         clause symbol, or in a space, joins the next one with no space, and
         any other sentence takes one space before the next, as
         :func:`~scriptconv.phonemizers.base.join_sentences` joins them. Where
-        two bounded segments of a ``reads_whole_text`` backend join, the
-        inner end and start symbols go. So the ``none`` size gives this list
-        as its one chunk.
+        two bounded segments join, the inner end and start symbols go. So the
+        ``none`` size gives this list as its one chunk.
         """
         stages = dataclasses.replace(self._resolve(stages), chunk=Chunk.SENTENCE)
-        return _join(self._pieces(text, stages, clauses=False)).phonemes
+        return _join(self._pieces(text, stages, clauses=False), self._space).closed(self._space).phonemes
 
     def prepare(self, text: str, stages: Optional[Stages] = None) -> str:
         """*text* after the stages, for an engine that reads text, not phonemes.
@@ -525,18 +547,18 @@ class TextFrontend:
     def _chunk_pieces(self, text: str, stages: Stages) -> Iterator[_Piece]:
         """The chunks of :meth:`phonemize_lazy`, each with its streams."""
         if stages.chunk in (Chunk.SENTENCE, Chunk.CLAUSE):
-            yield from (piece for piece in self._pieces(text, stages, stages.chunk == Chunk.CLAUSE)
+            yield from (piece.closed(self._space) for piece in self._pieces(text, stages, stages.chunk == Chunk.CLAUSE)
                         if piece.phonemes)
             return
         paragraph: List[_Piece] = []
         for piece in self._pieces(text, stages, clauses=False):
             paragraph.append(piece)
             if stages.chunk == Chunk.PARAGRAPH and piece.ends_paragraph:
-                if (joined := _join(paragraph)).phonemes:
-                    yield joined
+                if (joined := _join(paragraph, self._space)).phonemes:
+                    yield joined.closed(self._space)
                 paragraph = []
-        if (joined := _join(paragraph)).phonemes:
-            yield joined
+        if (joined := _join(paragraph, self._space)).phonemes:
+            yield joined.closed(self._space)
 
     def _pieces(self, text: str, stages: Stages, clauses: bool) -> Iterator[_Piece]:
         """Steps 1 to 5: the sentences of *text*, or its clauses with *clauses*, with the blocks."""
@@ -553,6 +575,8 @@ class TextFrontend:
                 continue
             for piece in self._text_pieces(part, stages, clauses):
                 if held.phonemes:
+                    # a block before the first text has the bounds of the text after it
+                    held.bounds = held.bounds or piece.bounds
                     yield held
                 held = piece
         if held.phonemes:
@@ -568,36 +592,43 @@ class TextFrontend:
         if "normalize" in self.backend.owned_stages:
             # The backend reads the text with its own rules, so it gets the
             # sentences as written, cut before casing.
-            sentences = _sentence_tokenize(text)
-            ends = _paragraph_ends(text, sentences)
-            sentences = [self._read(sentence, stages) for sentence in sentences]
+            paragraphs = [[self._read(sentence, stages) for sentence in sentences]
+                          for sentences in _paragraph_sentences(text)]
         else:
-            text = self._read(text, stages)
-            sentences = _sentence_tokenize(text)
-            ends = _paragraph_ends(text, sentences)
+            paragraphs = _paragraph_sentences(self._read(text, stages))
         # A backend that overrides its output appends no clause symbol, so
         # its marks join as any other symbol.
         tokens = self.backend._keeps_punctuation()
-        for sentence, ends_paragraph in zip(sentences, ends):
-            texts = _clauses(sentence) if clauses else [sentence]
-            for index, part in enumerate(texts):
-                if not part.strip():
-                    continue
-                # A chunk never starts with a space, also for a backend that
-                # keeps the spaces it reads.
-                part = self._diacritize(part, stages).lstrip()
-                read = [list(phonemes) for phonemes in self.backend.phonemize_lazy(part, stages.lang)
-                        if phonemes]
-                self._check_read(part, [p for phonemes in read for p in phonemes], stages)
-                words_follow = clauses and any(c.isalnum() for c in "".join(texts[index + 1:]))
-                for count, phonemes in enumerate(read, 1):
-                    piece = _Piece(phonemes, tokens and phonemes[-1] in _CLAUSE_TOKENS)
-                    if count == len(read):
-                        if words_follow and piece.ends_in_token:
-                            piece.add([" "])
-                        piece.ends_sentence = not words_follow
-                        piece.ends_paragraph = ends_paragraph and not words_follow
-                    yield piece
+        for sentences in paragraphs:
+            for number, sentence in enumerate(sentences, 1):
+                yield from self._sentence_pieces(sentence, stages, clauses, tokens,
+                                                 ends_paragraph=number == len(sentences))
+
+    def _sentence_pieces(self, sentence: str, stages: Stages, clauses: bool, tokens: bool,
+                         ends_paragraph: bool) -> Iterator[_Piece]:
+        """Step 5 on one sentence of a backend that does not read whole text, one piece per sentence or clause.
+
+        *tokens* tells whether the backend appends clause symbols.
+        """
+        texts = _clauses(sentence) if clauses else [sentence]
+        for index, part in enumerate(texts):
+            if not part.strip():
+                continue
+            # A chunk never starts with a space, also for a backend that
+            # keeps the spaces it reads.
+            part = self._diacritize(part, stages).lstrip()
+            read = [piece for piece in map(_Piece.of, self.backend.phonemize_segments(part, stages.lang))
+                    if piece.phonemes]
+            self._check_read(part, [p for piece in read for p in piece.phonemes], stages)
+            words_follow = clauses and any(c.isalnum() for c in "".join(texts[index + 1:]))
+            for count, piece in enumerate(read, 1):
+                piece.ends_in_token = tokens and piece.phonemes[-1] in _CLAUSE_TOKENS
+                if count == len(read):
+                    if words_follow and piece.ends_in_token:
+                        piece.add(self._space.phonemes, self._space.streams)
+                    piece.ends_sentence = not words_follow
+                    piece.ends_paragraph = ends_paragraph and not words_follow
+                yield piece
 
     def _whole_text_read(self, text: str, stages: Stages, clauses: bool) -> Iterator[_Piece]:
         """Steps 2 to 5 for a ``reads_whole_text`` backend, one piece per sentence, or per segment with *clauses*.
@@ -625,10 +656,10 @@ class TextFrontend:
                     sentence.append(self._segment_piece(segment))
                 if sentence and segment.ends_sentence:
                     sentence[-1].ends_paragraph = segment.ends_paragraph
-                    pieces += sentence if clauses else [_join(sentence)]
+                    pieces += sentence if clauses else [_join(sentence, self._space)]
                     sentence = []
             if sentence:
-                pieces += sentence if clauses else [_join(sentence)]
+                pieces += sentence if clauses else [_join(sentence, self._space)]
             if not pieces:
                 self._check_read(cut, [], stages)
                 continue
@@ -637,25 +668,30 @@ class TextFrontend:
             yield from pieces
 
     def _segment_piece(self, segment: Segment) -> _Piece:
-        """*segment* with its clause symbol, when the frontend keeps punctuation."""
-        piece = _Piece(list(segment.phonemes), ends_sentence=segment.ends_sentence,
-                       streams={name: list(values) for name, values in segment.streams.items()},
-                       bounded=segment.bounded)
-        if self.backend.keep_punctuation and segment.mark is not None:
-            piece.add([segment.mark, " "] if segment.mark in _PAUSE_PUNCTUATION else [segment.mark])
+        """*segment* with its clause symbol, when the frontend keeps punctuation.
+
+        A bounded segment holds its marks, and its mark only tells that it
+        ends in one.
+        """
+        piece = _Piece.of(segment)
+        if segment.bounded:
+            piece.ends_in_token = segment.mark is not None
+        elif self.backend.keep_punctuation and segment.mark is not None:
+            piece.add([segment.mark])
+            if segment.mark in _PAUSE_PUNCTUATION:
+                piece.add(self._space.phonemes, self._space.streams)
             piece.ends_in_token = True
         return piece
 
-    @staticmethod
-    def _continue_sentence(piece: _Piece) -> None:
+    def _continue_sentence(self, piece: _Piece) -> None:
         """Mark *piece* as a clause that another clause of its sentence follows.
 
-        A clause symbol at its end takes a space after it, as the text writes
-        a space before the next word.
+        A clause symbol that the frontend appended takes a space after it, as
+        the text writes a space before the next word.
         """
         piece.ends_sentence = False
-        if piece.ends_in_token and not piece.bounded and piece.phonemes[-1] != " ":
-            piece.add([" "])
+        if piece.ends_in_token and piece.bounds is None and piece.phonemes[-1] != self._space.phonemes[0]:
+            piece.add(self._space.phonemes, self._space.streams)
 
     @staticmethod
     def _split(text: str, chunk: Chunk) -> List[str]:
@@ -664,7 +700,7 @@ class TextFrontend:
             return [text]
         if chunk == Chunk.PARAGRAPH:
             return _paragraphs(text)
-        sentences = _sentence_tokenize(text)
+        sentences = [sentence for paragraph in _paragraph_sentences(text) for sentence in paragraph]
         if chunk == Chunk.CLAUSE:
             return [clause for sentence in sentences for clause in _clauses(sentence)]
         return sentences
@@ -678,35 +714,51 @@ class TextFrontend:
         """Append the symbols of the inline block at *index* of a split text to *piece*.
 
         A space, tab or line break before the block in the text, also with
-        marks between it and the block, or a space after the block, becomes a
-        space symbol, unless *piece* is empty or
-        already ends in a space. :meth:`_before_block` reads what comes before
-        the block, and :meth:`_mark_after` reads the clause symbol after it. A
-        block whose symbols end in a character that is also a clause symbol,
-        with no clause symbol after it, takes a space before the next word,
+        marks between it and the block, or a space after the block, becomes
+        the backend's word break, unless *piece* is empty or already ends in
+        one. :meth:`_before_block` reads what comes before the block, and
+        :meth:`_mark_after` reads the clause symbol after it. A block whose
+        symbols end in a character that is also a clause symbol, with no
+        clause symbol after it, takes a word break before the next word,
         because that character ends no sentence. The piece then ends in a
         clause symbol that joins the next sentence with no space only when a
-        mark follows the block. A piece with a block is not bounded.
+        mark follows the block.
+
+        The block's symbols go inside the start and end symbols of a bounded
+        piece. The backend writes the marks of a bounded piece itself, so the
+        frontend reads no mark around the block: a word break comes before
+        the block where the text has whitespace and the piece does not end in
+        a mark, and after it where the text has a space.
         """
         text, after = parts[index - 1], parts[index + 1]
         symbols = parts[index][2:-2].strip()
         phonemes = piece.phonemes
-        piece.bounded = False
+        space, space_streams = self._space.phonemes, self._space.streams
+        if piece.bounds is not None:
+            if _SPACE_BEFORE_BLOCK.search(text) and phonemes and phonemes[-1] != space[0] and not piece.ends_in_token:
+                piece.add(space, space_streams)
+            piece.add(symbols)
+            piece.ends_in_token = not after.startswith(" ")
+            if not piece.ends_in_token:
+                piece.add(space, space_streams)
+            return
         before = self._before_block(phonemes, text, index > 1)
         if before is False:
             piece.pop()
-        if _SPACE_BEFORE_BLOCK.search(text) and phonemes and phonemes[-1] != " " and not before:
-            piece.add([" "])
+        if _SPACE_BEFORE_BLOCK.search(text) and phonemes and phonemes[-1] != space[0] and not before:
+            piece.add(space, space_streams)
         piece.add(symbols)
         mark = self._mark_after(after, index + 2 < len(parts), stages)
         piece.ends_in_token = bool(mark)
         if mark:
-            piece.add(mark)
+            piece.add(mark[0])
+            if mark[1:]:
+                piece.add(space, space_streams)
         elif after.startswith(" ") or (
                 self._keeps_punctuation() and symbols[-1] in _CLAUSE_TOKENS
                 and self.backend.remove_punctuation(after).strip()):
-            if phonemes[-1] != " ":
-                piece.add([" "])
+            if phonemes[-1] != space[0]:
+                piece.add(space, space_streams)
 
     def _mark_after(self, after: str, block_follows: bool, stages: Stages) -> Optional[str]:
         """The clause symbol in the text *after* a block, and the space after that symbol.
