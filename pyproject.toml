@@ -58,7 +58,7 @@ eu = ["scriptconv[phonemizers]", "euskaphone", "scriptconv-copyleft[eu]>=0.1.2a1
 pt-phonemizers = ["scriptconv[phonemizers]", "tugaphone>=1.2.0a1"]
 mwl = ["scriptconv[o2i]"]
 ghana = ["scriptconv[phonemizers]", "scriptconv-nonfree[ghana]>=0.1.0a1"]
-africa = ["scriptconv[phonemizers]", "scriptconv-nonfree>=0.1.0a1"]
+africa = ["scriptconv[phonemizers]", "scriptconv-nonfree[africa]>=0.1.0a1"]
 gl = ["scriptconv[phonemizers]", "scriptconv-copyleft[gl]>=0.1.2a1"]
 he = ["scriptconv[phonemizers]", "phonikud-onnx", "phonikud"]
 fa = ["scriptconv[phonemizers]", "scriptconv-copyleft[fa]>=0.1.2a1"]

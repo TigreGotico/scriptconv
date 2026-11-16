@@ -364,9 +364,9 @@ licences of that code:
 - **scriptconv-copyleft** holds KoG2P and the espeak, Cotovía, AhoTTS,
   transphone, misaki, g2pfa, g2pk and pykakasi wrappers, and the Japanese
   functions of `scriptconv.readings`.
-- **scriptconv-nonfree** holds mantoq, iqra_phonetiser, africa-g2p and their
-  wrappers (Mantoq, Halabi, Iqra, AfricaG2P), and the viphoneme and
-  ghana-g2p wrappers.
+- **scriptconv-nonfree** holds mantoq, iqra_phonetiser and their wrappers
+  (Mantoq, Halabi, Iqra), and the viphoneme, africa-g2p and ghana-g2p
+  wrappers.
 
 The registry keeps every member and its extra. A moved member imports from
 its sister package when it is resolved, and the extra that served it
@@ -379,6 +379,44 @@ The old import paths, for example
 `scriptconv.phonemizers.mul.EspeakPhonemizer`, give the class from the
 sister package with a `DeprecationWarning` until the release that
 `scriptconv.phonemizers._moved.REMOVAL_VERSION` names.
+
+### africa-g2p and ghana-g2p
+
+`africa_g2p` (`AfricaG2PPhonemizer`) and `ghana_g2p` (`GhanaG2PPhonemizer`)
+live in scriptconv-nonfree. The `africa` extra installs africa-g2p
+(AfriSpeech/africa-g2p) from PyPI, at 0.3.5 or later. The `ghana` extra
+installs ghana-g2p (GhanaNLP/ghana-g2p) with the same africa-g2p floor.
+ghana-g2p loads the same installed africa-g2p, so the two backends read the
+same rule tables. `identity()` gives the africa-g2p version for
+`africa_g2p` and the ghana-g2p version for `ghana_g2p`.
+
+Each africa-g2p rule table records its source in a `confidence` field. The
+values `omniglot`, `high`, `medium` and `hand-verified` mean a transcription
+of an Omniglot chart or of Hartell (ed.), *Alphabets of Africa* (UNESCO,
+1993). Both backends serve these tables by default.
+
+They also serve the 5 `tts-reviewed` tables of africa-g2p 0.3.5 by default:
+Dagbani, Ewe, Fante, Ga and Twi. Each is an Omniglot chart with corrections
+that an LLM proposed, and no native speaker has checked the corrections. The
+corrected Ewe table measures closer to WikiPron Ewe than the chart it
+replaces: phoneme error rate 0.4690 against 0.4948 on 247 words.
+
+Every other value is a draft. In africa-g2p 0.3.5, 352 tables are
+`llm-draft`: an LLM drafted them from corpus text, and no chart backs them.
+Both backends refuse a draft table with `UnsupportedLanguageError`, and the
+message names the table, its `confidence` and the africa-g2p version.
+`allow_draft_rules=True` on the constructor, or as a keyword of
+`get_phonemizer`, accepts the drafts:
+
+```python
+from scriptconv.phonemizers import Phonemizer, get_phonemizer
+
+get_phonemizer(Phonemizer.AFRICA_G2P, allow_draft_rules=True).phonemize_string("aba", "aab")
+```
+
+The code of africa-g2p is Apache-2.0. Its rule tables have no licence grant,
+and they are not for commercial use. scriptconv-nonfree states the terms in
+`LICENSE.africa-g2p-data.md`.
 
 ### Three Arabic edges on the same Halabi phonetiser
 
@@ -556,7 +594,7 @@ xpinyin, pypinyin), Arabic (arbtok, mantoq), Hebrew (phonikud), Persian,
 Vietnamese (viphoneme, Python below 3.12 only), Portuguese (tugaphone), Galician
 (Cotovía), Russian (vosk, the vosk-tts inventory, `Alphabet.VOSK`, with the
 voice's pronunciation dictionary passed as `phonemizer_model`), Basque
-(AhoTTS, euskaphone), Mirandese and Barranquenho (the orthography2ipa specs
+(AhoTTS, euskaphone), African languages (africa-g2p, ghana-g2p), Mirandese and Barranquenho (the orthography2ipa specs
 `mwl`, `mwl-x-sendim`, `mwl-x-ifanes` and `ext-PT-x-barranco`), Levantine
 Arabic/English code-switching (shami, whose `phonemize_with_language_ids` also returns the
 parallel per-phoneme language-ID stream), and orthography2ipa for its
