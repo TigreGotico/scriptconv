@@ -547,8 +547,8 @@ class TextFrontend:
         :func:`_marks_after`). A backend with a mark table gets the marks from
         it, also where no word follows them (see :meth:`_take_marks`). A
         block that starts a sentence after a sentence that ends in a clause
-        symbol follows that symbol with no space. A block before the first text is a chunk of its own at
-        ``sentence`` and ``clause`` size, with the marks right after it, and
+        symbol follows that symbol with no space. A block before the first
+        text is a chunk of its own at ``sentence`` and ``clause`` size, with the marks right after it, and
         it starts the chunk after it at ``paragraph`` and ``none`` size. A
         chunk of bounded segments has one start and one end symbol, with the
         block's symbols between them. A chunk that gives no phonemes is not
@@ -723,19 +723,20 @@ class TextFrontend:
         break before it, as tts-punctuation puts a closing mark with the
         sentence that it ends. A backend with a mark table
         (:meth:`~scriptconv.phonemizers.base.BasePhonemizer.mark_symbols`)
-        writes the symbols of its table for the marks after a word, and the
-        symbols of the table at the start of *piece* are its read of the marks
-        alone. The frontend writes the table, and removes those symbols from
-        *piece*. Where *piece* does not start with the table, the backend read
-        the marks alone in another way, or the marks belong to the text after
-        them. The frontend then writes only the start of the table that the
-        backend also writes for the marks with *following*, the text after
-        them up to the end of the next word. dizione reads ``;* go`` alone
-        with no mark, but ``x;* go`` with ``;``. It reads ``x .5``, ``x != y``
-        and ``x:( go`` with no mark, as the decimal point, the operator and
-        the emoticon belong to the text after the block. *piece* is ``None``
-        where no word follows the marks before the next block or the end of
-        the text. A backend with no table writes symbols whose characters are
+        writes the symbols of its table for the marks after a word. The table
+        is the backend's read of the marks at the end of a text, and the
+        backend can read them in another way where a word follows. So the
+        frontend writes the mark symbols at the start of the table's read of
+        the marks with *following*, the text after them up to the end of the
+        next word. It removes from *piece* the symbols at its start that the
+        backend writes for one of the marks, also where that read drops them.
+        dizione drops ``);`` at the end of a text as an emoticon, but reads
+        ``x.);5`` with ``. ) ;``. It reads ``;* go`` alone with no mark, but
+        ``x;* go`` with ``;``, and it drops all of ``:'))`` in ``x:')) go``.
+        It reads ``x .5``, ``x != y`` and ``x:( go`` with no mark, as the
+        decimal point, the operator and the emoticon belong to the text after
+        the block. *piece* is ``None`` where no word follows the marks before
+        the next block or the end of the text. A backend with no table writes symbols whose characters are
         all in *marks*. A backend that drops the marks writes no such symbols,
         and then *held* keeps its word break.
         """
@@ -750,28 +751,30 @@ class TextFrontend:
             symbols = phonemes[:count]
             streams = {name: values[:count] for name, values in piece.streams.items()} if count else {}
         else:
-            symbols, streams = list(table.phonemes), table.streams
-            if phonemes[:len(symbols)] == symbols:
-                count = len(symbols)
-            else:
-                read = self.backend.mark_symbols(marks + following).phonemes
-                size = next((i for i, (symbol, other) in enumerate(zip(symbols, read)) if symbol != other),
-                            min(len(symbols), len(read)))
-                count = next((i for i, symbol in enumerate(phonemes) if symbol not in symbols), len(phonemes))
-                symbols, streams = symbols[:size], {name: values[:size] for name, values in streams.items()}
-        if not symbols:
-            return
+            run = set("".join(marks.split()))
+            written = set(table.phonemes).union(*(self.backend.mark_symbols(char).phonemes for char in run))
+            read = self.backend.mark_symbols(marks + following)
+
+            def closes(symbol: str) -> bool:
+                return symbol in written or set(symbol) <= run
+
+            size = next((i for i, symbol in enumerate(read.phonemes) if not closes(symbol)), len(read.phonemes))
+            count = next((i for i, symbol in enumerate(phonemes) if not closes(symbol)), len(phonemes))
+            symbols = list(read.phonemes[:size])
+            streams = {name: values[:size] for name, values in read.streams.items()}
         space = list(self._space.phonemes)
-        if held.phonemes[-len(space):] == space:
-            for _ in space:
-                held.pop()
-        held.add(symbols, streams)
         if count:
             if phonemes[count:count + len(space)] == space:
                 count += len(space)
             del phonemes[:count]
             for values in piece.streams.values():
                 del values[:count]
+        if not symbols:
+            return
+        if held.phonemes[-len(space):] == space:
+            for _ in space:
+                held.pop()
+        held.add(symbols, streams)
         held.ends_in_token = held.bounds is not None or (
             self._keeps_punctuation() and held.phonemes[-1] in _CLAUSE_TOKENS)
 

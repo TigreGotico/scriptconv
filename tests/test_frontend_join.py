@@ -567,12 +567,28 @@ class TestDizioneTokensAndBlocks:
             assert _after(frontend.phonemize(text, Stages(chunk=chunk)), ["Q", "Z"]) == _after(clauses, ["ɛ", "k", "s"])
 
     @pytest.mark.parametrize("keep", [True, False])
+    @pytest.mark.parametrize("text", ["Wait [[QZ]].);5 go.", "Wait [[QZ]]!):D go.", 'Wait [[QZ]]"):go now.',
+                                      "Wait [[QZ]]:')) go now.", "Wait [[QZ]]:']] go now.", "Wait [[QZ]]);'* go.",
+                                      "Wait [[QZ]]):'* go.", "Wait [[QZ]];') ' go."])
+    def test_no_mark_of_the_run_after_a_block_starts_the_next_chunk(self, backend, text, keep):
+        # dizione reads a tail such as ");" or ":'))" at the end of a text as an emoticon, and with the next word as marks
+        frontend = TextFrontend(FrontendConfig("en-US", keep_punctuation=keep), backend)
+        assert _ids(frontend, text, Chunk.NONE, "ids") == [self._with_block(backend, text)]
+        for chunk in (Chunk.SENTENCE, Chunk.CLAUSE):
+            chunks = frontend.phonemize(text, Stages(chunk=chunk))
+            assert [c[1] for c in chunks[1:] if c[1] in set(".,?!;:…)\"'")] == []
+
+    @pytest.mark.parametrize("keep", [True, False])
     @pytest.mark.parametrize("text", ["Wait [[QZ]]%. go now.", "Wait [[QZ]] %, go now.", 'He said "wait [[QZ]]&" Go.',
                                       'He said "wait [[QZ]].%" Go.', "Wait [[QZ]]\u00a7. go now.", "Wait [[QZ]]%.",
                                       "Wait [[QZ]].% go now.", "Wait [[QZ]]!& go."])
     def test_a_symbol_that_dizione_reads_as_a_word_ends_the_marks(self, backend, text, keep):
         frontend = TextFrontend(FrontendConfig("en-US", keep_punctuation=keep), backend)
         assert _ids(frontend, text, Chunk.NONE, "ids") == [self._with_block(backend, text)]
+        # the word goes with the text after it, so the block's chunk ends in marks only
+        for chunk in (Chunk.SENTENCE, Chunk.CLAUSE):
+            after = _after(frontend.phonemize(text, Stages(chunk=chunk)), ["Q", "Z"])
+            assert [s for s in after if s[:1] != "<" and any(c.isalpha() for c in s)] == []
 
     @pytest.mark.parametrize("keep", [True, False])
     @pytest.mark.parametrize("text", ["Wait [[QZ]] \u2019tis fine.", "He left [[QZ]] \u2019cause it rained.",
