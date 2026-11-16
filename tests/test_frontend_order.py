@@ -44,15 +44,17 @@ def tokens_ipa(phonemized):
 
 class TestTheHookReadsTheWholeText:
     def test_a_reading_that_needs_the_word_after_a_raw_sentence_end(self):
-        # quebra_frases ends a sentence after "Prof.", and text2spoken reads
-        # "Prof." as "Professor" only when it sees the name after it.
+        # quebra_frases ends a sentence after "Mrs.". text2spoken reads a title
+        # of its "titles" table, "Mrs.": "Missus", only before a capital letter,
+        # so it reads "Mrs." only when it sees the name after it.
+        assert frontend_module._sentence_tokenize("Mrs. Smith arrived.") == ["Mrs.", "Smith arrived."]
         hook = spoken_normalizer()
-        assert hook("Prof.", "en") == "Prof."
-        assert hook("Prof. Smith arrived.", "en") == "Professor Smith arrived."
+        assert hook("Mrs.", "en") == "Mrs."
+        assert hook("Mrs. Smith arrived.", "en") == "Missus Smith arrived."
         frontend = TextFrontend(FrontendConfig("en", normalizer=hook, stages=Stages(diacritize=False)),
                                 Echo())
-        assert frontend.phonemize("Prof. Smith arrived.") == [list("Professor Smith arrived")]
-        assert frontend.phonemize_flat("Prof. Smith arrived.") == list("Professor Smith arrived")
+        assert frontend.phonemize("Mrs. Smith arrived.") == [list("Missus Smith arrived")]
+        assert frontend.phonemize_flat("Mrs. Smith arrived.") == list("Missus Smith arrived")
 
     def test_the_whole_text_is_normalised_before_the_first_sentence_is_read(self, monkeypatch):
         events = []

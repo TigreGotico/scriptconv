@@ -17,7 +17,7 @@
    :func:`~scriptconv.phonemizers.base.join_sentences`.
 
 A sentence split on raw text cuts at full stops that belong to the reading, as
-in ``"Prof. Smith arrived."``, so the split runs after normalisation.
+in ``"Mrs. Smith arrived."``, so the split runs after normalisation.
 
 The frontend skips a stage that the backend names in ``owned_stages``, because
 the backend runs it itself. scriptconv does not normalise text. The hook is
