@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a104](https://github.com/TigreGotico/scriptconv/tree/0.0.4a104) (2026-11-16)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a103...0.0.4a104)
+
+**Merged pull requests:**
+
+- feat\(frontend\): read the whole text before cutting it into chunks [\#272](https://github.com/TigreGotico/scriptconv/pull/272) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a103](https://github.com/TigreGotico/scriptconv/tree/0.0.4a103) (2026-11-16)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a102...0.0.4a103)
@@ -340,11 +348,6 @@
 ## [0.0.4a60](https://github.com/TigreGotico/scriptconv/tree/0.0.4a60) (2026-11-12)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a59...0.0.4a60)
-
-**Merged pull requests:**
-
-- fix\(notation\): strict drops no mark and accepts spaces [\#177](https://github.com/TigreGotico/scriptconv/pull/177) ([JarbasAl](https://github.com/JarbasAl))
-- fix\(notation\): one definition of lossless, measured on every notation edge [\#176](https://github.com/TigreGotico/scriptconv/pull/176) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a59](https://github.com/TigreGotico/scriptconv/tree/0.0.4a59) (2026-11-12)
 
