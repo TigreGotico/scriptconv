@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a113](https://github.com/TigreGotico/scriptconv/tree/0.0.4a113) (2026-11-17)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a112...0.0.4a113)
+
+**Merged pull requests:**
+
+- fix\(frontend\): a semicolon or colon inside a sentence is a space [\#293](https://github.com/TigreGotico/scriptconv/pull/293) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a112](https://github.com/TigreGotico/scriptconv/tree/0.0.4a112) (2026-11-17)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a111...0.0.4a112)
