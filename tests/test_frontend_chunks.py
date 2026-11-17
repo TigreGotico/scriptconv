@@ -210,3 +210,37 @@ class TestWholeTextBackends:
         assert identity.frontend == FRONTEND_VERSION == 2
         assert DizionePhonemizer().identity("en-US").frontend is None
         assert identity.differs_from(DizionePhonemizer().identity("en-US")) == ("frontend",)
+
+
+class TestClauseBreakWithPunctuationOff:
+    """With punctuation off, a clause break inside a sentence is a space, so the sentence is one chunk."""
+
+    @pytest.mark.parametrize("text", ["kum, ayibo.", "kum; ayibo.", "kum: ayibo.", "kum | ayibo."])
+    @pytest.mark.parametrize("backend", [Echo, GraphemePhonemizer])
+    def test_a_clause_break_inside_a_sentence_is_a_space(self, backend, text):
+        expected = [list("kum ayibo")]
+        assert TextFrontend(FrontendConfig("xh"), backend()).phonemize(text) == expected
+        assert backend().phonemize(text, "xh") == expected
+
+    @pytest.mark.parametrize("text", ["kum, ayibo.", "kum; ayibo.", "kum: ayibo."])
+    def test_with_punctuation_the_mark_is_the_clause_symbol(self, text):
+        frontend = TextFrontend(FrontendConfig("xh", keep_punctuation=True), GraphemePhonemizer())
+        assert frontend.phonemize(text) == [list(text)]
+
+    @pytest.mark.parametrize("lang", ["el", "el-GR"])
+    def test_a_greek_semicolon_is_the_question_mark_and_ends_the_sentence(self, lang):
+        expected = [list("τι κάνεις"), list("καλά")]
+        assert TextFrontend(FrontendConfig(lang), Echo()).phonemize("τι κάνεις; καλά.") == expected
+        assert Echo().phonemize("τι κάνεις; καλά.", lang) == expected
+
+    def test_a_phoneme_written_as_a_clause_symbol_keeps_the_space(self):
+        class LongVowel(GraphemePhonemizer):
+            """Graphemes, with the X-SAMPA length symbol ":" after a vowel at the end of a word."""
+
+            def phonemize_string(self, text, lang):
+                return re.sub(r"([aeiou])\b", r"\1:", super().phonemize_string(text, lang))
+
+        assert LongVowel().phonemize("ma; pa.", "xx") == [list("ma: pa:")]
+
+    def test_a_greek_colon_is_still_a_space(self):
+        assert Echo().phonemize("ένα: δύο.", "el") == [list("ένα δύο")]
