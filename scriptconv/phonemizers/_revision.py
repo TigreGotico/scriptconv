@@ -22,6 +22,10 @@ A code token is any token but a comment, a blank line or a string that stands
 as a statement, as a docstring does. So a release that changes code or data on
 the path of the backend changes the revision, and a release that changes only
 docs, docstrings, ``version.py`` or the modules of other backends keeps it.
+
+A module on the path that does not load from a file in a directory, as from a
+zip archive, raises :class:`RevisionSourceUnavailable`, so it never counts as
+an empty digest. :func:`code_revision` then gives no revision.
 """
 import functools
 import hashlib
@@ -87,6 +91,18 @@ _VERSION_FILES = frozenset({"version.py", "_version.py"})
 _NATIVE = frozenset({".so", ".pyd", ".dll", ".dylib"})
 
 
+class RevisionSourceUnavailable(OSError):
+    """A module or package on the path of a backend has no source file in a directory to hash."""
+
+
+def _source_file(where, what: str) -> Path:
+    """*where* as a path, when it is a file in a directory."""
+    path = Path(where) if where else None
+    if path is None or not path.is_file():
+        raise RevisionSourceUnavailable(f"{what} does not load from a file in a directory: {where}")
+    return path
+
+
 def code_revision(backend, lang: str, arguments: Mapping, settings: Mapping) -> Optional[str]:
     """The revision of *backend* for *lang*, or ``None`` when its code cannot be read.
 
@@ -103,12 +119,11 @@ def code_revision(backend, lang: str, arguments: Mapping, settings: Mapping) -> 
         for cls in type(backend).__mro__:
             if cls.__module__ in ("builtins", "abc") or cls.__module__.split(".")[0] == "scriptconv":
                 continue
-            path = inspect.getsourcefile(cls)
-            if path is None:
-                raise OSError(f"no source file for {cls.__qualname__}")
-            digest.update(f"\0class\0{cls.__module__}\0{file_digest(Path(path))}".encode())
+            path = _source_file(inspect.getsourcefile(cls), f"the class {cls.__qualname__}")
+            digest.update(f"\0class\0{cls.__module__}\0{file_digest(path)}".encode())
     except (OSError, TypeError, RuntimeError) as exc:
-        LOG.warning("the identity of %s for %r has no revision: %s", type(backend).__name__, lang, exc)
+        LOG.warning("the identity of %s for %r has no revision: %s: %s",
+                    type(backend).__name__, lang, type(exc).__name__, exc)
         return None
     return f"{FORMAT}:{digest.hexdigest()}"
 
@@ -135,7 +150,7 @@ def _probe_digest(module: str, qualname: str, lang: str, arguments: str) -> str:
             others.add(top)
         elif Path(where).relative_to(root).as_posix() != "version.py":
             entries.append((f"scriptconv/{Path(where).relative_to(root).as_posix()}",
-                            file_digest(Path(where))))
+                            file_digest(_source_file(where, name))))
     for opened in (Path(os.path.abspath(name)) for name in probe["opened"]):
         if (opened.is_relative_to(root) and opened.suffix not in (".py", ".pyc")
                 and "__pycache__" not in opened.parts and opened.is_file()):
@@ -160,8 +175,12 @@ def _top_level_digest(name: str) -> str:
     """The hash of the files of one top-level module, where the import system finds it."""
     spec = find_spec(name)
     if spec is None:
-        return ""
+        raise RevisionSourceUnavailable(f"the module {name} is not on the import path")
     if spec.submodule_search_locations:
+        for location in spec.submodule_search_locations:
+            if not Path(location).is_dir():
+                raise RevisionSourceUnavailable(
+                    f"the package {name} does not load from a directory: {location}")
         digest = hashlib.sha256()
         for relative, path in sorted(_package_files(spec.submodule_search_locations)):
             if path.suffix in _NATIVE:
@@ -172,10 +191,8 @@ def _top_level_digest(name: str) -> str:
                 value = file_digest(path)
             digest.update(f"\0{relative}\0{value}".encode())
         return digest.hexdigest()
-    if spec.origin and Path(spec.origin).is_file():
-        origin = Path(spec.origin)
-        return _native(name) if origin.suffix in _NATIVE else file_digest(origin)
-    return ""
+    origin = _source_file(spec.origin, f"the module {name}")
+    return _native(name) if origin.suffix in _NATIVE else file_digest(origin)
 
 
 def _native(name: str) -> str:

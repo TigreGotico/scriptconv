@@ -1,6 +1,7 @@
 """Frontend errors, ``PhonemizerIdentity`` and the ``owned_stages`` table."""
 import dataclasses
 import hashlib
+import importlib
 import json
 import logging
 import os
@@ -10,6 +11,7 @@ import subprocess
 import sys
 import tomllib
 import unicodedata
+import zipfile
 from importlib import metadata
 from pathlib import Path
 from types import MappingProxyType
@@ -388,6 +390,34 @@ class TestCodeRevision:
         revisions = {UnicodeCodepointPhonemizer(form).identity("xx").revision
                      for form in ("NFC", "NFD", "NFKC", "NFKD")}
         assert None not in revisions and len(revisions) == 4
+
+    @staticmethod
+    def zipped_package(tmp_path, monkeypatch):
+        """A package ``zipped_backend`` that loads from a zip archive, with a grapheme subclass."""
+        archive = tmp_path / "backends.zip"
+        with zipfile.ZipFile(archive, "w") as zipped:
+            zipped.writestr("zipped_backend/__init__.py",
+                            "from scriptconv.phonemizers import GraphemePhonemizer\n\n\n"
+                            "class Zipped(GraphemePhonemizer):\n    pass\n")
+        monkeypatch.syspath_prepend(str(archive))
+        monkeypatch.delitem(sys.modules, "zipped_backend", raising=False)
+        return importlib.import_module("zipped_backend")
+
+    def test_a_package_in_a_zip_raises_a_named_error(self, tmp_path, monkeypatch):
+        from scriptconv.phonemizers._revision import RevisionSourceUnavailable, _top_level_digest
+        self.zipped_package(tmp_path, monkeypatch)
+        with pytest.raises(RevisionSourceUnavailable, match="zipped_backend"):
+            _top_level_digest("zipped_backend")
+
+    def test_a_class_from_a_zip_gives_no_revision_and_a_warning(self, tmp_path, monkeypatch, caplog):
+        zipped = self.zipped_package(tmp_path, monkeypatch)
+        with caplog.at_level(logging.WARNING, logger="scriptconv.phonemizers._revision"):
+            identity = zipped.Zipped().identity("en")
+        assert GraphemePhonemizer().identity("en").revision is not None
+        assert identity.revision is None
+        warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warnings) == 1
+        assert "RevisionSourceUnavailable" in warnings[0] and "Zipped" in warnings[0]
 
     @pytest.mark.parametrize("source, lang", CODE_BACKENDS.values(), ids=CODE_BACKENDS)
     def test_another_unicode_version_changes_the_revision(self, source, lang, monkeypatch):
