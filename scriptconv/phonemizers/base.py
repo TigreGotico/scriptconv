@@ -22,11 +22,14 @@ legitimately differ on text containing digits.
 import abc
 import dataclasses
 import functools
+import hashlib
 import inspect
+import json
 import re
 import string
 import unicodedata
 from importlib import metadata
+from types import MappingProxyType
 from typing import Callable, ClassVar, Iterable, Iterator, List, Mapping, Optional, Tuple, Literal, Union
 
 from scriptconv.phonemizers.enums import Alphabet
@@ -130,6 +133,17 @@ def _between_letters(text: str, index: int) -> bool:
     return text[letter].isalpha()
 
 
+def _rules_revision(rules: Mapping) -> str:
+    """The ``revision`` of a backend whose phonemes follow from *rules* alone.
+
+    *rules* holds every input that decides the output, as JSON values. A set or
+    a frozenset is written sorted, so every process gives the same hash.
+    """
+    serialised = json.dumps(rules, sort_keys=True, ensure_ascii=False,
+                            separators=(",", ":"), default=sorted)
+    return "sha256:" + hashlib.sha256(serialised.encode()).hexdigest()
+
+
 def _clause_mark(punctuation: str) -> Optional[str]:
     """The symbol a run of clause-final punctuation is kept as, if any."""
     if ".." in punctuation or "\u2026" in punctuation:
@@ -198,7 +212,9 @@ class PhonemizerIdentity:
     lang: str
     """The resolved lect, ``"pt-PT-x-porto"``."""
     revision: Optional[str] = None
-    """The orthography2ipa spec revision, when the backend has one."""
+    """A hash of the spec or the tables that give the phonemes, when the
+    backend has one: the orthography2ipa spec revision, dizione's build
+    fingerprint, or the hash of the rule tables that an in-tree backend reads."""
     frontend: Optional[int] = None
     """The version of the stage order of :class:`~scriptconv.frontend.TextFrontend`.
     ``None`` for a backend called directly."""
@@ -776,6 +792,16 @@ class GraphemePhonemizer(BasePhonemizer):
     # Regular expression matching whitespace:
     whitespace_re = re.compile(r"\s+")
 
+    lowercase: bool = True
+    """Lowercase the text before the character rules."""
+    in_word_chars: str = "-"
+    """Characters that stay as written between two letters. Elsewhere
+    :attr:`replace_chars` applies to them."""
+    replace_chars: Mapping[str, str] = MappingProxyType({";": ",", "-": " ", ":": ","})
+    """Each character and the text that replaces it."""
+    drop_chars: str = '<>()[]"'
+    """Characters removed after :attr:`replace_chars`."""
+
     def __init__(self, alphabet: Alphabet = Alphabet.UNICODE,
                  normalizer: Optional[Callable[[str, str], str]] = None,
                  stress_notation: str = "acute"):
@@ -802,17 +828,38 @@ class GraphemePhonemizer(BasePhonemizer):
         Returns:
             str: A normalized string of graphemes.
         """
-        text = text.lower()
-        text = text.replace(";", ",")
-        text = "".join(" " if char == "-" and not _between_letters(text, i) else char
+        if self.lowercase:
+            text = text.lower()
+        text = "".join(char if char in self.in_word_chars and _between_letters(text, i)
+                       else self.replace_chars.get(char, char)
                        for i, char in enumerate(text))
-        text = text.replace(":", ",")
-        text = re.sub(r"[\<\>\(\)\[\]\"]+", "", text)
+        text = text.translate(dict.fromkeys(map(ord, self.drop_chars)))
         text = re.sub(self.whitespace_re, " ", text).strip()
         if self.stress_notation == "plus":
             from scriptconv.diacritics import replace_stress_mark
             text = replace_stress_mark(text, lang, before="+")
         return text
+
+    def identity(self, lang: str) -> PhonemizerIdentity:
+        """The base identity, with ``revision`` the hash of the character rules.
+
+        The rules are :attr:`lowercase`, :attr:`in_word_chars`,
+        :attr:`replace_chars`, :attr:`drop_chars`, the whitespace pattern, the
+        stress notation, and the Unicode version that lowercasing and the
+        letter test read. With a notation other than ``"acute"``, the vowels
+        that carry a stress mark in *lang* join them.
+        """
+        identity = super().identity(lang)
+        rules = {"lowercase": self.lowercase, "in_word_chars": frozenset(self.in_word_chars),
+                 "replace_chars": dict(self.replace_chars),
+                 "drop_chars": frozenset(self.drop_chars),
+                 "whitespace": self.whitespace_re.pattern,
+                 "stress_notation": self.stress_notation,
+                 "unicode": unicodedata.unidata_version}
+        if self.stress_notation != "acute":
+            from scriptconv.diacritics import _stress_vowels
+            rules["stress_vowels"] = _stress_vowels(identity.lang)
+        return dataclasses.replace(identity, revision=_rules_revision(rules))
 
 
 class UnicodeCodepointPhonemizer(BasePhonemizer):
@@ -841,3 +888,9 @@ class UnicodeCodepointPhonemizer(BasePhonemizer):
             str: The input text normalized to Unicode NFD, with combining marks separated into distinct codepoints.
         """
         return unicodedata.normalize(self.form, text)
+
+    def identity(self, lang: str) -> PhonemizerIdentity:
+        """The base identity, with ``revision`` the hash of the normalisation
+        form and of the Unicode version whose tables decompose the text."""
+        rules = {"form": self.form, "unicode": unicodedata.unidata_version}
+        return dataclasses.replace(super().identity(lang), revision=_rules_revision(rules))

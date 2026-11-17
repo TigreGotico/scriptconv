@@ -51,6 +51,22 @@ spec that gives the phonemes did not change. The class attribute
 `engine_distribution` names the package that supplies the engine, and `None`
 means the code is in this repository.
 
+**Some backends hold a `revision`.** `orthography2ipa`, `mwl_phonemizer`, `barranquenho`
+and `dizione` take it from their engine. `graphemes`, `unicode` and
+`matoub_kab` read only tables that scriptconv ships. Their `revision` is
+`sha256:` and the hash of those tables, written as sorted JSON:
+
+| backend | tables in the hash |
+| --- | --- |
+| `graphemes` | the class attributes `lowercase`, `in_word_chars`, `replace_chars` and `drop_chars`, the whitespace pattern, `stress_notation`, and the Unicode version of Python. With `"plus"` or `"none"`, also the vowels that carry a stress mark in the language. |
+| `unicode` | the normalisation form and the Unicode version of Python |
+| `matoub_kab` | the vendored rule tables and the Unicode version of Python |
+
+A change to one of these tables changes the `revision`. A new scriptconv
+release that keeps the tables keeps the `revision`, so `differs_from` reports
+nothing. A backend that calls an engine outside scriptconv has no `revision`,
+so a change of its `version` always shows.
+
 **Failures have types.** Each error below is a `FrontendError`, which is a
 `ValueError`. `UnsupportedLanguageError` means the backend has no reading for
 the language. `StageError` means a stage failed. `UnreadTextError` means text

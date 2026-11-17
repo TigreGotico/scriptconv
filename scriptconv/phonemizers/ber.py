@@ -19,9 +19,11 @@ doubled symbol rather than length, and does not back ``/a/`` beside a backing
 consonant. A caller driving Matoub-82M needs the Matoub string: the other one
 carries symbols that model has no embedding row for.
 """
+import dataclasses
+import unicodedata
 from typing import List
 
-from scriptconv.phonemizers.base import BasePhonemizer
+from scriptconv.phonemizers.base import BasePhonemizer, PhonemizerIdentity, _rules_revision
 from scriptconv.phonemizers.enums import Alphabet
 
 
@@ -54,6 +56,18 @@ class MatoubKabylePhonemizer(BasePhonemizer):
             ValueError: if the language code is not Kabyle.
         """
         return cls.match_lang(target_lang, cls._LANGS)
+
+    def identity(self, lang: str) -> PhonemizerIdentity:
+        """The base identity, with ``revision`` the hash of the vendored rule
+        tables and of the Unicode version that case folding reads."""
+        from scriptconv.phonemizers._vendored import matoub_kab as rules
+        tables = {"vowels": rules.VOWELS, "backing_triggers": rules.BACKING_TRIGGERS,
+                  "spirants": rules.SPIRANTS, "plain": rules.PLAIN,
+                  "nasal_assimilation": rules.NASAL_ASSIMILATION, "fold": rules.FOLD,
+                  "legacy_tense_t": rules.LEGACY_TENSE_T, "length": rules.LENGTH,
+                  "boundary": rules.BOUNDARY, "split": rules._SPLIT.pattern,
+                  "strip": frozenset(rules._STRIP), "unicode": unicodedata.unidata_version}
+        return dataclasses.replace(super().identity(lang), revision=_rules_revision(tables))
 
     def phonemize_string(self, text: str, lang: str = "kab") -> str:
         self.get_lang(lang)

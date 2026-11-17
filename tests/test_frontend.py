@@ -4,12 +4,15 @@ Each expected value is worked out by hand from the rule it tests. The fake
 backends return the characters of the text they receive, so the text that
 reached a backend is the expected phonemes.
 """
+import hashlib
 import itertools
+import json
 import logging
 import re
 import sys
 import time
 import tomllib
+import unicodedata
 from importlib.metadata import metadata
 from pathlib import Path
 
@@ -939,8 +942,11 @@ class TestBackends:
 
     def test_identity_names_the_backend_and_the_language(self):
         frontend = TextFrontend(FrontendConfig("pt-PT", Phonemizer.UNICODE))
+        rules = json.dumps({"form": "NFD", "unicode": unicodedata.unidata_version},
+                           sort_keys=True, separators=(",", ":"))
+        revision = "sha256:" + hashlib.sha256(rules.encode()).hexdigest()
         assert frontend.identity() == PhonemizerIdentity(
-            "unicode", "scriptconv", VERSION_STR, "pt-PT", None, frontend_module.FRONTEND_VERSION)
+            "unicode", "scriptconv", VERSION_STR, "pt-PT", revision, frontend_module.FRONTEND_VERSION)
         reference = TextFrontend(FrontendConfig("pt-PT", Phonemizer.UNICODE, stages=Stages(lang="es")))
         assert reference.identity().lang == "es"
 

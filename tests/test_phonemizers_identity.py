@@ -2,10 +2,15 @@
 import dataclasses
 import hashlib
 import logging
+import os
 import re
+import subprocess
+import sys
 import tomllib
+import unicodedata
 from importlib import metadata
 from pathlib import Path
+from types import MappingProxyType
 
 import orthography2ipa
 import pytest
@@ -26,6 +31,8 @@ from scriptconv.phonemizers import (
     get_phonemizer,
     get_phonemizer_class,
 )
+from scriptconv.phonemizers._vendored import matoub_kab
+from scriptconv.phonemizers.ber import MatoubKabylePhonemizer
 from scriptconv.phonemizers.eu import EuskaphonePhonemizer
 from scriptconv.phonemizers.mul import EpitranPhonemizer
 from scriptconv.phonemizers.o2ipa import Orthography2IPAPhonemizer
@@ -214,6 +221,102 @@ class TestOrthography2IPARevision:
         upgraded = dataclasses.replace(current, version="99.0.0")
         assert current.differs_from(upgraded) == ()
 
+
+# Each backend whose revision hashes the tables that scriptconv ships, as
+# source text for a fresh process, with a language it reads.
+TABLE_BACKENDS = [
+    ("GraphemePhonemizer()", "en"),
+    ("GraphemePhonemizer(stress_notation='plus')", "ru"),
+    ("GraphemePhonemizer(stress_notation='none')", "uk"),
+    ("UnicodeCodepointPhonemizer()", "xx"),
+    ("UnicodeCodepointPhonemizer('NFKC')", "xx"),
+    ("MatoubKabylePhonemizer()", "kab"),
+]
+REVISIONS = f"""
+from scriptconv.phonemizers import GraphemePhonemizer, UnicodeCodepointPhonemizer
+from scriptconv.phonemizers.ber import MatoubKabylePhonemizer
+for source, lang in {TABLE_BACKENDS!r}:
+    print(eval(source).identity(lang).revision)
+"""
+
+
+def grapheme_mutant(**rules):
+    """A grapheme backend with *rules* in place of its own, in a subclass."""
+    return type("Mutant", (GraphemePhonemizer,), rules)()
+
+
+class TestTableRevision:
+    def test_the_revision_is_the_same_in_every_process(self):
+        runs = [subprocess.run([sys.executable, "-c", REVISIONS], cwd=ROOT, check=True,
+                               capture_output=True, text=True,
+                               env={**os.environ, "PYTHONHASHSEED": seed}).stdout.split()
+                for seed in ("0", "1", "4242")]
+        assert len(runs[0]) == len(TABLE_BACKENDS)
+        assert all(revision.startswith("sha256:") for revision in runs[0])
+        assert runs[0] == runs[1] == runs[2]
+        assert len(set(runs[0])) == len(TABLE_BACKENDS)
+
+    @pytest.mark.parametrize("source, lang", TABLE_BACKENDS)
+    def test_an_equal_revision_hides_a_scriptconv_upgrade(self, source, lang):
+        current = eval(source).identity(lang)
+        upgraded = dataclasses.replace(eval(source).identity(lang), version="0.0.4a999")
+        assert current.revision is not None
+        assert current.differs_from(upgraded) == ()
+
+    @pytest.mark.parametrize("rules, text, before, after", [
+        ({"replace_chars": MappingProxyType({";": ".", "-": " ", ":": ","})},
+         "a;b", "a,b", "a.b"),
+        ({"drop_chars": "<>()[]"}, 'say "hi"',
+         "say hi", 'say "hi"'),
+        ({"in_word_chars": ""}, "motse-moholo", "motse-moholo", "motse moholo"),
+        ({"lowercase": False}, "Ab", "ab", "Ab"),
+        ({"whitespace_re": re.compile(" +")}, "a\tb", "a b", "a\tb"),
+    ])
+    def test_a_grapheme_rule_change_changes_the_output_and_the_revision(self, rules, text,
+                                                                        before, after):
+        original, mutant = GraphemePhonemizer(), grapheme_mutant(**rules)
+        assert (original.phonemize_string(text, "en"), mutant.phonemize_string(text, "en")) == \
+            (before, after)
+        assert original.identity("en").revision is not None
+        assert mutant.identity("en").revision != original.identity("en").revision
+
+    def test_the_order_of_the_dropped_characters_does_not_change_the_revision(self):
+        reordered = grapheme_mutant(drop_chars='"][)(><')
+        assert GraphemePhonemizer().identity("en").revision is not None
+        assert reordered.identity("en").revision == GraphemePhonemizer().identity("en").revision
+
+    def test_the_stress_notation_changes_the_revision(self):
+        revisions = {GraphemePhonemizer(stress_notation=notation).identity("ru").revision
+                     for notation in GraphemePhonemizer.STRESS_NOTATIONS}
+        assert None not in revisions and len(revisions) == 3
+
+    def test_the_normalisation_form_changes_the_revision(self):
+        revisions = {UnicodeCodepointPhonemizer(form).identity("xx").revision
+                     for form in ("NFC", "NFD", "NFKC", "NFKD")}
+        assert None not in revisions and len(revisions) == 4
+
+    @pytest.mark.parametrize("source, lang", TABLE_BACKENDS)
+    def test_another_unicode_version_changes_the_revision(self, source, lang, monkeypatch):
+        current = eval(source).identity(lang).revision
+        monkeypatch.setattr(unicodedata, "unidata_version", "1.1.0")
+        assert current is not None
+        assert eval(source).identity(lang).revision != current
+
+    @pytest.mark.parametrize("table, key, value", [
+        ("PLAIN", "a", "a"), ("SPIRANTS", "t", ("t", "t")), ("FOLD", "t\u0361\u0283", "t\u0283"),
+    ])
+    def test_a_kabyle_table_change_changes_the_output_and_the_revision(self, table, key, value,
+                                                                       monkeypatch):
+        phonemizer = MatoubKabylePhonemizer()
+        current = (phonemizer.phonemize_string("taddart čay", "kab"),
+                   phonemizer.identity("kab").revision)
+        original = getattr(matoub_kab, table)
+        monkeypatch.setattr(matoub_kab, table, {**original, key: value})
+        mutant = (phonemizer.phonemize_string("taddart čay", "kab"),
+                  phonemizer.identity("kab").revision)
+        assert original[key] != value
+        assert current[1] is not None
+        assert mutant[0] != current[0] and mutant[1] != current[1]
 
 
 class TestDeclarations:
