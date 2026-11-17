@@ -1,9 +1,11 @@
 """Frontend errors, ``PhonemizerIdentity`` and the ``owned_stages`` table."""
 import dataclasses
 import hashlib
+import json
 import logging
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tomllib
@@ -31,7 +33,6 @@ from scriptconv.phonemizers import (
     get_phonemizer,
     get_phonemizer_class,
 )
-from scriptconv.phonemizers._vendored import matoub_kab
 from scriptconv.phonemizers.ber import MatoubKabylePhonemizer
 from scriptconv.phonemizers.eu import EuskaphonePhonemizer
 from scriptconv.phonemizers.mul import EpitranPhonemizer
@@ -222,68 +223,161 @@ class TestOrthography2IPARevision:
         assert current.differs_from(upgraded) == ()
 
 
-# Each backend whose revision hashes the tables that scriptconv ships, as
-# source text for a fresh process, with a language it reads.
-TABLE_BACKENDS = [
-    ("GraphemePhonemizer()", "en"),
-    ("GraphemePhonemizer(stress_notation='plus')", "ru"),
-    ("GraphemePhonemizer(stress_notation='none')", "uk"),
-    ("UnicodeCodepointPhonemizer()", "xx"),
-    ("UnicodeCodepointPhonemizer('NFKC')", "xx"),
-    ("MatoubKabylePhonemizer()", "kab"),
-]
+# Each backend whose revision hashes the code and data on its path, as source
+# text for a fresh process, with a language it reads.
+CODE_BACKENDS = {
+    "graphemes": ("GraphemePhonemizer()", "ru"),
+    "graphemes-plus": ("GraphemePhonemizer(stress_notation='plus')", "ru"),
+    "graphemes-none": ("GraphemePhonemizer(stress_notation='none')", "uk"),
+    "unicode": ("UnicodeCodepointPhonemizer()", "xx"),
+    "unicode-nfkc": ("UnicodeCodepointPhonemizer('NFKC')", "xx"),
+    "matoub_kab": ("MatoubKabylePhonemizer()", "kab"),
+}
 REVISIONS = f"""
+import json, scriptconv
 from scriptconv.phonemizers import GraphemePhonemizer, UnicodeCodepointPhonemizer
 from scriptconv.phonemizers.ber import MatoubKabylePhonemizer
-for source, lang in {TABLE_BACKENDS!r}:
-    print(eval(source).identity(lang).revision)
+print(json.dumps({{"scriptconv": scriptconv.__file__, **{{name: eval(source).identity(lang).revision
+                  for name, (source, lang) in {CODE_BACKENDS!r}.items()}}}}))
 """
+SCRIPTCONV = Path(sys.modules["scriptconv"].__file__).parent
+
+# Edits of the scriptconv source, (file, old text, new text), each of which
+# changes the output of the named backend for some input.
+CODE_MUTANTS = {
+    "G1 the letter test before a hyphen skips no combining mark": (
+        "graphemes", "phonemizers/base.py",
+        '    while letter > 0 and unicodedata.category(text[letter]).startswith("M"):',
+        "    while False:"),
+    "G2 the whitespace pattern takes re.ASCII": (
+        "graphemes", "phonemizers/base.py",
+        'whitespace_re = re.compile(r"\\s+")', 'whitespace_re = re.compile(r"\\s+", re.ASCII)'),
+    "G3 the plus notation writes the sign after the vowel": (
+        "graphemes-plus", "diacritics.py",
+        "out.insert(base, before)\n            base += 1\n            out.append(after)",
+        "out.insert(base, after)\n            base += 1\n            out.append(before)"),
+    "P1 no mark separates two words": (
+        "graphemes", "phonemizers/base.py",
+        "_SEPARATING_MARKS = frozenset(mark", "_SEPARATING_MARKS = frozenset() and frozenset(mark"),
+    "P2 a colon between digits is punctuation": (
+        "unicode", "phonemizers/base.py",
+        "and chars[i - 1].isdigit() and chars[i + 1].isdigit():", "and False:"),
+    "P3 a semicolon is kept as a comma": (
+        "unicode", "phonemizers/base.py", '":": ":", ";": ";",', '":": ":", ";": ",",'),
+    "P4 a semicolon is kept as a comma, Kabyle": (
+        "matoub_kab", "phonemizers/base.py", '":": ":", ";": ";",', '":": ":", ";": ",",'),
+    "P5 no mark separates two words, Kabyle": (
+        "matoub_kab", "phonemizers/base.py",
+        "_SEPARATING_MARKS = frozenset(mark", "_SEPARATING_MARKS = frozenset() and frozenset(mark"),
+    "K1 a doubled vowel is long": (
+        "matoub_kab", "phonemizers/_vendored/matoub_kab/__init__.py",
+        "word[index + 1] == char and char not in VOWELS", "word[index + 1] == char"),
+    "K2 Kabyle carries stress marks": (
+        "matoub_kab", "diacritics.py",
+        '**dict.fromkeys(("lv", "sl", "az-Latn", "uz-Latn"), "Latn"),',
+        '**dict.fromkeys(("lv", "sl", "az-Latn", "uz-Latn", "kab"), "Latn"),'),
+}
+# Edits that change no output: a docstring and a comment, the version, and
+# the code of another backend.
+NEUTRAL_EDITS = {
+    "a docstring and a comment": (
+        "phonemizers/base.py",
+        '    """Whether the character at *index* of *text* stands between two letters.\n',
+        '    """Whether the character at *index* of *text* stands between two letters, or not.\n'
+        "    # a comment\n"),
+    "version.py": ("version.py", "VERSION_ALPHA = ", "VERSION_ALPHA = 999 + "),
+    "the code of another backend": (
+        "phonemizers/zh.py", "\nclass JiebaPhonemizer(", "\nANSWER = 42\n\n\nclass JiebaPhonemizer("),
+}
 
 
-def grapheme_mutant(**rules):
-    """A grapheme backend with *rules* in place of its own, in a subclass."""
-    return type("Mutant", (GraphemePhonemizer,), rules)()
+def revisions_in_a_copy(directory, edit=None):
+    """The revision of each of :data:`CODE_BACKENDS`, in a fresh process, from a
+    copy of the scriptconv package with *edit* ``(file, old, new)`` applied."""
+    tree = directory / "tree"
+    shutil.copytree(SCRIPTCONV, tree / "scriptconv", ignore=shutil.ignore_patterns("__pycache__"))
+    if edit is not None:
+        target, old, new = edit
+        path = tree / "scriptconv" / target
+        source = path.read_text(encoding="utf-8")
+        assert source.count(old) == 1, f"{old!r} is not in {target} once"
+        path.write_text(source.replace(old, new), encoding="utf-8")
+    done = subprocess.run([sys.executable, "-c", REVISIONS], cwd=tree, check=True,
+                          capture_output=True, text=True,
+                          env={**os.environ, "PYTHONPATH": str(tree), "PYTHONDONTWRITEBYTECODE": "1"})
+    revisions = json.loads(done.stdout.splitlines()[-1])
+    assert Path(revisions.pop("scriptconv")).is_relative_to(tree)
+    return revisions
 
 
-class TestTableRevision:
+@pytest.fixture(scope="module")
+def pristine(tmp_path_factory):
+    return revisions_in_a_copy(tmp_path_factory.mktemp("pristine"))
+
+
+class LongVowel(GraphemePhonemizer):
+    """Graphemes, with ":" after each "a"."""
+
+    def phonemize_string(self, text, lang):
+        return super().phonemize_string(text, lang).replace("a", "a:")
+
+
+class TestCodeRevision:
     def test_the_revision_is_the_same_in_every_process(self):
         runs = [subprocess.run([sys.executable, "-c", REVISIONS], cwd=ROOT, check=True,
                                capture_output=True, text=True,
-                               env={**os.environ, "PYTHONHASHSEED": seed}).stdout.split()
+                               env={**os.environ, "PYTHONHASHSEED": seed}).stdout.splitlines()[-1]
                 for seed in ("0", "1", "4242")]
-        assert len(runs[0]) == len(TABLE_BACKENDS)
-        assert all(revision.startswith("sha256:") for revision in runs[0])
+        revisions = json.loads(runs[0])
+        revisions.pop("scriptconv")
+        assert all(revision.startswith("sc1:") for revision in revisions.values())
         assert runs[0] == runs[1] == runs[2]
-        assert len(set(runs[0])) == len(TABLE_BACKENDS)
+        assert len(set(revisions.values())) == len(CODE_BACKENDS)
 
-    @pytest.mark.parametrize("source, lang", TABLE_BACKENDS)
+    @pytest.mark.parametrize("source, lang", CODE_BACKENDS.values(), ids=CODE_BACKENDS)
     def test_an_equal_revision_hides_a_scriptconv_upgrade(self, source, lang):
         current = eval(source).identity(lang)
         upgraded = dataclasses.replace(eval(source).identity(lang), version="0.0.4a999")
         assert current.revision is not None
         assert current.differs_from(upgraded) == ()
 
-    @pytest.mark.parametrize("rules, text, before, after", [
-        ({"replace_chars": MappingProxyType({";": ".", "-": " ", ":": ","})},
-         "a;b", "a,b", "a.b"),
-        ({"drop_chars": "<>()[]"}, 'say "hi"',
-         "say hi", 'say "hi"'),
-        ({"in_word_chars": ""}, "motse-moholo", "motse-moholo", "motse moholo"),
-        ({"lowercase": False}, "Ab", "ab", "Ab"),
-        ({"whitespace_re": re.compile(" +")}, "a\tb", "a b", "a\tb"),
+    @pytest.mark.parametrize("mutant", CODE_MUTANTS)
+    def test_a_code_change_on_the_path_changes_the_revision(self, mutant, pristine, tmp_path):
+        backend, *edit = CODE_MUTANTS[mutant]
+        assert pristine[backend] is not None
+        assert revisions_in_a_copy(tmp_path, edit)[backend] != pristine[backend]
+
+    @pytest.mark.parametrize("edit", NEUTRAL_EDITS)
+    def test_an_edit_that_changes_no_output_keeps_every_revision(self, edit, pristine, tmp_path):
+        assert None not in pristine.values()
+        assert revisions_in_a_copy(tmp_path, NEUTRAL_EDITS[edit]) == pristine
+
+    def test_a_subclass_with_its_own_method_has_its_own_revision(self):
+        assert LongVowel().phonemize_string("casa", "en") != GraphemePhonemizer().phonemize_string("casa", "en")
+        assert GraphemePhonemizer().identity("en").revision is not None
+        assert LongVowel().identity("en").revision != GraphemePhonemizer().identity("en").revision
+
+    @pytest.mark.parametrize("name, value, text, before, after", [
+        ("replace_chars", MappingProxyType({";": ".", "-": " ", ":": ","}), "a;b", "a,b", "a.b"),
+        ("drop_chars", "<>()[]", 'say "hi"', "say hi", 'say "hi"'),
+        ("in_word_chars", "", "motse-moholo", "motse-moholo", "motse moholo"),
+        ("lowercase", False, "Ab", "ab", "Ab"),
     ])
-    def test_a_grapheme_rule_change_changes_the_output_and_the_revision(self, rules, text,
-                                                                        before, after):
-        original, mutant = GraphemePhonemizer(), grapheme_mutant(**rules)
-        assert (original.phonemize_string(text, "en"), mutant.phonemize_string(text, "en")) == \
+    def test_a_character_rule_set_on_the_instance_changes_the_revision(self, name, value, text,
+                                                                       before, after):
+        original, changed = GraphemePhonemizer(), GraphemePhonemizer()
+        setattr(changed, name, value)
+        assert (original.phonemize_string(text, "en"), changed.phonemize_string(text, "en")) == \
             (before, after)
         assert original.identity("en").revision is not None
-        assert mutant.identity("en").revision != original.identity("en").revision
+        assert changed.identity("en").revision != original.identity("en").revision
 
-    def test_the_order_of_the_dropped_characters_does_not_change_the_revision(self):
-        reordered = grapheme_mutant(drop_chars='"][)(><')
+    def test_a_rule_set_on_the_instance_to_its_default_keeps_the_revision(self):
+        changed = GraphemePhonemizer()
+        changed.drop_chars = '<>()[]"'
+        changed.replace_chars = {";": ",", "-": " ", ":": ","}
         assert GraphemePhonemizer().identity("en").revision is not None
-        assert reordered.identity("en").revision == GraphemePhonemizer().identity("en").revision
+        assert changed.identity("en").revision == GraphemePhonemizer().identity("en").revision
 
     def test_the_stress_notation_changes_the_revision(self):
         revisions = {GraphemePhonemizer(stress_notation=notation).identity("ru").revision
@@ -295,28 +389,12 @@ class TestTableRevision:
                      for form in ("NFC", "NFD", "NFKC", "NFKD")}
         assert None not in revisions and len(revisions) == 4
 
-    @pytest.mark.parametrize("source, lang", TABLE_BACKENDS)
+    @pytest.mark.parametrize("source, lang", CODE_BACKENDS.values(), ids=CODE_BACKENDS)
     def test_another_unicode_version_changes_the_revision(self, source, lang, monkeypatch):
         current = eval(source).identity(lang).revision
         monkeypatch.setattr(unicodedata, "unidata_version", "1.1.0")
         assert current is not None
         assert eval(source).identity(lang).revision != current
-
-    @pytest.mark.parametrize("table, key, value", [
-        ("PLAIN", "a", "a"), ("SPIRANTS", "t", ("t", "t")), ("FOLD", "t\u0361\u0283", "t\u0283"),
-    ])
-    def test_a_kabyle_table_change_changes_the_output_and_the_revision(self, table, key, value,
-                                                                       monkeypatch):
-        phonemizer = MatoubKabylePhonemizer()
-        current = (phonemizer.phonemize_string("taddart čay", "kab"),
-                   phonemizer.identity("kab").revision)
-        original = getattr(matoub_kab, table)
-        monkeypatch.setattr(matoub_kab, table, {**original, key: value})
-        mutant = (phonemizer.phonemize_string("taddart čay", "kab"),
-                  phonemizer.identity("kab").revision)
-        assert original[key] != value
-        assert current[1] is not None
-        assert mutant[0] != current[0] and mutant[1] != current[1]
 
 
 class TestDeclarations:

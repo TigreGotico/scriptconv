@@ -51,21 +51,32 @@ spec that gives the phonemes did not change. The class attribute
 `engine_distribution` names the package that supplies the engine, and `None`
 means the code is in this repository.
 
-**Some backends hold a `revision`.** `orthography2ipa`, `mwl_phonemizer`, `barranquenho`
-and `dizione` take it from their engine. `graphemes`, `unicode` and
-`matoub_kab` read only tables that scriptconv ships. Their `revision` is
-`sha256:` and the hash of those tables, written as sorted JSON:
+**Some backends hold a `revision`.** `orthography2ipa`, `mwl_phonemizer`,
+`barranquenho` and `dizione` take it from their engine. For `graphemes`,
+`unicode` and `matoub_kab`, the `revision` is `sc1:` and a hash of the code and
+data on the path of the backend.
 
-| backend | tables in the hash |
-| --- | --- |
-| `graphemes` | the class attributes `lowercase`, `in_word_chars`, `replace_chars` and `drop_chars`, the whitespace pattern, `stress_notation`, and the Unicode version of Python. With `"plus"` or `"none"`, also the vowels that carry a stress mark in the language. |
-| `unicode` | the normalisation form and the Unicode version of Python |
-| `matoub_kab` | the vendored rule tables and the Unicode version of Python |
+A probe in a fresh process builds the backend. It reads a text with every
+clause mark through `phonemize` and `phonemize_to_list`, with
+`keep_punctuation` off and on. The hash then covers these inputs:
 
-A change to one of these tables changes the `revision`. A new scriptconv
-release that keeps the tables keeps the `revision`, so `differs_from` reports
-nothing. A backend that calls an engine outside scriptconv has no `revision`,
-so a change of its `version` always shows.
+- each scriptconv module that the probe loads, and each scriptconv data file
+  that it opens
+- each other distribution that the probe loads, such as quebra-frases, whole
+- the source file of each class of the backend outside scriptconv, so a
+  subclass counts
+- the arguments of the backend, a character rule set on the instance, the
+  language and the Unicode version of Python
+
+The code of a module counts as its tokens. Comments, blank lines, docstrings
+and `version.py` do not count. A release that changes code or data on the path
+of the backend changes the `revision`. A release that changes only other
+backends, docs or `version.py` keeps it, and `differs_from` then reports
+nothing.
+
+The first `identity` call for a backend and a language runs the probe. Later
+calls use the stored value. A backend that calls an engine outside scriptconv
+has no `revision`, so a change of its `version` always shows.
 
 **Failures have types.** Each error below is a `FrontendError`, which is a
 `ValueError`. `UnsupportedLanguageError` means the backend has no reading for
