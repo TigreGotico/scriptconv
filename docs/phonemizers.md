@@ -756,7 +756,8 @@ voice's pronunciation dictionary passed as `phonemizer_model`), Basque
 Arabic/English code-switching (shami, whose `phonemize_with_language_ids` also returns the
 parallel per-phoneme language-ID stream), and orthography2ipa for its
 data-driven language specs. Trivial built-ins that need no extra:
-`GraphemePhonemizer` (normalized characters) and `UnicodeCodepointPhonemizer`
+`GraphemePhonemizer` (normalized characters, where a hyphen between two
+letters stays as part of the word) and `UnicodeCodepointPhonemizer`
 (codepoints as phonemes).
 
 The OpenJTalk backend runs on pyopenjtalk-plus with onnxruntime, which the
