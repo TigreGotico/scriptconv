@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a112](https://github.com/TigreGotico/scriptconv/tree/0.0.4a112) (2026-11-17)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a111...0.0.4a112)
+
+**Merged pull requests:**
+
+- fix\(graphemes\): keep an in-word hyphen [\#292](https://github.com/TigreGotico/scriptconv/pull/292) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a111](https://github.com/TigreGotico/scriptconv/tree/0.0.4a111) (2026-11-17)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a110...0.0.4a111)
