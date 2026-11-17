@@ -309,10 +309,10 @@ class _CopyingLookup:
     """Gives each gruut word its own copy of the lexicon pronunciation.
 
     gruut caches each lexicon pronunciation as one list and gives that list to
-    every word that reads it. The French liaison, the Catalan fusion, elision
-    and diphthong rules, and the Farsi genitive rule change the list of the
-    word in place. Without a copy, one "nous allons" adds the liaison z to
-    every later "nous" in the process.
+    every word that reads it. The French liaison, which Italian also runs, the
+    Catalan fusion, elision and diphthong rules, and the Farsi genitive rule
+    change the list of the word in place. Without a copy, one "nous allons"
+    adds the liaison z to every later "nous" in the process.
     """
 
     def __init__(self, lookup):
@@ -375,10 +375,13 @@ class GruutPhonemizer(BasePhonemizer):
             processors = _GRUUT.processors = {}
         processor = processors.get(lang)
         if processor is None:
-            processor = processors[lang] = TextProcessor(default_lang=lang)
+            # cache the processor only once its lookup copies: a processor
+            # stored before a failed get_settings would leak on the next call
+            processor = TextProcessor(default_lang=lang)
             settings = processor.get_settings(lang)
             if settings.lookup_phonemes is not None:
                 settings.lookup_phonemes = _CopyingLookup(settings.lookup_phonemes)
+            processors[lang] = processor
         graph, root = processor(text, lang=lang)
         for sentence in processor.sentences(graph, root):
             sent_phonemes = [w.phonemes for w in sentence if w.phonemes]
