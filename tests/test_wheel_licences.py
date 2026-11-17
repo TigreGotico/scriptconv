@@ -38,6 +38,7 @@ FIRST_PARTY = {
 }
 CANGJIE5 = "scriptconv/data/LICENSE.cangjie5"
 HANGUL_TO_IPA = "scriptconv/phonemizers/_thirdparty/LICENSE.hangul_to_ipa"
+F5TTS = "scriptconv/phonemizers/_thirdparty/LICENSE.f5tts"
 MATOUB = "scriptconv/phonemizers/_vendored/matoub_kab/LICENSE.md"
 DIZIONE = "scriptconv/phonemizers/_thirdparty/dizione/LICENSE"
 CMUDICT = "scriptconv/phonemizers/_thirdparty/dizione/built/LICENSE.cmudict"
@@ -54,6 +55,7 @@ THIRD_PARTY = {
     "scriptconv/phonemizers/_thirdparty/dizione/built/sources.json": (("Apache-2.0", DIZIONE),),
     "scriptconv/phonemizers/_thirdparty/dizione/built/": (("LicenseRef-CMUdict", CMUDICT),),
     "scriptconv/phonemizers/_thirdparty/dizione/": (("Apache-2.0", DIZIONE),),
+    "scriptconv/phonemizers/_thirdparty/f5tts.py": (("MIT", F5TTS),),
     "scriptconv/phonemizers/_thirdparty/g2pw/": (("Apache-2.0", G2PW),),
     "scriptconv/phonemizers/_thirdparty/hangul2ipa.py": (("MIT", HANGUL_TO_IPA),),
     "scriptconv/phonemizers/_thirdparty/ko_tables/": (("MIT", HANGUL_TO_IPA),),
