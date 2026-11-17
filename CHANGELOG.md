@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a111](https://github.com/TigreGotico/scriptconv/tree/0.0.4a111) (2026-11-17)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a110...0.0.4a111)
+
+**Merged pull requests:**
+
+- fix: normalize extra pulls text2spoken nl [\#294](https://github.com/TigreGotico/scriptconv/pull/294) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a110](https://github.com/TigreGotico/scriptconv/tree/0.0.4a110) (2026-11-17)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a109...0.0.4a110)
