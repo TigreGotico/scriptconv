@@ -367,14 +367,18 @@ class GruutPhonemizer(BasePhonemizer):
                 "(or 'pip install scriptconv[gruut]')."
             ) from e
         # one processor per thread, as gruut.sentences keeps it: the lexicon
-        # is a sqlite connection, which only its own thread can use
-        processor = getattr(_GRUUT, "processor", None)
+        # is a sqlite connection, which only its own thread can use.
+        # One processor per language too: gruut reads every sentence after
+        # the first, and the part-of-speech tags, with default_lang.
+        processors = getattr(_GRUUT, "processors", None)
+        if processors is None:
+            processors = _GRUUT.processors = {}
+        processor = processors.get(lang)
         if processor is None:
-            processor = _GRUUT.processor = TextProcessor(default_lang=lang)
-        settings = processor.get_settings(lang)
-        if settings.lookup_phonemes is not None and \
-                not isinstance(settings.lookup_phonemes, _CopyingLookup):
-            settings.lookup_phonemes = _CopyingLookup(settings.lookup_phonemes)
+            processor = processors[lang] = TextProcessor(default_lang=lang)
+            settings = processor.get_settings(lang)
+            if settings.lookup_phonemes is not None:
+                settings.lookup_phonemes = _CopyingLookup(settings.lookup_phonemes)
         graph, root = processor(text, lang=lang)
         for sentence in processor.sentences(graph, root):
             sent_phonemes = [w.phonemes for w in sentence if w.phonemes]
