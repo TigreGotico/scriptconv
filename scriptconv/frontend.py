@@ -609,6 +609,31 @@ class TextFrontend:
                                 + part[start + len(core):])
         return "".join(parts)
 
+    def say_as(self, text: str, interpret_as: str, format: Optional[str] = None,
+               detail: Optional[str] = None, lang: Optional[str] = None) -> str:
+        """*text* in the form that an SSML ``say-as`` element names, as the normaliser hook reads it.
+
+        The attributes go to the hook as ``say_as=text2spoken.SayAs(...)``, so the say-as reads with the params
+        that the hook binds, as the rest of the text does. The hook runs even when the backend owns the
+        ``normalize`` stage. A failed call follows the failure policy of the stages: the text as written, or
+        :class:`StageError` in strict mode. With no hook, or without the ``normalize`` extra, the text comes back
+        as written with one warning, in every mode, because the SSML must still speak.
+        """
+        stages = self._resolve(None)
+        if lang:
+            stages = dataclasses.replace(stages, lang=lang)
+        try:
+            from text2spoken import SayAs
+        except ImportError:
+            SayAs = None
+        if self.config.normalizer is None or SayAs is None:
+            LOG.warning("say-as %r for lang=%r needs the normaliser hook of the `normalize` extra "
+                        "(`pip install scriptconv[normalize]`). The text reads as written.",
+                        interpret_as, stages.lang)
+            return text
+        return self._stage("normalize", stages, self.config.normalizer, text, stages.lang,
+                           say_as=SayAs(interpret_as=interpret_as, format=format, detail=detail))
+
     def identity(self) -> PhonemizerIdentity:
         """What phonemizes this frontend's language, with :data:`FRONTEND_VERSION`."""
         return dataclasses.replace(self.backend.identity(self._resolve(None).lang),
