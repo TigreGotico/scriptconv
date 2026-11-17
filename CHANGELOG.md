@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a110](https://github.com/TigreGotico/scriptconv/tree/0.0.4a110) (2026-11-17)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a109...0.0.4a110)
+
+**Merged pull requests:**
+
+- feat: F5-TTS text phonemizers f5tts\_char and f5tts\_pinyin [\#284](https://github.com/TigreGotico/scriptconv/pull/284) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a109](https://github.com/TigreGotico/scriptconv/tree/0.0.4a109) (2026-11-17)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a108...0.0.4a109)
