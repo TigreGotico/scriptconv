@@ -245,7 +245,8 @@ class TestInlineBlocks:
         (True, "Olá [[a:]] sim.", ["olá a: ", "sim."], "olá a: sim."),
         # an ellipsis gives no symbol
         (True, "Espera [[a]]... vamos.", ["espera a", "vamos."], "espera a vamos."),
-        (False, "Um [[x]]. Dois; três.", ["um x", "dois", "três"], "um x dois três"),
+        # with punctuation off, a clause break inside a sentence is a space
+        (False, "Um [[x]]. Dois; três.", ["um x", "dois três"], "um x dois três"),
         (False, "Olá, [[ana]], tudo bem?", ["olá ana", "tudo bem"], "olá ana tudo bem"),
         # an empty block reads as no text, so the full stop ends the clause of "ab"
         (True, "ab [[]]. cd", ["ab.", "cd"], "ab.cd"),

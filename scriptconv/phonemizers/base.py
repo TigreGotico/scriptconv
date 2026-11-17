@@ -486,16 +486,25 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         return None
 
     def _bare_sentences(self, text: str, lang: str) -> Iterator[List[str]]:
-        """Per-chunk phonemes, with the punctuation removed before the backend."""
+        """Per-sentence phonemes, with the punctuation removed before the backend.
+
+        The backend reads each chunk of :meth:`chunk_text` alone. A ``:``,
+        ``;``, ``...`` or ``|`` inside a sentence is a clause break, so it is a
+        space, as a ``,`` is. In ``el`` a ``;`` is the question mark, so it
+        ends the sentence.
+        """
+        question_semicolon = _primary_subtag(lang) == "el"
+        sentence: List[List[str]] = []
         for chunk, punct, eos in self.chunk_text(text):
             phoneme_str = _clause_breaks_as_spaces(
                 self.phonemize_string(self.remove_punctuation(chunk), lang))
             # Filter out (lang) switch (flags) that surround words from languages
             # other than the current voice — mirrors _process_phones().
             phoneme_str = re.sub(r"\([^)]+\)", "", phoneme_str)
-            # phonemize() marks every chunk as end-of-sentence, so each chunk is
-            # its own sentence.
-            yield list(phoneme_str)
+            sentence.append(list(phoneme_str))
+            if eos or (question_semicolon and punct == ";"):
+                yield join_sentences(sentence, keep_punctuation=False)
+                sentence = []
 
     def _keeps_punctuation(self) -> bool:
         cls = type(self)

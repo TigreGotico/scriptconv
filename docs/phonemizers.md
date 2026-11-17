@@ -59,6 +59,9 @@ stayed unread, and its `unread` attribute lists that text.
 
 **Punctuation is opt-in.** By default no punctuation reaches the phonemes,
 which is what every voice trained on scriptconv's output so far has learned.
+Each sentence is then one list of `phonemize(text)`: a `:`, `;`, `...` or `|`
+inside a sentence is a space, as a `,` is. In `el` a `;` is the question mark,
+so it ends the sentence.
 Set `keep_punctuation = True` on the instance (or pass `keep_punctuation=True`
 to `get_phonemizer`) to keep it the way Piper does: each clause is phonemized
 on its own and followed by its symbol, `.` `?` `!` alone and `,` `:` `;`
