@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a108](https://github.com/TigreGotico/scriptconv/tree/0.0.4a108) (2026-11-17)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a107...0.0.4a108)
+
+**Merged pull requests:**
+
+- fix\(gruut\): keep the lexicon unchanged across liaison calls [\#287](https://github.com/TigreGotico/scriptconv/pull/287) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a107](https://github.com/TigreGotico/scriptconv/tree/0.0.4a107) (2026-11-16)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a106...0.0.4a107)
@@ -372,10 +380,6 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a58...0.0.4a59)
 
-**Merged pull requests:**
-
-- fix\(ko\): install g2pk only below Python 3.13 [\#184](https://github.com/TigreGotico/scriptconv/pull/184) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [0.0.4a58](https://github.com/TigreGotico/scriptconv/tree/0.0.4a58) (2026-11-12)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a57...0.0.4a58)
@@ -387,10 +391,6 @@
 ## [0.0.4a56](https://github.com/TigreGotico/scriptconv/tree/0.0.4a56) (2026-11-12)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a55...0.0.4a56)
-
-**Merged pull requests:**
-
-- fix\(misaki\): install what misaki\_en, \_ja, \_ko and \_zh need [\#185](https://github.com/TigreGotico/scriptconv/pull/185) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a55](https://github.com/TigreGotico/scriptconv/tree/0.0.4a55) (2026-11-12)
 
