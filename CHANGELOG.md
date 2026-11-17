@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a115](https://github.com/TigreGotico/scriptconv/tree/0.0.4a115) (2026-11-17)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a114...0.0.4a115)
+
+**Merged pull requests:**
+
+- feat: TextFrontend.say\_as reads a run in the form that SSML names [\#317](https://github.com/TigreGotico/scriptconv/pull/317) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a114](https://github.com/TigreGotico/scriptconv/tree/0.0.4a114) (2026-11-17)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a113...0.0.4a114)
@@ -252,10 +260,6 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a81...0.0.4a82)
 
-**Merged pull requests:**
-
-- fix\(phonemizers\): stop transphone pip installs, correct the ko errors and alphabet [\#198](https://github.com/TigreGotico/scriptconv/pull/198) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [0.0.4a81](https://github.com/TigreGotico/scriptconv/tree/0.0.4a81) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a80...0.0.4a81)
@@ -387,10 +391,6 @@
 ## [0.0.4a65](https://github.com/TigreGotico/scriptconv/tree/0.0.4a65) (2026-11-12)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a64...0.0.4a65)
-
-**Merged pull requests:**
-
-- fix\(phonemizers\): run Mirandese and Barranquenho on the orthography2ipa specs [\#199](https://github.com/TigreGotico/scriptconv/pull/199) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a64](https://github.com/TigreGotico/scriptconv/tree/0.0.4a64) (2026-11-12)
 
