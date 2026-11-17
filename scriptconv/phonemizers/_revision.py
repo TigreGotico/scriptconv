@@ -15,8 +15,12 @@ open. The hash then covers:
   differ by platform and by Python build;
 - the source file of each class in the MRO of the backend that is not in
   scriptconv, so a subclass that changes a method changes the revision;
-- the arguments that build the backend, the settings that a caller changes on
-  the instance, the language and :data:`unicodedata.unidata_version`.
+- the class of the backend, the arguments that build it, the settings that
+  change the output besides the code, the language and
+  :data:`unicodedata.unidata_version`.
+
+For :meth:`~scriptconv.frontend.TextFrontend.identity`, a second probe reads
+through a frontend, so the modules of the frontend stages count too.
 
 A code token is any token but a comment, a blank line or a string that stands
 as a statement, as a docstring does. So a release that changes code or data on
@@ -25,7 +29,10 @@ docs, docstrings, ``version.py`` or the modules of other backends keeps it.
 
 A module on the path that does not load from a file in a directory, as from a
 zip archive, raises :class:`RevisionSourceUnavailable`, so it never counts as
-an empty digest. :func:`code_revision` then gives no revision.
+an empty digest. A probe that exits with an error, runs longer than
+:data:`PROBE_TIMEOUT`, or prints no readable result raises
+:class:`RevisionProbeFailed`. In both cases :func:`code_revision` gives no
+revision and logs one warning.
 """
 import functools
 import hashlib
@@ -38,22 +45,28 @@ import subprocess
 import sys
 import tokenize
 import unicodedata
+import uuid
 from importlib.metadata import packages_distributions, version
 from importlib.util import find_spec
 from pathlib import Path
-from typing import Dict, Iterator, List, Mapping, Optional, Tuple
+from typing import Dict, Iterator, List, Mapping, Optional, Tuple, Union
 
 LOG = logging.getLogger(__name__)
 
 FORMAT = "sc1"
 """The prefix of a revision. It changes when the inputs or the encoding of the hash change."""
 
-#: Texts for the probe: every clause mark, a stress mark, digits and brackets.
+#: Texts for the probe: every clause mark, a stress mark, digits, brackets,
+#: paragraphs and inline blocks.
 PROBE_TEXTS = (
     "azul, a. b? c! d: e; f... g… h| i، j؛ k؟ l",
     "ázul tanemmirt",
     "16:30 «x» (y) [z] \"w\" a-b",
+    "T\u00edtulo\n\nTexto [[\u02c8a]] fim. a [[ ]] b",
 )
+
+PROBE_TIMEOUT = 30
+"""The seconds a probe may run before it counts as failed."""
 
 _PROBE = """
 import sys
@@ -64,26 +77,38 @@ def audit(event, args):
         opened.add(args[0] if isinstance(args[0], str) else args[0].decode(errors="replace"))
 sys.addaudithook(audit)
 import importlib, json, warnings
-module, qualname, lang, arguments, texts = sys.argv[1:4] + [json.loads(a) for a in sys.argv[4:6]]
+marker, module, qualname, lang, mode = sys.argv[1:6]
+arguments, texts = (json.loads(a) for a in sys.argv[6:8])
 backend_class = importlib.import_module(module)
 for part in qualname.split("."):
     backend_class = getattr(backend_class, part)
+def calls(keep):
+    backend = backend_class(**arguments)
+    if mode == "backend":
+        backend.keep_punctuation = keep
+        return [lambda text: backend.phonemize(text, lang),
+                lambda text: backend.phonemize_to_list(text, lang)]
+    from scriptconv.frontend import Chunk, FrontendConfig, Stages, TextFrontend
+    frontend = TextFrontend(FrontendConfig(lang, keep_punctuation=keep,
+                                           stages=Stages(normalize=False, diacritize=False)), backend)
+    return [frontend.phonemize_flat] + [
+        lambda text, chunk=chunk: list(frontend.phonemize_lazy(text, Stages(chunk=chunk)))
+        for chunk in Chunk]
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     for keep in (False, True):
-        backend = backend_class(**arguments)
-        backend.keep_punctuation = keep
-        for text in texts:
-            for method in (backend.phonemize, backend.phonemize_to_list):
+        for call in calls(keep):
+            for text in texts:
                 try:
-                    method(text, lang)
+                    call(text)
                 except Exception:
                     pass
 modules = {name: getattr(loaded, "__file__", None)
            for name, loaded in list(sys.modules.items()) if name not in before}
-print(json.dumps({"modules": modules, "opened": sorted(opened)}))
+print(marker + json.dumps({"modules": modules, "opened": sorted(opened)}), flush=True)
 """
-"""Prints the modules that the backend loads and the files that it opens."""
+"""Prints, after a marker, the modules that a backend, or a frontend that reads
+through it, loads and the files that it opens."""
 
 _NOT_CODE = frozenset({tokenize.COMMENT, tokenize.NL, tokenize.ENCODING, tokenize.ENDMARKER})
 _LINE = frozenset({"NEWLINE", "INDENT", "DEDENT"})
@@ -95,6 +120,10 @@ class RevisionSourceUnavailable(OSError):
     """A module or package on the path of a backend has no source file in a directory to hash."""
 
 
+class RevisionProbeFailed(RuntimeError):
+    """The probe process failed, timed out, or gave no readable result."""
+
+
 def _source_file(where, what: str) -> Path:
     """*where* as a path, when it is a file in a directory."""
     path = Path(where) if where else None
@@ -103,18 +132,24 @@ def _source_file(where, what: str) -> Path:
     return path
 
 
-def code_revision(backend, lang: str, arguments: Mapping, settings: Mapping) -> Optional[str]:
+def code_revision(backend, lang: str, settings: Mapping, frontend: bool = False) -> Optional[str]:
     """The revision of *backend* for *lang*, or ``None`` when its code cannot be read.
 
-    *arguments* rebuild the backend in the probe, so they must be JSON values.
-    *settings* are the values a caller set on the instance; they join the hash.
+    The probe rebuilds the backend from ``backend._revision_arguments()``.
+    *settings* are values besides the code that change the output; they join
+    the hash. With *frontend*, the probe reads through a
+    :class:`~scriptconv.frontend.TextFrontend`, so the modules of the frontend
+    count too.
     """
     probed = next(cls for cls in type(backend).__mro__ if cls.__module__.startswith("scriptconv."))
+    arguments = backend._revision_arguments()
+    mode = "frontend" if frontend else "backend"
     digest = hashlib.sha256(json.dumps(
-        [FORMAT, f"{probed.__module__}:{probed.__qualname__}", lang, arguments, settings,
+        [FORMAT, mode, f"{probed.__module__}:{probed.__qualname__}",
+         f"{type(backend).__module__}:{type(backend).__qualname__}", lang, arguments, settings,
          unicodedata.unidata_version], sort_keys=True, ensure_ascii=False).encode())
     try:
-        digest.update(_probe_digest(probed.__module__, probed.__qualname__, lang,
+        digest.update(_probe_digest(probed.__module__, probed.__qualname__, lang, mode,
                                     json.dumps(arguments, sort_keys=True)).encode())
         for cls in type(backend).__mro__:
             if cls.__module__ in ("builtins", "abc") or cls.__module__.split(".")[0] == "scriptconv":
@@ -128,16 +163,51 @@ def code_revision(backend, lang: str, arguments: Mapping, settings: Mapping) -> 
     return f"{FORMAT}:{digest.hexdigest()}"
 
 
+def _probe_digest(*key: str) -> str:
+    """The digest that :func:`_probe_outcome` keeps for *key*, or the error it keeps."""
+    outcome = _probe_outcome(*key)
+    if isinstance(outcome, Exception):
+        raise outcome
+    return outcome
+
+
 @functools.lru_cache(maxsize=None)
-def _probe_digest(module: str, qualname: str, lang: str, arguments: str) -> str:
-    """The hash of the code and data that a probe of the backend loads, for one language."""
+def _probe_outcome(*key: str) -> Union[str, Exception]:
+    """The probe digest for *key*, or its error, kept so that a failed probe
+    does not run again in this process."""
+    try:
+        return _run_probe(*key)
+    except (RevisionProbeFailed, OSError) as exc:
+        return exc
+
+
+def _run_probe(module: str, qualname: str, lang: str, mode: str, arguments: str) -> str:
+    """The hash of the code and data that a probe of the backend, or of a
+    frontend that reads through it, loads for one language.
+
+    Raises:
+        RevisionProbeFailed: If the probe exits with an error, runs longer than
+            :data:`PROBE_TIMEOUT`, or prints no readable result after its marker.
+    """
     pythonpath = os.pathsep.join(entry or os.getcwd() for entry in sys.path)
-    done = subprocess.run([sys.executable, "-P", "-c", _PROBE, module, qualname, lang, arguments,
-                           json.dumps(PROBE_TEXTS)],
-                          capture_output=True, text=True, env={**os.environ, "PYTHONPATH": pythonpath})
+    marker = f"scriptconv-revision-probe-{uuid.uuid4().hex}:"
+    what = f"the revision probe of {qualname} for {lang!r}"
+    try:
+        done = subprocess.run([sys.executable, "-P", "-c", _PROBE, marker, module, qualname, lang, mode,
+                               arguments, json.dumps(PROBE_TEXTS)],
+                              capture_output=True, text=True, timeout=PROBE_TIMEOUT,
+                              env={**os.environ, "PYTHONPATH": pythonpath})
+    except subprocess.TimeoutExpired:
+        raise RevisionProbeFailed(f"{what} ran longer than {PROBE_TIMEOUT} s") from None
     if done.returncode:
-        raise RuntimeError(f"the revision probe of {qualname} for {lang!r} failed:\n{done.stderr}")
-    probe = json.loads(done.stdout.splitlines()[-1])
+        raise RevisionProbeFailed(f"{what} exited with {done.returncode}:\n{done.stderr}")
+    results = [line[len(marker):] for line in done.stdout.splitlines() if line.startswith(marker)]
+    if len(results) != 1:
+        raise RevisionProbeFailed(f"{what} printed {len(results)} results")
+    try:
+        probe = json.loads(results[0])
+    except ValueError as exc:
+        raise RevisionProbeFailed(f"{what} printed a result that is not JSON: {exc}") from None
     modules: Dict[str, Optional[str]] = probe["modules"]
     root = Path(modules["scriptconv"]).parent
     entries: List[Tuple[str, str]] = []

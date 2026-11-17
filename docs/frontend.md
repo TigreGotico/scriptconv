@@ -383,5 +383,25 @@ Build a `TextFrontend` to get the phonemes that a voice reads.
 stage order. A change to the steps raises it, so a dataset phonemized under
 older steps is detectable. A backend called directly has `frontend=None`.
 
+The `revision` of a frontend is not the `revision` of its backend. It is `sc1:`
+and a hash of these inputs:
+
+- the `revision` of the backend
+- each scriptconv module that a frontend loads when it reads a probe text
+  through the backend, such as `frontend` and `diacritics`
+- the settings that change the output: `keep_punctuation`, `strict`,
+  `whole_text_limit`, the alphabet, the resolved language, the chunk size and
+  whether the normaliser runs
+- `text2spoken.revision(lang)` when the normaliser is `spoken_normalizer()`
+
+The `revision` is `None` when scriptconv cannot vouch for a stage, so a
+`version` difference shows. These cases give `None`:
+
+- the backend has no `revision`
+- the normaliser is another callable
+- the installed text2spoken has no `revision`
+- the frontend diacritizes
+- a casing runs
+
 ---
 [← phonemizers](phonemizers.md) · [Home](../README.md) · [ovos →](ovos.md)

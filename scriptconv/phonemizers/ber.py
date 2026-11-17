@@ -61,7 +61,7 @@ class MatoubKabylePhonemizer(BasePhonemizer):
         on the path of this backend, the vendored rules among them, as
         :func:`~scriptconv.phonemizers._revision.code_revision` gives it."""
         from scriptconv.phonemizers._revision import code_revision
-        revision = code_revision(self, lang, {}, {})
+        revision = code_revision(self, lang, {})
         return dataclasses.replace(super().identity(lang), revision=revision)
 
     def phonemize_string(self, text: str, lang: str = "kab") -> str:

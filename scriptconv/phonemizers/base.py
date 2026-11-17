@@ -28,7 +28,7 @@ import string
 import unicodedata
 from importlib import metadata
 from types import MappingProxyType
-from typing import Callable, ClassVar, Iterable, Iterator, List, Mapping, Optional, Tuple, Literal, Union
+from typing import Callable, ClassVar, Dict, Iterable, Iterator, List, Mapping, Optional, Tuple, Literal, Union
 
 from scriptconv.phonemizers.enums import Alphabet
 from scriptconv.version import VERSION_STR
@@ -633,6 +633,11 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
             return sister, metadata.version(sister)
         return "scriptconv", VERSION_STR
 
+    def _revision_arguments(self) -> Dict[str, object]:
+        """The constructor arguments, as JSON values, that rebuild this backend
+        in the probe of :func:`~scriptconv.phonemizers._revision.code_revision`."""
+        return {}
+
     def identity(self, lang: str) -> PhonemizerIdentity:
         """What phonemizes *lang* here: the engine, its version and the lect.
 
@@ -804,6 +809,9 @@ class GraphemePhonemizer(BasePhonemizer):
         """The output writes the mark, in every language, unless the notation is ``"none"``."""
         return self.stress_notation != "none"
 
+    def _revision_arguments(self) -> Dict[str, object]:
+        return {"stress_notation": self.stress_notation}
+
     def phonemize_string(self, text: str, lang: str) -> str:
         """
         Normalizes input text by applying a series of transformations
@@ -839,7 +847,7 @@ class GraphemePhonemizer(BasePhonemizer):
                     if name in vars(self) and getattr(self, name) != getattr(type(self), name)}
         if "replace_chars" in settings:
             settings["replace_chars"] = dict(settings["replace_chars"])
-        revision = code_revision(self, lang, {"stress_notation": self.stress_notation}, settings)
+        revision = code_revision(self, lang, settings)
         return dataclasses.replace(super().identity(lang), revision=revision)
 
 
@@ -855,6 +863,9 @@ class UnicodeCodepointPhonemizer(BasePhonemizer):
     def reads_stress_mark(self, lang: str) -> bool:
         """The output is the text's codepoints, so the mark is one of them in every language."""
         return True
+
+    def _revision_arguments(self) -> Dict[str, object]:
+        return {"form": self.form}
 
     def phonemize_string(self, text: str, lang: str) -> str:
         # Phonemes = codepoints
@@ -875,5 +886,5 @@ class UnicodeCodepointPhonemizer(BasePhonemizer):
         on the path of this backend and of its normalisation form, as
         :func:`~scriptconv.phonemizers._revision.code_revision` gives it."""
         from scriptconv.phonemizers._revision import code_revision
-        revision = code_revision(self, lang, {"form": self.form}, {})
+        revision = code_revision(self, lang, {})
         return dataclasses.replace(super().identity(lang), revision=revision)

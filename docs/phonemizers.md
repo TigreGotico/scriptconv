@@ -76,7 +76,12 @@ nothing.
 
 The first `identity` call for a backend and a language runs the probe. Later
 calls use the stored value. A backend that calls an engine outside scriptconv
-has no `revision`, so a change of its `version` always shows.
+has no `revision`, so a change of its `version` always shows. A probe that
+fails, runs longer than 30 seconds or prints no result also gives no
+`revision`, with one warning.
+
+A `TextFrontend` has its own `revision`, which covers the frontend stages too.
+See [frontend](frontend.md).
 
 **Failures have types.** Each error below is a `FrontendError`, which is a
 `ValueError`. `UnsupportedLanguageError` means the backend has no reading for

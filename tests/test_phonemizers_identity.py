@@ -9,6 +9,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 import tomllib
 import unicodedata
 import zipfile
@@ -35,6 +36,7 @@ from scriptconv.phonemizers import (
     get_phonemizer,
     get_phonemizer_class,
 )
+from scriptconv.frontend import FrontendConfig, Stages, TextFrontend, spoken_normalizer
 from scriptconv.phonemizers.ber import MatoubKabylePhonemizer
 from scriptconv.phonemizers.eu import EuskaphonePhonemizer
 from scriptconv.phonemizers.mul import EpitranPhonemizer
@@ -235,17 +237,26 @@ CODE_BACKENDS = {
     "unicode-nfkc": ("UnicodeCodepointPhonemizer('NFKC')", "xx"),
     "matoub_kab": ("MatoubKabylePhonemizer()", "kab"),
 }
+# Each frontend whose revision hashes the code on its path, with its backend.
+CODE_FRONTENDS = {
+    "frontend-graphemes": ("GraphemePhonemizer()", "pt-PT"),
+    "frontend-unicode": ("UnicodeCodepointPhonemizer()", "pt-PT"),
+}
 REVISIONS = f"""
 import json, scriptconv
+from scriptconv.frontend import FrontendConfig, TextFrontend
 from scriptconv.phonemizers import GraphemePhonemizer, UnicodeCodepointPhonemizer
 from scriptconv.phonemizers.ber import MatoubKabylePhonemizer
-print(json.dumps({{"scriptconv": scriptconv.__file__, **{{name: eval(source).identity(lang).revision
-                  for name, (source, lang) in {CODE_BACKENDS!r}.items()}}}}))
+revisions = {{name: eval(source).identity(lang).revision for name, (source, lang) in {CODE_BACKENDS!r}.items()}}
+revisions.update({{name: TextFrontend(FrontendConfig(lang), eval(source)).identity().revision
+                  for name, (source, lang) in {CODE_FRONTENDS!r}.items()}})
+print(json.dumps({{"scriptconv": scriptconv.__file__, **revisions}}))
 """
 SCRIPTCONV = Path(sys.modules["scriptconv"].__file__).parent
 
-# Edits of the scriptconv source, (file, old text, new text), each of which
-# changes the output of the named backend for some input.
+# Edits of the scriptconv source, (file, old text, new text), on the path of the
+# named backend or frontend. Each edit but F4 changes its output for some input.
+# F4 edits a module that the frontend loads and calls only when it diacritizes.
 CODE_MUTANTS = {
     "G1 the letter test before a hyphen skips no combining mark": (
         "graphemes", "phonemizers/base.py",
@@ -274,6 +285,12 @@ CODE_MUTANTS = {
     "K1 a doubled vowel is long": (
         "matoub_kab", "phonemizers/_vendored/matoub_kab/__init__.py",
         "word[index + 1] == char and char not in VOWELS", "word[index + 1] == char"),
+    "F3 a block of whitespace cuts the text": (
+        "frontend-graphemes", "frontend.py", "if block[2:-2].strip():", "if block[2:-2]:"),
+    "F4 a diacritics change on the frontend path": (
+        "frontend-unicode", "diacritics.py",
+        '**dict.fromkeys(("lv", "sl", "az-Latn", "uz-Latn"), "Latn"),',
+        '**dict.fromkeys(("lv", "sl", "az-Latn", "uz-Latn", "pt"), "Latn"),'),
     "K2 Kabyle carries stress marks": (
         "matoub_kab", "diacritics.py",
         '**dict.fromkeys(("lv", "sl", "az-Latn", "uz-Latn"), "Latn"),',
@@ -334,7 +351,7 @@ class TestCodeRevision:
         revisions.pop("scriptconv")
         assert all(revision.startswith("sc1:") for revision in revisions.values())
         assert runs[0] == runs[1] == runs[2]
-        assert len(set(revisions.values())) == len(CODE_BACKENDS)
+        assert len(set(revisions.values())) == len(CODE_BACKENDS) + len(CODE_FRONTENDS)
 
     @pytest.mark.parametrize("source, lang", CODE_BACKENDS.values(), ids=CODE_BACKENDS)
     def test_an_equal_revision_hides_a_scriptconv_upgrade(self, source, lang):
@@ -425,6 +442,115 @@ class TestCodeRevision:
         monkeypatch.setattr(unicodedata, "unidata_version", "1.1.0")
         assert current is not None
         assert eval(source).identity(lang).revision != current
+
+
+def frontend(backend=None, **config):
+    return TextFrontend(FrontendConfig("pt-PT", **config), backend or GraphemePhonemizer())
+
+
+class TestFrontendRevision:
+    def test_the_frontend_revision_covers_the_backend_and_the_frontend(self):
+        identity, backend = frontend().identity(), GraphemePhonemizer().identity("pt-PT")
+        assert backend.revision is not None and identity.revision.startswith("sc1:")
+        assert identity.revision != backend.revision
+
+    def test_keep_punctuation_changes_the_revision(self):
+        assert frontend().identity().revision is not None
+        assert frontend(keep_punctuation=True).identity().revision != frontend().identity().revision
+
+    def test_a_normaliser_that_scriptconv_cannot_vouch_for_gives_no_revision(self):
+        assert frontend().identity().revision is not None
+        assert frontend(normalizer=lambda text, lang: text.upper()).identity().revision is None
+
+    def test_the_text2spoken_hook_folds_in_the_text2spoken_revision(self, monkeypatch):
+        import text2spoken
+        monkeypatch.setattr(text2spoken, "revision", lambda lang: f"t2s1:{lang}:1", raising=False)
+        first = frontend(normalizer=spoken_normalizer()).identity().revision
+        monkeypatch.setattr(text2spoken, "revision", lambda lang: f"t2s1:{lang}:2")
+        second = frontend(normalizer=spoken_normalizer()).identity().revision
+        assert None not in (first, second) and first != second
+        assert first != frontend().identity().revision
+
+    def test_a_text2spoken_without_a_revision_gives_no_revision(self, monkeypatch):
+        import text2spoken
+        monkeypatch.delattr(text2spoken, "revision", raising=False)
+        assert frontend().identity().revision is not None
+        assert frontend(normalizer=spoken_normalizer()).identity().revision is None
+
+    def test_a_text2spoken_revision_error_gives_no_revision_and_a_warning(self, monkeypatch, caplog):
+        import text2spoken
+
+        def fails(lang):
+            raise ValueError("a module loads from a zip file")
+        monkeypatch.setattr(text2spoken, "revision", fails, raising=False)
+        with caplog.at_level(logging.WARNING, logger="scriptconv.frontend"):
+            assert frontend(normalizer=spoken_normalizer()).identity().revision is None
+        assert [r.levelno for r in caplog.records if r.name == "scriptconv.frontend"] == [logging.WARNING]
+
+    def test_a_diacritizing_frontend_gives_no_revision(self):
+        assert TextFrontend(FrontendConfig("es"), GraphemePhonemizer()).identity().revision is not None
+        assert TextFrontend(FrontendConfig("ar"), GraphemePhonemizer()).identity().revision is None
+
+    def test_a_casing_gives_no_revision(self):
+        assert frontend().identity().revision is not None
+        assert frontend(stages=Stages(casing=str.upper)).identity().revision is None
+
+    def test_a_backend_with_no_revision_gives_no_revision(self):
+        class Custom(BasePhonemizer):
+            def phonemize_string(self, text, lang):
+                return text
+        assert frontend(Custom()).identity().revision is None
+
+
+@pytest.fixture
+def fresh_probes():
+    """Probe results kept by no earlier test, and none kept after this one."""
+    from scriptconv.phonemizers import _revision
+    cache = getattr(_revision, "_probe_outcome", _revision._probe_digest)
+    cache.cache_clear()
+    yield
+    cache.cache_clear()
+
+
+def fake_python(directory, body):
+    """An executable that runs the shell *body* in place of Python."""
+    path = directory / "python"
+    path.write_text(f"#!/bin/sh\n{body}\n")
+    path.chmod(0o755)
+    return str(path)
+
+
+class TestProbeFailures:
+    def assert_no_revision_and_one_warning(self, caplog, words):
+        with caplog.at_level(logging.WARNING, logger="scriptconv.phonemizers._revision"):
+            identity = GraphemePhonemizer().identity("en")
+        assert identity.revision is None
+        warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warnings) == 1 and "RevisionProbeFailed" in warnings[0] and words in warnings[0]
+
+    def test_a_probe_that_runs_too_long_gives_no_revision(self, fresh_probes, tmp_path, monkeypatch,
+                                                          caplog):
+        from scriptconv.phonemizers import _revision
+        monkeypatch.setattr(_revision, "PROBE_TIMEOUT", 1, raising=False)
+        monkeypatch.setattr(sys, "executable", fake_python(tmp_path, "sleep 5"))
+        started = time.monotonic()
+        self.assert_no_revision_and_one_warning(caplog, "longer than 1 s")
+        assert time.monotonic() - started < 4
+
+    def test_a_probe_that_prints_nothing_gives_no_revision(self, fresh_probes, tmp_path, monkeypatch,
+                                                           caplog):
+        monkeypatch.setattr(sys, "executable", fake_python(tmp_path, "exit 0"))
+        self.assert_no_revision_and_one_warning(caplog, "printed 0 results")
+
+    def test_a_print_after_the_probe_result_keeps_the_revision(self, fresh_probes, tmp_path,
+                                                               monkeypatch):
+        from scriptconv.phonemizers import _revision
+        expected = GraphemePhonemizer().identity("en").revision
+        getattr(_revision, "_probe_outcome", _revision._probe_digest).cache_clear()
+        (tmp_path / "sitecustomize.py").write_text('import atexit\natexit.register(print, "done")\n')
+        monkeypatch.syspath_prepend(str(tmp_path))
+        assert expected is not None
+        assert GraphemePhonemizer().identity("en").revision == expected
 
 
 class TestDeclarations:

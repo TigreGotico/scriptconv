@@ -55,8 +55,10 @@ differences stay:
 import copy
 import dataclasses
 import enum
+import hashlib
 import importlib.util
 import itertools
+import json
 import logging
 import re
 import unicodedata
@@ -635,9 +637,48 @@ class TextFrontend:
                            say_as=SayAs(interpret_as=interpret_as, format=format, detail=detail))
 
     def identity(self) -> PhonemizerIdentity:
-        """What phonemizes this frontend's language, with :data:`FRONTEND_VERSION`."""
-        return dataclasses.replace(self.backend.identity(self._resolve(None).lang),
-                                   frontend=FRONTEND_VERSION)
+        """What phonemizes this frontend's language, with :data:`FRONTEND_VERSION`.
+
+        ``revision`` is ``sc1:`` and a hash of the backend's revision, of the
+        code of the scriptconv modules that the frontend loads, of the stage
+        settings and of ``text2spoken.revision`` when the normaliser is
+        :func:`spoken_normalizer`. It is ``None``, so a ``version`` difference
+        shows, when scriptconv cannot vouch for a stage: the backend has no
+        revision, the normaliser is another callable or a text2spoken with no
+        ``revision``, the frontend diacritizes, or a casing runs.
+        """
+        stages = self._resolve(None)
+        identity = dataclasses.replace(self.backend.identity(stages.lang), frontend=FRONTEND_VERSION)
+        return dataclasses.replace(identity, revision=self._revision(identity.revision, stages))
+
+    def _revision(self, backend_revision: Optional[str], stages: Stages) -> Optional[str]:
+        """The revision of :meth:`identity`, from the backend's revision and the resolved *stages*."""
+        if backend_revision is None or stages.diacritize or stages.casing is not None:
+            return None
+        normalizer = None
+        if stages.normalize and self.config.normalizer is not None:
+            try:
+                from text2spoken import normalize, revision
+            except ImportError:
+                return None
+            if self.config.normalizer is not normalize:
+                return None
+            try:
+                normalizer = revision(stages.lang)
+            except (ValueError, RuntimeError, OSError) as exc:
+                LOG.warning("text2spoken gives no revision for %r, so the frontend has none: %s",
+                            stages.lang, exc)
+                return None
+        from scriptconv.phonemizers._revision import FORMAT, code_revision
+        settings = {"keep_punctuation": self.config.keep_punctuation, "strict": self.config.strict,
+                    "whole_text_limit": self.config.whole_text_limit,
+                    "alphabet": Alphabet(self.config.alphabet).value, "normalize": stages.normalize,
+                    "lang": stages.lang, "chunk": stages.chunk.value}
+        code = code_revision(self.backend, stages.lang, settings, frontend=True)
+        if code is None:
+            return None
+        digest = hashlib.sha256(json.dumps([FORMAT, backend_revision, code, normalizer]).encode())
+        return f"{FORMAT}:{digest.hexdigest()}"
 
     def register(self, graph: ConversionGraph) -> None:
         """Add a ``text -> <alphabet>`` edge that runs :meth:`phonemize_lazy`.

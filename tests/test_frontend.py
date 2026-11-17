@@ -939,10 +939,11 @@ class TestBackends:
 
     def test_identity_names_the_backend_and_the_language(self):
         frontend = TextFrontend(FrontendConfig("pt-PT", Phonemizer.UNICODE))
-        revision = UnicodeCodepointPhonemizer().identity("pt-PT").revision
-        assert revision is not None
-        assert frontend.identity() == PhonemizerIdentity(
-            "unicode", "scriptconv", VERSION_STR, "pt-PT", revision, frontend_module.FRONTEND_VERSION)
+        identity = frontend.identity()
+        assert identity.revision.startswith("sc1:")
+        assert identity.revision != UnicodeCodepointPhonemizer().identity("pt-PT").revision
+        assert identity == PhonemizerIdentity(
+            "unicode", "scriptconv", VERSION_STR, "pt-PT", identity.revision, frontend_module.FRONTEND_VERSION)
         reference = TextFrontend(FrontendConfig("pt-PT", Phonemizer.UNICODE, stages=Stages(lang="es")))
         assert reference.identity().lang == "es"
 
