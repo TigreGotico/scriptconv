@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import subprocess
+import threading
 import weakref
 from typing import List, Dict, Optional, Sequence, TYPE_CHECKING
 
@@ -301,6 +302,27 @@ class CharsiuPhonemizer(ByT5Phonemizer):
         return " ".join([self._infer_onnx(w, lang) for w in text.split()])
 
 
+_GRUUT = threading.local()
+
+
+class _CopyingLookup:
+    """Gives each gruut word its own copy of the lexicon pronunciation.
+
+    gruut caches each lexicon pronunciation as one list and gives that list to
+    every word that reads it. The French liaison, the Catalan fusion, elision
+    and diphthong rules, and the Farsi genitive rule change the list of the
+    word in place. Without a copy, one "nous allons" adds the liaison z to
+    every later "nous" in the process.
+    """
+
+    def __init__(self, lookup):
+        self.lookup = lookup
+
+    def __call__(self, *args, **kwargs):
+        phonemes = self.lookup(*args, **kwargs)
+        return None if phonemes is None else list(phonemes)
+
+
 class GruutPhonemizer(BasePhonemizer):
     """
     A phonemizer class that uses the Gruut library to convert text into phonemes.
@@ -337,14 +359,28 @@ class GruutPhonemizer(BasePhonemizer):
         """
         lang = self.get_lang(lang)
         try:
-            import gruut
+            from gruut import TextProcessor
         except ImportError as e:
             raise ImportError(
                 "gruut is required for the Gruut phonemizer. "
                 "Install it with 'pip install gruut' "
                 "(or 'pip install scriptconv[gruut]')."
             ) from e
-        for sentence in gruut.sentences(text, lang=lang):
+        # one processor per thread, as gruut.sentences keeps it: the lexicon
+        # is a sqlite connection, which only its own thread can use.
+        # One processor per language too: gruut reads every sentence after
+        # the first, and the part-of-speech tags, with default_lang.
+        processors = getattr(_GRUUT, "processors", None)
+        if processors is None:
+            processors = _GRUUT.processors = {}
+        processor = processors.get(lang)
+        if processor is None:
+            processor = processors[lang] = TextProcessor(default_lang=lang)
+            settings = processor.get_settings(lang)
+            if settings.lookup_phonemes is not None:
+                settings.lookup_phonemes = _CopyingLookup(settings.lookup_phonemes)
+        graph, root = processor(text, lang=lang)
+        for sentence in processor.sentences(graph, root):
             sent_phonemes = [w.phonemes for w in sentence if w.phonemes]
             if sentence and not sent_phonemes:
                 raise RuntimeError(f"did you install gruut[{lang}] ?")
