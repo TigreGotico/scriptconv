@@ -47,7 +47,7 @@ ja = ["scriptconv-copyleft[ja]>=0.1.2a1"]
 zh = ["pypinyin>=0.50,<1"]
 # --- phonemizer wrappers (scriptconv.phonemizers) ---
 phonemizers = ["quebra-frases", "linguatag[langcodes]>=0.2.3a1"]
-normalize = ["text2spoken[ar,es,eu,fr,nl,pt,ru]>=0.0.2a59"]
+normalize = ["text2spoken[pt]>=0.0.2a66"]
 espeak = ["scriptconv[phonemizers]", "scriptconv-copyleft[espeak]>=0.1.2a1"]
 gruut = ["scriptconv[phonemizers]", "gruut"]
 goruut = ["scriptconv[phonemizers]", "pygoruut"]
