@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a114](https://github.com/TigreGotico/scriptconv/tree/0.0.4a114) (2026-11-17)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a113...0.0.4a114)
+
+**Merged pull requests:**
+
+- fix: the normalize extra takes text2spoken\[pt\] only [\#314](https://github.com/TigreGotico/scriptconv/pull/314) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a113](https://github.com/TigreGotico/scriptconv/tree/0.0.4a113) (2026-11-17)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a112...0.0.4a113)
@@ -387,10 +395,6 @@
 ## [0.0.4a64](https://github.com/TigreGotico/scriptconv/tree/0.0.4a64) (2026-11-12)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a63...0.0.4a64)
-
-**Merged pull requests:**
-
-- fix\(testing\): a repeated sentence is a sentence set defect [\#197](https://github.com/TigreGotico/scriptconv/pull/197) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a63](https://github.com/TigreGotico/scriptconv/tree/0.0.4a63) (2026-11-12)
 
