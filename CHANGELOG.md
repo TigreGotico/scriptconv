@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a109](https://github.com/TigreGotico/scriptconv/tree/0.0.4a109) (2026-11-17)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a108...0.0.4a109)
+
+**Merged pull requests:**
+
+- fix\(gruut\): wrap the lookup before the processor is cached [\#289](https://github.com/TigreGotico/scriptconv/pull/289) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a108](https://github.com/TigreGotico/scriptconv/tree/0.0.4a108) (2026-11-17)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a107...0.0.4a108)
@@ -363,10 +371,6 @@
 ## [0.0.4a62](https://github.com/TigreGotico/scriptconv/tree/0.0.4a62) (2026-11-12)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a61...0.0.4a62)
-
-**Merged pull requests:**
-
-- fix\(testing\): the sentence gate fails closed and measures noise per row [\#187](https://github.com/TigreGotico/scriptconv/pull/187) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a61](https://github.com/TigreGotico/scriptconv/tree/0.0.4a61) (2026-11-12)
 
