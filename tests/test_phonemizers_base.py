@@ -405,3 +405,34 @@ class TestRemovePunctuationAfterStressMark(unittest.TestCase):
 
         with mock.patch.object(base, "unicodedata", mock.Mock(category=category)):
             self.assertEqual(BasePhonemizer.remove_punctuation(text), text)
+
+
+class TestGraphemeHyphen(unittest.TestCase):
+    """A grapheme backend's symbols are the letters of the word, so a hyphen
+    between two letters stays, as an apostrophe does in ``d'água``. A hyphen
+    with a space next to it or at a word edge separates words."""
+
+    def test_hyphen_between_letters_stays(self):
+        for lang, text in (("ig", "Nna m na-arụ ọrụ."), ("st", "Maseru ke motse-moholo wa Lesotho.")):
+            with self.subTest(lang=lang):
+                self.assertEqual(GraphemePhonemizer().phonemize_string(text, lang), text.lower())
+
+    def test_hyphen_after_a_stressed_vowel_stays(self):
+        self.assertEqual(GraphemePhonemizer().phonemize_string("когда\u0301-нибудь", "ru"),
+                         "когда\u0301-нибудь")
+
+    def test_hyphen_through_the_frontend_in_both_modes(self):
+        from scriptconv.frontend import FrontendConfig, TextFrontend
+        for keep, end in ((False, ""), (True, ".")):
+            with self.subTest(keep_punctuation=keep):
+                frontend = TextFrontend(FrontendConfig("st", keep_punctuation=keep), GraphemePhonemizer())
+                self.assertEqual(frontend.phonemize("Maseru ke motse-moholo wa Lesotho."),
+                                 [list("maseru ke motse-moholo wa lesotho" + end)])
+
+    def test_hyphen_that_is_not_inside_a_word_is_a_space(self):
+        g = GraphemePhonemizer()
+        self.assertEqual(g.phonemize_string("kum - ayibo", "xh"), "kum ayibo")
+        self.assertEqual(g.phonemize_string("pre- and post", "en"), "pre and post")
+        self.assertEqual(g.phonemize_string("-kum ayibo-", "xh"), "kum ayibo")
+        self.assertEqual(g.phonemize_string("-kum", "xh"), "kum")
+        self.assertEqual(g.phonemize_string("10-20", "en"), "10 20")

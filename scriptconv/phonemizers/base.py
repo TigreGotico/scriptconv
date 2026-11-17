@@ -117,6 +117,19 @@ def _clause_breaks_as_spaces(phonemes: str) -> str:
     return " ".join(line.strip() for line in phonemes.split("\n") if line.strip())
 
 
+def _between_letters(text: str, index: int) -> bool:
+    """Whether the character at *index* of *text* stands between two letters.
+
+    The letter before it may carry combining marks, such as a stress mark (U+0301).
+    """
+    if not 0 < index < len(text) - 1 or not text[index + 1].isalpha():
+        return False
+    letter = index - 1
+    while letter > 0 and unicodedata.category(text[letter]).startswith("M"):
+        letter -= 1
+    return text[letter].isalpha()
+
+
 def _clause_mark(punctuation: str) -> Optional[str]:
     """The symbol a run of clause-final punctuation is kept as, if any."""
     if ".." in punctuation or "\u2026" in punctuation:
@@ -646,14 +659,9 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         chars = list(text)
         separates = False
         for i, c in enumerate(chars):
-            if c in ("'", "’", "-") and 0 < i < len(chars) - 1 and chars[i + 1].isalpha():
-                # a letter may carry combining marks, such as a stress mark (U+0301)
-                letter = i - 1
-                while letter > 0 and unicodedata.category(chars[letter]).startswith("M"):
-                    letter -= 1
-                if chars[letter].isalpha():
-                    out.append(c)
-                    continue
+            if c in ("'", "’", "-") and _between_letters(text, i):
+                out.append(c)
+                continue
             if c in _SEPARATING_MARKS:
                 if i == 0 or chars[i - 1] not in _SEPARATING_MARKS:
                     end = i
@@ -746,7 +754,8 @@ class GraphemePhonemizer(BasePhonemizer):
     """
     A phonemizer class that treats input text as graphemes (characters).
     It performs text normalization and returns the normalized text as a string
-    of characters.
+    of characters. A hyphen between two letters is part of the word, as in
+    ``motse-moholo``, so it stays. Any other hyphen becomes a space.
 
     ``stress_notation`` is how the output writes the stress mark (U+0301
     after a vowel) of a :data:`scriptconv.diacritics.STRESS_LANGS` language:
@@ -786,7 +795,8 @@ class GraphemePhonemizer(BasePhonemizer):
         """
         text = text.lower()
         text = text.replace(";", ",")
-        text = text.replace("-", " ")
+        text = "".join(" " if char == "-" and not _between_letters(text, i) else char
+                       for i, char in enumerate(text))
         text = text.replace(":", ",")
         text = re.sub(r"[\<\>\(\)\[\]\"]+", "", text)
         text = re.sub(self.whitespace_re, " ", text).strip()

@@ -482,7 +482,6 @@ class TestInlineBlocks:
         "[[x]]? [[?]]. vem.",
         "Olá [[x]] [[?]] sim.",
         "Sim [[x.]]...",
-        "Sim [[x.]]-vem.",
         "Sim [[x.]][[]] vem.",
     ])
     def test_a_block_that_ends_in_a_mark_reads_as_a_plain_word(self, keep, text):
@@ -496,6 +495,13 @@ class TestInlineBlocks:
         expected = list("".join(frontend.phonemize_flat(plain)).replace("k", symbols))
         assert frontend.phonemize_flat(text) == expected
         assert join_sentences(frontend.phonemize(text), keep) == expected
+
+    @pytest.mark.parametrize("keep, expected", [(True, "sim x. vem."), (False, "sim x. vem")])
+    def test_a_hyphen_after_a_block_is_no_letter_of_a_word(self, keep, expected):
+        # the hyphen follows a mark, not a letter, so it separates two words
+        frontend = TextFrontend(FrontendConfig("pt-PT", Phonemizer.GRAPHEMES, keep_punctuation=keep,
+                                               stages=Stages(diacritize=False)))
+        assert frontend.phonemize_flat("Sim [[x.]]-vem.") == list(expected)
 
     # A backend can write a phoneme with the character of a clause symbol, as
     # X-SAMPA writes ":" for length and "?" for a glottal stop. That phoneme
@@ -846,7 +852,7 @@ class TestBackends:
     def test_grapheme_and_unicode_backends_build_without_get_lang(self):
         graphemes = TextFrontend(FrontendConfig("xx-Test", Phonemizer.GRAPHEMES))
         assert graphemes.phonemize("Ab-c. Dé!", Stages(diacritize=False)) == [
-            ["a", "b", " ", "c"], ["d", "é"]]
+            ["a", "b", "-", "c"], ["d", "é"]]
         codepoints = TextFrontend(FrontendConfig("xx-Test", Phonemizer.UNICODE))
         assert codepoints.phonemize("Dé", Stages(diacritize=False)) == [["D", "e", "́"]]
 
