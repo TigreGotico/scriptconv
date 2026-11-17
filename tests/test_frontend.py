@@ -980,10 +980,17 @@ class TestSpokenNormalizer:
             spoken_normalizer()
 
     def test_the_extra_installs_every_language_extra_of_text2spoken(self):
+        """A language extra of text2spoken that holds a requirement, such as `pt` for tugalex, is in the extra. An extra
+        with no requirement, kept so that an install that names it still resolves, adds nothing to name."""
         pyproject = tomllib.loads((Path(__file__).parent.parent / "pyproject.toml").read_text(encoding="utf-8"))
         requirement, = map(Requirement, pyproject["project"]["optional-dependencies"]["normalize"])
-        languages = set(metadata("text2spoken").get_all("Provides-Extra")) - {"test"}
+        installed = metadata("text2spoken")
+        markers = [Requirement(line).marker for line in installed.get_all("Requires-Dist") or []]
+        languages = {extra for extra in installed.get_all("Provides-Extra") if extra != "test"
+                     and any(marker and marker.evaluate({"extra": extra}) and not marker.evaluate({"extra": ""})
+                             for marker in markers)}
         assert requirement.name == "text2spoken"
+        assert languages, "no language extra of text2spoken holds a requirement"
         assert languages <= requirement.extras, f"text2spoken extras missing: {sorted(languages - requirement.extras)}"
 
 
