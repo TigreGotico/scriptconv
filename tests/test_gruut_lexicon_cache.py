@@ -18,7 +18,9 @@ import threading
 import unittest
 from contextlib import closing
 from pathlib import Path
+from unittest import mock
 
+import gruut.text_processor
 import gruut_lang_ca
 import gruut_lang_en
 import gruut_lang_fr
@@ -143,6 +145,42 @@ class TestFirstLanguageOfThread(unittest.TestCase):
         self.assertEqual(en_record_readings(outputs_en[2]), EN_RECORD)
         self.assertEqual(en_record_readings(outputs_fr[1]), EN_RECORD)
         self.assertEqual(outputs_fr[2], fr_expected())
+
+
+
+class TestFailedFirstLoad(unittest.TestCase):
+    """A processor is cached only with the copying lookup. One failed settings
+    load must not leave a processor behind that leaks the liaison."""
+
+    def test_liaison_does_not_leak_after_a_failed_load(self):
+        real_get_settings = gruut.text_processor.get_settings
+        loads = []
+
+        def fail_once(*args, **kwargs):
+            loads.append(args)
+            if len(loads) == 1:
+                raise OSError("injected")
+            return real_get_settings(*args, **kwargs)
+
+        outputs = []
+
+        def run():
+            phonemizer = GruutPhonemizer()
+            for text in ["nous dînons", "nous dînons", "nous allons", "nous dînons"]:
+                try:
+                    outputs.append(phonemizer.phonemize_string(text, "fr"))
+                except OSError as e:
+                    outputs.append(str(e))
+
+        with mock.patch("gruut.text_processor.get_settings", fail_once):
+            thread = threading.Thread(target=run)
+            thread.start()
+            thread.join()
+
+        nous = lexicon(gruut_lang_fr, "nous")
+        plain = f"{nous} {lexicon(gruut_lang_fr, 'dînons')}"
+        liaison = f"{nous}z {lexicon(gruut_lang_fr, 'allons')}"
+        self.assertEqual(outputs, ["injected", plain, liaison, plain])
 
 
 if __name__ == "__main__":
