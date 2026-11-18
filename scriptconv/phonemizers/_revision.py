@@ -16,8 +16,11 @@ open. The hash then covers:
 - the source file of each class in the MRO of the backend that is not in
   scriptconv, so a subclass that changes a method changes the revision;
 - the class of the backend, the arguments that build it, the settings that
-  change the output besides the code, the language and
-  :data:`unicodedata.unidata_version`.
+  change the output besides the code, whether the backend keeps clause
+  punctuation, the language and :data:`unicodedata.unidata_version`.
+
+The ``normalizer`` hook of a backend stays out: it is the ``normalize``
+stage, which :meth:`~scriptconv.frontend.TextFrontend.identity` covers.
 
 A backend that wraps an engine with a revision of its own, as tugaphone or
 orthography2ipa, names the distributions that the engine revision covers in
@@ -166,7 +169,8 @@ def code_revision(backend, lang: str, settings: Mapping, frontend: bool = False)
     digest = hashlib.sha256(json.dumps(
         [FORMAT, mode, f"{probed.__module__}:{probed.__qualname__}",
          f"{type(backend).__module__}:{type(backend).__qualname__}", lang, arguments, settings,
-         unicodedata.unidata_version], sort_keys=True, ensure_ascii=False).encode())
+         backend._keeps_punctuation(), unicodedata.unidata_version],
+        sort_keys=True, ensure_ascii=False).encode())
     try:
         covered = sorted({_canonical(name) for name in backend._covered_distributions(lang)})
         outcome = _probe_outcome(probed.__module__, probed.__qualname__, lang, mode,

@@ -469,6 +469,24 @@ class LongVowel(GraphemePhonemizer):
         return super().phonemize_string(text, lang).replace("a", "a:")
 
 
+class OwnLazy(GraphemePhonemizer):
+    """Graphemes, with a ``phonemize_lazy`` of its own, so ``keep_punctuation`` changes nothing."""
+
+    def phonemize_lazy(self, text, lang):
+        yield list(self.phonemize_string(text, lang))
+
+
+# The revision of a grapheme backend with instance settings, in a fresh process.
+INSTANCE_SETTINGS_REVISION = """
+import json, re
+from scriptconv.phonemizers import GraphemePhonemizer
+backend = GraphemePhonemizer()
+backend.keep_punctuation = True
+backend.whitespace_re = re.compile(r"\\s+", re.ASCII)
+print(json.dumps(backend.identity("ru").revision))
+"""
+
+
 class TestCodeRevision:
     def test_the_revision_is_the_same_in_every_process(self, tmp_path):
         runs = [subprocess.run([sys.executable, "-c", REVISIONS], cwd=ROOT, check=True,
@@ -526,6 +544,60 @@ class TestCodeRevision:
         changed.replace_chars = {";": ",", "-": " ", ":": ","}
         assert GraphemePhonemizer().identity("en").revision is not None
         assert changed.identity("en").revision == GraphemePhonemizer().identity("en").revision
+
+    # keep_punctuation: a clause symbol comes before its space, and a symbol
+    # that ends the text stays (BasePhonemizer.phonemize_to_list).
+    @pytest.mark.parametrize("source, lang, plain, kept", [
+        ("GraphemePhonemizer()", "ru", "a b", "a, b."),
+        ("UnicodeCodepointPhonemizer()", "xx", "a b", "a, b."),
+    ])
+    def test_keep_punctuation_set_on_the_instance_changes_the_revision(self, source, lang, plain, kept):
+        original, keeping = eval(source), eval(source)
+        keeping.keep_punctuation = True
+        assert ("".join(original.phonemize_to_list("a, b.", lang)),
+                "".join(keeping.phonemize_to_list("a, b.", lang))) == (plain, kept)
+        assert original.identity(lang).revision is not None
+        assert keeping.identity(lang).revision != original.identity(lang).revision
+
+    def test_keep_punctuation_that_the_backend_ignores_keeps_the_revision(self):
+        original, keeping = OwnLazy(), OwnLazy()
+        keeping.keep_punctuation = True
+        assert keeping.phonemize_to_list("a, b.", "ru") == original.phonemize_to_list("a, b.", "ru")
+        assert original.identity("ru").revision is not None
+        assert keeping.identity("ru").revision == original.identity("ru").revision
+
+    def test_a_whitespace_pattern_set_on_the_instance_changes_the_revision(self):
+        original, ascii_only = GraphemePhonemizer(), GraphemePhonemizer()
+        ascii_only.whitespace_re = re.compile(r"\s+", re.ASCII)
+        # U+00A0 is whitespace to str patterns, and not to ASCII ones
+        assert (original.phonemize_string("a\xa0b", "ru"), ascii_only.phonemize_string("a\xa0b", "ru")) == \
+            ("a b", "a\xa0b")
+        assert original.identity("ru").revision is not None
+        assert ascii_only.identity("ru").revision != original.identity("ru").revision
+
+    def test_settings_set_on_the_instance_to_their_defaults_keep_the_revision(self):
+        changed = GraphemePhonemizer()
+        changed.keep_punctuation = False
+        changed.whitespace_re = re.compile(r"\s+")
+        assert GraphemePhonemizer().identity("ru").revision is not None
+        assert changed.identity("ru").revision == GraphemePhonemizer().identity("ru").revision
+
+    def test_instance_settings_give_the_same_revision_in_every_process(self, tmp_path):
+        runs = [subprocess.run([sys.executable, "-c", INSTANCE_SETTINGS_REVISION], cwd=ROOT, check=True,
+                               capture_output=True, text=True,
+                               env={**os.environ, "PYTHONHASHSEED": seed,
+                                    "XDG_CACHE_HOME": str(tmp_path / seed)}).stdout.splitlines()[-1]
+                for seed in ("0", "1")]
+        assert json.loads(runs[0]).startswith("sc1:")
+        assert runs[0] == runs[1]
+        assert json.loads(runs[0]) != GraphemePhonemizer().identity("ru").revision
+
+    def test_the_normaliser_hook_stays_out_of_the_revision(self):
+        import text2spoken
+        hooked = GraphemePhonemizer(normalizer=text2spoken.normalize)
+        assert hooked.phonemize("2 gatos", "pt-PT") != GraphemePhonemizer().phonemize("2 gatos", "pt-PT")
+        assert GraphemePhonemizer().identity("pt-PT").revision is not None
+        assert hooked.identity("pt-PT").revision == GraphemePhonemizer().identity("pt-PT").revision
 
     def test_the_stress_notation_changes_the_revision(self):
         revisions = {GraphemePhonemizer(stress_notation=notation).identity("ru").revision
