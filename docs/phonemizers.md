@@ -416,7 +416,8 @@ licence and the upstream commit in `UPSTREAM.md`. dizione looks words up in a
 dictionary built from CMUdict. It picks the reading of a homograph from the
 words around it, and a small model guesses the words that the dictionary does
 not have. Its own text rules read numbers, dates, money, units and
-abbreviations.
+abbreviations. Install the backend with `pip install scriptconv[en-phonemizers]`,
+which holds numpy for that model.
 
 ```python
 from scriptconv.phonemizers.dizione import DizionePhonemizer

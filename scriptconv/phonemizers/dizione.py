@@ -23,6 +23,14 @@ from functools import cached_property
 from pathlib import Path
 from typing import ClassVar, Dict, Iterator, List, Optional, Set, Tuple, Union
 
+try:
+    import numpy  # noqa: F401  # the vendored model imports it at module level
+except ImportError as e:
+    raise ImportError(
+        "numpy is required for the dizione phonemizer, whose model guesses the words that its dictionary "
+        "lacks. Install it with 'pip install numpy' (or 'pip install scriptconv[en-phonemizers]')."
+    ) from e
+
 from scriptconv.phonemizers._thirdparty import dizione
 from scriptconv.phonemizers._thirdparty.dizione.engine import Phonemizer as DizioneEngine
 from scriptconv.phonemizers._thirdparty.dizione.homographs import SENTENCE_END
