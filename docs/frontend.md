@@ -46,8 +46,9 @@ the result. So a diacritizer that marks the last letter of `عندي ` before a
 block marks the `ي`, not the space after it.
 
 A backend can own a stage. It then runs that stage itself, and the frontend
-skips it. A backend can own `normalize`, `diacritize` or both. Tugaphone and
-Arbtok own `diacritize`, and dizione owns `normalize`. The normalisation hook
+skips it. A backend can own `normalize`, `diacritize` or both. Tugaphone owns
+`normalize` and `diacritize`, Arbtok owns `diacritize`, and dizione owns
+`normalize`. The normalisation hook
 runs for every backend that does not own `normalize`, because the caller
 chooses it.
 
