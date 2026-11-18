@@ -1,0 +1,44 @@
+"""The tugaphone identity has no revision, with one warning, where tugaphone gives none.
+
+A tugaphone with no ``content_revision`` module, as 1.7.1, and an orthography2ipa whose engine source cannot be read
+both phonemize, so their identity must not raise. The expected identity is the base identity of the backend, which
+has no revision."""
+import logging
+import sys
+
+import pytest
+import tugaphone
+from orthography2ipa.exceptions import EngineSourceUnavailable
+
+from scriptconv.phonemizers import pt
+from scriptconv.phonemizers.base import BasePhonemizer
+from scriptconv.phonemizers.pt import TugaphonePhonemizer
+
+
+@pytest.fixture(autouse=True)
+def fresh_cache():
+    pt._tugaphone_revision.cache_clear()
+    yield
+    pt._tugaphone_revision.cache_clear()
+
+
+def _check(phonemizer, caplog):
+    with caplog.at_level(logging.WARNING):
+        identity = phonemizer.identity("pt-PT")
+        phonemizer.identity("pt-PT")
+    assert identity == BasePhonemizer.identity(phonemizer, "pt-PT")
+    assert identity.revision is None
+    assert len([r for r in caplog.records if "no revision" in r.getMessage()]) == 1
+
+
+def test_a_tugaphone_with_no_content_revision_module(monkeypatch, caplog):
+    monkeypatch.setitem(sys.modules, "tugaphone.content_revision", None)
+    _check(TugaphonePhonemizer(), caplog)
+
+
+def test_an_engine_whose_source_cannot_be_read(monkeypatch, caplog):
+    def unreadable(lect):
+        raise EngineSourceUnavailable("cannot read the source of orthography2ipa.allophony")
+
+    monkeypatch.setattr(tugaphone, "revision", unreadable)
+    _check(TugaphonePhonemizer(), caplog)
