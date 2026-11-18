@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a123](https://github.com/TigreGotico/scriptconv/tree/0.0.4a123) (2026-11-18)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a122...0.0.4a123)
+
+**Merged pull requests:**
+
+- fix: dizione reads a spelling over 28 letters in pieces instead of exhausting memory [\#342](https://github.com/TigreGotico/scriptconv/pull/342) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a122](https://github.com/TigreGotico/scriptconv/tree/0.0.4a122) (2026-11-18)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a121...0.0.4a122)
@@ -395,10 +403,6 @@
 ## [0.0.4a70](https://github.com/TigreGotico/scriptconv/tree/0.0.4a70) (2026-11-13)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a69...0.0.4a70)
-
-**Merged pull requests:**
-
-- fix\(phonemizers\): keep the space after a clause inside a sentence [\#215](https://github.com/TigreGotico/scriptconv/pull/215) ([JarbasAl](https://github.com/JarbasAl))
 
 ## [0.0.4a69](https://github.com/TigreGotico/scriptconv/tree/0.0.4a69) (2026-11-13)
 
