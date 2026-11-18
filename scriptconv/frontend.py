@@ -658,9 +658,10 @@ class TextFrontend:
         kept = _identity_cache.load(entry_key)
         if kept is not None:
             return kept
+        state = _identity_cache.snapshot(self.backend)
         identity = dataclasses.replace(self.backend.identity(stages.lang), frontend=FRONTEND_VERSION)
         identity = dataclasses.replace(identity, revision=self._revision(identity.revision, stages))
-        _identity_cache.store(entry_key, identity, self.backend)
+        _identity_cache.store(entry_key, identity, state)
         return identity
 
     def _revision_settings(self, stages: Stages) -> Dict[str, object]:

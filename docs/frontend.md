@@ -412,14 +412,29 @@ backend.
 
 An entry is found by the Python interpreter and version, the `sys.path`
 entries, the Unicode version, the backend class with its arguments and
-instance settings, and the frontend settings. A hit also needs these files to
-keep their size and modification time:
+instance settings, and the frontend settings. A hit also needs the state of
+these files and directories to stay as it was before the identity was
+computed:
 
-- each `sys.path` directory, so an installed or removed distribution gives a
-  miss
-- the `RECORD` of each distribution, so a reinstalled one gives a miss
-- each file of a package from an editable install or a checkout on the path
+- the names in each `sys.path` directory, so an installed or removed
+  distribution gives a miss
+- the size and modification time of the `RECORD` of each distribution, so a
+  reinstalled one gives a miss
+- each package and module of each checkout on the path and of each editable
+  install, whether or not the process imports it. A file counts by its size
+  and modification time, and a directory by its names, so new bytecode in
+  `__pycache__` changes nothing
 - the source file of each class of the backend outside scriptconv
+
+A checkout is a `sys.path` directory that is not a site or standard library
+directory, such as an entry of `PYTHONPATH` or the target of a `.pth` file. An
+editable install is found by its `direct_url.json` or its setuptools finder.
+The state is taken before the identity is computed, so a change that lands
+during the computation gives a miss at the next call.
+
+Two edits are not seen: an edit of an installed file that keeps the `RECORD`
+as it is, and an edit that keeps the size of a file and puts its old
+modification time back.
 
 An entry that cannot be read is a miss, and a cache directory that cannot be
 written gives no entry and no error. Two processes can write one entry at

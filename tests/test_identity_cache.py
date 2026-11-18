@@ -54,6 +54,27 @@ def site(tmp_path, monkeypatch):
     return directory
 
 
+@pytest.fixture
+def site_packages(tmp_path, monkeypatch):
+    """A site directory of this test: on ``sys.path`` and in ``site.getsitepackages()``."""
+    import site as site_module
+    directory = tmp_path / "site-packages"
+    directory.mkdir()
+    sites = site_module.getsitepackages()
+    monkeypatch.setattr(site_module, "getsitepackages", lambda: [*sites, str(directory)])
+    monkeypatch.syspath_prepend(str(directory))
+    return directory
+
+
+def package(root, name, files=("__init__.py",)):
+    """A package *name* under *root* with *files*, and the path of its last file."""
+    for file in files:
+        path = root / name / file
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("ANSWER = 1\n")
+    return path
+
+
 def hit_then(monkeypatch, change):
     """The backend calls of a first identity, a second one, and a third one after *change*."""
     calls = counted_backend_calls(monkeypatch)
@@ -122,6 +143,80 @@ class TestKey:
             fake_distribution(site, "installed", top="installed")
         assert hit_then(monkeypatch, install) == 2
 
+    def test_an_edited_data_file_of_a_checkout_package_that_no_one_imports_is_a_miss(self, monkeypatch,
+                                                                                    tmp_path):
+        # as numtag, which only the probe of the text2spoken revision loads
+        checkout = tmp_path / "checkout"
+        lexicon = package(checkout, "unloadedpkg", ("__init__.py", "data/pt-PT/lexicon.json"))
+        monkeypatch.syspath_prepend(str(checkout))
+        assert hit_then(monkeypatch, lambda: lexicon.write_text('{"vinte": 21}')) == 2
+
+    def test_an_edited_editable_install_that_no_one_imports_is_a_miss(self, monkeypatch, site_packages,
+                                                                       tmp_path):
+        project = tmp_path / "project"
+        lexicon = package(project / "src", "editablepkg2", ("__init__.py", "data/lexicon.json"))
+        fake_distribution(site_packages, "editablepkg2", top="editablepkg2", editable_root=project)
+        assert hit_then(monkeypatch, lambda: lexicon.write_text('{"vinte": 21}')) == 2
+
+    def test_an_edited_package_of_an_editable_finder_that_no_one_imports_is_a_miss(self, monkeypatch,
+                                                                                    site_packages, tmp_path):
+        module = package(tmp_path / "lib", "mappedpkg", ("__init__.py", "rules.py"))
+        (site_packages / "__editable___mappedpkg_1_0_finder.py").write_text(
+            f"import sys\nMAPPING: dict[str, str] = {{'mappedpkg': {str(module.parent)!r}}}\n")
+        assert hit_then(monkeypatch, lambda: module.write_text("ANSWER = 42\n")) == 2
+
+    def test_an_edited_checkout_with_an_egg_info_that_shadows_a_distribution_is_a_miss(
+            self, monkeypatch, site_packages, tmp_path):
+        # a checkout where `pip install .` left a scriptconv.egg-info
+        fake_distribution(site_packages, "eggpkg", top="eggpkg")
+        package(site_packages, "eggpkg")
+        checkout = tmp_path / "checkout"
+        module = package(checkout, "eggpkg")
+        egg = checkout / "eggpkg.egg-info"
+        egg.mkdir()
+        (egg / "PKG-INFO").write_text("Metadata-Version: 2.1\nName: eggpkg\nVersion: 1.0\n")
+        (egg / "top_level.txt").write_text("eggpkg\n")
+        monkeypatch.syspath_prepend(str(checkout))
+        monkeypatch.delitem(sys.modules, "eggpkg", raising=False)
+        assert Path(__import__("eggpkg").__file__) == module
+        assert hit_then(monkeypatch, lambda: module.write_text("ANSWER = 42\n")) == 2
+
+    def test_an_edit_while_the_identity_is_computed_gives_a_miss(self, monkeypatch, tmp_path):
+        checkout = tmp_path / "checkout"
+        module = package(checkout, "racedpkg")
+        monkeypatch.syspath_prepend(str(checkout))
+        monkeypatch.delitem(sys.modules, "racedpkg", raising=False)
+        __import__("racedpkg")
+        calls = counted_backend_calls(monkeypatch)
+        identity = GraphemePhonemizer.identity
+
+        def edited_during(self, lang):
+            computed = identity(self, lang)
+            if len(calls) == 1:
+                module.write_text("ANSWER = 42\n")
+            return computed
+        monkeypatch.setattr(GraphemePhonemizer, "identity", edited_during)
+        frontend().identity()
+        frontend().identity()
+        frontend().identity()
+        assert len(calls) == 2
+
+    def test_bytecode_written_while_the_identity_is_computed_keeps_the_entry(self, monkeypatch, tmp_path):
+        checkout = tmp_path / "checkout"
+        module = package(checkout, "compiledpkg")
+        monkeypatch.syspath_prepend(str(checkout))
+        calls = counted_backend_calls(monkeypatch)
+        identity = GraphemePhonemizer.identity
+
+        def compiled_during(self, lang):
+            (module.parent / "__pycache__").mkdir(exist_ok=True)
+            (module.parent / "__pycache__" / "__init__.cpython-312.pyc").write_bytes(b"")
+            return identity(self, lang)
+        monkeypatch.setattr(GraphemePhonemizer, "identity", compiled_during)
+        frontend().identity()
+        frontend().identity()
+        assert len(calls) == 1
+
     def test_another_python_is_a_miss(self, monkeypatch):
         assert hit_then(monkeypatch, lambda: monkeypatch.setattr(sys, "version", "3.99.0 (other)")) == 2
 
@@ -172,9 +267,9 @@ class TestEntries:
             from scriptconv.phonemizers import GraphemePhonemizer, PhonemizerIdentity, _identity_cache
             key = {"writer": "test"}
             identity = PhonemizerIdentity("graphemes", "scriptconv", "1", "pt-PT", "sc1:" + sys.argv[1] * 64, 2)
-            backend = GraphemePhonemizer()
+            state = _identity_cache.snapshot(GraphemePhonemizer())
             for _ in range(40):
-                _identity_cache.store(key, identity, backend)
+                _identity_cache.store(key, identity, state)
         """)
         writers = [subprocess.Popen([sys.executable, "-c", writer, digit], cwd=tmp_path,
                                     env={**os.environ, "PYTHONPATH": str(ROOT)}) for digit in "12"]

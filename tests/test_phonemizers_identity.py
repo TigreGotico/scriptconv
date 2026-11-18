@@ -430,10 +430,28 @@ def revisions_in_a_copy(directory, edit=None, script=REVISIONS):
         path.write_text(source.replace(old, new), encoding="utf-8")
     done = subprocess.run([sys.executable, "-c", script], cwd=tree, check=True,
                           capture_output=True, text=True,
-                          env={**os.environ, "PYTHONPATH": str(tree), "PYTHONDONTWRITEBYTECODE": "1"})
+                          env={**os.environ, "PYTHONPATH": str(tree), "PYTHONDONTWRITEBYTECODE": "1",
+                               "XDG_CACHE_HOME": str(directory / "cache")})
     revisions = json.loads(done.stdout.splitlines()[-1])
     assert Path(revisions.pop("scriptconv")).is_relative_to(tree)
     return revisions
+
+
+GRAPHEMES_REVISION = """
+import json, scriptconv
+from scriptconv.frontend import FrontendConfig, TextFrontend
+from scriptconv.phonemizers import GraphemePhonemizer
+revision = TextFrontend(FrontendConfig("pt-PT"), GraphemePhonemizer()).identity().revision
+print(json.dumps({"scriptconv": scriptconv.__file__, "graphemes": revision}))
+"""
+
+
+def test_a_fresh_process_of_the_tests_keeps_its_identities_out_of_the_user_cache(tmp_path, monkeypatch):
+    user = tmp_path / "user-cache"
+    monkeypatch.setenv("XDG_CACHE_HOME", str(user))
+    assert revisions_in_a_copy(tmp_path, script=GRAPHEMES_REVISION)["graphemes"].startswith("sc1:")
+    assert not (user / "scriptconv" / "identity").exists()
+    assert list((tmp_path / "cache" / "scriptconv" / "identity").glob("*.json"))
 
 
 @pytest.fixture(scope="module")
@@ -449,10 +467,11 @@ class LongVowel(GraphemePhonemizer):
 
 
 class TestCodeRevision:
-    def test_the_revision_is_the_same_in_every_process(self):
+    def test_the_revision_is_the_same_in_every_process(self, tmp_path):
         runs = [subprocess.run([sys.executable, "-c", REVISIONS], cwd=ROOT, check=True,
                                capture_output=True, text=True,
-                               env={**os.environ, "PYTHONHASHSEED": seed}).stdout.splitlines()[-1]
+                               env={**os.environ, "PYTHONHASHSEED": seed,
+                                    "XDG_CACHE_HOME": str(tmp_path / seed)}).stdout.splitlines()[-1]
                 for seed in ("0", "1", "4242")]
         revisions = json.loads(runs[0])
         revisions.pop("scriptconv")

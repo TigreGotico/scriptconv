@@ -58,7 +58,7 @@ import uuid
 from importlib.metadata import packages_distributions, version
 from importlib.util import find_spec
 from pathlib import Path
-from typing import Collection, Dict, Iterator, List, Mapping, NamedTuple, Optional, Set, Tuple, Union
+from typing import Collection, Dict, Iterator, List, Mapping, NamedTuple, Optional, Tuple, Union
 
 LOG = logging.getLogger(__name__)
 
@@ -120,10 +120,6 @@ print(marker + json.dumps({"modules": modules, "opened": sorted(opened)}), flush
 """
 """Prints, after a marker, the modules that a backend, or a frontend that reads
 through it, loads and the files that it opens."""
-
-LOADED_TOPS: Set[str] = set()
-"""The top-level modules outside the standard library that the probes of this
-process loaded, so the identity cache can watch the ones no distribution holds."""
 
 _NOT_CODE = frozenset({tokenize.COMMENT, tokenize.NL, tokenize.ENCODING, tokenize.ENDMARKER})
 _LINE = frozenset({"NEWLINE", "INDENT", "DEDENT"})
@@ -248,7 +244,6 @@ def _run_probe(module: str, qualname: str, lang: str, mode: str, arguments: str,
         top = name.split(".")[0]
         if top in sys.stdlib_module_names or where is None:
             continue
-        LOADED_TOPS.add(top)
         if top != "scriptconv":
             others.add(top)
         elif Path(where).relative_to(root).as_posix() != "version.py":
