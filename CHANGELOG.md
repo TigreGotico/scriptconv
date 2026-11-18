@@ -1,12 +1,21 @@
 # Changelog
 
+## [0.0.4a125](https://github.com/TigreGotico/scriptconv/tree/0.0.4a125) (2026-11-18)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a124...0.0.4a125)
+
+**Merged pull requests:**
+
+- fix: only a missing module gives the tugaphone identity no revision [\#348](https://github.com/TigreGotico/scriptconv/pull/348) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- feat: GraphemePhonemizer takes its character rules as keyword arguments [\#347](https://github.com/TigreGotico/scriptconv/pull/347) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- fix\(dizione\): a missing numpy raises an ImportError that names the extra [\#346](https://github.com/TigreGotico/scriptconv/pull/346) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a124](https://github.com/TigreGotico/scriptconv/tree/0.0.4a124) (2026-11-18)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a123...0.0.4a124)
 
 **Merged pull requests:**
 
-- fix\(dizione\): a missing numpy raises an ImportError that names the extra [\#346](https://github.com/TigreGotico/scriptconv/pull/346) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 - fix: the tugaphone identity has no revision, not an exception, where tugaphone gives none [\#345](https://github.com/TigreGotico/scriptconv/pull/345) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a123](https://github.com/TigreGotico/scriptconv/tree/0.0.4a123) (2026-11-18)
@@ -389,17 +398,9 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a72...0.0.4a73)
 
-**Merged pull requests:**
-
-- fix: keep words apart at a sentence with no mark and at a joined ! or ? [\#221](https://github.com/TigreGotico/scriptconv/pull/221) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a72](https://github.com/TigreGotico/scriptconv/tree/0.0.4a72) (2026-11-13)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a71...0.0.4a72)
-
-**Merged pull requests:**
-
-- fix: make the normalize extra install every text2spoken language [\#219](https://github.com/TigreGotico/scriptconv/pull/219) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a71](https://github.com/TigreGotico/scriptconv/tree/0.0.4a71) (2026-11-13)
 
