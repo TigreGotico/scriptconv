@@ -59,7 +59,9 @@ _SEPARATING_MARKS = frozenset(mark for mark, symbol in CLAUSE_PUNCTUATION.items(
 # sentence tokenizer, which knows abbreviations; inside a sentence an ellipsis
 # or "|" still ends a clause, as in chunk_text, but carries no symbol (espeak-ng
 # reads an ellipsis as a spoken-name pause, which Piper does not keep).
-_CLAUSE_BREAK = re.compile(r"(?:\.\.+|\u2026|[,:;!?|\u060c\u061b\u061f])[^\w\s]*(?=\s)")
+# The atomic group keeps a long run of dots linear: once the run is matched, no
+# shorter split of it is tried when no whitespace follows.
+_CLAUSE_BREAK = re.compile(r"(?>(?:\.\.+|\u2026|[,:;!?|\u060c\u061b\u061f])[^\w\s]*)(?=\s)")
 _TRAILING_PUNCTUATION = re.compile(r"[^\w\s]+\s*$")
 # One or more blank lines: a paragraph break.
 _PARAGRAPH_BREAK = re.compile(r"(\n(?:[^\S\n]*\n)+)")

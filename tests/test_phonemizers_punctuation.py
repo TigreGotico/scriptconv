@@ -331,3 +331,14 @@ class TestSplitClauses:
     def test_split(self, sentence, clauses):
         from scriptconv.phonemizers.base import split_clauses
         assert split_clauses(sentence) == clauses
+
+    @pytest.mark.timeout(10)
+    def test_a_long_run_of_dots_with_no_space_after_it_is_one_clause(self):
+        from scriptconv.phonemizers.base import split_clauses
+        sentence = "a" + "." * 20000 + "b"
+        assert split_clauses(sentence) == [(sentence, None)]
+
+    @pytest.mark.timeout(10)
+    def test_a_long_run_of_dots_before_a_space_ends_a_clause(self):
+        from scriptconv.phonemizers.base import split_clauses
+        assert split_clauses("a" + "." * 20000 + " b") == [("a", None), (" b", None)]
