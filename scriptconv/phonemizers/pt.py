@@ -100,16 +100,23 @@ def _tugaphone_revision(lect: str) -> Optional[Tuple[str, FrozenSet[str]]]:
     """``tugaphone.revision`` of *lect* and the distributions it covers, or
     ``None`` and one warning in this process when tugaphone gives no revision:
     a tugaphone with no ``content_revision`` module, as 1.7.1, or an engine
-    whose source cannot be read, as orthography2ipa installed as byte code."""
+    whose source cannot be read, as orthography2ipa installed as byte code.
+    Only a missing module counts: an ImportError that ``tugaphone.revision``
+    raises is a bug in that install, so it propagates."""
     import tugaphone
-    from orthography2ipa.exceptions import EngineSourceUnavailable
     try:
+        from orthography2ipa.exceptions import EngineSourceUnavailable
         from tugaphone.content_revision import distributions
-        return tugaphone.revision(lect), frozenset(distributions(tugaphone.resolve_lect(lect)))
-    except (ImportError, tugaphone.RevisionError, EngineSourceUnavailable) as exc:
-        LOG.warning("tugaphone gives no revision for %r, so the identity has none: %s: %s",
-                    lect, type(exc).__name__, exc)
-        return None
+    except ImportError as exc:
+        failure = exc
+    else:
+        try:
+            return tugaphone.revision(lect), frozenset(distributions(tugaphone.resolve_lect(lect)))
+        except (tugaphone.RevisionError, EngineSourceUnavailable) as exc:
+            failure = exc
+    LOG.warning("tugaphone gives no revision for %r, so the identity has none: %s: %s",
+                lect, type(failure).__name__, failure)
+    return None
 
 
 class BarranquenhoPhonemizer(BasePhonemizer):
