@@ -89,14 +89,10 @@ LOG = logging.getLogger(__name__)
 
 FRONTEND_VERSION = 2
 """The version of the stage order, in :meth:`TextFrontend.identity`. A change
-to the stages raises it. Version 1 cut the raw text into sentences before
-normalisation."""
+to the stages raises it."""
 
-# scripts/time_owner_backends.py, output in scripts/time_owner_backends.txt: one dizione call on English text
-# dense in dates and prices, also with a blank line and quotes after each sentence, stays under 100 ms up to
-# 1,750 characters, both with a new backend per call (at most 61.9 ms in two runs) and with one backend read
-# again and again (at most 79.3 ms in 11 runs). At 2,000 characters one run of the second kind took 100.5 ms.
-# Prose reads faster. The limit bounds the read; a full garbage collection of the process can add to one call.
+# One dizione call on English text dense in dates and prices stays under 100 ms up to this size
+# (scripts/time_owner_backends.txt). Prose reads faster.
 WHOLE_TEXT_LIMIT = 1_750
 """The default of :attr:`FrontendConfig.whole_text_limit`."""
 
@@ -559,8 +555,9 @@ class TextFrontend:
         it, also where no word follows them (see :meth:`_take_marks`). A
         block that starts a sentence after a sentence that ends in a clause
         symbol follows that symbol with no space. A block before the first
-        text is a chunk of its own at ``sentence`` and ``clause`` size, with the marks right after it, and
-        it starts the chunk after it at ``paragraph`` and ``none`` size. A
+        text is a chunk of its own at ``sentence`` and ``clause`` size, with
+        the marks right after it, and it starts the chunk after it at
+        ``paragraph`` and ``none`` size. A
         chunk of bounded segments has one start and one end symbol, with the
         block's symbols between them. A chunk that gives no phonemes is not
         yielded.
@@ -858,8 +855,8 @@ class TextFrontend:
         phonemes = piece.phonemes if piece is not None else []
         table = self.backend.mark_symbols(marks)
         if table is None:
-            count = next((i for i, symbol in enumerate(phonemes) if not set(symbol) <= set(marks.lstrip())),
-                         len(phonemes))
+            mark_chars = set(marks.lstrip())
+            count = next((i for i, symbol in enumerate(phonemes) if not set(symbol) <= mark_chars), len(phonemes))
             # whitespace between two runs of marks stays, and whitespace after them goes
             while count and not phonemes[count - 1].strip():
                 count -= 1
