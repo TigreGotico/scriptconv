@@ -573,6 +573,27 @@ class TestInlineBlocks:
                                                stages=Stages(diacritize=False)))
         assert frontend.phonemize_flat("Sim [[x.]]-vem.") == list(expected)
 
+    # tts-punctuation: "A hyphen with a space next to it, or at a word edge,
+    # is no part of a word: it gives no symbol, and a space separates the two
+    # words." A hyphen next to a block stands at the edge of a word.
+    @pytest.mark.parametrize("keep, expected", [(True, "sim vem xy."), (False, "sim vem xy")])
+    def test_a_hyphen_before_a_block_is_no_letter_of_a_word(self, keep, expected):
+        frontend = TextFrontend(FrontendConfig("pt-PT", Phonemizer.GRAPHEMES, keep_punctuation=keep,
+                                               stages=Stages(diacritize=False)))
+        assert frontend.phonemize_flat("Sim vem-[[xy]].") == list(expected)
+        assert frontend.phonemize("Sim vem-[[xy]].") == [list(expected)]
+
+    # tts-punctuation: a "!" or "?" between two letters "still separates two
+    # words, so it becomes a space". The block is the word after the mark.
+    @pytest.mark.parametrize("keep", [True, False])
+    @pytest.mark.parametrize("text", ["Sim![[rui]]", "Sim?[[rui]] vem.", "Sim?![[rui]] vem."])
+    def test_a_mark_that_separates_two_words_before_a_block_is_a_space(self, keep, text):
+        frontend = TextFrontend(FrontendConfig("pt-PT", Phonemizer.GRAPHEMES, keep_punctuation=keep,
+                                               stages=Stages(diacritize=False)))
+        plain = text.replace("[[", "").replace("]]", "")
+        assert "".join(frontend.phonemize_flat(plain)).startswith("sim rui")
+        assert frontend.phonemize_flat(text) == frontend.phonemize_flat(plain)
+
     # A backend can write a phoneme with the character of a clause symbol, as
     # X-SAMPA writes ":" for length and "?" for a glottal stop. That phoneme
     # stays before a block, as before a plain word.
