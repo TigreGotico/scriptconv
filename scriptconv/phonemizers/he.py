@@ -3,6 +3,7 @@ from scriptconv.phonemizers.base import BasePhonemizer
 
 
 class PhonikudPhonemizer(BasePhonemizer):
+    """Hebrew text to IPA with phonikud."""
     engine_distribution = "phonikud"
 
     def __init__(self):
@@ -19,23 +20,14 @@ class PhonikudPhonemizer(BasePhonemizer):
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
-        """
-        Validates and returns the closest supported language code.
-
-        Args:
-            target_lang (str): The language code to validate.
-
-        Returns:
-            str: The validated language code.
+        """The closest of ``he`` to *target_lang*.
 
         Raises:
-            ValueError: If the language code is unsupported.
+            UnsupportedLanguageError: If none is close enough.
         """
-        # this check is here only to throw an exception if invalid language is provided
         return cls.match_lang(target_lang, ["he"])
 
     def phonemize_string(self, text: str, lang: str = "he") -> str:
-        """
-        """
-        lang = self.get_lang(lang)
+        """The IPA of *text*, after a check that *lang* is Hebrew."""
+        self.get_lang(lang)
         return self.g2p(text)

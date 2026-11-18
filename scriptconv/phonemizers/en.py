@@ -4,8 +4,10 @@ from scriptconv.phonemizers.enums import Alphabet
 
 
 class DeepPhonemizer(BasePhonemizer):
-    """
-    https://github.com/spring-media/DeepPhonemizer
+    """Text to IPA or ARPA with DeepPhonemizer (https://github.com/spring-media/DeepPhonemizer).
+
+    A model name of :attr:`MODELS` downloads into ``~/.local/share/deepphonemizer``
+    on first use. A model whose name holds ``ipa`` emits IPA, any other ARPA.
     """
 
     engine_distribution = "deep-phonemizer"
@@ -28,7 +30,7 @@ class DeepPhonemizer(BasePhonemizer):
                 "phonemizer. Install them with 'pip install deep-phonemizer torch' "
                 "(or 'pip install scriptconv[en-phonemizers]')."
             ) from e
-        # needed for latest torch version
+        # torch.load reads these classes of a checkpoint only when they are allowed
         torch.serialization.add_safe_globals([dp.preprocessing.text.Preprocessor])
         torch.serialization.add_safe_globals([dp.preprocessing.text.LanguageTokenizer])
         torch.serialization.add_safe_globals([dp.preprocessing.text.SequenceTokenizer])
@@ -61,42 +63,21 @@ class DeepPhonemizer(BasePhonemizer):
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
-        """
-        Validates and returns the closest supported language code.
-
-        Args:
-            target_lang (str): The language code to validate.
-
-        Returns:
-            str: The validated language code.
+        """The closest of ``de`` and ``en_us`` to *target_lang*.
 
         Raises:
-            ValueError: If the language code is unsupported.
+            UnsupportedLanguageError: If none is close enough.
         """
-        # this check is here only to throw an exception if invalid language is provided
         return cls.match_lang(target_lang, ['de', 'en_us'])
 
     def phonemize_string(self, text: str, lang: str) -> str:
-        """
-        Normalizes input text by applying a series of transformations
-        and returns it as a sequence of graphemes.
-
-        Parameters:
-            text (str): Input text to be converted to graphemes.
-            lang (str): The language code (ignored for grapheme phonemization,
-                        but required by BasePhonemizer).
-
-        Returns:
-            str: A normalized string of graphemes.
-        """
+        """The phonemes of *text* from the checkpoint's model for *lang*."""
         lang = self.get_lang(lang)
         return self.phonemizer(text, lang)
 
 
 class OpenPhonemizer(BasePhonemizer):
-    """
-    https://github.com/NeuralVox/OpenPhonemizer
-    """
+    """English text to IPA with OpenPhonemizer (https://github.com/NeuralVox/OpenPhonemizer)."""
 
     engine_distribution = "openphonemizer"
 
@@ -104,7 +85,6 @@ class OpenPhonemizer(BasePhonemizer):
         try:
             from openphonemizer import OpenPhonemizer
             import torch
-            # needed for latest torch version
             import dp
         except ImportError as e:
             raise ImportError(
@@ -121,42 +101,21 @@ class OpenPhonemizer(BasePhonemizer):
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
-        """
-        Validates and returns the closest supported language code.
-
-        Args:
-            target_lang (str): The language code to validate.
-
-        Returns:
-            str: The validated language code.
+        """The closest of ``en`` to *target_lang*.
 
         Raises:
-            ValueError: If the language code is unsupported.
+            UnsupportedLanguageError: If none is close enough.
         """
-        # this check is here only to throw an exception if invalid language is provided
         return cls.match_lang(target_lang, ["en"])
 
     def phonemize_string(self, text: str, lang: str) -> str:
-        """
-        Normalizes input text by applying a series of transformations
-        and returns it as a sequence of graphemes.
-
-        Parameters:
-            text (str): Input text to be converted to graphemes.
-            lang (str): The language code (ignored for grapheme phonemization,
-                        but required by BasePhonemizer).
-
-        Returns:
-            str: A normalized string of graphemes.
-        """
-        lang = self.get_lang(lang)
+        """The IPA of *text*, after a check that *lang* is English."""
+        self.get_lang(lang)
         return self.phonemizer(text)
 
 
 class G2PEnPhonemizer(BasePhonemizer):
-    """
-    https://github.com/Kyubyong/g2p
-    """
+    """English text to IPA or ARPA with g2p_en (https://github.com/Kyubyong/g2p)."""
 
     engine_distribution = "g2p_en"
 
@@ -178,36 +137,16 @@ class G2PEnPhonemizer(BasePhonemizer):
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
-        """
-        Validates and returns the closest supported language code.
-
-        Args:
-            target_lang (str): The language code to validate.
-
-        Returns:
-            str: The validated language code.
+        """The closest of ``en`` to *target_lang*.
 
         Raises:
-            ValueError: If the language code is unsupported.
+            UnsupportedLanguageError: If none is close enough.
         """
-        # this check is here only to throw an exception if invalid language is provided
         return cls.match_lang(target_lang, ["en"])
 
     def phonemize_string(self, text: str, lang: str) -> str:
-        """
-        Normalizes input text by applying a series of transformations
-        and returns it as a sequence of graphemes.
-
-        Parameters:
-            text (str): Input text to be converted to graphemes.
-            lang (str): The language code (ignored for grapheme phonemization,
-                        but required by BasePhonemizer).
-
-        Returns:
-            str: A normalized string of graphemes.
-        """
-        lang = self.get_lang(lang)
-        # NOTE: this model returns ARPA not IPA, may need to map phonemes
+        """The ARPA symbols of *text* from g2p_en, mapped to IPA unless the alphabet is ARPA."""
+        self.get_lang(lang)
         if self.alphabet == Alphabet.ARPA:
             return self.g2p(text)
         return "".join([arpa_to_ipa_lookup.get(pho, pho) for pho in self.g2p(text)])

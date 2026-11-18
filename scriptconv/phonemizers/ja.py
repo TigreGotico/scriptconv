@@ -22,37 +22,30 @@ class OpenJTaklPhonemizer(BasePhonemizer):
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
-        """
-        Validates and returns the closest supported language code.
-
-        Args:
-            target_lang (str): The language code to validate.
-
-        Returns:
-            str: The validated language code.
+        """The closest of ``ja`` to *target_lang*.
 
         Raises:
-            ValueError: If the language code is unsupported.
+            UnsupportedLanguageError: If none is close enough.
         """
-        # this check is here only to throw an exception if invalid language is provided
         return cls.match_lang(target_lang, ["ja"])
 
     def phonemize_string(self, text: str, lang: str = "ja") -> str:
-        """
-        """
-        lang = self.get_lang(lang)
+        """The reading of *text* in romaji or kana, after a check that *lang* is Japanese."""
+        self.get_lang(lang)
         return self.g2p(text, kana=self.alphabet == Alphabet.KANA)
 
 
 class CutletPhonemizer(BasePhonemizer):
+    """Japanese text to romaji with cutlet.
+
+    With *use_foreign_spelling*, a word whose UniDic lemma has a foreign
+    spelling reads as that spelling: "カツ" gives "cutlet", not "katsu".
+    """
     engine_distribution = "cutlet"
 
     def __init__(self, alphabet=Alphabet.HEPBURN, use_foreign_spelling = False):
         _check_alphabet(self, alphabet,
                         [Alphabet.HEPBURN, Alphabet.KUNREI, Alphabet.NIHON])
-        # If `use_foreign_spelling` is true, output will use the foreign spelling
-        #         provided in a UniDic lemma when available. For example, "カツ" will
-        #         become "cutlet" instead of "katsu".
         try:
             import cutlet
         except ImportError as e:
@@ -67,25 +60,16 @@ class CutletPhonemizer(BasePhonemizer):
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
-        """
-        Validates and returns the closest supported language code.
-
-        Args:
-            target_lang (str): The language code to validate.
-
-        Returns:
-            str: The validated language code.
+        """The closest of ``ja`` to *target_lang*.
 
         Raises:
-            ValueError: If the language code is unsupported.
+            UnsupportedLanguageError: If none is close enough.
         """
-        # this check is here only to throw an exception if invalid language is provided
         return cls.match_lang(target_lang, ["ja"])
 
     def phonemize_string(self, text: str, lang: str = "ja") -> str:
-        """
-        """
-        lang = self.get_lang(lang)
+        """The romaji of *text*, after a check that *lang* is Japanese."""
+        self.get_lang(lang)
         return self.g2p.romaji(text)
 
 
