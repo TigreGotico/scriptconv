@@ -638,6 +638,12 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         in the probe of :func:`~scriptconv.phonemizers._revision.code_revision`."""
         return {}
 
+    def _identity_settings(self) -> Dict[str, object]:
+        """The settings on the instance, as JSON values, that change
+        :meth:`identity` besides the constructor arguments. They join the key
+        of the identity cache."""
+        return {}
+
     def _covered_distributions(self, lang: str) -> FrozenSet[str]:
         """The distributions whose own revision the identity of this backend
         holds for *lang*. The probe of
@@ -850,12 +856,16 @@ class GraphemePhonemizer(BasePhonemizer):
         :func:`~scriptconv.phonemizers._revision.code_revision` gives it. A
         character rule set on the instance joins the hash."""
         from scriptconv.phonemizers._revision import code_revision
+        revision = code_revision(self, lang, self._identity_settings())
+        return dataclasses.replace(super().identity(lang), revision=revision)
+
+    def _identity_settings(self) -> Dict[str, object]:
+        """Each character rule set on the instance to a value other than the class default."""
         settings = {name: getattr(self, name) for name in self._RULES
                     if name in vars(self) and getattr(self, name) != getattr(type(self), name)}
         if "replace_chars" in settings:
             settings["replace_chars"] = dict(settings["replace_chars"])
-        revision = code_revision(self, lang, settings)
-        return dataclasses.replace(super().identity(lang), revision=revision)
+        return settings
 
 
 class UnicodeCodepointPhonemizer(BasePhonemizer):

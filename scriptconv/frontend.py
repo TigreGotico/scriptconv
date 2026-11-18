@@ -61,6 +61,7 @@ import itertools
 import json
 import logging
 import re
+import sys
 import unicodedata
 from typing import Callable, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Tuple
 
@@ -646,10 +647,39 @@ class TextFrontend:
         shows, when scriptconv cannot vouch for a stage: the backend has no
         revision, the normaliser is another callable or a text2spoken with no
         ``revision``, the frontend diacritizes, or a casing runs.
+
+        An identity with a ``revision`` is kept on disk, as
+        :mod:`scriptconv.phonemizers._identity_cache` describes, so a later
+        process reads it back with no probe and no call into the backend.
         """
+        from scriptconv.phonemizers import _identity_cache
         stages = self._resolve(None)
+        entry_key = _identity_cache.key(self.backend, self._identity_settings(stages))
+        kept = _identity_cache.load(entry_key)
+        if kept is not None:
+            return kept
         identity = dataclasses.replace(self.backend.identity(stages.lang), frontend=FRONTEND_VERSION)
-        return dataclasses.replace(identity, revision=self._revision(identity.revision, stages))
+        identity = dataclasses.replace(identity, revision=self._revision(identity.revision, stages))
+        _identity_cache.store(entry_key, identity, self.backend)
+        return identity
+
+    def _revision_settings(self, stages: Stages) -> Dict[str, object]:
+        """The frontend settings that change the output and join the revision."""
+        return {"keep_punctuation": self.config.keep_punctuation, "strict": self.config.strict,
+                "whole_text_limit": self.config.whole_text_limit,
+                "alphabet": Alphabet(self.config.alphabet).value, "normalize": stages.normalize,
+                "lang": stages.lang, "chunk": stages.chunk.value}
+
+    def _identity_settings(self, stages: Stages) -> Dict[str, object]:
+        """The frontend settings that change :meth:`identity`: those of the
+        revision, and the stages that decide whether there is one."""
+        normalizer = None
+        if stages.normalize and self.config.normalizer is not None:
+            text2spoken = sys.modules.get("text2spoken")
+            normalizer = ("text2spoken" if text2spoken is not None
+                          and self.config.normalizer is getattr(text2spoken, "normalize", None) else "other")
+        return {**self._revision_settings(stages), "diacritize": stages.diacritize,
+                "casing": stages.casing is not None, "normalizer": normalizer}
 
     def _revision(self, backend_revision: Optional[str], stages: Stages) -> Optional[str]:
         """The revision of :meth:`identity`, from the backend's revision and the resolved *stages*."""
@@ -670,11 +700,7 @@ class TextFrontend:
                             stages.lang, exc)
                 return None
         from scriptconv.phonemizers._revision import FORMAT, code_revision
-        settings = {"keep_punctuation": self.config.keep_punctuation, "strict": self.config.strict,
-                    "whole_text_limit": self.config.whole_text_limit,
-                    "alphabet": Alphabet(self.config.alphabet).value, "normalize": stages.normalize,
-                    "lang": stages.lang, "chunk": stages.chunk.value}
-        code = code_revision(self.backend, stages.lang, settings, frontend=True)
+        code = code_revision(self.backend, stages.lang, self._revision_settings(stages), frontend=True)
         if code is None:
             return None
         digest = hashlib.sha256(json.dumps([FORMAT, backend_revision, code, normalizer]).encode())

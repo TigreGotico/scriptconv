@@ -403,5 +403,27 @@ The `revision` is `None` when scriptconv cannot vouch for a stage, so a
 - the frontend diacritizes
 - a casing runs
 
+**The identity is kept on disk.** The first `identity()` of a frontend runs
+the revision probes, which take seconds. An identity with a `revision` is then
+written to `~/.cache/scriptconv/identity/` (`$XDG_CACHE_HOME` when it is set,
+`~/Library/Caches` on macOS, `%LOCALAPPDATA%` on Windows). A later process
+reads it back in about a millisecond, with no probe and no call into the
+backend.
+
+An entry is found by the Python interpreter and version, the `sys.path`
+entries, the Unicode version, the backend class with its arguments and
+instance settings, and the frontend settings. A hit also needs these files to
+keep their size and modification time:
+
+- each `sys.path` directory, so an installed or removed distribution gives a
+  miss
+- the `RECORD` of each distribution, so a reinstalled one gives a miss
+- each file of a package from an editable install or a checkout on the path
+- the source file of each class of the backend outside scriptconv
+
+An entry that cannot be read is a miss, and a cache directory that cannot be
+written gives no entry and no error. Two processes can write one entry at
+once: each writes a temporary file and renames it into place.
+
 ---
 [← phonemizers](phonemizers.md) · [Home](../README.md) · [ovos →](ovos.md)

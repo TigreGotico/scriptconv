@@ -1,7 +1,7 @@
 import dataclasses
 import functools
 import logging
-from typing import FrozenSet, Optional, Tuple
+from typing import Dict, FrozenSet, Optional, Tuple
 
 from scriptconv.phonemizers.base import BasePhonemizer, PhonemizerIdentity, _check_alphabet
 from scriptconv.phonemizers.enums import Alphabet
@@ -58,6 +58,9 @@ class TugaphonePhonemizer(BasePhonemizer):
             return dialects[target_lang.replace("_", "-").lower()]
         # this check is here only to throw an exception if invalid language is provided
         return cls.match_lang(target_lang, ["pt-PT", "pt-BR", "pt-AO", "pt-MZ", "pt-TL"])
+
+    def _identity_settings(self) -> Dict[str, object]:
+        return {"contact": self.contact}
 
     def _covered_distributions(self, lang: str) -> FrozenSet[str]:
         """The distributions that ``tugaphone.revision`` covers for the lect of *lang*."""
