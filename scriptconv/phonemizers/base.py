@@ -719,8 +719,9 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         matching the digit:digit exemption in ``chunk_text``.
 
         A mark that :data:`CLAUSE_PUNCTUATION` reads as ``!`` or ``?``, such as
-        the Arabic ``؟``, between two letters, as in "Sim!Não", still
-        separates two words, so a run of them becomes one space.
+        the Arabic ``؟``, between two letters, as in "Sim!Não", or between a
+        digit and a letter, as in "4.50!They", still separates two words, so a
+        run of them becomes one space.
         """
         out = []
         chars = list(text)
@@ -737,7 +738,7 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
                     letter = i - 1
                     while letter > 0 and unicodedata.category(chars[letter]).startswith("M"):
                         letter -= 1
-                    separates = (i > 0 and chars[letter].isalpha()
+                    separates = (i > 0 and chars[letter].isalnum()
                                  and end < len(chars) and chars[end].isalpha())
                     if separates:
                         out.append(" ")
@@ -788,6 +789,10 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         # still splits as before.
         def _delim_alt(delimiter: str) -> str:
             escaped = re.escape(delimiter)
+            if delimiter in (":", ";"):
+                # as in split_clauses, only before whitespace, so the ":" in
+                # the Bengali word "নি:সন্দেহে" stays in its word
+                return f"{escaped}(?=\\s|$)"
             return f"(?:(?<!\\d){escaped}|{escaped}(?!\\d))"
 
         delimiter_pattern = _delim_alt(delimiters[0])
