@@ -17,7 +17,7 @@ import pytest
 from packaging.requirements import Requirement
 
 from scriptconv import frontend as frontend_module
-from scriptconv.frontend import FrontendConfig, Stages, TextFrontend, spoken_normalizer
+from scriptconv.frontend import Chunk, FrontendConfig, Stages, TextFrontend, spoken_normalizer
 from scriptconv.graph import ConversionGraph
 from scriptconv.phonemizers import (
     Alphabet,
@@ -183,6 +183,42 @@ class TestStageOrder:
         frontend = build(Echo(), normalizer=stages.normalize)
         assert frontend.phonemize("ab", Stages(normalize=False, diacritize=False)) == [list("ab")]
         assert stages.log == []
+
+
+class TestSegmentText:
+    """The ``text`` of a segment is the staged source text the backend read."""
+
+    @pytest.mark.parametrize("chunk, text, expected", [
+        (Chunk.SENTENCE, "Olá mundo. Tudo bem?", ["Olá mundo.", "Tudo bem?"]),
+        (Chunk.CLAUSE, "Olá, mundo. Tudo bem?", ["Olá,", "mundo.", "Tudo bem?"]),
+        (Chunk.PARAGRAPH, "Olá mundo. Tudo bem?", ["Olá mundo. Tudo bem?"]),
+        (Chunk.NONE, "Olá mundo. Tudo bem?", ["Olá mundo. Tudo bem?"]),
+    ])
+    def test_the_text_is_the_staged_sentence_or_clause(self, chunk, text, expected):
+        frontend = build(Echo(), stages=Stages(diacritize=False))
+        assert [s.text for s in frontend.segments(text, Stages(chunk=chunk))] == expected
+
+    def test_a_sentence_the_backend_splits_does_not_repeat_its_text(self):
+        class Splitter(Echo):
+            def phonemize_lazy(self, text, lang):
+                yield list(text)
+                yield list(text)
+
+        frontend = build(Splitter(), stages=Stages(diacritize=False))
+        assert [s.text for s in frontend.segments("Olá mundo.",
+                                                  Stages(chunk=Chunk.NONE))] == ["Olá mundo."]
+
+    def test_the_normalizer_output_is_the_text(self):
+        frontend = build(Echo(), normalizer=lambda text, lang: text.upper(),
+                         stages=Stages(diacritize=False))
+        assert [s.text for s in frontend.segments("Olá mundo. Tudo bem?")] == [
+            "OLÁ MUNDO.", "TUDO BEM?"]
+
+    def test_a_block_keeps_its_written_text(self):
+        frontend = build(Echo(), stages=Stages(diacritize=False))
+        assert [s.text for s in frontend.segments("[[ana]] Olá.",
+                                                  Stages(chunk=Chunk.SENTENCE))] == [
+            "[[ana]]", "Olá."]
 
 
 class TestInlineBlocks:

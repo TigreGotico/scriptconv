@@ -286,6 +286,10 @@ class _Piece:
     """The backend's start and end symbols, with their stream values, for a
     piece of bounded segments. :attr:`phonemes` holds neither: :meth:`closed`
     writes them around a chunk, so a join or a block works inside them."""
+    text: Optional[str] = None
+    """The staged source text of the piece, or ``None`` where the frontend
+    cannot say. The first piece of a part holds the part's text, and each
+    later piece of that part holds ``""``."""
 
     @classmethod
     def of(cls, segment: Segment) -> "_Piece":
@@ -424,6 +428,7 @@ def _join(pieces: Iterable[_Piece], space: Segment) -> _Piece:
     :meth:`TextFrontend.phonemize_flat` join by this function.
     """
     joined = _Piece([])
+    texts = []
     for piece in pieces:
         if not piece.phonemes:
             continue
@@ -434,6 +439,9 @@ def _join(pieces: Iterable[_Piece], space: Segment) -> _Piece:
         joined.ends_in_token = piece.ends_in_token
         joined.ends_sentence = piece.ends_sentence
         joined.ends_paragraph = piece.ends_paragraph
+        texts.append(piece.text)
+    if texts and all(text is not None for text in texts):
+        joined.text = " ".join(t for t in texts if t)
     return joined
 
 
@@ -575,11 +583,16 @@ class TextFrontend:
         bounded segments of the backend join, the inner end and start symbols
         go with their stream values. Each chunk is a :class:`~scriptconv.phonemizers.base.Segment`
         whose symbols hold the clause symbols, so its ``mark`` is ``None``.
+        The segment's ``text`` is the staged source text of its chunk, joined
+        with one space for a chunk of several sentences, or ``None`` where the
+        frontend cannot say. The first piece of a part holds the part's text,
+        and each later piece of that part holds ``""``, so it drops out of the
+        join.
         """
         for chunk in self._chunk_pieces(text, self._resolve(stages)):
             yield Segment(tuple(chunk.phonemes), None, chunk.ends_sentence,
                           {name: tuple(values) for name, values in chunk.streams.items()},
-                          chunk.ends_paragraph, chunk.bounds is not None)
+                          chunk.ends_paragraph, chunk.bounds is not None, text=chunk.text)
 
     def phonemize_flat(self, text: str, stages: Optional[Stages] = None) -> List[str]:
         """Phonemes of *text* as one list, for training.
@@ -941,6 +954,7 @@ class TextFrontend:
             self._check_read(part, [p for piece in read for p in piece.phonemes], stages)
             words_follow = clauses and any(c.isalnum() for c in "".join(texts[index + 1:]))
             for count, piece in enumerate(read, 1):
+                piece.text = part.strip() if count == 1 else ""
                 piece.ends_in_token = tokens and piece.phonemes[-1] in _CLAUSE_TOKENS
                 if count == len(read):
                     if words_follow and piece.ends_in_token:
@@ -993,6 +1007,7 @@ class TextFrontend:
         ends in one.
         """
         piece = _Piece.of(segment)
+        piece.text = segment.text
         if segment.bounded:
             piece.ends_in_token = segment.mark is not None
         elif self.backend.keep_punctuation and segment.mark is not None:
@@ -1054,6 +1069,7 @@ class TextFrontend:
         """
         text, after = parts[index - 1], parts[index + 1]
         symbols = parts[index][2:-2].strip()
+        piece.text = parts[index]
         phonemes = piece.phonemes
         space, space_streams = self._space.phonemes, self._space.streams
         if piece.bounds is not None:
