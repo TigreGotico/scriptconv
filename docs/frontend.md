@@ -407,8 +407,12 @@ The `revision` is `None` when scriptconv cannot vouch for a stage, so a
 the revision probes, which take seconds. An identity with a `revision` is then
 written to `~/.cache/scriptconv/identity/` (`$XDG_CACHE_HOME` when it is set,
 `~/Library/Caches` on macOS, `%LOCALAPPDATA%` on Windows). A later process
-reads it back in about a millisecond, with no probe and no call into the
-backend.
+reads it back with no probe and no call into the backend. In an install with
+no editable installs, a hit takes about a millisecond. Each checkout on the
+path and each editable install adds the time to read the state of its files,
+so in a development venv with hundreds of editable installs a hit takes about
+60 to 75 ms. phoonnx runs this check in a background thread, so a voice load
+does not wait for it.
 
 An entry is found by the Python interpreter and version, the `sys.path`
 entries, the Unicode version, the backend class with its arguments and
