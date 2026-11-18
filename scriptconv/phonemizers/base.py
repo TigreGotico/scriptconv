@@ -28,7 +28,7 @@ import string
 import unicodedata
 from importlib import metadata
 from types import MappingProxyType
-from typing import Callable, ClassVar, Dict, Iterable, Iterator, List, Mapping, Optional, Tuple, Literal, Union
+from typing import Callable, ClassVar, Dict, FrozenSet, Iterable, Iterator, List, Mapping, Optional, Tuple, Literal, Union
 
 from scriptconv.phonemizers.enums import Alphabet
 from scriptconv.version import VERSION_STR
@@ -637,6 +637,13 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         """The constructor arguments, as JSON values, that rebuild this backend
         in the probe of :func:`~scriptconv.phonemizers._revision.code_revision`."""
         return {}
+
+    def _covered_distributions(self, lang: str) -> FrozenSet[str]:
+        """The distributions whose own revision the identity of this backend
+        holds for *lang*. The probe of
+        :func:`~scriptconv.phonemizers._revision.code_revision` leaves their
+        files out of the hash."""
+        return frozenset()
 
     def identity(self, lang: str) -> PhonemizerIdentity:
         """What phonemizes *lang* here: the engine, its version and the lect.

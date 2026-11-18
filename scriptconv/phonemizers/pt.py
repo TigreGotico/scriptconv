@@ -1,13 +1,23 @@
 import dataclasses
+import functools
+import logging
+from typing import FrozenSet, Optional, Tuple
 
 from scriptconv.phonemizers.base import BasePhonemizer, PhonemizerIdentity, _check_alphabet
 from scriptconv.phonemizers.enums import Alphabet
 from scriptconv.phonemizers.o2ipa import Orthography2IPAPhonemizer
 
+LOG = logging.getLogger(__name__)
+
 
 class TugaphonePhonemizer(BasePhonemizer):
     owned_stages = frozenset({"diacritize"})
     engine_distribution = "tugaphone"
+
+    contact = "none"
+    """The embedded-language policy that this backend passes to tugaphone.
+    ``tugaphone.revision`` covers ``"none"`` only, so any other value gives
+    no ``revision``."""
 
     def __init__(self):
         try:
@@ -49,10 +59,51 @@ class TugaphonePhonemizer(BasePhonemizer):
         # this check is here only to throw an exception if invalid language is provided
         return cls.match_lang(target_lang, ["pt-PT", "pt-BR", "pt-AO", "pt-MZ", "pt-TL"])
 
+    def _covered_distributions(self, lang: str) -> FrozenSet[str]:
+        """The distributions that ``tugaphone.revision`` covers for the lect of *lang*."""
+        engine = _tugaphone_revision(self.get_lang(lang))
+        return frozenset() if engine is None else engine[1]
+
+    def identity(self, lang: str) -> PhonemizerIdentity:
+        """The base identity, with ``revision`` the code revision of this
+        backend that holds ``tugaphone.revision`` of the resolved lect.
+
+        ``tugaphone.revision`` covers tugaphone and each distribution that its
+        output path loads, for ``contact="none"``. The code revision of
+        :func:`~scriptconv.phonemizers._revision.code_revision` adds the
+        scriptconv code on the path of this backend, and the distributions
+        that tugaphone does not cover. So a tugaphone release that keeps its
+        revision keeps this revision. ``revision`` is ``None`` when
+        :attr:`contact` is not ``"none"``, and, with one warning, when
+        tugaphone gives no revision.
+        """
+        from scriptconv.phonemizers._revision import code_revision
+        identity = super().identity(lang)
+        if self.contact != "none":
+            return identity
+        engine = _tugaphone_revision(identity.lang)
+        if engine is None:
+            return identity
+        return dataclasses.replace(
+            identity, revision=code_revision(self, identity.lang, {"tugaphone": engine[0]}))
+
     def phonemize_string(self, text: str, lang: str) -> str:
         lang = self.get_lang(lang)
-        return self.tuga.phonemize_sentence(text, lang)
+        return self.tuga.phonemize_sentence(text, lang, contact=self.contact)
 
+
+@functools.lru_cache(maxsize=None)
+def _tugaphone_revision(lect: str) -> Optional[Tuple[str, FrozenSet[str]]]:
+    """``tugaphone.revision`` of *lect* and the distributions it covers, or
+    ``None`` and one warning in this process when tugaphone gives no revision."""
+    import tugaphone
+    from tugaphone.content_revision import distributions
+    try:
+        return tugaphone.revision(lect), frozenset(distributions(tugaphone.resolve_lect(lect)))
+    except tugaphone.RevisionError as exc:
+        LOG.warning("tugaphone gives no revision for %r, so the identity has none: %s: %s",
+                    lect, type(exc).__name__, exc)
+        return None
 
 
 class BarranquenhoPhonemizer(BasePhonemizer):
@@ -87,10 +138,21 @@ class BarranquenhoPhonemizer(BasePhonemizer):
         """
         return cls.match_lang(target_lang, cls._LANGS)
 
+    def _covered_distributions(self, lang: str) -> FrozenSet[str]:
+        return self._o2i._covered_distributions(self._SPEC)
+
     def identity(self, lang: str) -> PhonemizerIdentity:
-        engine = self._o2i.identity(self._SPEC)
-        return dataclasses.replace(super().identity(lang), distribution=engine.distribution,
-                                   version=engine.version, revision=engine.revision)
+        """The base identity, with ``revision`` the code revision of this
+        backend that holds the orthography2ipa revision of ``ext-PT-x-barranco``,
+        as :meth:`Orthography2IPAPhonemizer.identity
+        <scriptconv.phonemizers.o2ipa.Orthography2IPAPhonemizer.identity>` gives it."""
+        from scriptconv.phonemizers._revision import code_revision
+        identity = super().identity(lang)
+        engine = self._o2i._spec_revision(self._SPEC)
+        if engine is None:
+            return identity
+        return dataclasses.replace(
+            identity, revision=code_revision(self, identity.lang, {"orthography2ipa": engine}))
 
     def phonemize_string(self, text: str, lang: str = "ext-PT-x-barrancos") -> str:
         self.get_lang(lang)

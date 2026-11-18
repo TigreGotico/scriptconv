@@ -143,9 +143,11 @@ class TestDiffersFrom:
 
 class TestIdentity:
     def test_a_wrapper_names_its_engine_and_the_resolved_lect(self):
-        assert TugaphonePhonemizer().identity("pt-pt-x-porto") == PhonemizerIdentity(
+        identity = TugaphonePhonemizer().identity("pt-pt-x-porto")
+        assert identity == PhonemizerIdentity(
             backend="tugaphone", distribution="tugaphone",
-            version=tugaphone.version.__version__, lang="pt-PT-x-porto", revision=None)
+            version=tugaphone.version.__version__, lang="pt-PT-x-porto", revision=identity.revision)
+        assert identity.revision.startswith("sc1:")
 
     @pytest.mark.parametrize("member, lang, distribution", [
         (Phonemizer.MANTOQ, "ar", "scriptconv-nonfree"),
@@ -178,29 +180,28 @@ class TestIdentity:
 
 
 class TestOrthography2IPARevision:
-    @staticmethod
-    def with_lexicon(lang):
-        """The spec revision and the lexicon revision of *lang*, hashed together."""
-        patches = lang in orthography2ipa.packaged_lexicon_sources(patches=True)
-        combined = (f"{orthography2ipa.spec_revision(lang)}\n"
-                    f"{orthography2ipa.lexicon_revision(lang, patches=patches)}")
-        return "sha256:" + hashlib.sha256(combined.encode()).hexdigest()
+    def test_the_revision_holds_the_spec_revision(self, monkeypatch):
+        first = Orthography2IPAPhonemizer().identity("gl")
+        monkeypatch.setattr(orthography2ipa, "spec_revision", lambda code: "sha256:other")
+        second = Orthography2IPAPhonemizer().identity("gl")
+        assert first.lang == "gl-ES" and first.revision.startswith("sc1:")
+        assert second.revision.startswith("sc1:") and second.revision != first.revision
 
-    def test_a_lect_with_no_lexicon_reports_the_spec_revision(self):
-        assert "gl-ES" not in orthography2ipa.packaged_lexicon_sources()
-        identity = Orthography2IPAPhonemizer().identity("gl")
-        assert (identity.lang, identity.revision) == \
-            ("gl-ES", orthography2ipa.spec_revision("gl-ES"))
-
-    def test_a_packaged_lexicon_changes_the_revision(self):
+    def test_a_packaged_lexicon_changes_the_revision(self, monkeypatch):
         assert "pt-PT" in orthography2ipa.packaged_lexicon_sources()
-        revision = Orthography2IPAPhonemizer().identity("pt-PT").revision
-        assert revision != orthography2ipa.spec_revision("pt-PT")
-        assert revision == self.with_lexicon("pt-PT")
+        with_lexicon = Orthography2IPAPhonemizer().identity("pt-PT").revision
+        rules_only = Orthography2IPAPhonemizer(packaged_lexicons=False).identity("pt-PT").revision
+        monkeypatch.setattr(orthography2ipa, "lexicon_revision", lambda code, patches: "other")
+        other_lexicon = Orthography2IPAPhonemizer().identity("pt-PT").revision
+        assert None not in (with_lexicon, rules_only, other_lexicon)
+        assert len({with_lexicon, rules_only, other_lexicon}) == 3
 
-    def test_an_engine_without_packaged_lexicons_reports_the_spec_revision(self):
-        identity = Orthography2IPAPhonemizer(packaged_lexicons=False).identity("pt-PT")
-        assert identity.revision == orthography2ipa.spec_revision("pt-PT")
+    def test_the_engine_files_leave_the_hash(self):
+        assert Orthography2IPAPhonemizer()._covered_distributions("pt-PT") == \
+            {"orthography2ipa", "o2i-lexicons"}
+        assert Orthography2IPAPhonemizer(packaged_lexicons=False)._covered_distributions("pt-PT") == \
+            {"orthography2ipa"}
+        assert Orthography2IPAPhonemizer()._covered_distributions("gl") == {"orthography2ipa"}
 
     def test_two_calls_give_equal_identities(self):
         phonemizer = Orthography2IPAPhonemizer()
@@ -208,7 +209,7 @@ class TestOrthography2IPARevision:
         phonemizer.phonemize_string("olá", "pt-PT")
         second = phonemizer.identity("pt-PT")
         assert first == second
-        assert second.revision == self.with_lexicon("pt-PT")
+        assert second.revision.startswith("sc1:")
 
     def test_a_missing_engine_source_gives_no_revision_and_a_warning(self, monkeypatch, caplog):
         def unavailable(code):
@@ -224,7 +225,93 @@ class TestOrthography2IPARevision:
     def test_an_equal_revision_hides_an_engine_upgrade(self):
         current = Orthography2IPAPhonemizer().identity("gl")
         upgraded = dataclasses.replace(current, version="99.0.0")
+        assert current.revision is not None
         assert current.differs_from(upgraded) == ()
+
+
+@pytest.fixture
+def fresh_tugaphone():
+    """No ``tugaphone.revision`` kept by an earlier test, and none kept after this one."""
+    from scriptconv.phonemizers import pt
+    cache = getattr(pt, "_tugaphone_revision", None)
+    if cache is not None:
+        cache.cache_clear()
+    yield
+    if cache is not None:
+        cache.cache_clear()
+
+
+def hashed_tops(monkeypatch):
+    """The names that :func:`_revision._top_level_digest` hashes from here on."""
+    from scriptconv.phonemizers import _revision
+    tops = []
+    digest = _revision._top_level_digest
+
+    def recorded(name):
+        tops.append(name)
+        return digest(name)
+    monkeypatch.setattr(_revision, "_top_level_digest", recorded)
+    return tops
+
+
+@pytest.mark.usefixtures("fresh_tugaphone")
+class TestTugaphoneRevision:
+    def test_the_revision_holds_the_tugaphone_revision(self, monkeypatch):
+        from scriptconv.phonemizers import pt
+        monkeypatch.setattr(tugaphone, "revision", lambda lang: "tp1:one")
+        first = TugaphonePhonemizer().identity("pt-PT").revision
+        pt._tugaphone_revision.cache_clear()
+        monkeypatch.setattr(tugaphone, "revision", lambda lang: "tp1:two")
+        second = TugaphonePhonemizer().identity("pt-PT").revision
+        assert first.startswith("sc1:") and second.startswith("sc1:")
+        assert first != second
+
+    def test_the_lect_changes_the_revision(self):
+        revisions = {TugaphonePhonemizer().identity(lect).revision
+                     for lect in ("pt-PT", "pt-BR", "pt-PT-x-porto")}
+        assert None not in revisions and len(revisions) == 3
+
+    def test_an_equal_revision_hides_a_tugaphone_upgrade(self, monkeypatch):
+        from scriptconv.phonemizers import base
+        current = TugaphonePhonemizer().identity("pt-PT")
+        installed = metadata.version
+        monkeypatch.setattr(base.metadata, "version",
+                            lambda name: "99.0.0" if name == "tugaphone" else installed(name))
+        upgraded = TugaphonePhonemizer().identity("pt-PT")
+        assert current.revision is not None and upgraded.version == "99.0.0"
+        assert current.revision == upgraded.revision
+        assert current.differs_from(upgraded) == ()
+
+    def test_the_tugaphone_files_leave_the_hash(self, monkeypatch):
+        from scriptconv.phonemizers import _revision
+        _revision._probe_outcome.cache_clear()
+        tops = hashed_tops(monkeypatch)
+        assert TugaphonePhonemizer().identity("pt-PT").revision is not None
+        assert TextFrontend(FrontendConfig("pt-PT"), TugaphonePhonemizer()).identity().revision is not None
+        assert "quebra_frases" in tops
+        assert not {"tugaphone", "orthography2ipa", "o2i_lexicons"} & set(tops)
+
+    def test_a_tugaphone_revision_error_gives_no_revision_and_one_warning(self, monkeypatch, caplog):
+        def fails(lang):
+            raise tugaphone.RevisionError("the revision probe for 'pt-PT' did not finish in 120 s")
+        monkeypatch.setattr(tugaphone, "revision", fails)
+        with caplog.at_level(logging.WARNING, logger="scriptconv.phonemizers.pt"):
+            identities = [TugaphonePhonemizer().identity("pt-PT") for _ in range(3)]
+        assert [identity.revision for identity in identities] == [None] * 3
+        warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warnings) == 1
+        assert "RevisionError" in warnings[0] and "did not finish in 120 s" in warnings[0]
+
+    def test_a_contact_other_than_none_gives_no_revision(self):
+        mixed = TugaphonePhonemizer()
+        mixed.contact = "en"
+        assert TugaphonePhonemizer().identity("pt-PT").revision is not None
+        assert mixed.identity("pt-PT").revision is None
+        # the policy reaches tugaphone and changes the output
+        assert mixed.phonemize_string("o weekend", "pt-PT") == \
+            tugaphone.TugaPhonemizer().phonemize_sentence("o weekend", "pt-PT", contact="en")
+        assert mixed.phonemize_string("o weekend", "pt-PT") != \
+            TugaphonePhonemizer().phonemize_string("o weekend", "pt-PT")
 
 
 # Each backend whose revision hashes the code and data on its path, as source
@@ -242,16 +329,36 @@ CODE_FRONTENDS = {
     "frontend-graphemes": ("GraphemePhonemizer()", "pt-PT"),
     "frontend-unicode": ("UnicodeCodepointPhonemizer()", "pt-PT"),
 }
-REVISIONS = f"""
+# Each backend that wraps an engine with a revision of its own, and a frontend
+# that reads through one.
+WRAPPER_BACKENDS = {
+    "tugaphone": ("TugaphonePhonemizer()", "pt-PT"),
+    "orthography2ipa": ("Orthography2IPAPhonemizer()", "pt-PT"),
+    "barranquenho": ("BarranquenhoPhonemizer()", "ext-PT-x-barrancos"),
+    "mirandese": ("MirandesePhonemizer()", "mwl-x-sendim"),
+}
+WRAPPER_FRONTENDS = {"frontend-tugaphone": ("TugaphonePhonemizer()", "pt-PT")}
+
+
+def revisions_script(backends, frontends):
+    """Python source that prints the revision of each of *backends* and *frontends*."""
+    return f"""
 import json, scriptconv
 from scriptconv.frontend import FrontendConfig, TextFrontend
 from scriptconv.phonemizers import GraphemePhonemizer, UnicodeCodepointPhonemizer
 from scriptconv.phonemizers.ber import MatoubKabylePhonemizer
-revisions = {{name: eval(source).identity(lang).revision for name, (source, lang) in {CODE_BACKENDS!r}.items()}}
+from scriptconv.phonemizers.mwl import MirandesePhonemizer
+from scriptconv.phonemizers.o2ipa import Orthography2IPAPhonemizer
+from scriptconv.phonemizers.pt import BarranquenhoPhonemizer, TugaphonePhonemizer
+revisions = {{name: eval(source).identity(lang).revision for name, (source, lang) in {backends!r}.items()}}
 revisions.update({{name: TextFrontend(FrontendConfig(lang), eval(source)).identity().revision
-                  for name, (source, lang) in {CODE_FRONTENDS!r}.items()}})
+                  for name, (source, lang) in {frontends!r}.items()}})
 print(json.dumps({{"scriptconv": scriptconv.__file__, **revisions}}))
 """
+
+
+REVISIONS = revisions_script(CODE_BACKENDS, CODE_FRONTENDS)
+WRAPPER_REVISIONS = revisions_script(WRAPPER_BACKENDS, WRAPPER_FRONTENDS)
 SCRIPTCONV = Path(sys.modules["scriptconv"].__file__).parent
 
 # Edits of the scriptconv source, (file, old text, new text), on the path of the
@@ -310,9 +417,9 @@ NEUTRAL_EDITS = {
 }
 
 
-def revisions_in_a_copy(directory, edit=None):
-    """The revision of each of :data:`CODE_BACKENDS`, in a fresh process, from a
-    copy of the scriptconv package with *edit* ``(file, old, new)`` applied."""
+def revisions_in_a_copy(directory, edit=None, script=REVISIONS):
+    """The revisions that *script* prints, in a fresh process, from a copy of
+    the scriptconv package with *edit* ``(file, old, new)`` applied."""
     tree = directory / "tree"
     shutil.copytree(SCRIPTCONV, tree / "scriptconv", ignore=shutil.ignore_patterns("__pycache__"))
     if edit is not None:
@@ -321,7 +428,7 @@ def revisions_in_a_copy(directory, edit=None):
         source = path.read_text(encoding="utf-8")
         assert source.count(old) == 1, f"{old!r} is not in {target} once"
         path.write_text(source.replace(old, new), encoding="utf-8")
-    done = subprocess.run([sys.executable, "-c", REVISIONS], cwd=tree, check=True,
+    done = subprocess.run([sys.executable, "-c", script], cwd=tree, check=True,
                           capture_output=True, text=True,
                           env={**os.environ, "PYTHONPATH": str(tree), "PYTHONDONTWRITEBYTECODE": "1"})
     revisions = json.loads(done.stdout.splitlines()[-1])
@@ -444,6 +551,58 @@ class TestCodeRevision:
         assert eval(source).identity(lang).revision != current
 
 
+# Edits of the wrapper code, (backend, file, old text, new text). Each changes
+# the output of the named backend for some input.
+WRAPPER_MUTANTS = {
+    "T1 the tugaphone wrapper drops the stress mark": (
+        "tugaphone", "phonemizers/pt.py",
+        "return self.tuga.phonemize_sentence(text, lang, contact=self.contact)",
+        'return self.tuga.phonemize_sentence(text, lang, contact=self.contact).replace("ˈ", "")'),
+    "T2 a semicolon is kept as a comma, tugaphone": (
+        "tugaphone", "phonemizers/base.py", '":": ":", ";": ";",', '":": ":", ";": ",",'),
+    "T3 the tugaphone frontend keeps a block of whitespace": (
+        "frontend-tugaphone", "frontend.py", "if block[2:-2].strip():", "if block[2:-2]:"),
+    "O1 the orthography2ipa wrapper drops the stress mark": (
+        "orthography2ipa", "phonemizers/o2ipa.py",
+        "return self._engine(resolved).transcribe(text)",
+        'return self._engine(resolved).transcribe(text).replace("ˈ", "")'),
+    "B1 the Barranquenho wrapper drops the stress mark": (
+        "barranquenho", "phonemizers/pt.py",
+        "return self._o2i.phonemize_string(text, self._SPEC)",
+        'return self._o2i.phonemize_string(text, self._SPEC).replace("ˈ", "")'),
+    "M1 the Mirandese wrapper drops the stress mark": (
+        "mirandese", "phonemizers/mwl.py",
+        "return self._o2i.phonemize_string(text, DIALECTS[self.get_lang(lang)])",
+        'return self._o2i.phonemize_string(text, DIALECTS[self.get_lang(lang)]).replace("ˈ", "")'),
+}
+
+
+@pytest.fixture(scope="module")
+def wrapped_pristine(tmp_path_factory):
+    return revisions_in_a_copy(tmp_path_factory.mktemp("wrapped"), script=WRAPPER_REVISIONS)
+
+
+# Each copy runs the tugaphone and orthography2ipa probes in a fresh process.
+@pytest.mark.timeout(900)
+class TestWrapperRevision:
+    def test_each_wrapper_has_its_own_revision(self, wrapped_pristine):
+        assert all(revision.startswith("sc1:") for revision in wrapped_pristine.values())
+        assert len(set(wrapped_pristine.values())) == len(WRAPPER_BACKENDS) + len(WRAPPER_FRONTENDS)
+
+    @pytest.mark.parametrize("mutant", WRAPPER_MUTANTS)
+    def test_a_wrapper_code_change_changes_the_revision(self, mutant, wrapped_pristine, tmp_path):
+        backend, *edit = WRAPPER_MUTANTS[mutant]
+        assert wrapped_pristine[backend] is not None
+        changed = revisions_in_a_copy(tmp_path, edit, WRAPPER_REVISIONS)
+        assert changed[backend] != wrapped_pristine[backend]
+
+    @pytest.mark.parametrize("edit", NEUTRAL_EDITS)
+    def test_an_edit_that_changes_no_output_keeps_every_wrapper_revision(self, edit, wrapped_pristine,
+                                                                         tmp_path):
+        assert None not in wrapped_pristine.values()
+        assert revisions_in_a_copy(tmp_path, NEUTRAL_EDITS[edit], WRAPPER_REVISIONS) == wrapped_pristine
+
+
 def frontend(backend=None, **config):
     return TextFrontend(FrontendConfig("pt-PT", **config), backend or GraphemePhonemizer())
 
@@ -504,12 +663,15 @@ class TestFrontendRevision:
 
 @pytest.fixture
 def fresh_probes():
-    """Probe results kept by no earlier test, and none kept after this one."""
+    """Probe results and warnings kept by no earlier test, and none kept after this one."""
     from scriptconv.phonemizers import _revision
-    cache = getattr(_revision, "_probe_outcome", _revision._probe_digest)
-    cache.cache_clear()
+    caches = [getattr(_revision, name) for name in ("_probe_outcome", "_probe_digest", "_warn_once")
+              if hasattr(getattr(_revision, name, None), "cache_clear")]
+    for cache in caches:
+        cache.cache_clear()
     yield
-    cache.cache_clear()
+    for cache in caches:
+        cache.cache_clear()
 
 
 def fake_python(directory, body):
@@ -542,11 +704,41 @@ class TestProbeFailures:
         monkeypatch.setattr(sys, "executable", fake_python(tmp_path, "exit 0"))
         self.assert_no_revision_and_one_warning(caplog, "printed 0 results")
 
+    def test_a_failed_probe_warns_once_in_a_process(self, fresh_probes, tmp_path, monkeypatch, caplog):
+        monkeypatch.setattr(sys, "executable", fake_python(tmp_path, "exit 0"))
+        with caplog.at_level(logging.WARNING, logger="scriptconv.phonemizers._revision"):
+            revisions = [GraphemePhonemizer().identity("en").revision for _ in range(5)]
+        assert revisions == [None] * 5
+        warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warnings) == 1 and "printed 0 results" in warnings[0]
+
+    def test_a_failed_probe_keeps_no_exception(self, fresh_probes, monkeypatch):
+        from scriptconv.phonemizers import _revision
+        keys = []
+
+        def fails(*key):
+            keys.append(key)
+            raise _revision.RevisionProbeFailed("the probe exited with 1")
+        monkeypatch.setattr(_revision, "_run_probe", fails)
+        for _ in range(5):
+            assert GraphemePhonemizer().identity("en").revision is None
+        assert len(keys) == 1
+        kept = _revision._probe_outcome(*keys[0])
+        # a kept exception, raised again on each call, grows its traceback
+        assert not isinstance(kept, BaseException)
+        assert "the probe exited with 1" in str(kept)
+
+    def test_scriptconv_loaded_before_the_probe_gives_no_revision(self, fresh_probes, tmp_path,
+                                                                  monkeypatch, caplog):
+        (tmp_path / "sitecustomize.py").write_text("import scriptconv.phonemizers.base\n")
+        monkeypatch.syspath_prepend(str(tmp_path))
+        self.assert_no_revision_and_one_warning(caplog, "scriptconv loaded before it started")
+
     def test_a_print_after_the_probe_result_keeps_the_revision(self, fresh_probes, tmp_path,
                                                                monkeypatch):
         from scriptconv.phonemizers import _revision
         expected = GraphemePhonemizer().identity("en").revision
-        getattr(_revision, "_probe_outcome", _revision._probe_digest).cache_clear()
+        _revision._probe_outcome.cache_clear()
         (tmp_path / "sitecustomize.py").write_text('import atexit\natexit.register(print, "done")\n')
         monkeypatch.syspath_prepend(str(tmp_path))
         assert expected is not None
