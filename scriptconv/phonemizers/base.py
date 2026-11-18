@@ -534,12 +534,17 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         ``;``, ``...`` or ``|`` inside a sentence is a clause break, so it is a
         space, as a ``,`` is. In ``el`` a ``;`` is the question mark, so it
         ends the sentence.
+
+        A backend that owns ``normalize`` reads the text with its own rules, so
+        its chunk reaches it as written, stripped of outer whitespace, with the
+        punctuation that its normaliser reads.
         """
         question_semicolon = _primary_subtag(lang) == "el"
         sentence: List[List[str]] = []
         for chunk, punct, eos in self.chunk_text(text):
-            phoneme_str = _clause_breaks_as_spaces(
-                self.phonemize_string(self.remove_punctuation(chunk), lang))
+            read = (chunk.strip() if "normalize" in self.owned_stages
+                    else self.remove_punctuation(chunk))
+            phoneme_str = _clause_breaks_as_spaces(self.phonemize_string(read, lang))
             # Filter out (lang) switch (flags) that surround words from languages
             # other than the current voice — mirrors _process_phones().
             phoneme_str = re.sub(r"\([^)]+\)", "", phoneme_str)
@@ -564,6 +569,11 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         in the same sentence, after any symbol or none. No sentence starts with
         a space: :func:`join_sentences` adds the space between two sentences.
         Each sentence comes with whether it ends in an appended symbol.
+
+        A backend that owns ``normalize`` reads the text with its own rules, so
+        each clause reaches it as written, stripped of outer whitespace, with
+        the punctuation that its normaliser reads; the base still appends the
+        clause symbol.
         """
         try:
             from quebra_frases import sentence_tokenize
@@ -575,7 +585,8 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
             phonemes: List[str] = []
             ends_in_token = False
             for clause, mark in split_clauses(sentence):
-                clause = self.remove_punctuation(clause)
+                clause = (clause.strip() if "normalize" in self.owned_stages
+                          else self.remove_punctuation(clause))
                 if not clause:
                     continue
                 phoneme_str = _LANG_FLAGS.sub("", self.phonemize_string(clause, lang))
