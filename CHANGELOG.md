@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a117](https://github.com/TigreGotico/scriptconv/tree/0.0.4a117) (2026-11-18)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a116...0.0.4a117)
+
+**Merged pull requests:**
+
+- feat: tugaphone revision, wrapper code in the o2i-family revisions, and probe failure fixes [\#328](https://github.com/TigreGotico/scriptconv/pull/328) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a116](https://github.com/TigreGotico/scriptconv/tree/0.0.4a116) (2026-11-18)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a115...0.0.4a116)
