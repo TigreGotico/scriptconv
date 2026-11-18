@@ -51,10 +51,19 @@ spec that gives the phonemes did not change. The class attribute
 `engine_distribution` names the package that supplies the engine, and `None`
 means the code is in this repository.
 
-**Some backends hold a `revision`.** `orthography2ipa`, `mwl_phonemizer`,
-`barranquenho` and `dizione` take it from their engine. For `graphemes`,
-`unicode` and `matoub_kab`, the `revision` is `sc1:` and a hash of the code and
-data on the path of the backend.
+**Some backends hold a `revision`.** For `graphemes`, `unicode` and
+`matoub_kab`, the `revision` is `sc1:` and a hash of the code and data on the
+path of the backend. `dizione` takes it from its engine.
+
+For `tugaphone`, `orthography2ipa`, `mwl_phonemizer` and `barranquenho`, the
+`revision` is `sc1:` and a hash of the revision that the engine gives and of
+the code on the path of the backend. The engine revision is
+`tugaphone.revision(lect)` or the orthography2ipa spec revision of the lect,
+with its packaged lexicon. The files of the distributions that the engine
+revision covers leave the hash. So an engine release that keeps its revision
+keeps the `revision` of the backend, and a change of the scriptconv code on
+the path changes it. When the engine gives no revision, the backend has none,
+with one warning.
 
 A probe in a fresh process builds the backend. It reads a text with every
 clause mark through `phonemize` and `phonemize_to_list`, with
@@ -77,8 +86,10 @@ nothing.
 The first `identity` call for a backend and a language runs the probe. Later
 calls use the stored value. A backend that calls an engine outside scriptconv
 has no `revision`, so a change of its `version` always shows. A probe that
-fails, runs longer than 30 seconds or prints no result also gives no
-`revision`, with one warning.
+fails, runs longer than 120 seconds or prints no result also gives no
+`revision`, with one warning per backend and language in a process. So does a
+probe that finds scriptconv imported before it starts, for example by a
+`sitecustomize.py`.
 
 A `TextFrontend` has its own `revision`, which covers the frontend stages too.
 See [frontend](frontend.md).

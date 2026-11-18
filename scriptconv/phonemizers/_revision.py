@@ -19,6 +19,13 @@ open. The hash then covers:
   change the output besides the code, the language and
   :data:`unicodedata.unidata_version`.
 
+A backend that wraps an engine with a revision of its own, as tugaphone or
+orthography2ipa, names the distributions that the engine revision covers in
+:meth:`~scriptconv.phonemizers.base.BasePhonemizer._covered_distributions`.
+Their files leave the hash, and the backend puts the engine revision in the
+settings. So a release of the engine that keeps its revision keeps the revision
+of the backend, and a change of the wrapper code changes it.
+
 For :meth:`~scriptconv.frontend.TextFrontend.identity`, a second probe reads
 through a frontend, so the modules of the frontend stages count too.
 
@@ -30,9 +37,10 @@ docs, docstrings, ``version.py`` or the modules of other backends keeps it.
 A module on the path that does not load from a file in a directory, as from a
 zip archive, raises :class:`RevisionSourceUnavailable`, so it never counts as
 an empty digest. A probe that exits with an error, runs longer than
-:data:`PROBE_TIMEOUT`, or prints no readable result raises
-:class:`RevisionProbeFailed`. In both cases :func:`code_revision` gives no
-revision and logs one warning.
+:data:`PROBE_TIMEOUT`, prints no readable result, or finds scriptconv loaded
+before it starts, as from a ``sitecustomize.py``, raises
+:class:`RevisionProbeFailed`. In each case :func:`code_revision` gives no
+revision and logs one warning per backend, language and error in a process.
 """
 import functools
 import hashlib
@@ -41,6 +49,7 @@ import io
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 import tokenize
@@ -49,7 +58,7 @@ import uuid
 from importlib.metadata import packages_distributions, version
 from importlib.util import find_spec
 from pathlib import Path
-from typing import Dict, Iterator, List, Mapping, Optional, Tuple, Union
+from typing import Collection, Dict, Iterator, List, Mapping, NamedTuple, Optional, Tuple, Union
 
 LOG = logging.getLogger(__name__)
 
@@ -65,8 +74,10 @@ PROBE_TEXTS = (
     "T\u00edtulo\n\nTexto [[\u02c8a]] fim. a [[ ]] b",
 )
 
-PROBE_TIMEOUT = 30
-"""The seconds a probe may run before it counts as failed."""
+PROBE_TIMEOUT = 120
+"""The seconds a probe may run before it counts as failed. A probe runs the
+engine of the backend, and an engine such as tugaphone takes tens of seconds
+to start on a loaded machine."""
 
 _PROBE = """
 import sys
@@ -124,6 +135,13 @@ class RevisionProbeFailed(RuntimeError):
     """The probe process failed, timed out, or gave no readable result."""
 
 
+class _Failed(NamedTuple):
+    """A probe that failed, kept as the name and message of its error, so a
+    later call neither raises it again nor grows its traceback."""
+
+    error: str
+
+
 def _source_file(where, what: str) -> Path:
     """*where* as a path, when it is a file in a directory."""
     path = Path(where) if where else None
@@ -139,7 +157,8 @@ def code_revision(backend, lang: str, settings: Mapping, frontend: bool = False)
     *settings* are values besides the code that change the output; they join
     the hash. With *frontend*, the probe reads through a
     :class:`~scriptconv.frontend.TextFrontend`, so the modules of the frontend
-    count too.
+    count too. The files of the distributions that
+    ``backend._covered_distributions(lang)`` names leave the hash.
     """
     probed = next(cls for cls in type(backend).__mro__ if cls.__module__.startswith("scriptconv."))
     arguments = backend._revision_arguments()
@@ -149,45 +168,51 @@ def code_revision(backend, lang: str, settings: Mapping, frontend: bool = False)
          f"{type(backend).__module__}:{type(backend).__qualname__}", lang, arguments, settings,
          unicodedata.unidata_version], sort_keys=True, ensure_ascii=False).encode())
     try:
-        digest.update(_probe_digest(probed.__module__, probed.__qualname__, lang, mode,
-                                    json.dumps(arguments, sort_keys=True)).encode())
+        covered = sorted({_canonical(name) for name in backend._covered_distributions(lang)})
+        outcome = _probe_outcome(probed.__module__, probed.__qualname__, lang, mode,
+                                 json.dumps(arguments, sort_keys=True), json.dumps(covered))
+        if isinstance(outcome, _Failed):
+            _warn_once(type(backend).__name__, lang, outcome.error)
+            return None
+        digest.update(outcome.encode())
         for cls in type(backend).__mro__:
             if cls.__module__ in ("builtins", "abc") or cls.__module__.split(".")[0] == "scriptconv":
                 continue
             path = _source_file(inspect.getsourcefile(cls), f"the class {cls.__qualname__}")
             digest.update(f"\0class\0{cls.__module__}\0{file_digest(path)}".encode())
     except (OSError, TypeError, RuntimeError) as exc:
-        LOG.warning("the identity of %s for %r has no revision: %s: %s",
-                    type(backend).__name__, lang, type(exc).__name__, exc)
+        _warn_once(type(backend).__name__, lang, f"{type(exc).__name__}: {exc}")
         return None
     return f"{FORMAT}:{digest.hexdigest()}"
 
 
-def _probe_digest(*key: str) -> str:
-    """The digest that :func:`_probe_outcome` keeps for *key*, or the error it keeps."""
-    outcome = _probe_outcome(*key)
-    if isinstance(outcome, Exception):
-        raise outcome
-    return outcome
+@functools.lru_cache(maxsize=None)
+def _warn_once(backend: str, lang: str, error: str) -> None:
+    """Logs that the identity of *backend* for *lang* has no revision, once per *error* in this process."""
+    LOG.warning("the identity of %s for %r has no revision: %s", backend, lang, error)
 
 
 @functools.lru_cache(maxsize=None)
-def _probe_outcome(*key: str) -> Union[str, Exception]:
+def _probe_outcome(*key: str) -> Union[str, _Failed]:
     """The probe digest for *key*, or its error, kept so that a failed probe
     does not run again in this process."""
     try:
         return _run_probe(*key)
     except (RevisionProbeFailed, OSError) as exc:
-        return exc
+        return _Failed(f"{type(exc).__name__}: {exc}")
 
 
-def _run_probe(module: str, qualname: str, lang: str, mode: str, arguments: str) -> str:
+def _run_probe(module: str, qualname: str, lang: str, mode: str, arguments: str,
+               covered: str) -> str:
     """The hash of the code and data that a probe of the backend, or of a
     frontend that reads through it, loads for one language.
 
+    *covered* is a JSON list of the distributions whose files leave the hash.
+
     Raises:
         RevisionProbeFailed: If the probe exits with an error, runs longer than
-            :data:`PROBE_TIMEOUT`, or prints no readable result after its marker.
+            :data:`PROBE_TIMEOUT`, prints no readable result after its marker,
+            or finds scriptconv loaded before it starts.
     """
     pythonpath = os.pathsep.join(entry or os.getcwd() for entry in sys.path)
     marker = f"scriptconv-revision-probe-{uuid.uuid4().hex}:"
@@ -209,6 +234,9 @@ def _run_probe(module: str, qualname: str, lang: str, mode: str, arguments: str)
     except ValueError as exc:
         raise RevisionProbeFailed(f"{what} printed a result that is not JSON: {exc}") from None
     modules: Dict[str, Optional[str]] = probe["modules"]
+    if "scriptconv" not in modules:
+        raise RevisionProbeFailed(f"{what} found scriptconv loaded before it started, "
+                                  "so it cannot tell which modules the backend loads")
     root = Path(modules["scriptconv"]).parent
     entries: List[Tuple[str, str]] = []
     others = set()
@@ -225,7 +253,7 @@ def _run_probe(module: str, qualname: str, lang: str, mode: str, arguments: str)
         if (opened.is_relative_to(root) and opened.suffix not in (".py", ".pyc")
                 and "__pycache__" not in opened.parts and opened.is_file()):
             entries.append((f"scriptconv/{opened.relative_to(root).as_posix()}", file_digest(opened)))
-    for top in _distribution_tops(others):
+    for top in _distribution_tops(others, frozenset(json.loads(covered))):
         entries.append((top, _top_level_digest(top)))
     digest = hashlib.sha256()
     for name, value in sorted(set(entries)):
@@ -233,12 +261,23 @@ def _run_probe(module: str, qualname: str, lang: str, mode: str, arguments: str)
     return digest.hexdigest()
 
 
-def _distribution_tops(loaded: set) -> set:
-    """*loaded*, and each other top-level module of a distribution that holds one of them."""
+def _distribution_tops(loaded: set, covered: Collection[str]) -> set:
+    """*loaded*, and each other top-level module of a distribution that holds one of them,
+    except those that only distributions in *covered* hold.
+
+    A top-level module that no installed distribution holds, as a checkout on
+    the import path, stands for a distribution of its own name.
+    """
     owners = packages_distributions()
     distributions = {owner for name in loaded for owner in owners.get(name, ())}
     held = {name for name, owned in owners.items() if distributions & set(owned)}
-    return (loaded | held) - {"scriptconv"}
+    return {name for name in (loaded | held) - {"scriptconv"}
+            if not {_canonical(owner) for owner in owners.get(name) or [name]} <= set(covered)}
+
+
+def _canonical(distribution: str) -> str:
+    """The normalised name of *distribution*, as PEP 503 gives it."""
+    return re.sub(r"[-_.]+", "-", distribution).lower()
 
 
 def _top_level_digest(name: str) -> str:
@@ -265,6 +304,7 @@ def _top_level_digest(name: str) -> str:
     return _native(name) if origin.suffix in _NATIVE else file_digest(origin)
 
 
+@functools.lru_cache(maxsize=None)
 def _native(name: str) -> str:
     """A compiled module of the top-level module *name*: the versions of the distributions that hold it."""
     owners = sorted(set(packages_distributions().get(name, ())))
