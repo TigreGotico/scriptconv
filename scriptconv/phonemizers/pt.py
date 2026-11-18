@@ -98,12 +98,15 @@ class TugaphonePhonemizer(BasePhonemizer):
 @functools.lru_cache(maxsize=None)
 def _tugaphone_revision(lect: str) -> Optional[Tuple[str, FrozenSet[str]]]:
     """``tugaphone.revision`` of *lect* and the distributions it covers, or
-    ``None`` and one warning in this process when tugaphone gives no revision."""
+    ``None`` and one warning in this process when tugaphone gives no revision:
+    a tugaphone with no ``content_revision`` module, as 1.7.1, or an engine
+    whose source cannot be read, as orthography2ipa installed as byte code."""
     import tugaphone
-    from tugaphone.content_revision import distributions
+    from orthography2ipa.exceptions import EngineSourceUnavailable
     try:
+        from tugaphone.content_revision import distributions
         return tugaphone.revision(lect), frozenset(distributions(tugaphone.resolve_lect(lect)))
-    except tugaphone.RevisionError as exc:
+    except (ImportError, tugaphone.RevisionError, EngineSourceUnavailable) as exc:
         LOG.warning("tugaphone gives no revision for %r, so the identity has none: %s: %s",
                     lect, type(exc).__name__, exc)
         return None
