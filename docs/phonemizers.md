@@ -512,6 +512,16 @@ Limits:
   that you pass.
 - About one unknown word in three that the model guesses has an error, and
   foreign names have the most.
+- A spelling longer than the longest word of the dictionary, 28 letters, is
+  read in pieces. The backend cuts it into pieces of at most 28 characters,
+  reads each piece as it reads a word, and joins the pieces with no space
+  between them, as it joins the parts of a hyphenated word. Each piece keeps
+  its own main stress. A hyphen, a mark and a part of a web address are
+  separate words to dizione already, so they keep their reading, and so does
+  every word of 28 letters or fewer. Without the bound, the unknown-word model
+  reads the whole run and the aligner matches its letters to its phones with a
+  table of one cell per letter and per phone, so a run of that length with no
+  end exhausts the memory of the machine.
 - `keep_punctuation` has no effect: the IPA string has no punctuation, and
   `tokens()` has all of it.
 
