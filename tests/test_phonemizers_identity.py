@@ -99,7 +99,7 @@ class TestErrors:
 
 class TestDiffersFrom:
     BASE = dict(backend="tugaphone", distribution="tugaphone", version="1.4.0a2",
-                lang="pt-PT", revision="sha256:ab12")
+                lang="pt-PT", revision="sha256:ab12", pipeline="sc1:cd34")
 
     def test_equal_identities_differ_in_nothing(self):
         assert PhonemizerIdentity(**self.BASE).differs_from(
@@ -107,7 +107,7 @@ class TestDiffersFrom:
 
     @pytest.mark.parametrize("field, value", [
         ("backend", "espeak"), ("distribution", "espeak-ng"), ("lang", "pt-BR"),
-        ("revision", None),
+        ("revision", None), ("pipeline", "sc1:ef56"),
     ])
     def test_each_field_is_compared(self, field, value):
         other = PhonemizerIdentity(**{**self.BASE, field: value})
@@ -135,6 +135,11 @@ class TestDiffersFrom:
     def test_a_version_change_shows_when_one_side_has_no_revision(self):
         other = PhonemizerIdentity(**{**self.BASE, "revision": None, "version": "1.4.0a3"})
         assert PhonemizerIdentity(**self.BASE).differs_from(other) == ("revision", "version")
+
+    @pytest.mark.parametrize("recorded, running", [(None, "sc1:cd34"), ("sc1:cd34", None)])
+    def test_a_pipeline_on_one_side_only_is_not_compared(self, recorded, running):
+        trained = PhonemizerIdentity(**{**self.BASE, "pipeline": recorded})
+        assert trained.differs_from(PhonemizerIdentity(**{**self.BASE, "pipeline": running})) == ()
 
     def test_an_identity_cannot_change(self):
         with pytest.raises(dataclasses.FrozenInstanceError):
@@ -623,6 +628,98 @@ class TestWrapperRevision:
                                                                          tmp_path):
         assert None not in wrapped_pristine.values()
         assert revisions_in_a_copy(tmp_path, NEUTRAL_EDITS[edit], WRAPPER_REVISIONS) == wrapped_pristine
+
+
+# The pipeline of a grapheme backend, which has a revision, and of an epitran
+# backend, which has none.
+PIPELINES = """
+import json, scriptconv
+from scriptconv.phonemizers import GraphemePhonemizer
+from scriptconv.phonemizers.mul import EpitranPhonemizer
+print(json.dumps({"scriptconv": scriptconv.__file__,
+                  "graphemes": GraphemePhonemizer().identity("pt").pipeline,
+                  "epitran": EpitranPhonemizer().identity("pol-Latn").pipeline}))
+"""
+
+# Edits that change how text is cut or read, (scriptconv file, old, new) or
+# (quebra_frases file, old, new), and the pipelines that each one changes.
+PIPELINE_MUTANTS = {
+    "a colon between digits is punctuation": (
+        "scriptconv/phonemizers/base.py",
+        "and chars[i - 1].isdigit() and chars[i + 1].isdigit():", "and False:", {"graphemes", "epitran"}),
+    "the epitran wrapper lowercases its output": (
+        "scriptconv/phonemizers/mul.py",
+        "return epi.transliterate(text)", "return epi.transliterate(text).lower()", {"epitran"}),
+    "quebra-frases returns the sentences in reverse": (
+        "quebra_frases/tokenization.py",
+        "    return re.split(_SENTENCE_REGEX, input_string)",
+        "    return re.split(_SENTENCE_REGEX, input_string)[::-1]", {"graphemes", "epitran"}),
+}
+PIPELINE_NEUTRAL_EDITS = {
+    **{name: ("scriptconv/" + target, old, new) for name, (target, old, new) in NEUTRAL_EDITS.items()},
+    "a comment in quebra-frases": (
+        "quebra_frases/tokenization.py",
+        "    return re.split(_SENTENCE_REGEX, input_string)",
+        "    # split at each sentence mark\n    return re.split(_SENTENCE_REGEX, input_string)"),
+}
+
+
+def pipelines_in_a_copy(directory, edit=None):
+    """The pipelines that :data:`PIPELINES` prints from a copy of scriptconv and quebra-frases with *edit*."""
+    import quebra_frases
+    tree = directory / "tree"
+    shutil.copytree(Path(quebra_frases.__file__).parent, tree / "quebra_frases",
+                    ignore=shutil.ignore_patterns("__pycache__"))
+    if edit is not None and edit[0].startswith("quebra_frases/"):
+        target, old, new = edit
+        source = (tree / target).read_text(encoding="utf-8")
+        assert source.count(old) == 1, f"{old!r} is not in {target} once"
+        (tree / target).write_text(source.replace(old, new), encoding="utf-8")
+        edit = None
+    elif edit is not None:
+        edit = (edit[0].removeprefix("scriptconv/"), *edit[1:])
+    return revisions_in_a_copy(directory, edit, PIPELINES)
+
+
+@pytest.fixture(scope="module")
+def pristine_pipelines(tmp_path_factory):
+    return pipelines_in_a_copy(tmp_path_factory.mktemp("pipelines"))
+
+
+class Echo(BasePhonemizer):
+    def phonemize_string(self, text, lang):
+        return text
+
+
+class TestPipeline:
+    def test_a_backend_with_no_revision_records_its_pipeline(self):
+        identity = Echo().identity("xx")
+        assert identity.revision is None
+        assert identity.pipeline.startswith("sc1:")
+
+    def test_each_backend_class_has_its_own_pipeline(self, pristine_pipelines):
+        assert all(value.startswith("sc1:") for value in pristine_pipelines.values())
+        assert pristine_pipelines["graphemes"] != pristine_pipelines["epitran"]
+
+    def test_the_pipeline_is_the_same_in_every_process(self, pristine_pipelines, tmp_path):
+        assert pipelines_in_a_copy(tmp_path) == pristine_pipelines
+
+    @pytest.mark.parametrize("mutant", PIPELINE_MUTANTS)
+    def test_a_change_to_the_code_that_reads_the_text_changes_the_pipeline(self, mutant, pristine_pipelines,
+                                                                          tmp_path):
+        *edit, changed = PIPELINE_MUTANTS[mutant]
+        after = pipelines_in_a_copy(tmp_path, tuple(edit))
+        assert {name for name in after if after[name] != pristine_pipelines[name]} == changed
+
+    @pytest.mark.parametrize("edit", PIPELINE_NEUTRAL_EDITS)
+    def test_an_edit_that_changes_no_output_keeps_the_pipeline(self, edit, pristine_pipelines, tmp_path):
+        assert pipelines_in_a_copy(tmp_path, PIPELINE_NEUTRAL_EDITS[edit]) == pristine_pipelines
+
+    def test_a_trained_identity_with_no_pipeline_shows_no_difference(self):
+        running = Echo().identity("xx")
+        trained = dataclasses.replace(running, pipeline=None)
+        assert running.pipeline is not None
+        assert trained.differs_from(running) == ()
 
 
 def frontend(backend=None, **config):

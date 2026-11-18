@@ -187,6 +187,24 @@ def code_revision(backend, lang: str, settings: Mapping, frontend: bool = False)
 
 
 @functools.lru_cache(maxsize=None)
+def pipeline_revision(backend_class: type) -> Optional[str]:
+    """The :attr:`~scriptconv.phonemizers.base.PhonemizerIdentity.pipeline` of *backend_class*.
+
+    It hashes the code tokens of the source file of each class in the MRO and
+    the files of quebra-frases, and is ``None`` when one of them cannot be read.
+    """
+    try:
+        digest = hashlib.sha256(f"{FORMAT}\0quebra_frases\0{_top_level_digest('quebra_frases')}".encode())
+        for cls in backend_class.__mro__:
+            if cls.__module__ not in ("builtins", "abc"):
+                path = _source_file(inspect.getsourcefile(cls), f"the class {cls.__qualname__}")
+                digest.update(f"\0{cls.__module__}\0{file_digest(path)}".encode())
+    except (OSError, TypeError):
+        return None
+    return f"{FORMAT}:{digest.hexdigest()}"
+
+
+@functools.lru_cache(maxsize=None)
 def _warn_once(backend: str, lang: str, error: str) -> None:
     """Logs that the identity of *backend* for *lang* has no revision, once per *error* in this process."""
     LOG.warning("the identity of %s for %r has no revision: %s", backend, lang, error)

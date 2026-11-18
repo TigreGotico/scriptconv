@@ -1012,7 +1012,8 @@ class TestBackends:
         assert identity.revision.startswith("sc1:")
         assert identity.revision != UnicodeCodepointPhonemizer().identity("pt-PT").revision
         assert identity == PhonemizerIdentity(
-            "unicode", "scriptconv", VERSION_STR, "pt-PT", identity.revision, frontend_module.FRONTEND_VERSION)
+            "unicode", "scriptconv", VERSION_STR, "pt-PT", identity.revision, frontend_module.FRONTEND_VERSION,
+            UnicodeCodepointPhonemizer().identity("pt-PT").pipeline)
         reference = TextFrontend(FrontendConfig("pt-PT", Phonemizer.UNICODE, stages=Stages(lang="es")))
         assert reference.identity().lang == "es"
 

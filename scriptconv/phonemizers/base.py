@@ -221,18 +221,26 @@ class PhonemizerIdentity:
     ``None`` for a backend called directly; it tells what :attr:`revision`
     holds, the backend's own revision when ``None`` and the frontend revision
     when set."""
+    pipeline: Optional[str] = None
+    """A hash of the code that reads text through the backend: the module of
+    each class of the backend, among them the sentence and clause cutting of
+    ``base.py``, and the files of the sentence splitter quebra-frases.
+    ``None`` when it was not recorded or a module has no source file."""
 
     def differs_from(self, other: "PhonemizerIdentity") -> Tuple[str, ...]:
         """Names of the fields that differ from *other*, ``revision`` first.
 
         ``revision`` outranks ``version``: when both sides hold the same
         revision, the spec that gives the phonemes did not change, so a
-        ``version`` difference is not reported.
+        ``version`` difference is not reported. ``pipeline`` counts only when
+        both sides hold one.
         """
         same_spec = self.revision is not None and self.revision == other.revision
+        unknown_pipeline = None in (self.pipeline, other.pipeline)
         names = [field.name for field in dataclasses.fields(self)
                  if getattr(self, field.name) != getattr(other, field.name)
-                 and not (same_spec and field.name == "version")]
+                 and not (same_spec and field.name == "version")
+                 and not (unknown_pipeline and field.name == "pipeline")]
         return tuple(sorted(names, key=lambda name: name != "revision"))
 
 
@@ -699,10 +707,12 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
                  for member, (_, cls_name, _) in PHONEMIZER_REGISTRY.items()}
         backend = next((names[cls.__name__] for cls in type(self).__mro__
                         if cls.__name__ in names), type(self).__name__)
+        from scriptconv.phonemizers._revision import pipeline_revision
         distribution, version = self._engine_release()
         # Grapheme, Unicode and Phonetisaurus backends take any language.
         resolved = self.get_lang(lang) if hasattr(self, "get_lang") else lang
-        return PhonemizerIdentity(backend, distribution, version, resolved)
+        return PhonemizerIdentity(backend, distribution, version, resolved,
+                                  pipeline=pipeline_revision(type(self)))
 
     @staticmethod
     def remove_punctuation(text):

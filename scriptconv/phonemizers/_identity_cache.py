@@ -61,7 +61,7 @@ from scriptconv.phonemizers.base import PhonemizerIdentity
 
 LOG = logging.getLogger(__name__)
 
-FORMAT = 2
+FORMAT = 3
 """The version of the entry format. It changes when the key or the entry change."""
 
 Stat = Tuple[str, int, int]
