@@ -265,6 +265,11 @@ class Segment:
     frontend joins two bounded segments, the inner end and start symbols go,
     with their stream values. A segment with no mark then takes the
     backend's :meth:`~BasePhonemizer.word_break` before the next one."""
+    text: Optional[str] = None
+    """The source text of the segment after the frontend's text stages
+    (casing, normalise, diacritize), as the backend read it; it never holds a
+    clause mark that the frontend appends; ``None`` when the backend cannot
+    say."""
 
 
 class MissingLanguageError(ValueError):
@@ -485,7 +490,10 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         For any other backend, :class:`~scriptconv.frontend.TextFrontend`
         calls this method on each sentence or clause, and a segment is a
         sentence of :meth:`phonemize_lazy`. A backend with side streams, or
-        with its own start and end symbols, overrides it to give them.
+        with its own start and end symbols, overrides it to give them. A
+        single segment carries the input *text* (stripped) as its
+        :attr:`Segment.text`; when the backend yields more than one, the
+        segment text is ``None``.
 
         Raises:
             NotImplementedError: If the backend reads whole text and does not
@@ -493,8 +501,10 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         """
         if self.reads_whole_text:
             raise NotImplementedError(f"{type(self).__name__} reads whole text and gives no segments")
-        for phonemes in self.phonemize_lazy(text, lang):
-            yield Segment(tuple(phonemes))
+        segments = [Segment(tuple(phonemes)) for phonemes in self.phonemize_lazy(text, lang)]
+        if len(segments) == 1:
+            segments[0] = dataclasses.replace(segments[0], text=text.strip())
+        yield from segments
 
     def word_break(self) -> Segment:
         """The symbol that separates two words in this backend's output, with its stream values.
