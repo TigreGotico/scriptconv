@@ -49,7 +49,7 @@ ROOT = Path(__file__).resolve().parent.parent
 # The table in knowledge/wiki/concepts/speech-stack-contract.md. A member not
 # listed here owns no stage.
 OWNED = {
-    Phonemizer.TUGAPHONE: {"diacritize"},
+    Phonemizer.TUGAPHONE: {"normalize", "diacritize"},
     Phonemizer.ARBTOK: {"diacritize"},
     Phonemizer.DIZIONE: {"normalize"},
 }
@@ -288,7 +288,10 @@ class TestTugaphoneRevision:
         tops = hashed_tops(monkeypatch)
         assert TugaphonePhonemizer().identity("pt-PT").revision is not None
         assert TextFrontend(FrontendConfig("pt-PT"), TugaphonePhonemizer()).identity().revision is not None
-        assert "quebra_frases" in tops
+        covered = {_revision._canonical(name)
+                   for name in TugaphonePhonemizer()._covered_distributions("pt-PT")}
+        assert covered
+        assert not covered & {_revision._canonical(name) for name in tops}
         assert not {"tugaphone", "orthography2ipa", "o2i_lexicons"} & set(tops)
 
     def test_a_tugaphone_revision_error_gives_no_revision_and_one_warning(self, monkeypatch, caplog):

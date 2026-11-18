@@ -11,7 +11,7 @@ LOG = logging.getLogger(__name__)
 
 
 class TugaphonePhonemizer(BasePhonemizer):
-    owned_stages = frozenset({"diacritize"})
+    owned_stages = frozenset({"normalize", "diacritize"})
     engine_distribution = "tugaphone"
 
     contact = "none"

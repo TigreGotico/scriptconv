@@ -7,7 +7,9 @@ still resolve to a default supported lect, and a non-Portuguese tag must be
 rejected.
 """
 import unittest
+from unittest import mock
 
+from scriptconv.frontend import FrontendConfig, TextFrontend
 from scriptconv.phonemizers.pt import TugaphonePhonemizer
 
 
@@ -36,6 +38,76 @@ class TestTugaphoneSubregionalLects(unittest.TestCase):
     def test_non_portuguese_still_rejected(self):
         with self.assertRaises(ValueError):
             TugaphonePhonemizer.get_lang("es")
+
+
+class TestTugaphoneOwnsNormalize(unittest.TestCase):
+    """The frontend leaves normalisation to tugaphone.
+
+    tugaphone spells out numbers, dates and abbreviations itself, so the
+    frontend must not run its ``normalizer`` hook before it, and the text must
+    reach tugaphone as written, abbreviations and dates included.
+    """
+
+    TEXT = "O Dr. Silva chega a 25/12/2023."
+    PUNCTUATED_TEXT = "Olá, Dr. Silva. Chega a 25/12/2023."
+
+    @staticmethod
+    def _frontend(normalizer, **config):
+        return TextFrontend(FrontendConfig("pt-PT", normalizer=normalizer, **config),
+                            TugaphonePhonemizer())
+
+    @classmethod
+    def _phonemes(cls, frontend):
+        return [phoneme for sentence in frontend.phonemize_lazy(cls.TEXT)
+                for phoneme in sentence]
+
+    def test_normalizer_hook_is_not_called(self):
+        calls = []
+        frontend = self._frontend(lambda text, lang: calls.append((text, lang)) or text)
+        self._phonemes(frontend)
+        self.assertEqual(calls, [])
+
+    def test_abbreviation_and_date_reach_tugaphone_as_written(self):
+        inputs = []
+        original = TugaphonePhonemizer.phonemize_string
+
+        def recording(self, text, lang):
+            inputs.append(text)
+            return original(self, text, lang)
+
+        frontend = self._frontend(lambda text, lang: text)
+        with mock.patch.object(TugaphonePhonemizer, "phonemize_string", recording):
+            self._phonemes(frontend)
+        self.assertTrue(inputs, "tugaphone was never called")
+        joined = " ".join(inputs)
+        self.assertIn("Dr.", joined)
+        self.assertIn("25/12/2023", joined)
+
+    def test_keep_punctuation_keeps_the_marks_and_the_written_text(self):
+        inputs = []
+        original = TugaphonePhonemizer.phonemize_string
+
+        def recording(self, text, lang):
+            inputs.append(text)
+            return original(self, text, lang)
+
+        frontend = self._frontend(lambda text, lang: text, keep_punctuation=True)
+        with mock.patch.object(TugaphonePhonemizer, "phonemize_string", recording):
+            phonemes = [phoneme for sentence in frontend.phonemize_lazy(self.PUNCTUATED_TEXT)
+                        for phoneme in sentence]
+        joined = " ".join(inputs)
+        self.assertTrue(inputs, "tugaphone was never called")
+        self.assertIn("Dr.", joined)
+        self.assertIn("25/12/2023", joined)
+        self.assertIn(",", phonemes)
+        self.assertIn(".", phonemes)
+
+    def test_frontend_phonemes_equal_tugaphone_reading(self):
+        from tugaphone import TugaPhonemizer
+        frontend = self._frontend(lambda text, lang: text)
+        frontend_phonemes = self._phonemes(frontend)
+        direct = list(TugaPhonemizer().phonemize_sentence(self.TEXT, "pt-PT"))
+        self.assertEqual(frontend_phonemes, direct)
 
 
 if __name__ == "__main__":
