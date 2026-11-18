@@ -69,6 +69,43 @@ _CLOSING_BRACKET = ")"
 _MARK_WORD = "x"
 # A sentence mark at the end of a text, with only closing marks after it.
 _ENDS_IN_SENTENCE_MARK = re.compile(r"[.?!][^\w\s]*\s*$")
+# The longest word of dizione's lexicon, "antidisestablishmentarianism" (28
+# letters). A longer spelling is no word that dizione reads whole: the
+# unknown-word model reads it, and the aligner then matches its letters to its
+# phones with a dynamic program whose table holds one cell per letter and per
+# phone, so a long run of letters exhausts the memory of the machine. Such a
+# spelling is read in pieces of at most this many characters.
+_MAX_WORD_LENGTH = 28
+
+
+class _BoundedEngine(DizioneEngine):
+    """dizione's engine, reading a spelling longer than any word in pieces.
+
+    :meth:`word` is where dizione forms the pronunciation of one spelling: it
+    looks the spelling up, derives it from a shorter word, builds it from two
+    words, and else hands the whole spelling to the unknown-word model, whose
+    phones the aligner matches to the letters. A spelling longer than
+    :data:`_MAX_WORD_LENGTH` is none of those words, so it is cut into pieces
+    of at most that many characters, and each piece is read as :meth:`word`
+    reads a word now. The phonemes of the pieces are joined as dizione joins
+    the parts of a hyphenated word, which is no space between them
+    (``sentence.groups``). A spelling that a table holds whole, such as one of
+    the user's overrides, is read whole, and so is every spelling of that
+    length or less.
+    """
+
+    def word(self, word):
+        if len(word) <= _MAX_WORD_LENGTH or word in self._cache:
+            return super().word(word)
+        known = self.known(word)
+        if known is not None:
+            result = (known, "dictionary")
+        else:
+            result = (tuple(phone for start in range(0, len(word), _MAX_WORD_LENGTH)
+                            for phone in self.word(word[start:start + _MAX_WORD_LENGTH])[0]),
+                      "pieces")
+        self._cache[word] = result
+        return result
 
 
 class DizionePhonemizer(BasePhonemizer):
@@ -114,7 +151,7 @@ class DizionePhonemizer(BasePhonemizer):
         _check_alphabet(self, alphabet, [Alphabet.IPA])
         super().__init__(alphabet)
         self.data_dir = Path(data_dir) if data_dir is not None else DATA_DIR
-        self.engine = DizioneEngine(self.data_dir, overrides=overrides)
+        self.engine = _BoundedEngine(self.data_dir, overrides=overrides)
         self.tokens_mode = tokens
 
     @classmethod
