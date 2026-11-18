@@ -27,7 +27,8 @@ import re
 import string
 import unicodedata
 from importlib import metadata
-from typing import Callable, ClassVar, Iterable, Iterator, List, Mapping, Optional, Tuple, Literal, Union
+from types import MappingProxyType
+from typing import Callable, ClassVar, Dict, Iterable, Iterator, List, Mapping, Optional, Tuple, Literal, Union
 
 from scriptconv.phonemizers.enums import Alphabet
 from scriptconv.version import VERSION_STR
@@ -198,7 +199,10 @@ class PhonemizerIdentity:
     lang: str
     """The resolved lect, ``"pt-PT-x-porto"``."""
     revision: Optional[str] = None
-    """The orthography2ipa spec revision, when the backend has one."""
+    """A hash of the spec, code and data that give the phonemes, when the
+    backend has one: the orthography2ipa spec revision, dizione's build
+    fingerprint, or the hash of the code and data on the path of an in-tree
+    backend."""
     frontend: Optional[int] = None
     """The version of the stage order of :class:`~scriptconv.frontend.TextFrontend`.
     ``None`` for a backend called directly."""
@@ -629,6 +633,11 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
             return sister, metadata.version(sister)
         return "scriptconv", VERSION_STR
 
+    def _revision_arguments(self) -> Dict[str, object]:
+        """The constructor arguments, as JSON values, that rebuild this backend
+        in the probe of :func:`~scriptconv.phonemizers._revision.code_revision`."""
+        return {}
+
     def identity(self, lang: str) -> PhonemizerIdentity:
         """What phonemizes *lang* here: the engine, its version and the lect.
 
@@ -776,6 +785,17 @@ class GraphemePhonemizer(BasePhonemizer):
     # Regular expression matching whitespace:
     whitespace_re = re.compile(r"\s+")
 
+    lowercase: bool = True
+    """Lowercase the text before the character rules."""
+    in_word_chars: str = "-"
+    """Characters that stay as written between two letters. Elsewhere
+    :attr:`replace_chars` applies to them."""
+    replace_chars: Mapping[str, str] = MappingProxyType({";": ",", "-": " ", ":": ","})
+    """Each character and the text that replaces it."""
+    drop_chars: str = '<>()[]"'
+    """Characters removed after :attr:`replace_chars`."""
+    _RULES = ("lowercase", "in_word_chars", "replace_chars", "drop_chars")
+
     def __init__(self, alphabet: Alphabet = Alphabet.UNICODE,
                  normalizer: Optional[Callable[[str, str], str]] = None,
                  stress_notation: str = "acute"):
@@ -788,6 +808,9 @@ class GraphemePhonemizer(BasePhonemizer):
     def reads_stress_mark(self, lang: str) -> bool:
         """The output writes the mark, in every language, unless the notation is ``"none"``."""
         return self.stress_notation != "none"
+
+    def _revision_arguments(self) -> Dict[str, object]:
+        return {"stress_notation": self.stress_notation}
 
     def phonemize_string(self, text: str, lang: str) -> str:
         """
@@ -802,17 +825,30 @@ class GraphemePhonemizer(BasePhonemizer):
         Returns:
             str: A normalized string of graphemes.
         """
-        text = text.lower()
-        text = text.replace(";", ",")
-        text = "".join(" " if char == "-" and not _between_letters(text, i) else char
+        if self.lowercase:
+            text = text.lower()
+        text = "".join(char if char in self.in_word_chars and _between_letters(text, i)
+                       else self.replace_chars.get(char, char)
                        for i, char in enumerate(text))
-        text = text.replace(":", ",")
-        text = re.sub(r"[\<\>\(\)\[\]\"]+", "", text)
+        text = text.translate(dict.fromkeys(map(ord, self.drop_chars)))
         text = re.sub(self.whitespace_re, " ", text).strip()
         if self.stress_notation == "plus":
             from scriptconv.diacritics import replace_stress_mark
             text = replace_stress_mark(text, lang, before="+")
         return text
+
+    def identity(self, lang: str) -> PhonemizerIdentity:
+        """The base identity, with ``revision`` the hash of the code and data
+        on the path of this backend, as
+        :func:`~scriptconv.phonemizers._revision.code_revision` gives it. A
+        character rule set on the instance joins the hash."""
+        from scriptconv.phonemizers._revision import code_revision
+        settings = {name: getattr(self, name) for name in self._RULES
+                    if name in vars(self) and getattr(self, name) != getattr(type(self), name)}
+        if "replace_chars" in settings:
+            settings["replace_chars"] = dict(settings["replace_chars"])
+        revision = code_revision(self, lang, settings)
+        return dataclasses.replace(super().identity(lang), revision=revision)
 
 
 class UnicodeCodepointPhonemizer(BasePhonemizer):
@@ -828,6 +864,9 @@ class UnicodeCodepointPhonemizer(BasePhonemizer):
         """The output is the text's codepoints, so the mark is one of them in every language."""
         return True
 
+    def _revision_arguments(self) -> Dict[str, object]:
+        return {"form": self.form}
+
     def phonemize_string(self, text: str, lang: str) -> str:
         # Phonemes = codepoints
         """
@@ -841,3 +880,11 @@ class UnicodeCodepointPhonemizer(BasePhonemizer):
             str: The input text normalized to Unicode NFD, with combining marks separated into distinct codepoints.
         """
         return unicodedata.normalize(self.form, text)
+
+    def identity(self, lang: str) -> PhonemizerIdentity:
+        """The base identity, with ``revision`` the hash of the code and data
+        on the path of this backend and of its normalisation form, as
+        :func:`~scriptconv.phonemizers._revision.code_revision` gives it."""
+        from scriptconv.phonemizers._revision import code_revision
+        revision = code_revision(self, lang, {})
+        return dataclasses.replace(super().identity(lang), revision=revision)

@@ -51,6 +51,38 @@ spec that gives the phonemes did not change. The class attribute
 `engine_distribution` names the package that supplies the engine, and `None`
 means the code is in this repository.
 
+**Some backends hold a `revision`.** `orthography2ipa`, `mwl_phonemizer`,
+`barranquenho` and `dizione` take it from their engine. For `graphemes`,
+`unicode` and `matoub_kab`, the `revision` is `sc1:` and a hash of the code and
+data on the path of the backend.
+
+A probe in a fresh process builds the backend. It reads a text with every
+clause mark through `phonemize` and `phonemize_to_list`, with
+`keep_punctuation` off and on. The hash then covers these inputs:
+
+- each scriptconv module that the probe loads, and each scriptconv data file
+  that it opens
+- each other distribution that the probe loads, such as quebra-frases, whole
+- the source file of each class of the backend outside scriptconv, so a
+  subclass counts
+- the arguments of the backend, a character rule set on the instance, the
+  language and the Unicode version of Python
+
+The code of a module counts as its tokens. Comments, blank lines, docstrings
+and `version.py` do not count. A release that changes code or data on the path
+of the backend changes the `revision`. A release that changes only other
+backends, docs or `version.py` keeps it, and `differs_from` then reports
+nothing.
+
+The first `identity` call for a backend and a language runs the probe. Later
+calls use the stored value. A backend that calls an engine outside scriptconv
+has no `revision`, so a change of its `version` always shows. A probe that
+fails, runs longer than 30 seconds or prints no result also gives no
+`revision`, with one warning.
+
+A `TextFrontend` has its own `revision`, which covers the frontend stages too.
+See [frontend](frontend.md).
+
 **Failures have types.** Each error below is a `FrontendError`, which is a
 `ValueError`. `UnsupportedLanguageError` means the backend has no reading for
 the language. `StageError` means a stage failed. `UnreadTextError` means text

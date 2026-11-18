@@ -19,9 +19,10 @@ doubled symbol rather than length, and does not back ``/a/`` beside a backing
 consonant. A caller driving Matoub-82M needs the Matoub string: the other one
 carries symbols that model has no embedding row for.
 """
+import dataclasses
 from typing import List
 
-from scriptconv.phonemizers.base import BasePhonemizer
+from scriptconv.phonemizers.base import BasePhonemizer, PhonemizerIdentity
 from scriptconv.phonemizers.enums import Alphabet
 
 
@@ -54,6 +55,14 @@ class MatoubKabylePhonemizer(BasePhonemizer):
             ValueError: if the language code is not Kabyle.
         """
         return cls.match_lang(target_lang, cls._LANGS)
+
+    def identity(self, lang: str) -> PhonemizerIdentity:
+        """The base identity, with ``revision`` the hash of the code and data
+        on the path of this backend, the vendored rules among them, as
+        :func:`~scriptconv.phonemizers._revision.code_revision` gives it."""
+        from scriptconv.phonemizers._revision import code_revision
+        revision = code_revision(self, lang, {})
+        return dataclasses.replace(super().identity(lang), revision=revision)
 
     def phonemize_string(self, text: str, lang: str = "kab") -> str:
         self.get_lang(lang)
