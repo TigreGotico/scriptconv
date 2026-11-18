@@ -42,3 +42,17 @@ def test_an_engine_whose_source_cannot_be_read(monkeypatch, caplog):
 
     monkeypatch.setattr(tugaphone, "revision", unreadable)
     _check(TugaphonePhonemizer(), caplog)
+
+
+def test_an_import_error_inside_the_revision_call_propagates(monkeypatch):
+    def broken(lect):
+        raise ImportError("cannot import name 'x' from 'tugaphone.registry'")
+
+    monkeypatch.setattr(tugaphone, "revision", broken)
+    with pytest.raises(ImportError, match="tugaphone.registry"):
+        TugaphonePhonemizer().identity("pt-PT")
+
+
+def test_an_orthography2ipa_with_no_exceptions_module(monkeypatch, caplog):
+    monkeypatch.setitem(sys.modules, "orthography2ipa.exceptions", None)
+    _check(TugaphonePhonemizer(), caplog)
