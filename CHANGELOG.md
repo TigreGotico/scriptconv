@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a116](https://github.com/TigreGotico/scriptconv/tree/0.0.4a116) (2026-11-18)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a115...0.0.4a116)
+
+**Merged pull requests:**
+
+- feat: identity revision for the grapheme, unicode and matoub\_kab backends [\#322](https://github.com/TigreGotico/scriptconv/pull/322) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a115](https://github.com/TigreGotico/scriptconv/tree/0.0.4a115) (2026-11-17)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a114...0.0.4a115)
@@ -264,10 +272,6 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a80...0.0.4a81)
 
-**Merged pull requests:**
-
-- fix\(notation\): strict refuses a stressed syllabic consonant; measure the kana and strip edges [\#200](https://github.com/TigreGotico/scriptconv/pull/200) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [0.0.4a80](https://github.com/TigreGotico/scriptconv/tree/0.0.4a80) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a79...0.0.4a80)
@@ -399,10 +403,6 @@
 ## [0.0.4a63](https://github.com/TigreGotico/scriptconv/tree/0.0.4a63) (2026-11-12)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a62...0.0.4a63)
-
-**Merged pull requests:**
-
-- fix\(phonemizers\): fill the o2i identity revision [\#201](https://github.com/TigreGotico/scriptconv/pull/201) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a62](https://github.com/TigreGotico/scriptconv/tree/0.0.4a62) (2026-11-12)
 
