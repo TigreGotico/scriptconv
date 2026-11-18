@@ -8,6 +8,9 @@ writes ``ˈ`` and stress 2 writes ``ˌ`` directly before the vowel.
 """
 import hashlib
 import shutil
+import sys
+import tomllib
+from pathlib import Path
 
 import pytest
 
@@ -22,6 +25,7 @@ from scriptconv.phonemizers import (
 from scriptconv.phonemizers._thirdparty import dizione
 from scriptconv.phonemizers._thirdparty.dizione.symbols import SYMBOL_TO_ID, Phonemized
 from scriptconv.phonemizers.dizione import DATA_DIR, DizionePhonemizer, _token_clauses
+from scriptconv.phonemizers.registry import PHONEMIZER_REGISTRY
 
 
 @pytest.fixture(scope="module")
@@ -346,3 +350,16 @@ def test_the_package_holds_the_pinned_data():
     found = {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
              for path in DATA_DIR.iterdir() if path.is_file()}
     assert found == BUILT
+
+
+def test_without_numpy_the_backend_names_the_extra_that_installs_it(monkeypatch):
+    monkeypatch.setitem(sys.modules, "numpy", None)
+    with pytest.raises(ImportError, match=r"scriptconv\[en-phonemizers\]"):
+        DizionePhonemizer()
+
+
+def test_the_extra_that_the_registry_names_for_dizione_holds_numpy():
+    extra = PHONEMIZER_REGISTRY[Phonemizer.DIZIONE][2]
+    pyproject = tomllib.loads((Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(encoding="utf-8"))
+    requirements = pyproject["project"]["optional-dependencies"][extra]
+    assert any(requirement.split(">")[0].split("<")[0].split("=")[0].strip() == "numpy" for requirement in requirements)

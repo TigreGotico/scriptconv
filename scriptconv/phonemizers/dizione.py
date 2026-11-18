@@ -149,6 +149,13 @@ class DizionePhonemizer(BasePhonemizer):
                  overrides: Optional[Union[Dict[str, str], str, Path]] = None,
                  tokens: bool = False):
         _check_alphabet(self, alphabet, [Alphabet.IPA])
+        try:
+            import numpy  # noqa: F401
+        except ImportError as e:
+            raise ImportError(
+                "numpy is required for the dizione phonemizer, whose model guesses the words that its dictionary "
+                "lacks. Install it with 'pip install numpy' (or 'pip install scriptconv[en-phonemizers]')."
+            ) from e
         super().__init__(alphabet)
         self.data_dir = Path(data_dir) if data_dir is not None else DATA_DIR
         self.engine = _BoundedEngine(self.data_dir, overrides=overrides)
