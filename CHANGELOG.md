@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a119](https://github.com/TigreGotico/scriptconv/tree/0.0.4a119) (2026-11-18)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a118...0.0.4a119)
+
+**Merged pull requests:**
+
+- docs: say what PhonemizerIdentity.revision holds, and the cache hit cost [\#332](https://github.com/TigreGotico/scriptconv/pull/332) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a118](https://github.com/TigreGotico/scriptconv/tree/0.0.4a118) (2026-11-18)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a117...0.0.4a118)
@@ -324,17 +332,9 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a75...0.0.4a76)
 
-**Merged pull requests:**
-
-- fix\(phonemizers\): remove the stress marks that goruut cannot read [\#207](https://github.com/TigreGotico/scriptconv/pull/207) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a75](https://github.com/TigreGotico/scriptconv/tree/0.0.4a75) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a74...0.0.4a75)
-
-**Merged pull requests:**
-
-- fix\(phonemizers\): stop the local goruut server the wrapper starts [\#206](https://github.com/TigreGotico/scriptconv/pull/206) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a74](https://github.com/TigreGotico/scriptconv/tree/0.0.4a74) (2026-11-14)
 
