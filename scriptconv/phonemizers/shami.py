@@ -51,6 +51,11 @@ class ShamiPhonemizer(BasePhonemizer):
         ValueError: If ``alphabet`` is not IPA, or ``inventory`` is not 88 or 90.
     """
 
+    #: The front end reads each Arabic span through text2spoken's Levantine
+    #: (``apc``) reading and each English span through its English one, so the
+    #: frontend's normaliser hook does not run first.
+    owned_stages = frozenset({"normalize"})
+
     def __init__(self, alphabet: Alphabet = Alphabet.IPA,
                  diacritizer_backend: str = "auto",
                  inventory: int = 88):

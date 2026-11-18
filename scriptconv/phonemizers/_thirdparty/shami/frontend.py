@@ -15,7 +15,7 @@ from .codeswitch import Span, segment
 from .diacritize import get_diacritizer, is_already_diacritized
 from .english_g2p import english_g2p
 from .levantine_g2p import arabic_fallback_ipa, levantine_g2p
-from .normalize import normalize_unicode, verbalize
+from .normalize import normalize_unicode
 from .phoneme_inventory import (
     BOS,
     BRK,
@@ -29,6 +29,10 @@ from .phoneme_inventory import (
 )
 
 _PUNCT_SET = set(PUNCT)
+
+# The text2spoken language that reads the numbers, money and times of a span:
+# Levantine Arabic for an Arabic span, English for an English one.
+_SPOKEN_LANG = {"ar": "apc", "en": "en"}
 
 _PAUSE_RE = re.compile(r"[,.!;:\u2026\u2014]+")
 _SHORT_PAUSE = {",", ";", ":"}
@@ -115,10 +119,11 @@ class TextFrontend:
         return levantine_g2p(diac, self.back_emphatics, self.epenthesize)
 
     def _span_to_ipa(self, span: Span) -> str:
-        verbalized = verbalize(span.text, span.lang)
+        from text2spoken import normalize
+        spoken = normalize(span.text, _SPOKEN_LANG[span.lang])
         if span.lang == "ar":
-            return self._arabic_to_ipa(verbalized)
-        return english_g2p(verbalized, self.inventory)
+            return self._arabic_to_ipa(spoken)
+        return english_g2p(spoken, self.inventory)
 
     def process(self, text: str) -> Utterance:
         normalized = normalize_unicode(text)
