@@ -59,10 +59,14 @@ _SEPARATING_MARKS = frozenset(mark for mark, symbol in CLAUSE_PUNCTUATION.items(
 # sentence tokenizer, which knows abbreviations; inside a sentence an ellipsis
 # or "|" still ends a clause, as in chunk_text, but carries no symbol (espeak-ng
 # reads an ellipsis as a spoken-name pause, which Piper does not keep).
-# The atomic group keeps a long run of dots linear: once the run is matched, no
-# shorter split of it is tried when no whitespace follows.
-_CLAUSE_BREAK = re.compile(r"(?>(?:\.\.+|\u2026|[,:;!?|\u060c\u061b\u061f])[^\w\s]*)(?=\s)")
-_TRAILING_PUNCTUATION = re.compile(r"[^\w\s]+\s*$")
+# A match starts only where a run of marks starts, and the run must reach
+# whitespace, so each run is read a fixed number of times and the split takes
+# linear time. Group 1 is the break: the first mark of the run that ends a
+# clause, through the end of the run.
+_CLAUSE_BREAK = re.compile(
+    r"(?<![^\w\s])(?=[^\w\s]*+\s)[^\w\s]*?((?:\.\.|\u2026|[,:;!?|\u060c\u061b\u061f])[^\w\s]*+)")
+# Starts only where a run of marks starts, so a long run is read once.
+_TRAILING_PUNCTUATION = re.compile(r"(?<![^\w\s])[^\w\s]++\s*+$")
 # One or more blank lines: a paragraph break.
 _PARAGRAPH_BREAK = re.compile(r"(\n(?:[^\S\n]*\n)+)")
 _LANG_FLAGS = re.compile(r"\([^)]+\)")
@@ -153,7 +157,7 @@ def split_clauses(sentence: str) -> List[Tuple[str, Optional[str]]]:
     clauses: List[Tuple[str, Optional[str]]] = []
     start = 0
     for match in _CLAUSE_BREAK.finditer(sentence):
-        clauses.append((sentence[start:match.start()], _clause_mark(match.group())))
+        clauses.append((sentence[start:match.start(1)], _clause_mark(match.group(1))))
         start = match.end()
     tail = sentence[start:]
     trailing = _TRAILING_PUNCTUATION.search(tail)
