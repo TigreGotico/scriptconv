@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a122](https://github.com/TigreGotico/scriptconv/tree/0.0.4a122) (2026-11-18)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a121...0.0.4a122)
+
+**Merged pull requests:**
+
+- fix: Segment.text keeps the words before an inline block and the mark after it [\#336](https://github.com/TigreGotico/scriptconv/pull/336) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a121](https://github.com/TigreGotico/scriptconv/tree/0.0.4a121) (2026-11-18)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a120...0.0.4a121)
@@ -395,10 +403,6 @@
 ## [0.0.4a69](https://github.com/TigreGotico/scriptconv/tree/0.0.4a69) (2026-11-13)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a68...0.0.4a69)
-
-**Merged pull requests:**
-
-- fix\(vosk\): read a combining acute as stress on the vowel before it [\#213](https://github.com/TigreGotico/scriptconv/pull/213) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a68](https://github.com/TigreGotico/scriptconv/tree/0.0.4a68) (2026-11-13)
 
