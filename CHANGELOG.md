@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.0.4a124](https://github.com/TigreGotico/scriptconv/tree/0.0.4a124) (2026-11-18)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a123...0.0.4a124)
+
+**Merged pull requests:**
+
+- fix\(dizione\): a missing numpy raises an ImportError that names the extra [\#346](https://github.com/TigreGotico/scriptconv/pull/346) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- fix: the tugaphone identity has no revision, not an exception, where tugaphone gives none [\#345](https://github.com/TigreGotico/scriptconv/pull/345) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a123](https://github.com/TigreGotico/scriptconv/tree/0.0.4a123) (2026-11-18)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a122...0.0.4a123)
@@ -395,10 +404,6 @@
 ## [0.0.4a71](https://github.com/TigreGotico/scriptconv/tree/0.0.4a71) (2026-11-13)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a70...0.0.4a71)
-
-**Merged pull requests:**
-
-- fix\(vosk\): look up a stress-marked word in the dictionary [\#217](https://github.com/TigreGotico/scriptconv/pull/217) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a70](https://github.com/TigreGotico/scriptconv/tree/0.0.4a70) (2026-11-13)
 
