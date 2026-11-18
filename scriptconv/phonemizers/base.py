@@ -860,7 +860,7 @@ class GraphemePhonemizer(BasePhonemizer):
         super().__init__(alphabet, normalizer)
         self.stress_notation = stress_notation
         rules = {"lowercase": lowercase, "in_word_chars": in_word_chars,
-                 "replace_chars": None if replace_chars is None else MappingProxyType(dict(replace_chars)),
+                 "replace_chars": None if replace_chars is None else dict(replace_chars),
                  "drop_chars": drop_chars}
         for name, value in rules.items():
             if value is not None:

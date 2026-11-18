@@ -1,4 +1,6 @@
 """The character rules of `GraphemePhonemizer` as constructor arguments."""
+import copy
+import pickle
 from types import MappingProxyType
 
 import pytest
@@ -43,3 +45,11 @@ def test_a_replace_chars_argument_is_copied_so_a_later_change_to_the_dict_change
     phonemizer = GraphemePhonemizer(replace_chars=table)
     table["-"] = "x"
     assert phonemizer.phonemize_string("a - b", "pt") == "a b"
+
+
+def test_an_instance_with_every_argument_pickles_and_deep_copies():
+    phonemizer = GraphemePhonemizer(lowercase=False, in_word_chars="", replace_chars={"-": " "}, drop_chars="<>")
+    text = "Ela mora em Vila-Real <hoje>."
+    for clone in (pickle.loads(pickle.dumps(phonemizer)), copy.deepcopy(phonemizer)):
+        assert clone.phonemize_string(text, "pt") == phonemizer.phonemize_string(text, "pt")
+        assert clone.identity("pt").revision == phonemizer.identity("pt").revision
