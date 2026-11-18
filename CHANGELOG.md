@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a120](https://github.com/TigreGotico/scriptconv/tree/0.0.4a120) (2026-11-18)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a119...0.0.4a120)
+
+**Merged pull requests:**
+
+- feat: Segment.text holds the staged source text of a chunk [\#334](https://github.com/TigreGotico/scriptconv/pull/334) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a119](https://github.com/TigreGotico/scriptconv/tree/0.0.4a119) (2026-11-18)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a118...0.0.4a119)
@@ -395,10 +403,6 @@
 ## [0.0.4a67](https://github.com/TigreGotico/scriptconv/tree/0.0.4a67) (2026-11-13)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a66...0.0.4a67)
-
-**Merged pull requests:**
-
-- fix\(phonemizers\): keep a hyphen or apostrophe after a stress mark [\#208](https://github.com/TigreGotico/scriptconv/pull/208) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a66](https://github.com/TigreGotico/scriptconv/tree/0.0.4a66) (2026-11-13)
 
