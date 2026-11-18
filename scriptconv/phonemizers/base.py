@@ -202,10 +202,25 @@ class PhonemizerIdentity:
     """A hash of the spec, code and data that give the phonemes, when the
     backend has one: the orthography2ipa spec revision, dizione's build
     fingerprint, or the hash of the code and data on the path of an in-tree
-    backend."""
+    backend.
+
+    Its meaning depends on :attr:`frontend`. With ``frontend`` ``None``, a
+    backend called directly, it is the backend's own revision. With
+    ``frontend`` set, it is the frontend revision with the ``sc1:`` prefix.
+    That revision covers the backend revision plus the frontend stage modules
+    and output settings, and text2spoken's revision when the normaliser is
+    :func:`~scriptconv.frontend.spoken_normalizer`. It is ``None`` when the
+    backend has no revision or scriptconv cannot vouch for a stage.
+
+    Two identities compare by ``revision`` only when both have ``frontend``
+    ``None`` or both have it set. A consumer that recorded a backend identity
+    compares it with ``backend.identity(lang)``, not with
+    :meth:`~scriptconv.frontend.TextFrontend.identity`."""
     frontend: Optional[int] = None
     """The version of the stage order of :class:`~scriptconv.frontend.TextFrontend`.
-    ``None`` for a backend called directly."""
+    ``None`` for a backend called directly; it tells what :attr:`revision`
+    holds, the backend's own revision when ``None`` and the frontend revision
+    when set."""
 
     def differs_from(self, other: "PhonemizerIdentity") -> Tuple[str, ...]:
         """Names of the fields that differ from *other*, ``revision`` first.
