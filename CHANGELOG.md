@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a118](https://github.com/TigreGotico/scriptconv/tree/0.0.4a118) (2026-11-18)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a117...0.0.4a118)
+
+**Merged pull requests:**
+
+- feat: keep TextFrontend.identity on disk [\#329](https://github.com/TigreGotico/scriptconv/pull/329) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a117](https://github.com/TigreGotico/scriptconv/tree/0.0.4a117) (2026-11-18)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a116...0.0.4a117)
@@ -395,10 +403,6 @@
 ## [0.0.4a66](https://github.com/TigreGotico/scriptconv/tree/0.0.4a66) (2026-11-13)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a65...0.0.4a66)
-
-**Merged pull requests:**
-
-- fix\(espeak\): stress the syllable a combining acute marks in ru and uk [\#205](https://github.com/TigreGotico/scriptconv/pull/205) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a65](https://github.com/TigreGotico/scriptconv/tree/0.0.4a65) (2026-11-12)
 
