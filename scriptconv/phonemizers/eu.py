@@ -18,8 +18,12 @@ class EuskaphonePhonemizer(BasePhonemizer):
     (``eu``, ``eu-x-zuberera``, ...) which euskaphone resolves internally, so a
     single instance serves every dialect.  ``euskaphone`` is imported lazily so
     importing ``scriptconv`` does not hard-require it.
+
+    euskaphone reads numbers, dates and abbreviations through ``text2spoken``
+    on every call, so this backend owns the ``normalize`` stage.
     """
 
+    owned_stages = frozenset({"normalize"})
     engine_distribution = "euskaphone"
 
     def __init__(self, alphabet: Alphabet = Alphabet.IPA):
