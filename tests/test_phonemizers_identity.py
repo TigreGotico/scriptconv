@@ -683,6 +683,13 @@ class TestFrontendRevision:
         assert frontend(Custom()).identity().revision is None
 
 
+GRAPHEMES_EN_REVISION = """
+import json
+from scriptconv.phonemizers import GraphemePhonemizer
+print(json.dumps(GraphemePhonemizer().identity("en").revision))
+"""
+
+
 @pytest.fixture
 def fresh_probes():
     """Probe results and warnings kept by no earlier test, and none kept after this one."""
@@ -755,6 +762,46 @@ class TestProbeFailures:
         (tmp_path / "sitecustomize.py").write_text("import scriptconv.phonemizers.base\n")
         monkeypatch.syspath_prepend(str(tmp_path))
         self.assert_no_revision_and_one_warning(caplog, "scriptconv loaded before it started")
+
+    def test_a_distribution_loaded_before_the_probe_still_counts(self, fresh_probes, tmp_path,
+                                                                 monkeypatch):
+        from scriptconv.phonemizers import _revision
+        expected = GraphemePhonemizer().identity("en").revision
+        _revision._probe_outcome.cache_clear()
+        (tmp_path / "sitecustomize.py").write_text("import quebra_frases\n")
+        monkeypatch.syspath_prepend(str(tmp_path))
+        assert expected is not None
+        assert GraphemePhonemizer().identity("en").revision == expected
+
+    def test_a_change_to_a_distribution_loaded_before_the_probe_changes_the_revision(self, tmp_path):
+        import quebra_frases
+        shutil.copytree(Path(quebra_frases.__file__).parent, tmp_path / "quebra_frases",
+                        ignore=shutil.ignore_patterns("__pycache__"))
+        (tmp_path / "sitecustomize.py").write_text("import quebra_frases\n")
+
+        def revision():
+            done = subprocess.run([sys.executable, "-c", GRAPHEMES_EN_REVISION], cwd=ROOT, check=True,
+                                  capture_output=True, text=True,
+                                  env={**os.environ, "PYTHONPATH": os.pathsep.join([str(tmp_path), str(ROOT)]),
+                                       "PYTHONDONTWRITEBYTECODE": "1"})
+            return json.loads(done.stdout.splitlines()[-1])
+        before = revision()
+        with open(tmp_path / "quebra_frases" / "tokenization.py", "a", encoding="utf-8") as module:
+            module.write("\n_split = sentence_tokenize\n\n\n"
+                         "def sentence_tokenize(input_string):\n    return _split(input_string)[::-1]\n")
+        after = revision()
+        assert None not in (before, after)
+        assert after != before
+
+    def test_another_distribution_loaded_before_the_probe_keeps_the_revision(self, fresh_probes, tmp_path,
+                                                                             monkeypatch):
+        from scriptconv.phonemizers import _revision
+        expected = GraphemePhonemizer().identity("en").revision
+        _revision._probe_outcome.cache_clear()
+        (tmp_path / "sitecustomize.py").write_text("import pytest\n")
+        monkeypatch.syspath_prepend(str(tmp_path))
+        assert expected is not None
+        assert GraphemePhonemizer().identity("en").revision == expected
 
     def test_a_print_after_the_probe_result_keeps_the_revision(self, fresh_probes, tmp_path,
                                                                monkeypatch):

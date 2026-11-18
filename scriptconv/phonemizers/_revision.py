@@ -36,7 +36,9 @@ docs, docstrings, ``version.py`` or the modules of other backends keeps it.
 
 A module on the path that does not load from a file in a directory, as from a
 zip archive, raises :class:`RevisionSourceUnavailable`, so it never counts as
-an empty digest. A probe that exits with an error, runs longer than
+an empty digest. A module of another distribution that loads before the
+probe, as from a ``sitecustomize.py`` or a ``.pth`` file, counts when the
+calls import its package. A probe that exits with an error, runs longer than
 :data:`PROBE_TIMEOUT`, prints no readable result, or finds scriptconv loaded
 before it starts, as from a ``sitecustomize.py``, raises
 :class:`RevisionProbeFailed`. In each case :func:`code_revision` gives no
@@ -80,14 +82,24 @@ engine of the backend, and an engine such as tugaphone takes tens of seconds
 to start on a loaded machine."""
 
 _PROBE = """
-import sys
+import builtins, importlib, sys
 before = set(sys.modules)
 opened = set()
+imported = set()
 def audit(event, args):
     if event == "open" and isinstance(args[0], (str, bytes)):
         opened.add(args[0] if isinstance(args[0], str) else args[0].decode(errors="replace"))
 sys.addaudithook(audit)
-import importlib, json, warnings
+load, load_module = builtins.__import__, importlib.import_module
+def recorded_import(name, globals=None, locals=None, fromlist=(), level=0):
+    if not level:
+        imported.add(name.partition(".")[0])
+    return load(name, globals, locals, fromlist, level)
+def recorded_import_module(name, package=None):
+    imported.add(name.partition(".")[0])
+    return load_module(name, package)
+builtins.__import__, importlib.import_module = recorded_import, recorded_import_module
+import json, warnings
 marker, module, qualname, lang, mode = sys.argv[1:6]
 arguments, texts = (json.loads(a) for a in sys.argv[6:8])
 backend_class = importlib.import_module(module)
@@ -114,12 +126,14 @@ with warnings.catch_warnings():
                     call(text)
                 except Exception:
                     pass
-modules = {name: getattr(loaded, "__file__", None)
-           for name, loaded in list(sys.modules.items()) if name not in before}
+# a module loaded before the probe, as by a sitecustomize.py, counts when the calls import its package
+used = imported - {"scriptconv"}
+modules = {name: getattr(loaded, "__file__", None) for name, loaded in list(sys.modules.items())
+           if name not in before or name.partition(".")[0] in used}
 print(marker + json.dumps({"modules": modules, "opened": sorted(opened)}), flush=True)
 """
 """Prints, after a marker, the modules that a backend, or a frontend that reads
-through it, loads and the files that it opens."""
+through it, loads or imports, and the files that it opens."""
 
 _NOT_CODE = frozenset({tokenize.COMMENT, tokenize.NL, tokenize.ENCODING, tokenize.ENDMARKER})
 _LINE = frozenset({"NEWLINE", "INDENT", "DEDENT"})
