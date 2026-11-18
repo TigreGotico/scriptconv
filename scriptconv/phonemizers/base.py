@@ -847,12 +847,24 @@ class GraphemePhonemizer(BasePhonemizer):
 
     def __init__(self, alphabet: Alphabet = Alphabet.UNICODE,
                  normalizer: Optional[Callable[[str, str], str]] = None,
-                 stress_notation: str = "acute"):
+                 stress_notation: str = "acute", *,
+                 lowercase: Optional[bool] = None,
+                 in_word_chars: Optional[str] = None,
+                 replace_chars: Optional[Mapping[str, str]] = None,
+                 drop_chars: Optional[str] = None):
+        """Each character rule that is not None replaces the class default for this instance, as in
+        ``GraphemePhonemizer(in_word_chars="")``, which turns every hyphen into a space."""
         if stress_notation not in self.STRESS_NOTATIONS:
             raise ValueError(f"stress_notation must be one of {self.STRESS_NOTATIONS}, "
                              f"not {stress_notation!r}")
         super().__init__(alphabet, normalizer)
         self.stress_notation = stress_notation
+        rules = {"lowercase": lowercase, "in_word_chars": in_word_chars,
+                 "replace_chars": None if replace_chars is None else dict(replace_chars),
+                 "drop_chars": drop_chars}
+        for name, value in rules.items():
+            if value is not None:
+                setattr(self, name, value)
 
     def reads_stress_mark(self, lang: str) -> bool:
         """The output writes the mark, in every language, unless the notation is ``"none"``."""
