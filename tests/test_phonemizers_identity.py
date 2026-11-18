@@ -339,6 +339,7 @@ WRAPPER_BACKENDS = {
     "orthography2ipa": ("Orthography2IPAPhonemizer()", "pt-PT"),
     "barranquenho": ("BarranquenhoPhonemizer()", "ext-PT-x-barrancos"),
     "mirandese": ("MirandesePhonemizer()", "mwl-x-sendim"),
+    "dizione": ("DizionePhonemizer()", "en-US"),
 }
 WRAPPER_FRONTENDS = {"frontend-tugaphone": ("TugaphonePhonemizer()", "pt-PT")}
 
@@ -350,6 +351,7 @@ import json, scriptconv
 from scriptconv.frontend import FrontendConfig, TextFrontend
 from scriptconv.phonemizers import GraphemePhonemizer, UnicodeCodepointPhonemizer
 from scriptconv.phonemizers.ber import MatoubKabylePhonemizer
+from scriptconv.phonemizers.dizione import DizionePhonemizer
 from scriptconv.phonemizers.mwl import MirandesePhonemizer
 from scriptconv.phonemizers.o2ipa import Orthography2IPAPhonemizer
 from scriptconv.phonemizers.pt import BarranquenhoPhonemizer, TugaphonePhonemizer
@@ -596,6 +598,9 @@ WRAPPER_MUTANTS = {
         "mirandese", "phonemizers/mwl.py",
         "return self._o2i.phonemize_string(text, DIALECTS[self.get_lang(lang)])",
         'return self._o2i.phonemize_string(text, DIALECTS[self.get_lang(lang)]).replace("ˈ", "")'),
+    "D1 the dizione wrapper joins two sentences with a bar": (
+        "dizione", "phonemizers/dizione.py",
+        'return " ".join(self._ipa_sentences(text))', 'return " | ".join(self._ipa_sentences(text))'),
 }
 
 
