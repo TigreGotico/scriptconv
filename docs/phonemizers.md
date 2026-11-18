@@ -817,6 +817,19 @@ data-driven language specs. Trivial built-ins that need no extra:
 letters stays as part of the word) and `UnicodeCodepointPhonemizer`
 (codepoints as phonemes).
 
+`GraphemePhonemizer` takes its character rules as keyword arguments, so a voice
+can match the text it trained on. `lowercase`, `in_word_chars`, `replace_chars`
+and `drop_chars` each replace the class default when they are given, and the
+identity revision then holds them. A voice whose training text had no hyphen
+in a word sets `in_word_chars=""`, and every hyphen becomes a space:
+
+```python
+from scriptconv.phonemizers.base import GraphemePhonemizer
+
+GraphemePhonemizer().phonemize_string("Ela mora em Vila-Real.", "pt")  # 'ela mora em vila-real.'
+GraphemePhonemizer(in_word_chars="").phonemize_string("Ela mora em Vila-Real.", "pt")  # 'ela mora em vila real.'
+```
+
 The OpenJTalk backend runs on pyopenjtalk-plus with onnxruntime, which the
 `ja-phonemizers` extra installs. pyopenjtalk installs the same `pyopenjtalk`
 module with another dictionary and other accent rules, and pyopenjtalk-plus
