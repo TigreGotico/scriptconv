@@ -793,6 +793,8 @@ class TextFrontend:
                     held.bounds = _first_bounds(reads, index + 1)
                 self._add_block(held, parts, index, stages)
                 marks, quotes = _marks_after(parts[index + 1], self._reads_as_word)
+                if marks:
+                    held.text = (held.text or "") + marks
                 following = _FOLLOWING.match(parts[index + 1], len(marks))[0]
                 continue
             after_block = index > 0
@@ -808,6 +810,13 @@ class TextFrontend:
                     quotes = ""
                 if marks:
                     self._take_marks(held, piece, marks, following)
+                    if piece.text is not None:
+                        # the marks moved to the block's piece leave the text
+                        # after them, and the whitespace after the marks, out of
+                        # this piece
+                        leading = marks.lstrip()
+                        if piece.text.startswith(leading):
+                            piece.text = piece.text[len(leading):].lstrip()
                     marks = ""
                     if not piece.phonemes:
                         continue
@@ -1069,7 +1078,7 @@ class TextFrontend:
         """
         text, after = parts[index - 1], parts[index + 1]
         symbols = parts[index][2:-2].strip()
-        piece.text = parts[index]
+        piece.text = " ".join(filter(None, (piece.text, parts[index])))
         phonemes = piece.phonemes
         space, space_streams = self._space.phonemes, self._space.streams
         if piece.bounds is not None:

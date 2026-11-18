@@ -220,6 +220,39 @@ class TestSegmentText:
                                                   Stages(chunk=Chunk.SENTENCE))] == [
             "[[ana]]", "Olá."]
 
+    @pytest.mark.parametrize("chunk, text, expected", [
+        (Chunk.SENTENCE, "اقرأ [[h a l o]] الآن.", ["اقرأ [[h a l o]]", "الآن."]),
+        (Chunk.CLAUSE, "اقرأ [[h a l o]] الآن.", ["اقرأ [[h a l o]]", "الآن."]),
+        (Chunk.PARAGRAPH, "اقرأ [[h a l o]] الآن.", ["اقرأ [[h a l o]] الآن."]),
+        (Chunk.SENTENCE, "ab [[xy]] cd. ef.", ["ab [[xy]]", "cd.", "ef."]),
+        (Chunk.PARAGRAPH, "ab [[xy]] cd. ef.", ["ab [[xy]] cd. ef."]),
+        (Chunk.SENTENCE, "a [[x]] b [[y]] c.", ["a [[x]]", "b [[y]]", "c."]),
+        (Chunk.CLAUSE, "a [[x]] b [[y]] c.", ["a [[x]]", "b [[y]]", "c."]),
+        (Chunk.PARAGRAPH, "a [[x]] b [[y]] c.", ["a [[x]] b [[y]] c."]),
+        (Chunk.SENTENCE, "[[ana]].", ["[[ana]]."]),
+        (Chunk.CLAUSE, "[[ana]].", ["[[ana]]."]),
+        (Chunk.PARAGRAPH, "[[ana]].", ["[[ana]]."]),
+        (Chunk.SENTENCE, "Olá [[ana]].", ["Olá [[ana]]."]),
+        (Chunk.CLAUSE, "Olá [[ana]].", ["Olá [[ana]]."]),
+        (Chunk.PARAGRAPH, "Olá [[ana]].", ["Olá [[ana]]."]),
+        (Chunk.SENTENCE, "[[ana]] Olá.", ["[[ana]]", "Olá."]),
+        (Chunk.SENTENCE, "Olá [[ana]], tudo bem?", ["Olá [[ana]],", "tudo bem?"]),
+        (Chunk.CLAUSE, "Olá [[ana]], tudo bem?", ["Olá [[ana]],", "tudo bem?"]),
+        (Chunk.PARAGRAPH, "Olá [[ana]], tudo bem?", ["Olá [[ana]], tudo bem?"]),
+        (Chunk.SENTENCE, "Olá [[ana]]! Tudo bem?", ["Olá [[ana]]!", "Tudo bem?"]),
+        (Chunk.PARAGRAPH, "Olá [[ana]]! Tudo bem?", ["Olá [[ana]]! Tudo bem?"]),
+    ])
+    def test_a_block_keeps_the_staged_words_before_it(self, chunk, text, expected):
+        frontend = build(Echo(), stages=Stages(diacritize=False))
+        assert [s.text for s in frontend.segments(text, Stages(chunk=chunk))] == expected
+
+    def test_the_words_before_a_block_are_the_staged_text(self):
+        frontend = build(Echo(), normalizer=lambda text, lang: text.upper(),
+                         stages=Stages(diacritize=False))
+        assert [s.text for s in frontend.segments("ab [[xy]] cd.",
+                                                  Stages(chunk=Chunk.SENTENCE))] == [
+            "AB [[xy]]", "CD."]
+
 
 class TestInlineBlocks:
     def test_no_stage_reads_a_block(self, monkeypatch):
