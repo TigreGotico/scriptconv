@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a121](https://github.com/TigreGotico/scriptconv/tree/0.0.4a121) (2026-11-18)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a120...0.0.4a121)
+
+**Merged pull requests:**
+
+- feat: tugaphone owns normalize; owners read their text with its punctuation [\#338](https://github.com/TigreGotico/scriptconv/pull/338) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a120](https://github.com/TigreGotico/scriptconv/tree/0.0.4a120) (2026-11-18)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a119...0.0.4a120)
@@ -395,10 +403,6 @@
 ## [0.0.4a68](https://github.com/TigreGotico/scriptconv/tree/0.0.4a68) (2026-11-13)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a67...0.0.4a68)
-
-**Merged pull requests:**
-
-- fix: run the hook in prepare and skip it for a backend that owns normalize [\#211](https://github.com/TigreGotico/scriptconv/pull/211) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a67](https://github.com/TigreGotico/scriptconv/tree/0.0.4a67) (2026-11-13)
 
