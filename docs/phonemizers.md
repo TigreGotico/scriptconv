@@ -52,7 +52,7 @@ spec that gives the phonemes did not change. The class attribute
 `engine_distribution` names the package that supplies the engine, and `None`
 means the code is in this repository.
 
-**Some backends hold a `revision`.** For `graphemes`, `unicode` and
+**Each backend holds a `revision`.** For `graphemes`, `unicode` and
 `matoub_kab`, the `revision` is `sc1:` and a hash of the code and data on the
 path of the backend. `dizione` takes it from its engine.
 
@@ -63,8 +63,17 @@ the code on the path of the backend. The engine revision is
 with its packaged lexicon. The files of the distributions that the engine
 revision covers leave the hash. So an engine release that keeps its revision
 keeps the `revision` of the backend, and a change of the scriptconv code on
-the path changes it. When the engine gives no revision, the backend has none,
-with one warning.
+the path changes it. When the engine gives no revision, with one warning, or
+when the tugaphone `contact` is not `none`, the `revision` holds the engine
+version in place of the engine revision, as for the other engines below.
+
+For a backend that calls any other engine, such as `epitran`, `espeak` or
+`gruut`, the `revision` is `sc1:` and a hash of the engine name and version and
+of the code on the path of the backend. The files of the engine distribution
+leave the hash, and the version stands for them. For `espeak` it is the version
+of the espeak-ng binary. So an engine release changes the `revision`, and so
+does a change of the scriptconv code on the path or of quebra-frases. The
+wrappers in scriptconv-copyleft and scriptconv-nonfree are code on the path.
 
 A probe in a fresh process builds the backend. It reads a text with every
 clause mark through `phonemize` and `phonemize_to_list`, with
@@ -72,7 +81,8 @@ clause mark through `phonemize` and `phonemize_to_list`, with
 
 - each scriptconv module that the probe loads, and each scriptconv data file
   that it opens
-- each other distribution that the probe loads, such as quebra-frases, whole
+- each other distribution that the probe loads, such as quebra-frases, whole.
+  The engine distribution, whose version the `revision` holds, is left out.
 - the source file of each class of the backend outside scriptconv, so a
   subclass counts
 - the arguments of the backend, a character rule set on the instance, the
@@ -85,12 +95,12 @@ backends, docs or `version.py` keeps it, and `differs_from` then reports
 nothing.
 
 The first `identity` call for a backend and a language runs the probe. Later
-calls use the stored value. A backend that calls an engine outside scriptconv
-has no `revision`, so a change of its `version` always shows. A probe that
-fails, runs longer than 120 seconds or prints no result also gives no
-`revision`, with one warning per backend and language in a process. So does a
-probe that finds scriptconv imported before it starts, for example by a
-`sitecustomize.py`.
+calls in the process use the stored value. A probe that fails, runs longer
+than 120 seconds or prints no result gives no `revision`, with one warning per
+backend and language in a process. So does a probe that finds scriptconv
+imported before it starts, for example by a `sitecustomize.py`. A backend
+class that subclasses `BasePhonemizer` directly, outside scriptconv and its
+sister packages, has no `revision`, because the probe cannot build it.
 
 A `TextFrontend` has its own `revision`, which covers the frontend stages too.
 See [frontend](frontend.md).

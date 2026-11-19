@@ -129,10 +129,11 @@ with warnings.catch_warnings():
                     call(text)
                 except Exception:
                     pass
-# a module loaded before the probe, as by a sitecustomize.py, counts when the calls import its package
+# a module loaded before the probe, as by a sitecustomize.py, counts when the calls import its package.
+# A module counts by its own name, as dateparser puts the standard _strptime in sys.modules as strptime_patched.
 used = imported - {"scriptconv"}
-modules = {name: getattr(loaded, "__file__", None) for name, loaded in list(sys.modules.items())
-           if name not in before or name.partition(".")[0] in used}
+modules = {getattr(loaded, "__name__", name): getattr(loaded, "__file__", None)
+           for name, loaded in list(sys.modules.items()) if name not in before or name.partition(".")[0] in used}
 print(marker + json.dumps({"modules": modules, "opened": sorted(opened)}), flush=True)
 """
 """Prints, after a marker, the modules that a backend, or a frontend that reads
@@ -142,6 +143,8 @@ _NOT_CODE = frozenset({tokenize.COMMENT, tokenize.NL, tokenize.ENCODING, tokeniz
 _LINE = frozenset({"NEWLINE", "INDENT", "DEDENT"})
 _VERSION_FILES = frozenset({"version.py", "_version.py"})
 _NATIVE = frozenset({".so", ".pyd", ".dll", ".dylib"})
+#: The packages whose classes the probe builds by name. A backend class from elsewhere is probed as its first base in them.
+_IN_TREE = frozenset({"scriptconv", "scriptconv_copyleft", "scriptconv_nonfree"})
 
 
 class RevisionSourceUnavailable(OSError):
@@ -177,7 +180,10 @@ def code_revision(backend, lang: str, settings: Mapping, frontend: bool = False)
     count too. The files of the distributions that
     ``backend._covered_distributions(lang)`` names leave the hash.
     """
-    probed = next(cls for cls in type(backend).__mro__ if cls.__module__.startswith("scriptconv."))
+    probed = next(cls for cls in type(backend).__mro__ if cls.__module__.partition(".")[0] in _IN_TREE)
+    if inspect.isabstract(probed):
+        # a backend class from elsewhere on BasePhonemizer itself, which the probe cannot build
+        return None
     arguments = backend._revision_arguments()
     mode = "frontend" if frontend else "backend"
     digest = hashlib.sha256(json.dumps(

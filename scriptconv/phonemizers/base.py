@@ -216,7 +216,8 @@ class PhonemizerIdentity:
     """A hash of the spec, code and data that give the phonemes, when the
     backend has one: the orthography2ipa spec revision, dizione's build
     fingerprint, or the hash of the code and data on the path of an in-tree
-    backend.
+    backend. For any other engine, the hash holds the engine version in place
+    of the engine's files.
 
     Its meaning depends on :attr:`frontend`. With ``frontend`` ``None``, a
     backend called directly, it is the backend's own revision. With
@@ -695,19 +696,32 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         return {}
 
     def _covered_distributions(self, lang: str) -> FrozenSet[str]:
-        """The distributions whose own revision the identity of this backend
-        holds for *lang*. The probe of
+        """The distributions whose own revision, or version, the identity of
+        this backend holds for *lang*. The probe of
         :func:`~scriptconv.phonemizers._revision.code_revision` leaves their
-        files out of the hash."""
-        return frozenset()
+        files out of the hash. For an engine outside scriptconv it is the
+        engine's distribution, whose version :meth:`identity` puts in the settings."""
+        if self.engine_distribution is None:
+            return frozenset()
+        return frozenset({self._engine_release()[0]})
 
     def identity(self, lang: str) -> PhonemizerIdentity:
-        """What phonemizes *lang* here: the engine, its version and the lect.
+        """What phonemizes *lang* here: the engine, its version, the lect and the revision.
+
+        ``revision`` is the hash of the code and data on the path of this
+        backend, as :func:`~scriptconv.phonemizers._revision.code_revision`
+        gives it, with :meth:`_identity_settings` in the settings. For an
+        engine outside scriptconv, the settings also hold the engine's
+        distribution and version, and the files of that distribution leave
+        the hash. So a change of the scriptconv code on the path, as
+        ``base.py``, ``diacritics.py`` or the sentence splitter, changes the
+        revision, and so does an engine release.
 
         Raises:
             ImportError: If the engine is not installed.
             UnsupportedLanguageError: If the backend does not support *lang*.
         """
+        from scriptconv.phonemizers._revision import code_revision
         from scriptconv.phonemizers.registry import PHONEMIZER_REGISTRY
         names = {cls_name: member.value
                  for member, (_, cls_name, _) in PHONEMIZER_REGISTRY.items()}
@@ -716,7 +730,11 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         distribution, version = self._engine_release()
         # Grapheme, Unicode and Phonetisaurus backends take any language.
         resolved = self.get_lang(lang) if hasattr(self, "get_lang") else lang
-        return PhonemizerIdentity(backend, distribution, version, resolved)
+        settings = self._identity_settings()
+        if self.engine_distribution is not None:
+            settings = {**settings, distribution: version}
+        return PhonemizerIdentity(backend, distribution, version, resolved,
+                                  code_revision(self, resolved, settings))
 
     @staticmethod
     def remove_punctuation(text):
@@ -926,15 +944,6 @@ class GraphemePhonemizer(BasePhonemizer):
             text = replace_stress_mark(text, lang, before="+")
         return text
 
-    def identity(self, lang: str) -> PhonemizerIdentity:
-        """The base identity, with ``revision`` the hash of the code and data
-        on the path of this backend, as
-        :func:`~scriptconv.phonemizers._revision.code_revision` gives it. A
-        character rule or a whitespace pattern set on the instance joins the hash."""
-        from scriptconv.phonemizers._revision import code_revision
-        revision = code_revision(self, lang, self._identity_settings())
-        return dataclasses.replace(super().identity(lang), revision=revision)
-
     def _identity_settings(self) -> Dict[str, object]:
         """Each character rule and the whitespace pattern, when set on the
         instance to a value other than the class default."""
@@ -976,11 +985,3 @@ class UnicodeCodepointPhonemizer(BasePhonemizer):
             str: The input text normalized to Unicode NFD, with combining marks separated into distinct codepoints.
         """
         return unicodedata.normalize(self.form, text)
-
-    def identity(self, lang: str) -> PhonemizerIdentity:
-        """The base identity, with ``revision`` the hash of the code and data
-        on the path of this backend and of its normalisation form, as
-        :func:`~scriptconv.phonemizers._revision.code_revision` gives it."""
-        from scriptconv.phonemizers._revision import code_revision
-        revision = code_revision(self, lang, {})
-        return dataclasses.replace(super().identity(lang), revision=revision)

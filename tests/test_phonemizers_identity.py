@@ -19,6 +19,7 @@ from types import MappingProxyType
 
 import orthography2ipa
 import pytest
+import quebra_frases
 import tugaphone.version
 from orthography2ipa.exceptions import EngineSourceUnavailable
 
@@ -211,13 +212,15 @@ class TestOrthography2IPARevision:
         assert first == second
         assert second.revision.startswith("sc1:")
 
-    def test_a_missing_engine_source_gives_no_revision_and_a_warning(self, monkeypatch, caplog):
+    def test_a_missing_engine_source_gives_the_base_revision_and_a_warning(self, monkeypatch, caplog):
         def unavailable(code):
             raise EngineSourceUnavailable("engine source of g2p.py is missing")
+        spec = Orthography2IPAPhonemizer().identity("gl")
         monkeypatch.setattr(orthography2ipa, "spec_revision", unavailable)
         with caplog.at_level(logging.WARNING, logger="scriptconv.phonemizers.o2ipa"):
             identity = Orthography2IPAPhonemizer().identity("gl")
-        assert identity.revision is None
+        assert identity == BasePhonemizer.identity(Orthography2IPAPhonemizer(), "gl")
+        assert identity.revision.startswith("sc1:") and identity.revision != spec.revision
         warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
         assert len(warnings) == 1
         assert "engine source" in warnings[0] and "g2p.py is missing" in warnings[0]
@@ -294,22 +297,24 @@ class TestTugaphoneRevision:
         assert not covered & {_revision._canonical(name) for name in tops}
         assert not {"tugaphone", "orthography2ipa", "o2i_lexicons"} & set(tops)
 
-    def test_a_tugaphone_revision_error_gives_no_revision_and_one_warning(self, monkeypatch, caplog):
+    def test_a_tugaphone_revision_error_gives_the_base_revision_and_one_warning(self, monkeypatch, caplog):
         def fails(lang):
             raise tugaphone.RevisionError("the revision probe for 'pt-PT' did not finish in 120 s")
         monkeypatch.setattr(tugaphone, "revision", fails)
         with caplog.at_level(logging.WARNING, logger="scriptconv.phonemizers.pt"):
             identities = [TugaphonePhonemizer().identity("pt-PT") for _ in range(3)]
-        assert [identity.revision for identity in identities] == [None] * 3
+        assert identities == [BasePhonemizer.identity(TugaphonePhonemizer(), "pt-PT")] * 3
+        assert identities[0].revision.startswith("sc1:")
         warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
         assert len(warnings) == 1
         assert "RevisionError" in warnings[0] and "did not finish in 120 s" in warnings[0]
 
-    def test_a_contact_other_than_none_gives_no_revision(self):
+    def test_a_contact_other_than_none_gives_the_base_revision(self):
         mixed = TugaphonePhonemizer()
         mixed.contact = "en"
-        assert TugaphonePhonemizer().identity("pt-PT").revision is not None
-        assert mixed.identity("pt-PT").revision is None
+        default = TugaphonePhonemizer().identity("pt-PT").revision
+        assert mixed.identity("pt-PT") == BasePhonemizer.identity(mixed, "pt-PT")
+        assert mixed.identity("pt-PT").revision.startswith("sc1:") and mixed.identity("pt-PT").revision != default
         # the policy reaches tugaphone and changes the output
         assert mixed.phonemize_string("o weekend", "pt-PT") == \
             tugaphone.TugaPhonemizer().phonemize_sentence("o weekend", "pt-PT", contact="en")
@@ -367,6 +372,7 @@ REVISIONS = revisions_script(CODE_BACKENDS, CODE_FRONTENDS)
 WRAPPER_REVISIONS = revisions_script(WRAPPER_BACKENDS, WRAPPER_FRONTENDS,
                                      "from scriptconv.phonemizers.dizione import DizionePhonemizer")
 SCRIPTCONV = Path(sys.modules["scriptconv"].__file__).parent
+QUEBRA_FRASES = Path(quebra_frases.__file__).parent
 
 # Edits of the scriptconv source, (file, old text, new text), on the path of the
 # named backend or frontend. Each edit but F4 changes its output for some input.
@@ -426,9 +432,11 @@ NEUTRAL_EDITS = {
 
 def revisions_in_a_copy(directory, edit=None, script=REVISIONS):
     """The revisions that *script* prints, in a fresh process, from a copy of
-    the scriptconv package with *edit* ``(file, old, new)`` applied."""
+    the scriptconv and quebra-frases packages with *edit* ``(file, old, new)``
+    applied. *file* is relative to the scriptconv package."""
     tree = directory / "tree"
-    shutil.copytree(SCRIPTCONV, tree / "scriptconv", ignore=shutil.ignore_patterns("__pycache__"))
+    for package in (SCRIPTCONV, QUEBRA_FRASES):
+        shutil.copytree(package, tree / package.name, ignore=shutil.ignore_patterns("__pycache__"))
     if edit is not None:
         target, old, new = edit
         path = tree / "scriptconv" / target
@@ -702,6 +710,71 @@ class TestWrapperRevision:
                                                                          tmp_path):
         assert None not in wrapped_pristine.values()
         assert revisions_in_a_copy(tmp_path, NEUTRAL_EDITS[edit], WRAPPER_REVISIONS) == wrapped_pristine
+
+
+# An engine backend, whose revision holds the engine version in place of the
+# engine's files, and a frontend that reads through it.
+ENGINE_BACKENDS = {"epitran": ("EpitranPhonemizer()", "rus-Cyrl")}
+ENGINE_FRONTENDS = {"frontend-epitran": ("EpitranPhonemizer()", "rus-Cyrl")}
+ENGINE_REVISIONS = revisions_script(ENGINE_BACKENDS, ENGINE_FRONTENDS,
+                                    "from scriptconv.phonemizers.mul import EpitranPhonemizer")
+# Edits on the path of the engine backend that change its output for some input.
+ENGINE_MUTANTS = {
+    "E1 a stress mark stays in the text that epitran reads": (
+        "epitran", "diacritics.py",
+        "    if STRESS_MARK not in text:\n        return text\n    vowels = _stress_vowels(lang)",
+        "    if True:\n        return text\n    vowels = _stress_vowels(lang)"),
+    "E2 the sentence splitter keeps the whole text as one sentence": (
+        "epitran", "../quebra_frases/tokenization.py",
+        "def sentence_tokenize(input_string):\n", "def sentence_tokenize(input_string):\n    return [input_string]\n"),
+    "E3 the epitran frontend keeps a block of whitespace": (
+        "frontend-epitran", "frontend.py", "if block[2:-2].strip():", "if block[2:-2]:"),
+}
+
+
+@pytest.fixture(scope="module")
+def engine_pristine(tmp_path_factory):
+    return revisions_in_a_copy(tmp_path_factory.mktemp("engine"), script=ENGINE_REVISIONS)
+
+
+# Each copy runs the epitran probes in a fresh process.
+@pytest.mark.timeout(900)
+class TestEngineRevision:
+    @pytest.mark.parametrize("member, lang", [
+        (Phonemizer.EPITRAN, "rus-Cyrl"), (Phonemizer.GRUUT, "ru"), (Phonemizer.ESPEAK, "pt"),
+        (Phonemizer.KOG2PK, "ko"), (Phonemizer.MANTOQ, "ar"),
+    ])
+    def test_an_engine_backend_has_a_revision(self, member, lang):
+        assert get_phonemizer(member).identity(lang).revision.startswith("sc1:")
+
+    @pytest.mark.parametrize("member, lang", [(Phonemizer.EPITRAN, "rus-Cyrl"), (Phonemizer.ESPEAK, "pt")])
+    def test_an_engine_release_changes_the_revision(self, member, lang, monkeypatch):
+        backend = get_phonemizer(member)
+        current = backend.identity(lang)
+        distribution, version = backend._engine_release()
+        monkeypatch.setattr(type(backend), "_engine_release", lambda self: (distribution, f"{version}.post1"))
+        released = backend.identity(lang)
+        assert None not in (current.revision, released.revision)
+        assert released.differs_from(current) == ("revision", "version")
+
+    @pytest.mark.parametrize("mutant", ENGINE_MUTANTS)
+    def test_a_code_change_on_the_path_changes_the_revision(self, mutant, engine_pristine, tmp_path):
+        backend, *edit = ENGINE_MUTANTS[mutant]
+        assert engine_pristine[backend] is not None
+        assert revisions_in_a_copy(tmp_path, edit, ENGINE_REVISIONS)[backend] != engine_pristine[backend]
+
+    @pytest.mark.parametrize("edit", NEUTRAL_EDITS)
+    def test_an_edit_that_changes_no_output_keeps_every_engine_revision(self, edit, engine_pristine, tmp_path):
+        assert None not in engine_pristine.values()
+        assert revisions_in_a_copy(tmp_path, NEUTRAL_EDITS[edit], ENGINE_REVISIONS) == engine_pristine
+
+    def test_a_backend_on_the_base_class_itself_gives_no_revision_and_no_warning(self, caplog):
+        class Custom(BasePhonemizer):
+            def phonemize_string(self, text, lang):
+                return text
+        with caplog.at_level(logging.WARNING):
+            assert Custom().identity("pt").revision is None
+        assert not caplog.records
 
 
 def frontend(backend=None, **config):

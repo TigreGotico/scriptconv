@@ -88,7 +88,7 @@ class Orthography2IPAPhonemizer(BasePhonemizer):
             revision = orthography2ipa.spec_revision(resolved_lang)
         except EngineSourceUnavailable as exc:
             LOG.warning("orthography2ipa cannot read its engine source, so the "
-                        "identity of %r has no revision: %s", resolved_lang, exc)
+                        "identity of %r holds the orthography2ipa version: %s", resolved_lang, exc)
             return None
         patches = self._lexicon_patches(resolved_lang)
         if patches is not None:
@@ -113,7 +113,8 @@ class Orthography2IPAPhonemizer(BasePhonemizer):
         the files of orthography2ipa and of a packaged lexicon. So an
         orthography2ipa release that keeps the spec revision keeps the
         revision. When orthography2ipa cannot read its engine source,
-        ``revision`` is ``None``.
+        ``revision`` is that of :meth:`BasePhonemizer.identity`, which holds
+        the orthography2ipa version.
         """
         from scriptconv.phonemizers._revision import code_revision
         identity = super().identity(lang)
