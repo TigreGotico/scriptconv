@@ -2,14 +2,19 @@
 
 import json
 import os
+import shutil
 import subprocess
+import threading
+import weakref
 from typing import List, Dict, Optional, Sequence, TYPE_CHECKING
 
 if TYPE_CHECKING:
     import numpy as np
 
+from scriptconv.diacritics import _diacritizer_family, strip_diacritics
+from scriptconv.phonemizers._moved import deprecated_getattr
 from scriptconv.phonemizers.enums import Alphabet
-from scriptconv.phonemizers.base import BasePhonemizer
+from scriptconv.phonemizers.base import BasePhonemizer, UnsupportedLanguageError, _check_alphabet
 # minimal ONNX session construction — scriptconv has no provider
 # machinery; consumers wanting CUDA/etc. pass providers= explicitly
 ProviderSpec = str
@@ -23,9 +28,18 @@ def make_session(model_path, providers=None, use_cuda=False):
     return onnxruntime.InferenceSession(model_path, providers=list(providers))
 
 
-class EspeakError(Exception):
-    """Custom exception for espeak-ng related errors."""
-    pass
+# Hong Kong and Macau Cantonese. A bare "yue" means mainland Cantonese in
+# Simplified script, so these tags are far from it by language distance. The
+# Cantonese resources of Charsiu, Goruut and Transphone carry no region and are
+# written in Traditional script, so these tags resolve to them directly.
+_HK_CANTONESE = frozenset({
+    "yue-hk", "yue-mo", "yue-hant", "yue-hant-hk", "yue-hant-mo",
+    "zh-hk", "zh-mo", "zh-hant-hk", "zh-hant-mo",
+})
+
+
+def _is_hk_cantonese(lang: str) -> bool:
+    return lang.lower().replace("_", "-") in _HK_CANTONESE
 
 
 class ByT5Phonemizer(BasePhonemizer):
@@ -116,8 +130,8 @@ class ByT5Phonemizer(BasePhonemizer):
         phones = b''.join(phone_bytes).decode("utf-8", errors="ignore")
         return phones
 
-    @staticmethod
-    def _encode_text(text: str, lang: str) -> "np.ndarray":
+    @classmethod
+    def _encode_text(cls, text: str, lang: str) -> "np.ndarray":
         import numpy as np
         """
         Encodes input text and language into a numpy array suitable for the model.
@@ -130,7 +144,7 @@ class ByT5Phonemizer(BasePhonemizer):
         Returns:
             numpy.ndarray: A numpy array of encoded input IDs.
         """
-        lang = ByT5Phonemizer.get_lang(lang)  # match lang code
+        lang = cls.get_lang(lang)  # match lang code
         # Prepend language tag and encode the string to bytes
         encoded_bytes = f"<{lang}>: {text}".encode("utf-8")
         # Convert bytes to a list of integers, adding a shift to account for special tokens
@@ -227,6 +241,24 @@ class CharsiuPhonemizer(ByT5Phonemizer):
                   'srp', 'hbs-latn', 'hbs-cyrl', 'snd', 'slo', 'slv', 'spa', 'spa-latin', 'spa-me', 'swa', 'swe', 'tgl',
                   'tam', 'tat', 'tha', 'tur', 'tuk', 'ukr', 'vie-n', 'vie-c', 'vie-s', 'wel-nw', 'wel-sw', 'ice', 'ang',
                   'gle', 'enm', 'syc', 'glg', 'sme', 'egy']
+    # BCP-47 tags for the labels whose code does not name the script of their
+    # CharsiuG2P data. dicts/srp.tsv is Serbian in Cyrillic, eSpeak NG output
+    # over a word list (the CharsiuG2P README says some word lists come from
+    # the Leipzig Corpora Collection). Its tag ties with hbs-cyrl, the WikiPron
+    # Serbo-Croatian list, so a Serbian request in Cyrillic picks srp only
+    # because srp comes first in BYT5_LANGS. dicts/zho-s.tsv and dicts/zho-t.tsv
+    # are ipa-dict Mandarin in Simplified and Traditional script. Their cmn
+    # tags keep Cantonese, Hokkien and the other Chinese languages away from
+    # them. dicts/kur.tsv is the AsoSoft Central Kurdish data, "Central Kurdish
+    # words in Standard Arabic script", which a Kurmanji request in Latin
+    # script must not reach. dicts/fra-qu.tsv is ipa-dict fr_QC, Quebec French
+    # (tu t͡sy). Read as a code, its suffix names Europe. dicts/arm-w.tsv is
+    # the WikiPron Western Armenian list (պապ bɑb), which has its own code.
+    # dicts/spa-me.tsv holds the same ipa-dict es_MX readings as dicts/spa.tsv,
+    # and the model scores lower with the spa-me prompt, so Spanish requests
+    # keep spa.
+    MATCH_TAGS = {"srp": "sr-Cyrl", "zho-s": "cmn-Hans", "zho-t": "cmn-Hant", "kur": "ckb",
+                  "fra-qu": "fr-CA", "arm-w": "hyw"}
 
     def __init__(self, model: Optional[str] = None, tokenizer_config: Optional[str] = None,
                  providers: Optional[Sequence[ProviderSpec]] = None,
@@ -258,155 +290,46 @@ class CharsiuPhonemizer(ByT5Phonemizer):
         Raises:
             ValueError: If the language code is unsupported.
         """
-        # Find the closest match
-        return cls.match_lang(target_lang, cls.BYT5_LANGS)
+        if _is_hk_cantonese(target_lang):
+            return "yue"
+        if target_lang.lower() in cls.BYT5_LANGS:
+            return target_lang.lower()
+        tags = {cls.MATCH_TAGS.get(label, label): label for label in cls.BYT5_LANGS}
+        return tags[cls.match_lang(target_lang, list(tags))]
 
     def phonemize_string(self, text: str, lang: str) -> str:
         # charsiu models can't handle whitespace, need to be phonemized word by word
         return " ".join([self._infer_onnx(w, lang) for w in text.split()])
 
 
-class EspeakPhonemizer(BasePhonemizer):
+_GRUUT = threading.local()
+
+
+class _CopyingLookup:
+    """Gives each gruut word its own copy of the lexicon pronunciation.
+
+    gruut caches each lexicon pronunciation as one list and gives that list to
+    every word that reads it. The French liaison, which Italian also runs, the
+    Catalan fusion, elision and diphthong rules, and the Farsi genitive rule
+    change the list of the word in place. Without a copy, one "nous allons"
+    adds the liaison z to every later "nous" in the process.
     """
-    A phonemizer class that uses the espeak-ng command-line tool to convert text into phonemes.
-    It segments the input text heuristically based on punctuation to mimic clause-by-clause processing.
-    """
-    ESPEAK_LANGS = ['es-419', 'ca', 'qya', 'ga', 'et', 'ky', 'io', 'fa-latn', 'en-gb', 'fo', 'haw', 'kl',
-                    'ta', 'ml', 'gd', 'sd', 'es', 'hy', 'ur', 'ro', 'hi', 'or', 'ti', 'ca-va', 'om', 'tr', 'pa',
-                    'smj', 'mk', 'bg', 'cv', "fr", 'fi', 'en-gb-x-rp', 'ru', 'mt', 'an', 'mr', 'pap', 'vi', 'id',
-                    'fr-be', 'ltg', 'my', 'nl', 'shn', 'ba', 'az', 'cmn', 'da', 'as', 'sw',
-                    'piqd', 'en-us', 'hr', 'it', 'ug', 'th', 'mi', 'cy', 'ru-lv', 'ia', 'tt', 'hu', 'xex', 'te', 'ne',
-                    'eu', 'ja', 'bpy', 'hak', 'cs', 'en-gb-scotland', 'hyw', 'uk', 'pt', 'bn', 'mto', 'yue',
-                    'be', 'gu', 'sv', 'sl', 'cmn-latn-pinyin', 'lfn', 'lv', 'fa', 'sjn', 'nog', 'ms',
-                    'vi-vn-x-central', 'lt', 'kn', 'he', 'qu', 'ca-ba', 'quc', 'nb', 'sk', 'tn', 'py', 'si', 'de',
-                    'ar', 'en-gb-x-gbcwmd', 'bs', 'qdb', 'sq', 'sr', 'tk', 'en-029', 'ht', 'ru-cl', 'af', 'pt-br',
-                    'fr-ch', 'ka', 'en-gb-x-gbclan', 'ko', 'is', 'ca-nw', 'gn', 'kok', 'la', 'lb', 'am', 'kk', 'ku',
-                    'kaa', 'jbo', 'eo', 'uz', 'nci', 'vi-vn-x-south', 'el', 'pl', 'grc', ]
 
-    _binary_available: Optional[bool] = None
+    def __init__(self, lookup):
+        self.lookup = lookup
 
-    def __init__(self, prefer_espyak: bool = False):
-        """
-        Args:
-            prefer_espyak: Use the pure-Python espyak G2P even when the
-                espeak-ng binary is installed. When False, espyak is only
-                used as a fallback if the binary is missing.
-        """
-        super().__init__(Alphabet.IPA)
-        self.prefer_espyak = prefer_espyak
-        self._espyak_g2p: dict = {}
+    def __call__(self, *args, **kwargs):
+        phonemes = self.lookup(*args, **kwargs)
+        return None if phonemes is None else list(phonemes)
 
-    def _espyak_phonemize(self, text: str, lang: str) -> str:
-        from espyak import G2P
-        if lang not in self._espyak_g2p:
-            self._espyak_g2p[lang] = G2P(lang)
-        return self._espyak_g2p[lang].phonemize(text)
-
-    @classmethod
-    def _has_binary(cls) -> bool:
-        if cls._binary_available is None:
-            import shutil
-            cls._binary_available = shutil.which("espeak-ng") is not None
-        return cls._binary_available
-
-    @classmethod
-    def get_lang(cls, target_lang: str) -> str:
-        """
-        Validates and returns the closest supported language code.
-
-        Args:
-            target_lang (str): The language code to validate.
-
-        Returns:
-            str: The validated language code.
-
-        Raises:
-            ValueError: If the language code is unsupported.
-        """
-        if target_lang.lower() == "en-gb":
-            return "en-gb-x-rp"
-        if target_lang in cls.ESPEAK_LANGS:
-            return target_lang
-        if target_lang.lower().split("-")[0] in cls.ESPEAK_LANGS:
-            return target_lang.lower().split("-")[0]
-        return cls.match_lang(target_lang, cls.ESPEAK_LANGS)
-
-    @staticmethod
-    def _run_espeak_command(args: List[str], input_text: str = None, check: bool = True) -> str:
-        """
-        Helper function to run espeak-ng commands via subprocess.
-        Executes 'espeak-ng' with the given arguments and input text.
-        Captures stdout and stderr, and raises EspeakError on failure.
-
-        Args:
-            args (List[str]): A list of command-line arguments for espeak-ng.
-            input_text (str, optional): The text to pass to espeak-ng's stdin. Defaults to None.
-            check (bool, optional): If True, raises a CalledProcessError if the command returns a non-zero exit code. Defaults to True.
-
-        Returns:
-            str: The stripped standard output from the espeak-ng command.
-
-        Raises:
-            EspeakError: If espeak-ng command is not found, or if the subprocess call fails.
-        """
-        command: List[str] = ['espeak-ng'] + args
-        
-        # Standard arguments for subprocess.run
-        subprocess_args = {
-            'input': input_text,
-            'capture_output': True,
-            'text': True,
-            'check': check,
-            'encoding': 'utf-8',
-            'errors': 'replace' # Replaces unencodable characters with a placeholder
-        }
-
-        # Add 'creationflags' to hide the terminal window on Windows
-        if os.name == 'nt':
-            subprocess_args['creationflags'] = 0x08000000
-
-        try:
-            process: subprocess.CompletedProcess = subprocess.run(
-                command,
-                **subprocess_args # Use the dynamic arguments
-            )
-            return process.stdout.strip()
-        except FileNotFoundError:
-            raise EspeakError(
-                "espeak-ng command not found. Please ensure espeak-ng is installed "
-                "and available in your system's PATH."
-            )
-        except subprocess.CalledProcessError as e:
-            raise EspeakError(
-                f"espeak-ng command failed with error code {e.returncode}:\n"
-                f"STDOUT: {e.stdout}\n"
-                f"STDERR: {e.stderr}"
-            )
-        except Exception as e:
-            raise EspeakError(f"An unexpected error occurred while running espeak-ng: {e}")
-
-    def phonemize_string(self, text: str, lang: str) -> str:
-        lang = self.get_lang(lang)
-        if self.prefer_espyak or not self._has_binary():
-            try:
-                return self._espyak_phonemize(text, lang)
-            except ImportError:
-                if not self._has_binary():
-                    raise EspeakError(
-                        "espeak-ng binary not found and espyak is not installed. "
-                        "Install espeak-ng or `pip install espyak` for the "
-                        "pure-Python fallback."
-                    )
-        return self._run_espeak_command(
-            ['-q', '-x', '--ipa', '-v', lang],
-            input_text=text
-        )
 
 class GruutPhonemizer(BasePhonemizer):
     """
     A phonemizer class that uses the Gruut library to convert text into phonemes.
     Note: Gruut's internal segmentation is sentence-based
     """
+
+    engine_distribution = "gruut"
     GRUUT_LANGS = ["en", "ar", "ca", "cs", "de", "es", "fa", "fr", "it",
                    "lb", "nl", "pt", "ru", "sv", "sw"]
 
@@ -435,8 +358,32 @@ class GruutPhonemizer(BasePhonemizer):
         Yields lists of word phonemes for each sentence.
         """
         lang = self.get_lang(lang)
-        import gruut
-        for sentence in gruut.sentences(text, lang=lang):
+        try:
+            from gruut import TextProcessor
+        except ImportError as e:
+            raise ImportError(
+                "gruut is required for the Gruut phonemizer. "
+                "Install it with 'pip install gruut' "
+                "(or 'pip install scriptconv[gruut]')."
+            ) from e
+        # one processor per thread, as gruut.sentences keeps it: the lexicon
+        # is a sqlite connection, which only its own thread can use.
+        # One processor per language too: gruut reads every sentence after
+        # the first, and the part-of-speech tags, with default_lang.
+        processors = getattr(_GRUUT, "processors", None)
+        if processors is None:
+            processors = _GRUUT.processors = {}
+        processor = processors.get(lang)
+        if processor is None:
+            # cache the processor only once its lookup copies: a processor
+            # stored before a failed get_settings would leak on the next call
+            processor = TextProcessor(default_lang=lang)
+            settings = processor.get_settings(lang)
+            if settings.lookup_phonemes is not None:
+                settings.lookup_phonemes = _CopyingLookup(settings.lookup_phonemes)
+            processors[lang] = processor
+        graph, root = processor(text, lang=lang)
+        for sentence in processor.sentences(graph, root):
             sent_phonemes = [w.phonemes for w in sentence if w.phonemes]
             if sentence and not sent_phonemes:
                 raise RuntimeError(f"did you install gruut[{lang}] ?")
@@ -458,11 +405,22 @@ class GruutPhonemizer(BasePhonemizer):
         return pho.strip()
 
 
+def _stop_goruut_server(process: subprocess.Popen) -> None:
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
+
+
 class GoruutPhonemizer(BasePhonemizer):
     """
     A phonemizer class that uses the pygoruut library to convert text into phonemes.
     https://github.com/neurlang/pygoruut/
     """
+
+    engine_distribution = "pygoruut"
     GORUUT_LANGS_NON_STD = [
         'BengaliDhaka', 'BengaliRahr', 'MalayArab', 'VietnameseCentral', 'VietnameseSouthern',
         'EnglishAmerican', 'EnglishBritish', 'NahuatlClassical', 'Hebrew2', 'Hebrew3',
@@ -601,15 +559,36 @@ class GoruutPhonemizer(BasePhonemizer):
 
     def __init__(self, remote_url=None):
         super().__init__(Alphabet.IPA)
-        from pygoruut.pygoruut import Pygoruut
-        from pygoruut.pygoruut_languages import PygoruutLanguages
+        try:
+            from pygoruut.pygoruut import Pygoruut
+            from pygoruut.pygoruut_languages import PygoruutLanguages
+        except ImportError as e:
+            raise ImportError(
+                "pygoruut is required for the Goruut phonemizer. "
+                "Install it with 'pip install pygoruut' "
+                "(or 'pip install scriptconv[goruut]')."
+            ) from e
 
         self.pygoruut_langs = PygoruutLanguages()
+        self._server_finalizer = None
         if remote_url is not None:
             # 'https://hashtron.cloud'
             self.pygoruut = Pygoruut(api=remote_url)
         else:
             self.pygoruut = Pygoruut()
+            # Pygoruut.__del__ never runs: its stderr drainer thread holds the
+            # instance, so the server outlives the process unless stopped here.
+            self._server_finalizer = weakref.finalize(
+                self, _stop_goruut_server, self.pygoruut.process)
+
+    def close(self) -> None:
+        """Stop the local goruut server that this phonemizer started.
+
+        The server also stops when the phonemizer is garbage-collected and at
+        interpreter exit. A remote server is never stopped.
+        """
+        if self._server_finalizer is not None:
+            self._server_finalizer()
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
@@ -631,10 +610,18 @@ class GoruutPhonemizer(BasePhonemizer):
             return 'EnglishAmerican'
         if target_lang.lower() == "en-gb" or target_lang.lower() == "en-uk":
             return 'EnglishBritish'
+        if _is_hk_cantonese(target_lang):
+            return cls.ISO639["yue"]
         lang = cls.match_lang(target_lang, list(cls.ISO639))
         return cls.ISO639[lang]
 
     def phonemize_string(self, text: str, lang: str) -> str:
+        # goruut's dicts/<lang>/language.json maps give no stress symbol for a
+        # combining acute or grave, so a stress mark only leaves a source-script
+        # letter in the IPA or moves the vowel. dicts/arabic and dicts/hebrew3
+        # map tashkeel and niqqud, so those marks reach goruut unchanged.
+        if _diacritizer_family(lang) == "stress":
+            text = strip_diacritics(text, lang)
         lang = self.get_lang(lang)
         return str(self.pygoruut.phonemize(language=lang, sentence=text))
 
@@ -642,30 +629,39 @@ class GoruutPhonemizer(BasePhonemizer):
 class EpitranPhonemizer(BasePhonemizer):
     """
     """
-    EPITRAN_LANGS = ['hsn-Latn', 'ful-Latn', 'jpn-Ktkn-red', 'tel-Telu', 'nld-Latn', 'aze-Latn', 'amh-Ethi-pp',
+
+    engine_distribution = "epitran"
+    EPITRAN_LANGS = ['hsn-Latn', 'ful-Latn', 'jpn-Kana', 'tel-Telu', 'nld-Latn', 'aze-Latn', 'amh-Ethi-pp',
                      'msa-Latn', 'spa-Latn-eu', 'ori-Orya', 'bxk-Latn', 'spa-Latn', 'kir-Cyrl', 'lij-Latn', 'kin-Latn',
                      'ces-Latn', 'sin-Sinh', 'urd-Arab', 'vie-Latn', 'gan-Latn', 'fra-Latn', 'nan-Latn', 'kaz-Latn',
-                     'swe-Latn', 'jpn-Ktkn', 'tam-Taml', 'sag-Latn', 'csb-Latn', 'pii-latn_Holopainen2019', 'yue-Latn',
+                     'swe-Latn', 'jpn-Kana-red', 'tam-Taml', 'sag-Latn', 'csb-Latn', 'pii-latn_Holopainen2019', 'yue-Latn',
                      'got-Latn', 'tur-Latn', 'aar-Latn', 'jav-Latn', 'ita-Latn', 'sna-Latn', 'ilo-Latn', 'tam-Taml-red',
-                     'kmr-Latn-red', 'uzb-Cyrl', 'amh-Ethi', 'mya-Mymr', 'aii-Syrc', 'lit-Latn', 'kmr-Latn',
-                     'hat-Latn-bab', 'ltc-Latn-bax', 'Goth2Latn', 'quy-Latn', 'hau-Latn', 'ood-Latn-alv', 'vie-Latn-so',
-                     'run-Latn', 'orm-Latn', 'ind-Latn', 'kir-Latn', 'mal-Mlym', 'ben-Beng-red', 'hun-Latn', 'uew',
-                     'sqi-Latn', 'jpn-Hrgn', 'deu-Latn-np', 'xho-Latn', 'fra-Latn-rev', 'fra-Latn-np', 'kaz-Cyrl-bab',
-                     'jpn-Hrgn-red', 'Latn2Goth', 'glg-Latn', 'uig-Arab', 'amh-Ethi-red', 'zul-Latn', 'hin-Deva',
-                     'uzb-Latn', 'tir-Ethi-red', 'kaz-Cyrl', 'mlt-Latn', 'deu-Latn-nar', 'est-Latn', 'eng-Latn',
+                     'kmr-Latn', 'uzb-Cyrl', 'amh-Ethi', 'mya-Mymr', 'aii-Syrc', 'lit-Latn', 'kmr-Latn-red',
+                     'hat-Latn-bab', 'ltc-Latn-bax', 'quy-Latn', 'hau-Latn', 'ood-Latn-alv',
+                     'run-Latn', 'orm-Latn', 'ind-Latn', 'kir-Latn', 'mal-Mlym', 'ben-Beng', 'hun-Latn', 'uew',
+                     'sqi-Latn', 'jpn-Hira', 'deu-Latn-np', 'xho-Latn', 'fra-Latn-rev', 'fra-Latn-np', 'kaz-Cyrl-bab',
+                     'jpn-Hira-red', 'glg-Latn', 'uig-Arab', 'amh-Ethi-red', 'zul-Latn', 'hin-Deva',
+                     'uzb-Latn', 'tir-Ethi', 'kaz-Cyrl', 'mlt-Latn', 'deu-Latn-nar', 'est-Latn', 'eng-Latn',
                      'pii-latn_Wiktionary', 'ckb-Arab', 'nya-Latn', 'mon-Cyrl-bab', 'fra-Latn-p', 'ood-Latn-sax',
-                     'ukr-Cyrl', 'tgl-Latn-red', 'lsm-Latn', 'kor-Hang', 'lav-Latn', 'generic-Latn', 'tur-Latn-red',
-                     'srp-Latn', 'tir-Ethi', 'kbd-Cyrl', 'hrv-Latn', 'srp-Cyrl', 'tpi-Latn', 'khm-Khmr', 'jam-Latn',
-                     'ben-Beng-east', 'por-Latn', 'cmn-Latn', 'cat-Latn', 'tha-Thai', 'ara-Arab', 'ben-Beng',
+                     'ukr-Cyrl', 'tgl-Latn', 'lsm-Latn', 'kor-Hang', 'lav-Latn', 'generic-Latn', 'tur-Latn-red',
+                     'srp-Latn', 'tir-Ethi-red', 'kbd-Cyrl', 'hrv-Latn', 'srp-Cyrl', 'tpi-Latn', 'khm-Khmr', 'jam-Latn',
+                     'ben-Beng-east', 'por-Latn', 'cmn-Latn', 'cat-Latn', 'tha-Thai', 'ara-Arab', 'ben-Beng-red',
                      'fin-Latn', 'hmn-Latn', 'lez-Cyrl', 'fas-Arab', 'lao-Laoo-prereform', 'mar-Deva', 'yor-Latn',
-                     'ron-Latn', 'tgl-Latn', 'lao-Laoo', 'deu-Latn', 'pan-Guru', 'tuk-Latn', 'tir-Ethi-pp', 'rus-Cyrl',
-                     'swa-Latn-red', 'ceb-Latn', 'wuu-Latn', 'hak-Latn', 'mri-Latn', 'epo-Latn', 'pol-Latn',
-                     'tur-Latn-bab', 'kat-Geor', 'tgk-Cyrl', 'aze-Cyrl', 'vie-Latn-ce', 'swa-Latn', 'tuk-Cyrl',
-                     'vie-Latn-no', 'nan-Latn-tl', 'zha-Latn', 'cjy-Latn', 'ava-Cyrl', 'som-Latn', 'kir-Arab']
+                     'ron-Latn', 'tgl-Latn-red', 'lao-Laoo', 'deu-Latn', 'pan-Guru', 'tuk-Latn', 'tir-Ethi-pp', 'rus-Cyrl',
+                     'swa-Latn', 'ceb-Latn', 'wuu-Latn', 'hak-Latn', 'mri-Latn', 'epo-Latn', 'pol-Latn',
+                     'tur-Latn-bab', 'kat-Geor', 'tgk-Cyrl', 'aze-Cyrl', 'swa-Latn-red', 'tuk-Cyrl',
+                     'nan-Latn-tl', 'zha-Latn', 'cjy-Latn', 'ava-Cyrl', 'som-Latn', 'kir-Arab']
 
     def __init__(self):
         super().__init__(Alphabet.IPA)
-        import epitran
+        try:
+            import epitran
+        except ImportError as e:
+            raise ImportError(
+                "epitran is required for the Epitran phonemizer. "
+                "Install it with 'pip install epitran' "
+                "(or 'pip install scriptconv[epitran]')."
+            ) from e
         self.epitran = epitran
         self._epis: Dict[str, epitran.Epitran] = {}
 
@@ -681,12 +677,35 @@ class EpitranPhonemizer(BasePhonemizer):
             str: The validated language code.
 
         Raises:
-            ValueError: If the language code is unsupported.
+            ValueError: If the language code is unsupported, or if it is
+                Japanese without a Kana or Hira script subtag. A refused
+                Korean tag gets a hint to use ko-Hang or kor-Hang.
         """
-        return cls.match_lang(target_lang, cls.EPITRAN_LANGS)
+        # Each epitran Japanese map converts one kana script. Kanji and the
+        # other kana script pass through unchanged, so a request for Jpan or
+        # Hrkt text would come back half converted.
+        subtags = (target_lang or "").replace("_", "-").lower().split("-")
+        if subtags[0] in ("ja", "jpn") and not {"kana", "hira"} & set(subtags[1:]):
+            raise UnsupportedLanguageError(f"unsupported language code: {target_lang} "
+                             "(epitran reads Japanese kana only; use ja-Kana or ja-Hira)")
+        try:
+            return cls.match_lang(target_lang, cls.EPITRAN_LANGS)
+        except ValueError as err:
+            # The epitran Korean map converts Hangul only. A bare Korean tag
+            # means the Kore script, Hangul plus Hanja, and Hanja passes
+            # through unchanged, so the match refuses it.
+            if subtags[0] in ("ko", "kor"):
+                raise ValueError(f"{err} (epitran reads Korean in Hangul; "
+                                 "use ko-Hang or kor-Hang)") from err
+            raise
 
     def phonemize_string(self, text: str, lang: str) -> str:
         lang = self.get_lang(lang)
+        # epitran reads English through Flite's lex_lookup; without it, epitran
+        # logs a warning and fails with KeyError('') on an empty ARPAbet string
+        if lang == "eng-Latn" and shutil.which("lex_lookup") is None:
+            raise RuntimeError("epitran English (eng-Latn) needs lex_lookup "
+                               "from Flite, and lex_lookup is not on PATH")
         epi = self._epis.get(lang)
         if epi is None:
             epi = self.epitran.Epitran(lang)
@@ -694,726 +713,108 @@ class EpitranPhonemizer(BasePhonemizer):
         return epi.transliterate(text)
 
 
-class MisakiPhonemizer(BasePhonemizer):
+class PhonetisaurusPhonemizer(BasePhonemizer):
+    """WFST grapheme-to-phoneme, through the ``phonetisaurus`` bindings.
+
+    https://github.com/AdolfVonKleist/Phonetisaurus
+
+    Phonetisaurus has no rules and no language list of its own: all of its
+    knowledge is in one trained FST, so the language and the symbol set are
+    properties of the MODEL, not of this wrapper. That has three consequences,
+    and each one is a design decision rather than a limitation to work around:
+
+    * ``model`` is required. scriptconv never downloads a model (the same rule
+      :class:`ByT5Phonemizer` follows). ``MODEL_SOURCES`` names where published
+      models live; a caller resolves one and passes the path.
+    * ``alphabet`` is declared by the caller, because only the caller knows
+      what the model was trained to emit. A CMUdict-trained model emits ARPA,
+      an o2i-trained or espeak-trained one emits IPA. The wrapper cannot read
+      it off the FST, so it does not guess.
+    * There is no language check and no ``LANG_DEFAULTS`` entry. A wrapper that
+      cannot know its own model's language must not be any language's default.
+
+    ``phonetisaurus`` ships the binaries it drives and the shared objects they
+    link against, and ``predict`` runs them under the ``PATH`` and
+    ``LD_LIBRARY_PATH`` from ``phonetisaurus.guess_environment()``. The apply
+    path needs no system package. Training is the exception: ``estimate-ngram``
+    also needs ``libquadmath.so.0`` from the host GCC runtime (``libquadmath0``
+    on Debian and Ubuntu). Training is not exercised here: this wrapper only
+    applies a model.
     """
-    https://github.com/hexgrad/misaki
-    """
-    MISAKI_LANGS = ['en-US', 'en-GB', 'ko', 'ja', 'vi', 'zh']
 
-    def __init__(self, alphabet: Alphabet = Alphabet.IPA):
-        # misaki emits IPA for every language except zh, where the alphabet selects
-        # the representation (IPA vs bopomofo) — see zh_version below. IPA is the
-        # sensible default for all of them.
-        super().__init__(alphabet)
-        self.g2p_en = self.g2p_zh = self.g2p_ko = self.g2p_vi = self.g2p_ja = None
+    engine_distribution = "phonetisaurus"
 
-    @property
-    def zh_version(self) -> str:
-        # misaki's zh G2P emits IPA + tone marks ("1.0") or bopomofo + tone numbers
-        # ("1.1"); the requested alphabet picks which, no separate class/param needed.
-        return "1.1" if self.alphabet == Alphabet.BOPOMOFO else "1.0"
+    #: Where published FSTs come from. Documentation, never a download.
+    MODEL_SOURCES = {
+        "rhasspy": "https://github.com/rhasspy/*-g2p (one g2p.fst per language)",
+        "cmudict": "trained from CMUdict with 'phonetisaurus train' (ARPA symbols)",
+    }
 
-    @classmethod
-    def get_lang(cls, target_lang: str) -> str:
+    #: Symbol sets a Phonetisaurus model is known to be trained on. The wrapper
+    #: passes the model's symbols through untouched, so this list says which
+    #: declarations are meaningful, not which conversions happen.
+    SUPPORTED_ALPHABETS = [Alphabet.IPA, Alphabet.ARPA, Alphabet.SAMPA,
+                           Alphabet.XSAMPA, Alphabet.GRAPHEMES]
+
+    def __init__(self, model: Optional[str] = None,
+                 alphabet: Alphabet = Alphabet.IPA,
+                 nbest: int = 1,
+                 separator: str = " ",
+                 normalizer=None):
         """
-        Validates and returns the closest supported language code.
-
         Args:
-            target_lang (str): The language code to validate.
-
-        Returns:
-            str: The validated language code.
-
-        Raises:
-            ValueError: If the language code is unsupported.
+            model: path to a trained Phonetisaurus FST. Required.
+            alphabet: the symbol set the model emits. The caller states it.
+            nbest: how many pronunciations the engine ranks per word. The
+                BEST one is returned whatever this is, so a higher value
+                changes the search, not the output shape. ``predict`` prints
+                one line per ranked pronunciation, best first, and yields one
+                pair per line, so the wrapper keeps the FIRST pair it sees for
+                a word and drops the rest.
+            separator: joins the symbols of one word. Models are trained on
+                symbol sequences, so the parts need a separator to stay
+                readable; pass "" for a bare string.
+            normalizer: see :class:`BasePhonemizer`.
         """
-        return cls.match_lang(target_lang, cls.MISAKI_LANGS)
-
-    def _get_phonemizer(self, lang: str):
-        """lazy load language specific phonemizer on first usage
-        NOTE: this can be slow
-        """
-        lang = self.get_lang(lang)
-
-        if lang == "zh":
-            if self.g2p_zh is None:
-                from misaki.zh import ZHG2P
-                self.g2p_zh = ZHG2P(version=self.zh_version)
-            return self.g2p_zh
-        elif lang == "ko":
-            if self.g2p_ko is None:
-                from misaki.ko import KOG2P
-                self.g2p_ko = KOG2P()
-            return self.g2p_ko
-        elif lang == "vi":
-            if self.g2p_vi is None:
-                from misaki.vi import VIG2P
-                self.g2p_vi = VIG2P()
-            return self.g2p_vi
-        elif lang == "ja":
-            if self.g2p_ja is None:
-                from misaki.ja import JAG2P
-                self.g2p_ja = JAG2P()
-            return self.g2p_ja
-        else:
-            if self.g2p_en is None:
-                from misaki import en
-                self.g2p_en = en.G2P()
-            if lang == "en-GB":
-                self.g2p_en.british = True
-            elif lang == "en-US":
-                self.g2p_en.british = False
-            return self.g2p_en
+        _check_alphabet(self, alphabet, self.SUPPORTED_ALPHABETS)
+        super().__init__(alphabet, normalizer=normalizer)
+        try:
+            import phonetisaurus
+        except ImportError as e:
+            raise ImportError(
+                "phonetisaurus is required for the Phonetisaurus phonemizer. "
+                "Install it with 'pip install phonetisaurus' "
+                "(or 'pip install scriptconv[phonetisaurus]')."
+            ) from e
+        if not model or not os.path.isfile(model):
+            raise ValueError(
+                "Phonetisaurus phonemization needs a local trained FST: pass "
+                "model=<path> (scriptconv never downloads — see "
+                "MODEL_SOURCES for where published models live)")
+        self.phonetisaurus = phonetisaurus
+        self.model = model
+        self.nbest = nbest
+        self.separator = separator
 
     def phonemize_string(self, text: str, lang: str) -> str:
-        pho = self._get_phonemizer(lang)
-        phonemes, tokens = pho(text)
-        return phonemes
+        """Phonemize ``text``. ``lang`` is accepted and not used: the model
+        decides the language, so a language argument here would claim a
+        routing this wrapper does not do."""
+        words = text.split()
+        if not words:
+            return ""
+        # predict() yields (word, symbols) and may reorder or drop a word it
+        # cannot read, so the result is indexed by word rather than zipped.
+        #
+        # With nbest > 1 it yields one pair PER RANKED PRONUNCIATION, best
+        # first, so a word appears more than once. dict() would keep the last
+        # pair, which is the WORST-ranked reading. Keep the first instead.
+        guesses: Dict[str, List[str]] = {}
+        for word, symbols in self.phonetisaurus.predict(
+                words, self.model, nbest=self.nbest):
+            guesses.setdefault(word, symbols)
+        return " ".join(self.separator.join(guesses[w])
+                        for w in words if w in guesses)
 
 
-# Per-language misaki phonemizers. misaki is NOT a thin wrapper: en ships ~6MB of
-# curated us/gb lexicons + spacy disambiguation, ja a cutlet romanizer + lexicon,
-# zh adds tone sandhi + an IPA/bopomofo frontend on top of pypinyin. Each language
-# has different heavy deps and params, so they are split into dedicated classes
-# (sharing the dispatch base). The base class above remains a back-compat
-# dispatcher for the legacy ``misaki`` phoneme type.
-class MisakiEnPhonemizer(MisakiPhonemizer):
-    """misaki English (curated us/gb lexicons + spacy; espeak only as OOV fallback)."""
-    MISAKI_LANGS = ['en-US', 'en-GB']
-
-
-class MisakiJaPhonemizer(MisakiPhonemizer):
-    """misaki Japanese (cutlet romanizer + ja_words lexicon; needs fugashi/unidic)."""
-    MISAKI_LANGS = ['ja']
-
-
-class MisakiZhPhonemizer(MisakiPhonemizer):
-    """misaki Chinese (pypinyin + tone sandhi + frontend).
-
-    The output representation follows the requested ``alphabet``: ``Alphabet.IPA``
-    (default) emits IPA + tone marks (ni↓xau↓), ``Alphabet.BOPOMOFO`` emits bopomofo
-    + tone numbers (ㄋㄧ2ㄏㄠ3). It must match the target model's training vocab.
-    """
-    MISAKI_LANGS = ['zh']
-
-
-class MisakiKoPhonemizer(MisakiPhonemizer):
-    """misaki Korean (KOG2P)."""
-    MISAKI_LANGS = ['ko']
-
-
-class MisakiViPhonemizer(MisakiPhonemizer):
-    """misaki Vietnamese (VIG2P + acronym/teencode dicts)."""
-    MISAKI_LANGS = ['vi']
-
-
-class TransphonePhonemizer(BasePhonemizer):
-    """
-    It provides approximiated phoneme tokenizers and G2P model for 7546 languages registered in the Glottolog database.
-    """
-    TRANSPHONE_LANGS = ['aaa', 'aab', 'aac', 'aad', 'aae', 'aaf', 'aag', 'aah', 'aai', 'aak', 'aal', 'aan', 'aao',
-                        'aap', 'aaq', 'aar', 'aas', 'aat', 'aau', 'aaw', 'aax', 'aaz', 'aba', 'abb', 'abc', 'abd',
-                        'abe', 'abf', 'abg', 'abh', 'abi', 'abj', 'abk', 'abl', 'abm', 'abn', 'abo', 'abp', 'abq',
-                        'abr', 'abs', 'abt', 'abu', 'abv', 'abw', 'abx', 'aby', 'abz', 'aca', 'acd', 'ace', 'acf',
-                        'ach', 'aci', 'ack', 'acl', 'acm', 'acn', 'acp', 'acq', 'acr', 'acs', 'act', 'acu', 'acv',
-                        'acw', 'acx', 'acy', 'acz', 'ada', 'add', 'ade', 'adf', 'adg', 'adh', 'adi', 'adj', 'adl',
-                        'adn', 'ado', 'adq', 'adr', 'ads', 'adt', 'adw', 'adx', 'ady', 'adz', 'aea', 'aeb', 'aec',
-                        'aed', 'aee', 'aek', 'ael', 'aem', 'aen', 'aeq', 'aer', 'aes', 'aeu', 'aew', 'aey', 'aez',
-                        'afb', 'afd', 'afe', 'afg', 'afi', 'afk', 'afn', 'afo', 'afp', 'afr', 'afs', 'aft', 'afu',
-                        'afz', 'agb', 'agc', 'agd', 'age', 'agf', 'agg', 'agh', 'agj', 'agk', 'agl', 'agm', 'agn',
-                        'ago', 'agq', 'agr', 'ags', 'agt', 'agu', 'agv', 'agw', 'agx', 'agy', 'agz', 'aha', 'ahb',
-                        'ahg', 'ahh', 'ahi', 'ahk', 'ahl', 'ahm', 'ahn', 'aho', 'ahp', 'ahs', 'aht', 'aia', 'aib',
-                        'aic', 'aid', 'aie', 'aif', 'aig', 'aih', 'aii', 'aij', 'aik', 'ail', 'aim', 'ain', 'aio',
-                        'aip', 'aiq', 'air', 'ais', 'ait', 'aiw', 'aix', 'aiy', 'aja', 'ajg', 'aji', 'ajn', 'ajp',
-                        'ajt', 'aju', 'ajw', 'ajz', 'aka', 'akb', 'akc', 'akd', 'ake', 'akf', 'akg', 'akh', 'aki',
-                        'akj', 'akk', 'akl', 'akm', 'ako', 'akp', 'akq', 'akr', 'aks', 'akt', 'aku', 'akv', 'akw',
-                        'akx', 'aky', 'akz', 'ala', 'alc', 'ald', 'ale', 'alf', 'alh', 'ali', 'alj', 'alk', 'all',
-                        'alm', 'aln', 'alo', 'alp', 'alq', 'alr', 'als', 'alt', 'alu', 'alw', 'alx', 'aly', 'alz',
-                        'ama', 'amb', 'amc', 'ame', 'amf', 'amg', 'amh', 'ami', 'amj', 'amk', 'aml', 'amm', 'amn',
-                        'amo', 'amp', 'amq', 'amr', 'ams', 'amt', 'amu', 'amv', 'amw', 'amx', 'amy', 'amz', 'ana',
-                        'anb', 'anc', 'and', 'ane', 'anf', 'ang', 'anh', 'ani', 'anj', 'ank', 'anl', 'anm', 'ann',
-                        'ano', 'anp', 'anq', 'anr', 'ans', 'ant', 'anu', 'anv', 'anw', 'anx', 'any', 'anz', 'aoa',
-                        'aob', 'aoc', 'aod', 'aoe', 'aof', 'aog', 'aoi', 'aoj', 'aok', 'aol', 'aom', 'aon', 'aor',
-                        'aos', 'aot', 'aou', 'aox', 'aoz', 'apb', 'apc', 'apd', 'ape', 'apf', 'apg', 'aph', 'api',
-                        'apj', 'apk', 'apl', 'apm', 'apn', 'apo', 'app', 'apq', 'apr', 'aps', 'apt', 'apu', 'apw',
-                        'apx', 'apy', 'apz', 'aqc', 'aqd', 'aqg', 'aqm', 'aqn', 'aqp', 'aqr', 'aqt', 'aqz', 'arb',
-                        'arc', 'ard', 'are', 'arg', 'arh', 'ari', 'arj', 'ark', 'arl', 'arn', 'aro', 'arp', 'arq',
-                        'arr', 'ars', 'aru', 'arv', 'arw', 'arx', 'ary', 'arz', 'asa', 'asb', 'asc', 'asd', 'ase',
-                        'asf', 'asg', 'ash', 'asi', 'asj', 'ask', 'asl', 'asm', 'asn', 'aso', 'asp', 'asq', 'asr',
-                        'ass', 'ast', 'asu', 'asv', 'asw', 'asx', 'asy', 'asz', 'ata', 'atb', 'atc', 'atd', 'ate',
-                        'atg', 'ati', 'atj', 'atk', 'atl', 'atm', 'atn', 'ato', 'atp', 'atq', 'atr', 'ats', 'att',
-                        'atu', 'atv', 'atw', 'atx', 'aty', 'atz', 'aua', 'aub', 'auc', 'aud', 'aug', 'auh', 'aui',
-                        'auj', 'auk', 'aul', 'aum', 'aun', 'auo', 'aup', 'auq', 'aur', 'aut', 'auu', 'auw', 'aux',
-                        'auy', 'auz', 'ava', 'avb', 'avd', 'ave', 'avi', 'avl', 'avm', 'avn', 'avs', 'avt', 'avu',
-                        'avv', 'awa', 'awb', 'awc', 'awe', 'awg', 'awh', 'awi', 'awk', 'awm', 'awn', 'awo', 'awr',
-                        'aws', 'awt', 'awu', 'awv', 'aww', 'awx', 'awy', 'axb', 'axe', 'axg', 'axk', 'axl', 'axx',
-                        'aya', 'ayb', 'ayc', 'ayd', 'aye', 'ayg', 'ayh', 'ayi', 'ayk', 'ayl', 'aym', 'ayn', 'ayo',
-                        'ayp', 'ayq', 'ayr', 'ayt', 'ayu', 'ayz', 'aza', 'azb', 'azd', 'azg', 'azj', 'azm', 'azn',
-                        'azo', 'azt', 'azz', 'baa', 'bab', 'bac', 'bae', 'baf', 'bag', 'bah', 'baj', 'bak', 'bam',
-                        'ban', 'bao', 'bap', 'bar', 'bas', 'bau', 'bav', 'baw', 'bax', 'bay', 'bba', 'bbb', 'bbc',
-                        'bbd', 'bbe', 'bbf', 'bbg', 'bbh', 'bbi', 'bbj', 'bbk', 'bbl', 'bbm', 'bbn', 'bbo', 'bbp',
-                        'bbq', 'bbr', 'bbs', 'bbt', 'bbu', 'bbv', 'bbw', 'bby', 'bca', 'bcc', 'bcd', 'bce', 'bcf',
-                        'bcg', 'bch', 'bci', 'bcj', 'bck', 'bcl', 'bcm', 'bcn', 'bco', 'bcp', 'bcq', 'bcr', 'bcs',
-                        'bct', 'bcu', 'bcv', 'bcw', 'bcy', 'bcz', 'bda', 'bdb', 'bdc', 'bdd', 'bde', 'bdf', 'bdg',
-                        'bdh', 'bdi', 'bdj', 'bdk', 'bdl', 'bdm', 'bdn', 'bdo', 'bdp', 'bdq', 'bdr', 'bds', 'bdt',
-                        'bdu', 'bdv', 'bdw', 'bdx', 'bdy', 'bea', 'beb', 'bec', 'bed', 'bee', 'bef', 'beg', 'beh',
-                        'bei', 'bej', 'bek', 'bel', 'bem', 'ben', 'beo', 'bep', 'beq', 'bes', 'bet', 'beu', 'bev',
-                        'bew', 'bex', 'bey', 'bez', 'bfa', 'bfb', 'bfc', 'bfd', 'bfe', 'bff', 'bfg', 'bfh', 'bfi',
-                        'bfj', 'bfk', 'bfl', 'bfm', 'bfn', 'bfo', 'bfp', 'bfq', 'bfs', 'bft', 'bfu', 'bfw', 'bfx',
-                        'bfy', 'bfz', 'bga', 'bgb', 'bgc', 'bgd', 'bge', 'bgf', 'bgg', 'bgi', 'bgj', 'bgk', 'bgl',
-                        'bgm', 'bgn', 'bgo', 'bgp', 'bgq', 'bgr', 'bgs', 'bgt', 'bgu', 'bgv', 'bgw', 'bgx', 'bgy',
-                        'bgz', 'bha', 'bhb', 'bhc', 'bhd', 'bhe', 'bhf', 'bhg', 'bhh', 'bhi', 'bhj', 'bhl', 'bhm',
-                        'bhn', 'bho', 'bhp', 'bhq', 'bhr', 'bhs', 'bht', 'bhu', 'bhv', 'bhw', 'bhy', 'bhz', 'bia',
-                        'bib', 'bid', 'bie', 'bif', 'big', 'bij', 'bil', 'bim', 'bin', 'bio', 'bip', 'biq', 'bir',
-                        'bis', 'bit', 'biu', 'biv', 'biw', 'bix', 'biy', 'biz', 'bja', 'bjb', 'bjc', 'bje', 'bjf',
-                        'bjg', 'bjh', 'bji', 'bjj', 'bjk', 'bjl', 'bjm', 'bjn', 'bjo', 'bjp', 'bjr', 'bjs', 'bjt',
-                        'bju', 'bjv', 'bjw', 'bjx', 'bjy', 'bjz', 'bka', 'bkc', 'bkd', 'bkf', 'bkh', 'bki', 'bkj',
-                        'bkk', 'bkl', 'bkm', 'bkn', 'bko', 'bkp', 'bkq', 'bkr', 'bks', 'bkt', 'bku', 'bkv', 'bkw',
-                        'bkx', 'bky', 'bkz', 'bla', 'blb', 'blc', 'bld', 'ble', 'blf', 'blh', 'bli', 'blj', 'blk',
-                        'bll', 'blm', 'bln', 'blo', 'blp', 'blq', 'blr', 'bls', 'blt', 'blv', 'blw', 'blx', 'bly',
-                        'blz', 'bma', 'bmb', 'bmc', 'bmd', 'bme', 'bmf', 'bmg', 'bmh', 'bmi', 'bmj', 'bmk', 'bml',
-                        'bmm', 'bmn', 'bmo', 'bmp', 'bmq', 'bmr', 'bms', 'bmt', 'bmu', 'bmv', 'bmw', 'bmx', 'bmz',
-                        'bna', 'bnb', 'bnc', 'bnd', 'bne', 'bnf', 'bng', 'bni', 'bnj', 'bnk', 'bnl', 'bnm', 'bnn',
-                        'bno', 'bnp', 'bnq', 'bnr', 'bns', 'bnu', 'bnv', 'bnw', 'bnx', 'bny', 'bnz', 'boa', 'bob',
-                        'bod', 'boe', 'bof', 'bog', 'boh', 'boi', 'boj', 'bok', 'bol', 'bom', 'bon', 'boo', 'bop',
-                        'boq', 'bor', 'bos', 'bot', 'bou', 'bov', 'bow', 'box', 'boy', 'boz', 'bpa', 'bpd', 'bpg',
-                        'bph', 'bpi', 'bpj', 'bpk', 'bpm', 'bpn', 'bpp', 'bpq', 'bpr', 'bps', 'bpt', 'bpu', 'bpv',
-                        'bpw', 'bpx', 'bpy', 'bpz', 'bqa', 'bqb', 'bqc', 'bqd', 'bqg', 'bqh', 'bqi', 'bqj', 'bqk',
-                        'bql', 'bqm', 'bqn', 'bqo', 'bqp', 'bqq', 'bqr', 'bqs', 'bqt', 'bqu', 'bqv', 'bqw', 'bqx',
-                        'bqy', 'bqz', 'bra', 'brb', 'brc', 'brd', 'bre', 'brf', 'brg', 'brh', 'bri', 'brj', 'brk',
-                        'brl', 'brm', 'brn', 'bro', 'brp', 'brq', 'brr', 'brs', 'brt', 'bru', 'brv', 'brw', 'brx',
-                        'bry', 'brz', 'bsa', 'bsb', 'bsc', 'bse', 'bsf', 'bsg', 'bsh', 'bsi', 'bsj', 'bsk', 'bsl',
-                        'bsm', 'bsn', 'bsp', 'bsq', 'bsr', 'bss', 'bst', 'bsu', 'bsw', 'bsx', 'bsy', 'bta', 'btc',
-                        'btd', 'bte', 'btf', 'btg', 'bth', 'bti', 'btj', 'btm', 'btn', 'bto', 'btp', 'btq', 'btr',
-                        'bts', 'btt', 'btu', 'btv', 'btw', 'btx', 'bty', 'btz', 'bua', 'bub', 'buc', 'bud', 'bue',
-                        'buf', 'bug', 'buh', 'bui', 'buj', 'buk', 'bul', 'bum', 'bun', 'buo', 'bup', 'buq', 'bus',
-                        'but', 'buu', 'buv', 'buw', 'bux', 'buy', 'buz', 'bva', 'bvb', 'bvc', 'bvd', 'bve', 'bvf',
-                        'bvg', 'bvh', 'bvi', 'bvj', 'bvk', 'bvl', 'bvm', 'bvn', 'bvo', 'bvq', 'bvr', 'bvt', 'bvu',
-                        'bvv', 'bvw', 'bvx', 'bvy', 'bvz', 'bwa', 'bwb', 'bwc', 'bwd', 'bwe', 'bwf', 'bwg', 'bwh',
-                        'bwi', 'bwj', 'bwk', 'bwl', 'bwm', 'bwn', 'bwo', 'bwp', 'bwq', 'bwr', 'bws', 'bwt', 'bwu',
-                        'bww', 'bwx', 'bwy', 'bwz', 'bxa', 'bxb', 'bxc', 'bxd', 'bxe', 'bxf', 'bxg', 'bxh', 'bxi',
-                        'bxj', 'bxk', 'bxl', 'bxm', 'bxn', 'bxp', 'bxq', 'bxr', 'bxs', 'bxu', 'bxv', 'bxw', 'bxz',
-                        'bya', 'byb', 'byc', 'byd', 'bye', 'byf', 'byg', 'byh', 'byi', 'byj', 'byk', 'byl', 'bym',
-                        'byn', 'byo', 'byp', 'byq', 'byr', 'bys', 'byt', 'byv', 'byw', 'byx', 'byz', 'bza', 'bzb',
-                        'bzc', 'bzd', 'bze', 'bzf', 'bzg', 'bzh', 'bzi', 'bzj', 'bzk', 'bzl', 'bzm', 'bzn', 'bzo',
-                        'bzp', 'bzq', 'bzr', 'bzs', 'bzu', 'bzv', 'bzw', 'bzx', 'bzy', 'bzz', 'caa', 'cab', 'cac',
-                        'cad', 'cae', 'caf', 'cag', 'cah', 'caj', 'cak', 'cal', 'cam', 'can', 'cao', 'cap', 'caq',
-                        'car', 'cas', 'cat', 'cav', 'cax', 'cay', 'caz', 'cbb', 'cbc', 'cbd', 'cbg', 'cbi', 'cbj',
-                        'cbk', 'cbl', 'cbn', 'cbo', 'cbq', 'cbr', 'cbs', 'cbt', 'cbu', 'cbv', 'cbw', 'ccc', 'ccd',
-                        'cce', 'ccg', 'cch', 'ccj', 'ccl', 'ccm', 'cco', 'ccp', 'ccr', 'cda', 'cde', 'cdf', 'cdh',
-                        'cdi', 'cdj', 'cdm', 'cdn', 'cdo', 'cdr', 'cds', 'cdy', 'cdz', 'cea', 'ceb', 'ceg', 'cek',
-                        'cen', 'ces', 'cet', 'cfa', 'cfd', 'cfg', 'cfm', 'cga', 'cgc', 'cgg', 'cgk', 'cha', 'chb',
-                        'chc', 'chd', 'che', 'chf', 'chg', 'chh', 'chj', 'chk', 'chl', 'chm', 'chn', 'cho', 'chp',
-                        'chq', 'chr', 'cht', 'chu', 'chv', 'chw', 'chx', 'chy', 'chz', 'cia', 'cib', 'cic', 'cid',
-                        'cie', 'cih', 'cik', 'cim', 'cin', 'cip', 'cir', 'ciw', 'ciy', 'cja', 'cje', 'cjh', 'cji',
-                        'cjk', 'cjm', 'cjn', 'cjo', 'cjp', 'cjs', 'cjv', 'cjy', 'ckb', 'ckh', 'ckl', 'cko', 'ckq',
-                        'ckr', 'cks', 'ckt', 'cku', 'ckv', 'ckx', 'cky', 'cla', 'clc', 'cld', 'cle', 'clh', 'cli',
-                        'clk', 'cll', 'clm', 'clo', 'clt', 'clu', 'clw', 'cly', 'cma', 'cme', 'cmi', 'cml', 'cmn',
-                        'cmo', 'cmr', 'cms', 'cna', 'cnb', 'cnc', 'cng', 'cnh', 'cni', 'cnk', 'cnl', 'cns', 'cnt',
-                        'cnu', 'cnw', 'coa', 'cob', 'coc', 'cod', 'coe', 'cof', 'cog', 'coh', 'coj', 'cok', 'col',
-                        'com', 'con', 'coo', 'cop', 'coq', 'cor', 'cos', 'cot', 'cou', 'cov', 'cow', 'cox', 'coz',
-                        'cpa', 'cpb', 'cpc', 'cpg', 'cpn', 'cpo', 'cps', 'cpu', 'cpx', 'cpy', 'cra', 'crb', 'crc',
-                        'crd', 'cre', 'crf', 'crg', 'crh', 'cri', 'crj', 'crk', 'crl', 'crm', 'crn', 'cro', 'crq',
-                        'crr', 'crs', 'crt', 'crv', 'crw', 'crx', 'cry', 'crz', 'csa', 'csb', 'csc', 'csd', 'cse',
-                        'csf', 'csg', 'csh', 'csi', 'csk', 'csl', 'csm', 'csn', 'cso', 'csq', 'csr', 'css', 'cst',
-                        'csv', 'csw', 'csy', 'csz', 'cta', 'ctd', 'cte', 'ctg', 'ctl', 'ctm', 'ctn', 'cto', 'ctp',
-                        'cts', 'ctt', 'ctu', 'ctz', 'cua', 'cub', 'cuc', 'cug', 'cuh', 'cui', 'cuj', 'cuk', 'cul',
-                        'cuo', 'cup', 'cuq', 'cur', 'cut', 'cuu', 'cuv', 'cuw', 'cux', 'cvg', 'cvn', 'cwa', 'cwb',
-                        'cwd', 'cwe', 'cwg', 'cwt', 'cya', 'cyb', 'cym', 'cyo', 'czh', 'czn', 'czo', 'czt', 'daa',
-                        'dac', 'dad', 'dae', 'dag', 'dah', 'dai', 'daj', 'dak', 'dal', 'dam', 'dan', 'dao', 'daq',
-                        'dar', 'das', 'dau', 'dav', 'daw', 'dax', 'daz', 'dba', 'dbb', 'dbd', 'dbe', 'dbf', 'dbg',
-                        'dbi', 'dbj', 'dbl', 'dbm', 'dbn', 'dbo', 'dbp', 'dbq', 'dbr', 'dbt', 'dbu', 'dbw', 'dby',
-                        'dcc', 'dcr', 'dda', 'ddd', 'dde', 'ddg', 'ddi', 'ddj', 'ddn', 'ddo', 'ddr', 'dds', 'ddw',
-                        'dec', 'ded', 'dee', 'def', 'deg', 'deh', 'dei', 'del', 'dem', 'den', 'deq', 'der', 'des',
-                        'deu', 'dev', 'dez', 'dga', 'dgb', 'dgc', 'dgd', 'dge', 'dgg', 'dgh', 'dgi', 'dgk', 'dgl',
-                        'dgn', 'dgo', 'dgr', 'dgs', 'dgt', 'dgw', 'dgx', 'dgz', 'dhd', 'dhg', 'dhi', 'dhl', 'dhm',
-                        'dhn', 'dho', 'dhr', 'dhs', 'dhu', 'dhv', 'dhw', 'dhx', 'dia', 'dib', 'dic', 'did', 'dif',
-                        'dig', 'dih', 'dii', 'dij', 'dik', 'dil', 'dim', 'din', 'dio', 'dip', 'diq', 'dir', 'dis',
-                        'dit', 'diu', 'div', 'diw', 'dix', 'diy', 'diz', 'djb', 'djc', 'djd', 'dje', 'djf', 'dji',
-                        'djj', 'djk', 'djm', 'djn', 'djo', 'djr', 'dju', 'djw', 'dka', 'dkk', 'dkr', 'dks', 'dkx',
-                        'dlg', 'dlk', 'dlm', 'dln', 'dma', 'dmb', 'dmc', 'dmd', 'dme', 'dmg', 'dmk', 'dml', 'dmm',
-                        'dmo', 'dmr', 'dms', 'dmu', 'dmv', 'dmx', 'dmy', 'dna', 'dnd', 'dne', 'dng', 'dni', 'dnj',
-                        'dnk', 'dnn', 'dnr', 'dnt', 'dnu', 'dnv', 'dnw', 'dny', 'doa', 'dob', 'doc', 'doe', 'dof',
-                        'doh', 'doi', 'dok', 'dol', 'don', 'doo', 'dop', 'doq', 'dor', 'dos', 'dot', 'dov', 'dow',
-                        'dox', 'doy', 'doz', 'dpp', 'drb', 'drc', 'drd', 'dre', 'drg', 'dri', 'drl', 'drn', 'dro',
-                        'drq', 'drs', 'drt', 'dru', 'dry', 'dsb', 'dse', 'dsh', 'dsi', 'dsl', 'dsn', 'dsq', 'dta',
-                        'dtb', 'dtd', 'dth', 'dti', 'dtk', 'dtm', 'dto', 'dtp', 'dtr', 'dts', 'dtt', 'dtu', 'dty',
-                        'dua', 'dub', 'duc', 'dud', 'due', 'duf', 'dug', 'duh', 'dui', 'duj', 'duk', 'dul', 'dum',
-                        'dun', 'duo', 'dup', 'duq', 'dur', 'dus', 'duu', 'duv', 'duw', 'dux', 'duy', 'duz', 'dva',
-                        'dwa', 'dwr', 'dww', 'dya', 'dyb', 'dyd', 'dyi', 'dym', 'dyn', 'dyo', 'dyu', 'dyy', 'dza',
-                        'dze', 'dzg', 'dzl', 'dzn', 'dzo', 'ebg', 'ebo', 'ebr', 'ebu', 'ecs', 'eee', 'efa', 'efe',
-                        'efi', 'ega', 'egl', 'ego', 'egy', 'ehu', 'eip', 'eit', 'eiv', 'eja', 'eka', 'eke', 'ekg',
-                        'eki', 'ekk', 'ekl', 'ekm', 'eko', 'ekp', 'ekr', 'eky', 'ele', 'elh', 'eli', 'elk', 'ell',
-                        'elm', 'elo', 'elu', 'elx', 'ema', 'emb', 'eme', 'emg', 'emi', 'emk', 'emn', 'emp', 'ems',
-                        'emu', 'emw', 'emy', 'ena', 'enb', 'enc', 'end', 'enf', 'eng', 'enh', 'enl', 'enm', 'enn',
-                        'eno', 'enq', 'enr', 'enu', 'env', 'enw', 'enx', 'eot', 'epi', 'era', 'erg', 'erh', 'eri',
-                        'erk', 'ero', 'err', 'ers', 'ert', 'erw', 'ese', 'esh', 'esi', 'esk', 'esl', 'esn', 'eso',
-                        'esq', 'ess', 'esu', 'etb', 'eth', 'etn', 'eto', 'etr', 'ets', 'ett', 'etu', 'etx', 'etz',
-                        'eus', 'eve', 'evh', 'evn', 'ewe', 'ewo', 'ext', 'eya', 'eyo', 'eza', 'eze', 'faa', 'fab',
-                        'fad', 'faf', 'fag', 'fah', 'fai', 'faj', 'fak', 'fal', 'fam', 'fan', 'fao', 'fap', 'far',
-                        'fat', 'fau', 'fax', 'fay', 'fcs', 'fer', 'ffm', 'fgr', 'fia', 'fie', 'fij', 'fil', 'fin',
-                        'fip', 'fir', 'fit', 'fiw', 'fkk', 'fkv', 'fla', 'flh', 'fli', 'fll', 'fln', 'flr', 'fmp',
-                        'fmu', 'fni', 'fod', 'foi', 'fon', 'for', 'fos', 'fpe', 'fqs', 'fra', 'frc', 'frd', 'frk',
-                        'frm', 'fro', 'frp', 'frq', 'frr', 'frs', 'frt', 'fry', 'fse', 'fsl', 'fss', 'fub', 'fuc',
-                        'fud', 'fue', 'fuf', 'fuh', 'fui', 'fuj', 'ful', 'fun', 'fuq', 'fur', 'fut', 'fuu', 'fuv',
-                        'fuy', 'fvr', 'fwa', 'fwe', 'gaa', 'gab', 'gac', 'gad', 'gae', 'gaf', 'gag', 'gah', 'gai',
-                        'gaj', 'gak', 'gal', 'gam', 'gan', 'gao', 'gap', 'gaq', 'gar', 'gas', 'gat', 'gau', 'gaw',
-                        'gax', 'gay', 'gaz', 'gbb', 'gbd', 'gbe', 'gbf', 'gbg', 'gbh', 'gbi', 'gbj', 'gbk', 'gbl',
-                        'gbm', 'gbn', 'gbo', 'gbp', 'gbq', 'gbr', 'gbs', 'gbu', 'gbv', 'gbw', 'gbx', 'gby', 'gbz',
-                        'gcc', 'gcd', 'gce', 'gcf', 'gcl', 'gcn', 'gcr', 'gct', 'gda', 'gdb', 'gdc', 'gdd', 'gde',
-                        'gdf', 'gdg', 'gdh', 'gdi', 'gdj', 'gdk', 'gdl', 'gdm', 'gdn', 'gdo', 'gdq', 'gdr', 'gds',
-                        'gdu', 'gdx', 'gea', 'geb', 'gec', 'ged', 'geh', 'gei', 'gej', 'gek', 'gel', 'geq', 'ges',
-                        'gev', 'gew', 'gex', 'gey', 'gez', 'gfk', 'gft', 'gga', 'ggb', 'ggd', 'gge', 'ggg', 'ggk',
-                        'ggl', 'ggn', 'ggo', 'ggt', 'ggu', 'ggw', 'gha', 'ghc', 'ghe', 'ghh', 'ghk', 'ghl', 'ghn',
-                        'gho', 'ghr', 'ghs', 'ght', 'gia', 'gid', 'gig', 'gih', 'gil', 'gim', 'gin', 'gip', 'giq',
-                        'gir', 'gis', 'git', 'giu', 'giw', 'gix', 'giz', 'gjk', 'gjm', 'gjn', 'gju', 'gka', 'gke',
-                        'gkn', 'gko', 'gkp', 'gku', 'gla', 'glc', 'gld', 'gle', 'glg', 'glh', 'glj', 'glk', 'gll',
-                        'glo', 'glr', 'glu', 'glv', 'glw', 'gly', 'gma', 'gmb', 'gmd', 'gmg', 'gmh', 'gml', 'gmm',
-                        'gmn', 'gmu', 'gmv', 'gmx', 'gmy', 'gmz', 'gna', 'gnb', 'gnc', 'gnd', 'gne', 'gng', 'gnh',
-                        'gni', 'gnk', 'gnl', 'gnm', 'gnn', 'gno', 'gnq', 'gnr', 'gnt', 'gnu', 'gnw', 'gnz', 'goa',
-                        'gob', 'goc', 'god', 'goe', 'gof', 'gog', 'goh', 'goi', 'gol', 'gom', 'gon', 'goo', 'gop',
-                        'goq', 'gor', 'gos', 'got', 'gou', 'gow', 'gox', 'goy', 'goz', 'gpa', 'gpe', 'gpn', 'gqa',
-                        'gqi', 'gqn', 'gqr', 'gqu', 'gra', 'grb', 'grc', 'grd', 'grg', 'grh', 'gri', 'grj', 'grm',
-                        'gro', 'grq', 'grr', 'grs', 'grt', 'gru', 'grv', 'grw', 'grx', 'gry', 'grz', 'gse', 'gsg',
-                        'gsl', 'gsm', 'gsn', 'gso', 'gsp', 'gss', 'gsw', 'gta', 'gua', 'gub', 'guc', 'gud', 'gue',
-                        'guf', 'gug', 'guh', 'gui', 'guj', 'guk', 'gul', 'gum', 'gun', 'guo', 'gup', 'guq', 'gur',
-                        'gus', 'gut', 'guu', 'guw', 'gux', 'guz', 'gva', 'gvc', 'gve', 'gvf', 'gvj', 'gvl', 'gvm',
-                        'gvn', 'gvo', 'gvp', 'gvr', 'gvs', 'gvy', 'gwa', 'gwb', 'gwc', 'gwd', 'gwe', 'gwf', 'gwg',
-                        'gwi', 'gwj', 'gwm', 'gwn', 'gwr', 'gwt', 'gwu', 'gww', 'gwx', 'gxx', 'gya', 'gyb', 'gyd',
-                        'gye', 'gyf', 'gyg', 'gyi', 'gyl', 'gym', 'gyn', 'gyr', 'gyy', 'gza', 'gzi', 'gzn', 'haa',
-                        'hab', 'hac', 'had', 'hae', 'haf', 'hag', 'hah', 'hai', 'haj', 'hak', 'hal', 'ham', 'han',
-                        'hao', 'hap', 'haq', 'har', 'has', 'hat', 'hau', 'hav', 'haw', 'hax', 'hay', 'haz', 'hba',
-                        'hbb', 'hbn', 'hbo', 'hbs', 'hbu', 'hca', 'hch', 'hdn', 'hds', 'hdy', 'hea', 'heb', 'hed',
-                        'heg', 'heh', 'hei', 'hem', 'her', 'hgm', 'hgw', 'hhi', 'hhr', 'hhy', 'hia', 'hib', 'hid',
-                        'hif', 'hig', 'hih', 'hii', 'hij', 'hik', 'hil', 'hin', 'hio', 'hit', 'hiw', 'hix', 'hji',
-                        'hka', 'hke', 'hkk', 'hks', 'hla', 'hlb', 'hld', 'hle', 'hlt', 'hlu', 'hma', 'hmb', 'hmc',
-                        'hmd', 'hme', 'hmf', 'hmg', 'hmh', 'hmi', 'hmj', 'hml', 'hmm', 'hmp', 'hmq', 'hmr', 'hms',
-                        'hmt', 'hmu', 'hmv', 'hmw', 'hmy', 'hmz', 'hna', 'hnd', 'hne', 'hnh', 'hni', 'hnj', 'hnn',
-                        'hno', 'hns', 'hnu', 'hoa', 'hob', 'hoc', 'hod', 'hoe', 'hoh', 'hoi', 'hoj', 'hol', 'hom',
-                        'hoo', 'hop', 'hor', 'hos', 'hot', 'hov', 'how', 'hoy', 'hoz', 'hpo', 'hps', 'hra', 'hrc',
-                        'hre', 'hrk', 'hrm', 'hro', 'hrp', 'hrt', 'hru', 'hrv', 'hrw', 'hrx', 'hrz', 'hsb', 'hsh',
-                        'hsl', 'hsn', 'hss', 'hti', 'hto', 'hts', 'htu', 'hub', 'huc', 'hud', 'hue', 'huf', 'hug',
-                        'huh', 'hui', 'huj', 'huk', 'hul', 'hum', 'hun', 'huo', 'hup', 'huq', 'hur', 'hus', 'hut',
-                        'huu', 'huv', 'huw', 'hux', 'huy', 'huz', 'hve', 'hvk', 'hvn', 'hvv', 'hwa', 'hwc', 'hwo',
-                        'hya', 'hye', 'iai', 'ian', 'iar', 'iba', 'ibb', 'ibd', 'ibe', 'ibg', 'ibl', 'ibm', 'ibn',
-                        'ibo', 'ibr', 'ibu', 'iby', 'ica', 'ich', 'icl', 'icr', 'ida', 'idb', 'idc', 'idd', 'ide',
-                        'idi', 'idr', 'idt', 'idu', 'ifa', 'ifb', 'ife', 'iff', 'ifk', 'ifm', 'ifu', 'ify', 'igb',
-                        'ige', 'igg', 'igl', 'igm', 'ign', 'igo', 'igw', 'ihp', 'ihw', 'iii', 'iin', 'ijc', 'ije',
-                        'ijj', 'ijn', 'ijs', 'ike', 'iki', 'ikk', 'ikl', 'iko', 'ikp', 'ikr', 'iks', 'ikt', 'ikv',
-                        'ikw', 'ikx', 'ikz', 'ila', 'ilb', 'ilg', 'ili', 'ilk', 'ill', 'ilo', 'ils', 'ilu', 'ilv',
-                        'ima', 'imi', 'iml', 'imn', 'imo', 'imr', 'imy', 'inb', 'ind', 'ing', 'inh', 'inj', 'inl',
-                        'inm', 'inn', 'ino', 'inp', 'ins', 'int', 'inz', 'ior', 'iou', 'iow', 'ipi', 'ipk', 'ipo',
-                        'iqu', 'iqw', 'ire', 'irh', 'iri', 'irk', 'irn', 'iru', 'irx', 'iry', 'isa', 'isc', 'isd',
-                        'ise', 'isg', 'ish', 'isi', 'isk', 'isl', 'ism', 'isn', 'iso', 'isr', 'ist', 'isu', 'ita',
-                        'itb', 'ite', 'iti', 'itk', 'itl', 'itm', 'ito', 'itr', 'its', 'itt', 'itv', 'itw', 'itx',
-                        'ity', 'itz', 'ium', 'ivb', 'ivv', 'iwk', 'iwm', 'iwo', 'iws', 'ixc', 'ixl', 'iya', 'iyo',
-                        'iyx', 'izh', 'izr', 'izz', 'jaa', 'jab', 'jac', 'jad', 'jae', 'jaf', 'jah', 'jaj', 'jak',
-                        'jal', 'jam', 'jan', 'jao', 'jaq', 'jas', 'jat', 'jau', 'jav', 'jax', 'jay', 'jaz', 'jbi',
-                        'jbj', 'jbk', 'jbn', 'jbr', 'jbt', 'jbu', 'jbw', 'jcs', 'jct', 'jda', 'jdg', 'jdt', 'jeb',
-                        'jee', 'jeg', 'jeh', 'jei', 'jek', 'jel', 'jen', 'jer', 'jet', 'jeu', 'jgb', 'jge', 'jgo',
-                        'jhi', 'jhs', 'jia', 'jib', 'jic', 'jid', 'jie', 'jig', 'jih', 'jii', 'jil', 'jim', 'jio',
-                        'jiq', 'jit', 'jiu', 'jiv', 'jiy', 'jje', 'jkm', 'jko', 'jkr', 'jku', 'jle', 'jls', 'jma',
-                        'jmb', 'jmc', 'jmd', 'jmi', 'jml', 'jmn', 'jmr', 'jms', 'jmw', 'jmx', 'jna', 'jnd', 'jng',
-                        'jni', 'jnj', 'jnl', 'jns', 'job', 'jod', 'jor', 'jos', 'jow', 'jpa', 'jpn', 'jpr', 'jqr',
-                        'jra', 'jrr', 'jru', 'jsl', 'jua', 'jub', 'juc', 'jud', 'juh', 'jui', 'juk', 'jul', 'jum',
-                        'jun', 'juo', 'jup', 'jur', 'jus', 'jut', 'juu', 'juw', 'juy', 'jvd', 'jvn', 'jwi', 'jya',
-                        'jye', 'jyy', 'kaa', 'kab', 'kac', 'kad', 'kae', 'kaf', 'kag', 'kah', 'kai', 'kaj', 'kak',
-                        'kal', 'kam', 'kan', 'kao', 'kap', 'kaq', 'kas', 'kat', 'kaw', 'kax', 'kay', 'kaz', 'kba',
-                        'kbb', 'kbc', 'kbd', 'kbe', 'kbg', 'kbh', 'kbi', 'kbj', 'kbk', 'kbl', 'kbm', 'kbn', 'kbo',
-                        'kbp', 'kbq', 'kbr', 'kbs', 'kbt', 'kbu', 'kbv', 'kbw', 'kbx', 'kby', 'kbz', 'kca', 'kcb',
-                        'kcc', 'kcd', 'kcf', 'kcg', 'kci', 'kcj', 'kck', 'kcl', 'kcm', 'kcn', 'kco', 'kcp', 'kcq',
-                        'kcr', 'kcs', 'kct', 'kcu', 'kcv', 'kcw', 'kcx', 'kcy', 'kcz', 'kda', 'kdc', 'kdd', 'kde',
-                        'kdf', 'kdg', 'kdh', 'kdi', 'kdj', 'kdk', 'kdl', 'kdm', 'kdn', 'kdp', 'kdq', 'kdr', 'kdt',
-                        'kdu', 'kdw', 'kdx', 'kdy', 'kdz', 'kea', 'keb', 'kec', 'ked', 'kee', 'kef', 'keg', 'keh',
-                        'kei', 'kej', 'kek', 'kel', 'kem', 'ken', 'keo', 'kep', 'keq', 'ker', 'kes', 'ket', 'keu',
-                        'kev', 'kew', 'key', 'kez', 'kfa', 'kfb', 'kfc', 'kfd', 'kfe', 'kff', 'kfg', 'kfh', 'kfk',
-                        'kfl', 'kfm', 'kfn', 'kfo', 'kfp', 'kfq', 'kfr', 'kfs', 'kft', 'kfu', 'kfv', 'kfw', 'kfx',
-                        'kfy', 'kfz', 'kga', 'kgb', 'kgd', 'kge', 'kgf', 'kgg', 'kgi', 'kgj', 'kgk', 'kgl', 'kgn',
-                        'kgo', 'kgp', 'kgq', 'kgr', 'kgs', 'kgt', 'kgu', 'kgv', 'kgw', 'kgx', 'kgy', 'kha', 'khb',
-                        'khc', 'khd', 'khe', 'khf', 'khg', 'khh', 'khj', 'khk', 'khl', 'khm', 'khn', 'kho', 'khp',
-                        'khq', 'khr', 'khs', 'kht', 'khu', 'khv', 'khw', 'khx', 'khy', 'khz', 'kia', 'kib', 'kic',
-                        'kid', 'kie', 'kif', 'kig', 'kih', 'kii', 'kij', 'kik', 'kil', 'kim', 'kin', 'kio', 'kip',
-                        'kiq', 'kir', 'kis', 'kit', 'kiu', 'kiv', 'kiw', 'kix', 'kiy', 'kiz', 'kja', 'kjb', 'kjc',
-                        'kjd', 'kje', 'kjg', 'kjh', 'kji', 'kjj', 'kjk', 'kjl', 'kjm', 'kjn', 'kjo', 'kjp', 'kjq',
-                        'kjr', 'kjs', 'kjt', 'kju', 'kjv', 'kjx', 'kjy', 'kjz', 'kka', 'kkb', 'kkc', 'kkd', 'kke',
-                        'kkf', 'kkg', 'kkh', 'kki', 'kkj', 'kkk', 'kkl', 'kkm', 'kko', 'kkp', 'kkq', 'kkr', 'kks',
-                        'kkt', 'kkv', 'kkw', 'kkx', 'kky', 'kkz', 'kla', 'klb', 'klc', 'kld', 'kle', 'klf', 'klg',
-                        'klh', 'kli', 'klj', 'klk', 'kll', 'klm', 'kln', 'klo', 'klp', 'klq', 'klr', 'kls', 'klt',
-                        'klu', 'klv', 'klw', 'klx', 'kly', 'klz', 'kma', 'kmb', 'kmc', 'kmd', 'kme', 'kmf', 'kmg',
-                        'kmh', 'kmi', 'kmj', 'kmk', 'kml', 'kmm', 'kmn', 'kmo', 'kmp', 'kmq', 'kmr', 'kms', 'kmt',
-                        'kmu', 'kmv', 'kmw', 'kmx', 'kmy', 'kmz', 'kna', 'knb', 'knc', 'knd', 'kne', 'knf', 'kng',
-                        'kni', 'knj', 'knk', 'knl', 'knm', 'knn', 'kno', 'knp', 'knq', 'knr', 'kns', 'knt', 'knu',
-                        'knv', 'knw', 'knx', 'kny', 'knz', 'koa', 'koc', 'kod', 'koe', 'kof', 'kog', 'koh', 'koi',
-                        'kol', 'kom', 'koo', 'kop', 'koq', 'kor', 'kos', 'kot', 'kou', 'kov', 'kow', 'koy', 'koz',
-                        'kpa', 'kpb', 'kpc', 'kpd', 'kpf', 'kpg', 'kph', 'kpi', 'kpj', 'kpk', 'kpl', 'kpm', 'kpn',
-                        'kpo', 'kpq', 'kpr', 'kps', 'kpt', 'kpu', 'kpv', 'kpw', 'kpx', 'kpy', 'kpz', 'kqa', 'kqb',
-                        'kqc', 'kqd', 'kqe', 'kqf', 'kqg', 'kqi', 'kqj', 'kqk', 'kql', 'kqm', 'kqn', 'kqo', 'kqp',
-                        'kqq', 'kqr', 'kqs', 'kqt', 'kqu', 'kqv', 'kqw', 'kqx', 'kqy', 'kqz', 'kra', 'krb', 'krc',
-                        'krd', 'kre', 'krf', 'krh', 'kri', 'krj', 'krk', 'krl', 'krm', 'krn', 'krp', 'krr', 'krs',
-                        'krt', 'kru', 'krv', 'krw', 'krx', 'kry', 'krz', 'ksb', 'ksc', 'ksd', 'kse', 'ksf', 'ksg',
-                        'ksh', 'ksi', 'ksj', 'ksk', 'ksl', 'ksm', 'ksn', 'ksp', 'ksq', 'ksr', 'kss', 'kst', 'ksu',
-                        'ksv', 'ksw', 'ksx', 'ksy', 'ksz', 'kta', 'ktb', 'ktc', 'ktd', 'kte', 'ktf', 'ktg', 'kth',
-                        'kti', 'ktj', 'ktk', 'ktl', 'ktm', 'ktn', 'kto', 'ktp', 'ktr', 'kts', 'ktt', 'ktu', 'ktv',
-                        'ktw', 'ktx', 'kty', 'ktz', 'kua', 'kub', 'kuc', 'kud', 'kue', 'kuf', 'kug', 'kuh', 'kui',
-                        'kuj', 'kuk', 'kul', 'kum', 'kun', 'kuo', 'kup', 'kuq', 'kur', 'kus', 'kut', 'kuu', 'kuv',
-                        'kuw', 'kux', 'kuy', 'kuz', 'kva', 'kvb', 'kvc', 'kvd', 'kve', 'kvf', 'kvg', 'kvh', 'kvi',
-                        'kvj', 'kvk', 'kvl', 'kvm', 'kvn', 'kvo', 'kvp', 'kvq', 'kvr', 'kvu', 'kvv', 'kvw', 'kvx',
-                        'kvy', 'kvz', 'kwa', 'kwb', 'kwc', 'kwd', 'kwe', 'kwf', 'kwg', 'kwh', 'kwi', 'kwj', 'kwk',
-                        'kwl', 'kwm', 'kwn', 'kwo', 'kwp', 'kwr', 'kws', 'kwt', 'kwu', 'kwv', 'kww', 'kwx', 'kwy',
-                        'kwz', 'kxa', 'kxb', 'kxc', 'kxd', 'kxf', 'kxh', 'kxi', 'kxj', 'kxk', 'kxl', 'kxm', 'kxn',
-                        'kxo', 'kxp', 'kxq', 'kxr', 'kxs', 'kxt', 'kxu', 'kxv', 'kxw', 'kxx', 'kxy', 'kxz', 'kya',
-                        'kyb', 'kyc', 'kyd', 'kye', 'kyf', 'kyg', 'kyh', 'kyi', 'kyj', 'kyk', 'kyl', 'kyn', 'kyo',
-                        'kyq', 'kyr', 'kys', 'kyt', 'kyu', 'kyw', 'kyx', 'kyy', 'kyz', 'kza', 'kzb', 'kzc', 'kzd',
-                        'kzf', 'kzg', 'kzi', 'kzj', 'kzk', 'kzl', 'kzm', 'kzn', 'kzo', 'kzp', 'kzq', 'kzr', 'kzs',
-                        'kzt', 'kzu', 'kzv', 'kzx', 'kzy', 'kzz', 'laa', 'lac', 'lad', 'lae', 'laf', 'lag', 'lai',
-                        'laj', 'lak', 'lal', 'lam', 'lan', 'lao', 'lap', 'laq', 'lar', 'las', 'lat', 'lav', 'law',
-                        'lax', 'laz', 'lbb', 'lbc', 'lbe', 'lbf', 'lbj', 'lbk', 'lbl', 'lbm', 'lbn', 'lbo', 'lbq',
-                        'lbr', 'lbs', 'lbt', 'lbu', 'lbv', 'lbw', 'lbx', 'lby', 'lbz', 'lcc', 'lcd', 'lce', 'lcf',
-                        'lch', 'lcl', 'lcm', 'lcp', 'lcq', 'lcs', 'lda', 'ldb', 'ldd', 'ldg', 'ldh', 'ldi', 'ldj',
-                        'ldk', 'ldl', 'ldm', 'ldo', 'ldp', 'ldq', 'lea', 'leb', 'lec', 'led', 'lee', 'lef', 'leh',
-                        'lei', 'lej', 'lek', 'lel', 'lem', 'leo', 'lep', 'leq', 'ler', 'les', 'let', 'leu', 'lev',
-                        'lew', 'lex', 'ley', 'lez', 'lfa', 'lga', 'lgb', 'lgg', 'lgh', 'lgi', 'lgk', 'lgl', 'lgm',
-                        'lgn', 'lgq', 'lgr', 'lgt', 'lgu', 'lgz', 'lha', 'lhh', 'lhi', 'lhl', 'lhm', 'lhn', 'lhp',
-                        'lhs', 'lht', 'lhu', 'lia', 'lib', 'lic', 'lid', 'lie', 'lif', 'lig', 'lih', 'lij', 'lik',
-                        'lil', 'lim', 'lin', 'lio', 'lip', 'liq', 'lis', 'lit', 'liu', 'liv', 'liw', 'lix', 'liy',
-                        'liz', 'lja', 'lje', 'lji', 'ljl', 'ljp', 'ljw', 'ljx', 'lka', 'lkb', 'lkc', 'lkd', 'lke',
-                        'lkh', 'lki', 'lkj', 'lkl', 'lkm', 'lkn', 'lko', 'lkr', 'lks', 'lkt', 'lku', 'lky', 'lla',
-                        'llb', 'llc', 'lld', 'lle', 'llf', 'llg', 'llh', 'lli', 'llj', 'llk', 'lll', 'llm', 'lln',
-                        'llp', 'llq', 'lls', 'llu', 'llx', 'lma', 'lmb', 'lmc', 'lmd', 'lme', 'lmf', 'lmg', 'lmi',
-                        'lmj', 'lmk', 'lml', 'lmn', 'lmo', 'lmp', 'lmq', 'lmr', 'lmu', 'lmv', 'lmw', 'lmx', 'lmy',
-                        'lna', 'lnb', 'lnd', 'lnh', 'lni', 'lnj', 'lnl', 'lnm', 'lnn', 'lno', 'lns', 'lnu', 'lnz',
-                        'loa', 'lob', 'loc', 'loe', 'lof', 'log', 'loh', 'loi', 'loj', 'lok', 'lol', 'lom', 'lon',
-                        'loo', 'lop', 'loq', 'lor', 'los', 'lot', 'lou', 'low', 'lox', 'loy', 'loz', 'lpa', 'lpe',
-                        'lpn', 'lpo', 'lpx', 'lra', 'lrc', 'lre', 'lrg', 'lri', 'lrl', 'lrm', 'lrn', 'lro', 'lrr',
-                        'lrt', 'lrv', 'lrz', 'lsa', 'lsd', 'lse', 'lsh', 'lsi', 'lsl', 'lsm', 'lsp', 'lsr', 'lss',
-                        'lst', 'lsy', 'ltc', 'ltg', 'lti', 'ltn', 'lto', 'lts', 'ltu', 'ltz', 'lua', 'lub', 'luc',
-                        'lud', 'lue', 'luf', 'lug', 'lui', 'luj', 'luk', 'lul', 'lum', 'lun', 'luo', 'lup', 'luq',
-                        'lur', 'lus', 'lut', 'luv', 'luw', 'luz', 'lva', 'lvk', 'lvs', 'lvu', 'lwa', 'lwe', 'lwg',
-                        'lwh', 'lwl', 'lwm', 'lwo', 'lwt', 'lwu', 'lww', 'lya', 'lyg', 'lyn', 'lzh', 'lzl', 'lzn',
-                        'lzz', 'maa', 'mab', 'mad', 'mae', 'maf', 'mag', 'mah', 'mai', 'maj', 'mak', 'mal', 'mam',
-                        'maq', 'mar', 'mas', 'mat', 'mau', 'mav', 'maw', 'max', 'maz', 'mba', 'mbb', 'mbc', 'mbd',
-                        'mbe', 'mbf', 'mbh', 'mbi', 'mbj', 'mbk', 'mbl', 'mbm', 'mbn', 'mbo', 'mbp', 'mbq', 'mbr',
-                        'mbs', 'mbt', 'mbu', 'mbv', 'mbw', 'mbx', 'mby', 'mbz', 'mca', 'mcb', 'mcc', 'mcd', 'mce',
-                        'mcf', 'mcg', 'mch', 'mci', 'mcj', 'mck', 'mcl', 'mcm', 'mcn', 'mco', 'mcp', 'mcq', 'mcr',
-                        'mcs', 'mct', 'mcu', 'mcv', 'mcw', 'mcx', 'mcy', 'mcz', 'mda', 'mdb', 'mdc', 'mdd', 'mde',
-                        'mdf', 'mdg', 'mdh', 'mdi', 'mdj', 'mdk', 'mdl', 'mdm', 'mdn', 'mdp', 'mdq', 'mdr', 'mds',
-                        'mdt', 'mdu', 'mdv', 'mdw', 'mdx', 'mdy', 'mdz', 'mea', 'meb', 'mec', 'med', 'mee', 'mef',
-                        'meh', 'mei', 'mej', 'mek', 'mel', 'mem', 'men', 'meo', 'mep', 'meq', 'mer', 'mes', 'met',
-                        'meu', 'mev', 'mew', 'mey', 'mez', 'mfa', 'mfb', 'mfc', 'mfd', 'mfe', 'mff', 'mfg', 'mfh',
-                        'mfi', 'mfj', 'mfk', 'mfl', 'mfm', 'mfn', 'mfo', 'mfp', 'mfq', 'mfr', 'mfs', 'mft', 'mfu',
-                        'mfv', 'mfw', 'mfx', 'mfy', 'mfz', 'mga', 'mgb', 'mgc', 'mgd', 'mge', 'mgf', 'mgg', 'mgh',
-                        'mgi', 'mgj', 'mgk', 'mgl', 'mgm', 'mgn', 'mgo', 'mgp', 'mgq', 'mgr', 'mgs', 'mgt', 'mgu',
-                        'mgv', 'mgw', 'mgy', 'mgz', 'mha', 'mhb', 'mhc', 'mhd', 'mhe', 'mhf', 'mhg', 'mhi', 'mhj',
-                        'mhk', 'mhl', 'mhm', 'mhn', 'mho', 'mhp', 'mhq', 'mhr', 'mhs', 'mht', 'mhu', 'mhw', 'mhx',
-                        'mhy', 'mhz', 'mia', 'mib', 'mic', 'mid', 'mie', 'mif', 'mig', 'mih', 'mii', 'mij', 'mik',
-                        'mil', 'mim', 'min', 'mio', 'mip', 'miq', 'mir', 'mit', 'miu', 'miw', 'mix', 'miy', 'miz',
-                        'mjc', 'mjd', 'mje', 'mjg', 'mjh', 'mji', 'mjj', 'mjk', 'mjl', 'mjm', 'mjn', 'mjo', 'mjp',
-                        'mjq', 'mjr', 'mjs', 'mjt', 'mju', 'mjv', 'mjw', 'mjx', 'mjy', 'mjz', 'mka', 'mkb', 'mkc',
-                        'mkd', 'mke', 'mkf', 'mkg', 'mki', 'mkj', 'mkk', 'mkl', 'mkm', 'mkn', 'mko', 'mkp', 'mkq',
-                        'mkr', 'mks', 'mkt', 'mku', 'mkv', 'mkw', 'mkx', 'mky', 'mkz', 'mla', 'mlb', 'mlc', 'mle',
-                        'mlf', 'mlh', 'mli', 'mlj', 'mlk', 'mll', 'mlm', 'mln', 'mlo', 'mlp', 'mlq', 'mlr', 'mls',
-                        'mlt', 'mlu', 'mlv', 'mlw', 'mlx', 'mlz', 'mma', 'mmb', 'mmc', 'mmd', 'mme', 'mmf', 'mmg',
-                        'mmh', 'mmi', 'mmj', 'mmk', 'mml', 'mmm', 'mmn', 'mmo', 'mmp', 'mmq', 'mmr', 'mmt', 'mmu',
-                        'mmv', 'mmw', 'mmx', 'mmy', 'mmz', 'mna', 'mnb', 'mnc', 'mnd', 'mne', 'mnf', 'mng', 'mnh',
-                        'mni', 'mnj', 'mnk', 'mnl', 'mnm', 'mnn', 'mnp', 'mnq', 'mnr', 'mns', 'mnu', 'mnv', 'mnw',
-                        'mnx', 'mny', 'mnz', 'moa', 'moc', 'moe', 'mog', 'moh', 'moi', 'moj', 'mok', 'mom', 'mon',
-                        'moo', 'mop', 'moq', 'mor', 'mos', 'mot', 'mou', 'mov', 'mow', 'mox', 'moy', 'moz', 'mpa',
-                        'mpb', 'mpc', 'mpd', 'mpe', 'mpg', 'mph', 'mpi', 'mpj', 'mpk', 'mpl', 'mpm', 'mpn', 'mpo',
-                        'mpp', 'mpq', 'mpr', 'mps', 'mpt', 'mpu', 'mpv', 'mpw', 'mpx', 'mpy', 'mpz', 'mqa', 'mqb',
-                        'mqc', 'mqe', 'mqf', 'mqg', 'mqh', 'mqi', 'mqj', 'mqk', 'mql', 'mqm', 'mqn', 'mqo', 'mqp',
-                        'mqq', 'mqr', 'mqs', 'mqt', 'mqu', 'mqv', 'mqw', 'mqx', 'mqy', 'mqz', 'mra', 'mrb', 'mrc',
-                        'mrd', 'mre', 'mrf', 'mrg', 'mrh', 'mri', 'mrj', 'mrk', 'mrl', 'mrm', 'mrn', 'mro', 'mrp',
-                        'mrq', 'mrr', 'mrs', 'mrt', 'mru', 'mrv', 'mrw', 'mrx', 'mry', 'mrz', 'msb', 'msc', 'msd',
-                        'mse', 'msf', 'msg', 'msh', 'msi', 'msj', 'msk', 'msl', 'msm', 'msn', 'mso', 'msp', 'msq',
-                        'msr', 'mss', 'msu', 'msv', 'msw', 'msx', 'msy', 'msz', 'mta', 'mtb', 'mtc', 'mtd', 'mte',
-                        'mtf', 'mtg', 'mth', 'mti', 'mtj', 'mtk', 'mtl', 'mtm', 'mtn', 'mto', 'mtp', 'mtq', 'mtr',
-                        'mts', 'mtt', 'mtu', 'mtv', 'mtw', 'mtx', 'mty', 'mua', 'mub', 'muc', 'mud', 'mug', 'muh',
-                        'mui', 'muj', 'muk', 'mum', 'muo', 'mup', 'muq', 'mur', 'mus', 'mut', 'muu', 'muv', 'mux',
-                        'muy', 'muz', 'mva', 'mvb', 'mvd', 'mve', 'mvf', 'mvg', 'mvh', 'mvi', 'mvk', 'mvl', 'mvn',
-                        'mvo', 'mvp', 'mvq', 'mvr', 'mvs', 'mvt', 'mvu', 'mvv', 'mvw', 'mvx', 'mvy', 'mvz', 'mwa',
-                        'mwb', 'mwc', 'mwe', 'mwf', 'mwg', 'mwh', 'mwi', 'mwk', 'mwl', 'mwm', 'mwn', 'mwo', 'mwp',
-                        'mwq', 'mws', 'mwt', 'mwu', 'mwv', 'mww', 'mwy', 'mwz', 'mxa', 'mxb', 'mxc', 'mxd', 'mxe',
-                        'mxf', 'mxg', 'mxh', 'mxi', 'mxj', 'mxk', 'mxl', 'mxm', 'mxn', 'mxo', 'mxp', 'mxq', 'mxr',
-                        'mxs', 'mxt', 'mxu', 'mxv', 'mxw', 'mxx', 'mxy', 'mxz', 'mya', 'myb', 'myc', 'mye', 'myf',
-                        'myg', 'myh', 'myj', 'myk', 'myl', 'mym', 'myo', 'myp', 'myr', 'mys', 'myu', 'myv', 'myw',
-                        'myx', 'myy', 'myz', 'mza', 'mzb', 'mzc', 'mzd', 'mze', 'mzg', 'mzh', 'mzi', 'mzj', 'mzk',
-                        'mzl', 'mzm', 'mzn', 'mzo', 'mzp', 'mzq', 'mzr', 'mzs', 'mzt', 'mzu', 'mzv', 'mzw', 'mzy',
-                        'mzz', 'naa', 'nab', 'nac', 'nae', 'naf', 'nag', 'naj', 'nak', 'nal', 'nam', 'nan', 'nao',
-                        'nap', 'naq', 'nar', 'nas', 'nat', 'nau', 'nav', 'naw', 'nax', 'nay', 'naz', 'nba', 'nbb',
-                        'nbc', 'nbd', 'nbe', 'nbh', 'nbi', 'nbj', 'nbk', 'nbl', 'nbm', 'nbn', 'nbo', 'nbp', 'nbq',
-                        'nbr', 'nbs', 'nbt', 'nbu', 'nbv', 'nbw', 'nby', 'nca', 'ncb', 'ncc', 'ncd', 'nce', 'ncf',
-                        'ncg', 'nch', 'nci', 'ncj', 'nck', 'ncl', 'ncm', 'ncn', 'nco', 'ncp', 'ncr', 'ncs', 'nct',
-                        'ncu', 'ncx', 'ncz', 'nda', 'ndb', 'ndc', 'ndd', 'nde', 'ndg', 'ndh', 'ndi', 'ndj', 'ndk',
-                        'ndl', 'ndm', 'ndn', 'ndo', 'ndp', 'ndq', 'ndr', 'nds', 'ndt', 'ndu', 'ndv', 'ndw', 'ndx',
-                        'ndy', 'ndz', 'nea', 'neb', 'nec', 'nee', 'neg', 'neh', 'nej', 'nek', 'nem', 'nen', 'nep',
-                        'neq', 'ner', 'nes', 'net', 'nev', 'new', 'nex', 'ney', 'nez', 'nfa', 'nfd', 'nfl', 'nfr',
-                        'nfu', 'nga', 'ngb', 'ngc', 'ngd', 'nge', 'ngg', 'ngh', 'ngi', 'ngj', 'ngk', 'ngl', 'ngn',
-                        'ngp', 'ngq', 'ngr', 'ngs', 'ngt', 'ngu', 'ngv', 'ngw', 'ngx', 'ngy', 'ngz', 'nha', 'nhb',
-                        'nhc', 'nhd', 'nhe', 'nhf', 'nhg', 'nhh', 'nhi', 'nhk', 'nhm', 'nhn', 'nho', 'nhp', 'nhq',
-                        'nhr', 'nht', 'nhu', 'nhv', 'nhw', 'nhx', 'nhy', 'nhz', 'nia', 'nib', 'nid', 'nie', 'nif',
-                        'nig', 'nih', 'nii', 'nij', 'nik', 'nil', 'nim', 'nin', 'nio', 'niq', 'nir', 'nis', 'nit',
-                        'niu', 'niv', 'niw', 'nix', 'niy', 'niz', 'nja', 'njb', 'njh', 'nji', 'njj', 'njl', 'njm',
-                        'njn', 'njo', 'njr', 'njs', 'nju', 'njx', 'njy', 'njz', 'nka', 'nkb', 'nkc', 'nkd', 'nke',
-                        'nkg', 'nkh', 'nki', 'nkj', 'nkk', 'nkm', 'nkn', 'nko', 'nkp', 'nkq', 'nkr', 'nks', 'nkt',
-                        'nku', 'nkv', 'nkw', 'nkx', 'nkz', 'nla', 'nlc', 'nld', 'nle', 'nlg', 'nli', 'nlj', 'nlk',
-                        'nll', 'nlo', 'nlu', 'nlv', 'nlx', 'nly', 'nlz', 'nma', 'nmb', 'nmc', 'nmd', 'nme', 'nmf',
-                        'nmg', 'nmh', 'nmi', 'nmk', 'nml', 'nmm', 'nmn', 'nmo', 'nmp', 'nmq', 'nmr', 'nms', 'nmt',
-                        'nmu', 'nmv', 'nmw', 'nmx', 'nmy', 'nmz', 'nna', 'nnb', 'nnc', 'nnd', 'nne', 'nnf', 'nng',
-                        'nnh', 'nni', 'nnj', 'nnk', 'nnl', 'nnm', 'nnn', 'nno', 'nnp', 'nnq', 'nnr', 'nns', 'nnt',
-                        'nnu', 'nnv', 'nnw', 'nny', 'nnz', 'noa', 'nob', 'noc', 'nod', 'noe', 'nof', 'nog', 'noh',
-                        'noi', 'noj', 'nok', 'nol', 'non', 'nop', 'noq', 'nor', 'nos', 'not', 'nou', 'now', 'noy',
-                        'noz', 'npa', 'nph', 'npi', 'npl', 'npn', 'npo', 'nps', 'npy', 'nqg', 'nqk', 'nqm', 'nqn',
-                        'nra', 'nrb', 'nrc', 'nre', 'nrf', 'nrg', 'nri', 'nrk', 'nrl', 'nrm', 'nrn', 'nrt', 'nru',
-                        'nrz', 'nsa', 'nsd', 'nse', 'nsf', 'nsg', 'nsh', 'nsi', 'nsk', 'nsl', 'nsm', 'nsn', 'nso',
-                        'nsp', 'nsq', 'nsr', 'nss', 'nst', 'nsu', 'nsw', 'nsx', 'nsy', 'nsz', 'nte', 'nti', 'ntj',
-                        'ntk', 'ntm', 'nto', 'ntp', 'ntr', 'ntu', 'ntw', 'nty', 'ntz', 'nua', 'nuc', 'nud', 'nue',
-                        'nuf', 'nug', 'nuh', 'nui', 'nuj', 'nuk', 'nul', 'num', 'nun', 'nuo', 'nup', 'nuq', 'nur',
-                        'nus', 'nut', 'nuu', 'nuv', 'nuw', 'nux', 'nuy', 'nuz', 'nvh', 'nvm', 'nvo', 'nwa', 'nwb',
-                        'nwe', 'nwi', 'nwm', 'nwo', 'nwr', 'nxa', 'nxd', 'nxe', 'nxg', 'nxi', 'nxl', 'nxn', 'nxo',
-                        'nxq', 'nxr', 'nxx', 'nya', 'nyb', 'nyc', 'nyd', 'nye', 'nyf', 'nyg', 'nyh', 'nyi', 'nyj',
-                        'nyk', 'nyl', 'nym', 'nyn', 'nyo', 'nyp', 'nyq', 'nyr', 'nys', 'nyt', 'nyu', 'nyv', 'nyw',
-                        'nyx', 'nyy', 'nza', 'nzb', 'nzi', 'nzk', 'nzm', 'nzs', 'nzu', 'nzy', 'nzz', 'oaa', 'oac',
-                        'oar', 'obi', 'obl', 'obm', 'obo', 'obr', 'obu', 'oca', 'och', 'oci', 'oco', 'ocu', 'odk',
-                        'odt', 'odu', 'ofo', 'ofs', 'ofu', 'ogb', 'ogc', 'oge', 'ogg', 'ogo', 'ogu', 'oia', 'oin',
-                        'ojb', 'ojc', 'ojg', 'ojp', 'ojs', 'ojv', 'ojw', 'oka', 'okb', 'okd', 'oke', 'okh', 'oki',
-                        'okj', 'okk', 'okl', 'okn', 'okr', 'oks', 'oku', 'okv', 'okx', 'ola', 'old', 'ole', 'olm',
-                        'olo', 'olr', 'olt', 'oma', 'omb', 'omc', 'omg', 'omi', 'omk', 'oml', 'omo', 'omr', 'omt',
-                        'omu', 'omw', 'omx', 'ona', 'onb', 'one', 'ong', 'oni', 'onj', 'onk', 'onn', 'ono', 'onp',
-                        'onr', 'ons', 'onu', 'onw', 'ood', 'oog', 'oon', 'oor', 'oos', 'opa', 'opk', 'opm', 'opo',
-                        'opt', 'opy', 'ora', 'orc', 'ore', 'org', 'orh', 'orn', 'oro', 'orr', 'ors', 'ort', 'oru',
-                        'orv', 'orw', 'orx', 'ory', 'orz', 'osa', 'osc', 'osi', 'oso', 'osp', 'oss', 'ost', 'osu',
-                        'osx', 'ota', 'otd', 'ote', 'oti', 'otl', 'otm', 'otn', 'otq', 'otr', 'ots', 'ott', 'otu',
-                        'otw', 'otx', 'oty', 'otz', 'oua', 'oub', 'oue', 'oui', 'oum', 'owi', 'owl', 'oyb', 'oyd',
-                        'oym', 'oyy', 'ozm', 'pab', 'pac', 'pad', 'pae', 'paf', 'pag', 'pah', 'pai', 'pak', 'pal',
-                        'pam', 'pan', 'pao', 'pap', 'paq', 'par', 'pas', 'pat', 'pau', 'pav', 'paw', 'pay', 'paz',
-                        'pbb', 'pbc', 'pbe', 'pbf', 'pbg', 'pbh', 'pbi', 'pbl', 'pbn', 'pbo', 'pbp', 'pbr', 'pbs',
-                        'pbt', 'pbu', 'pbv', 'pby', 'pca', 'pcb', 'pcc', 'pcd', 'pce', 'pcf', 'pcg', 'pci', 'pcj',
-                        'pck', 'pcl', 'pcm', 'pcn', 'pcp', 'pcw', 'pda', 'pdc', 'pdi', 'pdn', 'pdo', 'pdt', 'pdu',
-                        'pea', 'peb', 'ped', 'pee', 'pef', 'peg', 'peh', 'pei', 'pej', 'pek', 'pel', 'pem', 'peo',
-                        'pep', 'peq', 'pes', 'pev', 'pex', 'pey', 'pez', 'pfa', 'pfe', 'pfl', 'pga', 'pgg', 'pgi',
-                        'pgk', 'pgs', 'pgu', 'pha', 'phd', 'phg', 'phh', 'phk', 'phl', 'phm', 'phn', 'pho', 'phq',
-                        'phr', 'pht', 'phu', 'phv', 'pia', 'pib', 'pic', 'pid', 'pie', 'pif', 'pih', 'pii', 'pil',
-                        'pim', 'pin', 'pio', 'pip', 'pir', 'pis', 'pit', 'piu', 'piv', 'piw', 'pix', 'piy', 'piz',
-                        'pjt', 'pkb', 'pkg', 'pkh', 'pkn', 'pko', 'pkp', 'pkr', 'pks', 'pkt', 'pku', 'pla', 'plb',
-                        'plc', 'ple', 'plg', 'plh', 'pli', 'plj', 'plk', 'pll', 'pln', 'plo', 'plp', 'plq', 'plr',
-                        'pls', 'plt', 'plu', 'plv', 'plw', 'ply', 'plz', 'pma', 'pmb', 'pmd', 'pme', 'pmf', 'pmh',
-                        'pmi', 'pmj', 'pmm', 'pmn', 'pmo', 'pmq', 'pmr', 'pms', 'pmt', 'pmw', 'pmx', 'pmy', 'pmz',
-                        'pna', 'pnb', 'pnc', 'pne', 'png', 'pnh', 'pni', 'pnj', 'pnk', 'pnl', 'pnm', 'pnn', 'pno',
-                        'pnp', 'pnq', 'pnr', 'pns', 'pnt', 'pnu', 'pnv', 'pnw', 'pnx', 'pny', 'pnz', 'poc', 'poe',
-                        'pof', 'pog', 'poh', 'poi', 'pol', 'pom', 'pon', 'poo', 'pop', 'poq', 'por', 'pos', 'pot',
-                        'pov', 'pow', 'pox', 'poy', 'ppe', 'ppi', 'ppk', 'ppl', 'ppm', 'ppn', 'ppo', 'ppp', 'ppq',
-                        'pps', 'ppt', 'ppu', 'pqa', 'pqm', 'prc', 'pre', 'prf', 'prg', 'prh', 'pri', 'prk', 'prl',
-                        'prm', 'prn', 'pro', 'prq', 'prr', 'prs', 'prt', 'pru', 'prw', 'prx', 'prz', 'psa', 'psc',
-                        'psd', 'pse', 'psg', 'psh', 'psi', 'psl', 'psm', 'psn', 'pso', 'psp', 'psq', 'psr', 'pss',
-                        'pst', 'psu', 'psw', 'psy', 'pta', 'pth', 'pti', 'ptn', 'pto', 'ptp', 'ptr', 'ptt', 'ptu',
-                        'ptv', 'ptw', 'pty', 'pua', 'pub', 'pud', 'pue', 'puf', 'pug', 'pui', 'puj', 'pum', 'puo',
-                        'pup', 'puq', 'pur', 'pus', 'puu', 'puw', 'pux', 'puy', 'pwa', 'pwb', 'pwg', 'pwi', 'pwm',
-                        'pwn', 'pwo', 'pwr', 'pww', 'pye', 'pym', 'pyn', 'pys', 'pyu', 'pyx', 'pyy', 'pzn', 'qua',
-                        'qub', 'quc', 'qud', 'quf', 'qug', 'quh', 'qui', 'quk', 'qul', 'qum', 'qun', 'qup', 'qur',
-                        'qus', 'quv', 'quw', 'qux', 'quy', 'quz', 'qva', 'qvc', 'qve', 'qvh', 'qvi', 'qvj', 'qvl',
-                        'qvm', 'qvn', 'qvo', 'qvp', 'qvs', 'qvw', 'qvy', 'qvz', 'qwa', 'qwc', 'qwh', 'qws', 'qwt',
-                        'qxa', 'qxc', 'qxh', 'qxl', 'qxn', 'qxo', 'qxp', 'qxq', 'qxr', 'qxs', 'qxt', 'qxu', 'qxw',
-                        'qyp', 'raa', 'rab', 'rac', 'rad', 'raf', 'rag', 'rah', 'rai', 'rak', 'ral', 'ram', 'ran',
-                        'rao', 'rap', 'raq', 'rar', 'ras', 'rat', 'rau', 'rav', 'raw', 'rax', 'ray', 'raz', 'rbb',
-                        'rbp', 'rcf', 'rdb', 'rea', 'reb', 'ree', 'reg', 'rei', 'rej', 'rel', 'rem', 'ren', 'res',
-                        'ret', 'rey', 'rga', 'rge', 'rgk', 'rgn', 'rgr', 'rgs', 'rgu', 'rhg', 'rhp', 'ria', 'rif',
-                        'ril', 'rim', 'rin', 'rir', 'rit', 'riu', 'rjg', 'rji', 'rjs', 'rka', 'rkb', 'rkh', 'rki',
-                        'rkm', 'rkt', 'rma', 'rmb', 'rmc', 'rme', 'rmf', 'rmh', 'rmi', 'rmk', 'rml', 'rmm', 'rmn',
-                        'rmo', 'rmp', 'rmq', 'rms', 'rmt', 'rmw', 'rmx', 'rmy', 'rmz', 'rnd', 'rng', 'rnl', 'rnn',
-                        'rnp', 'rnr', 'rnw', 'rob', 'roc', 'rod', 'roe', 'rof', 'rog', 'roh', 'rol', 'rom', 'ron',
-                        'roo', 'rop', 'ror', 'rou', 'row', 'rpn', 'rpt', 'rri', 'rro', 'rsl', 'rth', 'rtm', 'rtw',
-                        'rub', 'ruc', 'rue', 'ruf', 'rug', 'ruh', 'ruk', 'run', 'ruo', 'rup', 'ruq', 'rus', 'rut',
-                        'ruu', 'rwa', 'rwk', 'rwm', 'rwo', 'rwr', 'rxd', 'rxw', 'ryn', 'rys', 'ryu', 'saa', 'sab',
-                        'sac', 'sad', 'sae', 'saf', 'sag', 'sah', 'saj', 'sak', 'sam', 'san', 'sao', 'saq', 'sar',
-                        'sas', 'sat', 'sau', 'sav', 'saw', 'sax', 'say', 'saz', 'sba', 'sbb', 'sbc', 'sbd', 'sbe',
-                        'sbf', 'sbg', 'sbh', 'sbi', 'sbj', 'sbk', 'sbl', 'sbm', 'sbn', 'sbo', 'sbp', 'sbq', 'sbr',
-                        'sbs', 'sbt', 'sbu', 'sbv', 'sbw', 'sbx', 'sby', 'sbz', 'scb', 'sce', 'scf', 'scg', 'sch',
-                        'sci', 'sck', 'scl', 'scn', 'sco', 'scp', 'scq', 'scs', 'scu', 'scv', 'scw', 'sda', 'sdb',
-                        'sdc', 'sde', 'sdf', 'sdg', 'sdh', 'sdj', 'sdk', 'sdl', 'sdm', 'sdn', 'sdo', 'sdp', 'sdr',
-                        'sds', 'sdu', 'sdx', 'sdz', 'sea', 'seb', 'sec', 'sed', 'see', 'sef', 'seg', 'seh', 'sei',
-                        'sej', 'sek', 'sel', 'sen', 'seo', 'sep', 'seq', 'ser', 'ses', 'set', 'seu', 'sev', 'sew',
-                        'sey', 'sez', 'sfb', 'sfe', 'sfm', 'sfs', 'sfw', 'sga', 'sgb', 'sgc', 'sgd', 'sge', 'sgg',
-                        'sgh', 'sgi', 'sgj', 'sgk', 'sgm', 'sgp', 'sgr', 'sgs', 'sgt', 'sgu', 'sgw', 'sgx', 'sgy',
-                        'sgz', 'sha', 'shb', 'shc', 'shd', 'she', 'shg', 'shh', 'shi', 'shj', 'shk', 'shl', 'shm',
-                        'shn', 'sho', 'shp', 'shq', 'shr', 'shs', 'sht', 'shu', 'shv', 'shw', 'shx', 'shy', 'shz',
-                        'sia', 'sib', 'sid', 'sie', 'sif', 'sig', 'sih', 'sii', 'sij', 'sil', 'sim', 'sin', 'sip',
-                        'siq', 'sir', 'sis', 'siu', 'siv', 'siw', 'six', 'siy', 'siz', 'sja', 'sjb', 'sjd', 'sje',
-                        'sjg', 'sjk', 'sjl', 'sjm', 'sjo', 'sjp', 'sjr', 'sjs', 'sjt', 'sju', 'sjw', 'ska', 'skb',
-                        'skc', 'skd', 'ske', 'skf', 'skg', 'skh', 'ski', 'skj', 'skk', 'skm', 'skn', 'sko', 'skp',
-                        'skq', 'skr', 'sks', 'skt', 'sku', 'skv', 'skw', 'skx', 'sky', 'skz', 'slc', 'sld', 'sle',
-                        'slf', 'slg', 'slh', 'sli', 'slk', 'sll', 'slm', 'sln', 'slp', 'slq', 'slr', 'slt', 'slu',
-                        'slv', 'slw', 'slx', 'sly', 'slz', 'sma', 'smb', 'smc', 'smd', 'sme', 'smf', 'smg', 'smh',
-                        'smj', 'smk', 'sml', 'smm', 'smn', 'smo', 'smp', 'smq', 'smr', 'sms', 'smt', 'smu', 'smv',
-                        'smw', 'smx', 'smy', 'smz', 'sna', 'snb', 'snc', 'snd', 'sne', 'snf', 'sng', 'sni', 'snj',
-                        'snk', 'snl', 'snm', 'snn', 'sno', 'snp', 'snq', 'snr', 'sns', 'snu', 'snv', 'snw', 'snx',
-                        'sny', 'snz', 'soa', 'sob', 'soc', 'sod', 'soe', 'sog', 'soh', 'soi', 'soj', 'sok', 'sol',
-                        'som', 'soo', 'sop', 'soq', 'sor', 'sos', 'sot', 'sou', 'sov', 'sow', 'sox', 'soy', 'soz',
-                        'spa', 'spb', 'spc', 'spd', 'spe', 'spg', 'spi', 'spk', 'spl', 'spm', 'spn', 'spo', 'spp',
-                        'spq', 'spr', 'sps', 'spt', 'spu', 'spv', 'spx', 'spy', 'sqa', 'sqh', 'sqi', 'sqk', 'sqm',
-                        'sqn', 'sqo', 'sqq', 'sqs', 'sqt', 'squ', 'sra', 'srb', 'src', 'sre', 'srf', 'srg', 'srh',
-                        'sri', 'srk', 'srl', 'srm', 'srn', 'sro', 'srp', 'srq', 'srr', 'srs', 'srt', 'sru', 'srv',
-                        'srw', 'srx', 'sry', 'srz', 'ssb', 'ssc', 'ssd', 'sse', 'ssf', 'ssg', 'ssh', 'ssi', 'ssj',
-                        'ssk', 'ssl', 'ssm', 'ssn', 'sso', 'ssp', 'ssq', 'ssr', 'sss', 'sst', 'ssu', 'ssv', 'ssw',
-                        'ssx', 'ssy', 'ssz', 'stb', 'ste', 'stf', 'stg', 'sti', 'stj', 'stk', 'stl', 'stm', 'stn',
-                        'sto', 'stp', 'stq', 'str', 'sts', 'stt', 'stu', 'stv', 'stw', 'sty', 'sua', 'sub', 'suc',
-                        'sue', 'sug', 'sui', 'suj', 'suk', 'sun', 'suq', 'sur', 'sus', 'sut', 'suv', 'suw', 'sux',
-                        'suy', 'suz', 'sva', 'svb', 'svc', 'sve', 'svk', 'svm', 'svs', 'swa', 'swb', 'swc', 'swe',
-                        'swf', 'swg', 'swh', 'swi', 'swj', 'swk', 'swl', 'swm', 'swn', 'swo', 'swp', 'swq', 'swr',
-                        'sws', 'swt', 'swu', 'swv', 'sww', 'swx', 'swy', 'sxb', 'sxe', 'sxg', 'sxk', 'sxn', 'sxr',
-                        'sxs', 'sxu', 'sxw', 'sya', 'syb', 'syc', 'syi', 'syk', 'syl', 'sym', 'syn', 'syo', 'sys',
-                        'syw', 'syx', 'syy', 'sza', 'szb', 'szc', 'sze', 'szg', 'szl', 'szn', 'szp', 'szv', 'szw',
-                        'taa', 'tab', 'tac', 'tad', 'tae', 'taf', 'tag', 'tah', 'taj', 'tak', 'tal', 'tam', 'tan',
-                        'tao', 'tap', 'taq', 'tar', 'tat', 'tau', 'tav', 'taw', 'tax', 'tay', 'taz', 'tba', 'tbc',
-                        'tbd', 'tbe', 'tbf', 'tbg', 'tbh', 'tbi', 'tbj', 'tbk', 'tbl', 'tbm', 'tbn', 'tbo', 'tbp',
-                        'tbr', 'tbs', 'tbt', 'tbu', 'tbv', 'tbw', 'tbx', 'tby', 'tbz', 'tca', 'tcb', 'tcc', 'tcd',
-                        'tce', 'tcf', 'tcg', 'tch', 'tci', 'tck', 'tcl', 'tcm', 'tcn', 'tco', 'tcp', 'tcq', 'tcs',
-                        'tct', 'tcu', 'tcw', 'tcx', 'tcy', 'tcz', 'tda', 'tdb', 'tdc', 'tdd', 'tde', 'tdf', 'tdg',
-                        'tdh', 'tdi', 'tdj', 'tdk', 'tdl', 'tdn', 'tdo', 'tdq', 'tdr', 'tds', 'tdt', 'tdu', 'tdv',
-                        'tdx', 'tdy', 'tea', 'tec', 'ted', 'tee', 'tef', 'teg', 'teh', 'tei', 'tek', 'tel', 'tem',
-                        'ten', 'teo', 'tep', 'teq', 'ter', 'tes', 'tet', 'teu', 'tev', 'tew', 'tex', 'tey', 'tfi',
-                        'tfn', 'tfo', 'tfr', 'tft', 'tga', 'tgb', 'tgc', 'tgd', 'tge', 'tgf', 'tgh', 'tgi', 'tgj',
-                        'tgk', 'tgl', 'tgn', 'tgo', 'tgp', 'tgq', 'tgs', 'tgt', 'tgu', 'tgw', 'tgx', 'tgy', 'tgz',
-                        'tha', 'thd', 'the', 'thf', 'thh', 'thi', 'thk', 'thl', 'thm', 'thn', 'thp', 'thq', 'thr',
-                        'ths', 'tht', 'thu', 'thv', 'thy', 'thz', 'tia', 'tic', 'tid', 'tif', 'tig', 'tih', 'tii',
-                        'tij', 'tik', 'til', 'tim', 'tin', 'tio', 'tip', 'tiq', 'tir', 'tis', 'tit', 'tiu', 'tiv',
-                        'tiw', 'tix', 'tiy', 'tiz', 'tja', 'tjg', 'tji', 'tjl', 'tjm', 'tjn', 'tjo', 'tjs', 'tju',
-                        'tjw', 'tkb', 'tkd', 'tke', 'tkg', 'tkl', 'tkm', 'tkn', 'tkp', 'tkq', 'tkr', 'tks', 'tkt',
-                        'tku', 'tkv', 'tkw', 'tkx', 'tkz', 'tla', 'tlb', 'tlc', 'tld', 'tlf', 'tlg', 'tli', 'tlj',
-                        'tlk', 'tll', 'tlm', 'tln', 'tlo', 'tlp', 'tlq', 'tlr', 'tls', 'tlt', 'tlu', 'tlv', 'tlx',
-                        'tly', 'tma', 'tmb', 'tmc', 'tmd', 'tmf', 'tmg', 'tmh', 'tmi', 'tmj', 'tml', 'tmm', 'tmn',
-                        'tmo', 'tmp', 'tmq', 'tmr', 'tms', 'tmt', 'tmu', 'tmv', 'tmw', 'tmy', 'tmz', 'tna', 'tnb',
-                        'tnc', 'tnd', 'tne', 'tng', 'tnh', 'tni', 'tnk', 'tnl', 'tnm', 'tnn', 'tno', 'tnp', 'tnq',
-                        'tnr', 'tns', 'tnt', 'tnu', 'tnv', 'tnw', 'tnx', 'tny', 'tnz', 'tob', 'toc', 'tod', 'tof',
-                        'tog', 'toh', 'toi', 'toj', 'tol', 'tom', 'ton', 'too', 'top', 'toq', 'tor', 'tos', 'tou',
-                        'tov', 'tow', 'tox', 'toy', 'toz', 'tpa', 'tpc', 'tpe', 'tpf', 'tpg', 'tpi', 'tpj', 'tpk',
-                        'tpl', 'tpm', 'tpn', 'tpo', 'tpp', 'tpq', 'tpr', 'tpt', 'tpu', 'tpv', 'tpw', 'tpx', 'tpy',
-                        'tpz', 'tqb', 'tql', 'tqm', 'tqn', 'tqo', 'tqp', 'tqq', 'tqr', 'tqt', 'tqu', 'tqw', 'tra',
-                        'trb', 'trc', 'trd', 'tre', 'trf', 'trg', 'trh', 'tri', 'trj', 'trm', 'trn', 'tro', 'trp',
-                        'trq', 'trr', 'trs', 'trt', 'tru', 'trv', 'trw', 'trx', 'try', 'trz', 'tsa', 'tsb', 'tsc',
-                        'tsd', 'tse', 'tsg', 'tsh', 'tsi', 'tsj', 'tsk', 'tsl', 'tsm', 'tsn', 'tso', 'tsp', 'tsq',
-                        'tsr', 'tss', 'tst', 'tsu', 'tsv', 'tsw', 'tsx', 'tsy', 'tsz', 'tta', 'ttb', 'ttc', 'ttd',
-                        'tte', 'ttf', 'ttg', 'tth', 'tti', 'ttj', 'ttk', 'ttl', 'ttm', 'ttn', 'tto', 'ttp', 'ttq',
-                        'ttr', 'tts', 'ttt', 'ttu', 'ttv', 'ttw', 'tty', 'ttz', 'tua', 'tub', 'tuc', 'tud', 'tue',
-                        'tuf', 'tug', 'tuh', 'tui', 'tuj', 'tuk', 'tul', 'tum', 'tun', 'tuo', 'tuq', 'tur', 'tus',
-                        'tuu', 'tuv', 'tux', 'tuy', 'tuz', 'tva', 'tvd', 'tve', 'tvk', 'tvl', 'tvm', 'tvn', 'tvo',
-                        'tvs', 'tvt', 'tvu', 'tvw', 'tvy', 'twa', 'twb', 'twc', 'twd', 'twe', 'twf', 'twg', 'twh',
-                        'twi', 'twl', 'twn', 'two', 'twp', 'twq', 'twr', 'twt', 'twu', 'tww', 'twx', 'twy', 'txa',
-                        'txb', 'txc', 'txe', 'txg', 'txh', 'txi', 'txj', 'txm', 'txn', 'txo', 'txq', 'txs', 'txt',
-                        'txu', 'txx', 'txy', 'tya', 'tye', 'tyh', 'tyi', 'tyj', 'tyn', 'typ', 'tyr', 'tys', 'tyt',
-                        'tyu', 'tyv', 'tyx', 'tyz', 'tza', 'tzh', 'tzj', 'tzm', 'tzn', 'tzo', 'tzx', 'uan', 'uar',
-                        'uba', 'ubi', 'ubl', 'ubr', 'ubu', 'uby', 'uda', 'ude', 'udg', 'udi', 'udj', 'udl', 'udm',
-                        'udu', 'ues', 'ufi', 'uga', 'ugb', 'uge', 'ugn', 'ugo', 'ugy', 'uha', 'uhn', 'uig', 'uis',
-                        'uiv', 'uji', 'uka', 'ukg', 'ukh', 'ukl', 'ukp', 'ukq', 'ukr', 'uks', 'uku', 'ukw', 'uky',
-                        'ula', 'ulb', 'ulc', 'ule', 'ulf', 'uli', 'ulk', 'ull', 'ulm', 'uln', 'ulu', 'ulw', 'uma',
-                        'umb', 'umd', 'umg', 'umi', 'umm', 'umn', 'umo', 'ump', 'umr', 'ums', 'umu', 'una', 'une',
-                        'ung', 'unk', 'unm', 'unn', 'unr', 'unu', 'unz', 'upi', 'upv', 'ura', 'urb', 'urc', 'urd',
-                        'ure', 'urg', 'urh', 'uri', 'urk', 'url', 'urm', 'urn', 'uro', 'urr', 'urt', 'uru', 'urv',
-                        'urw', 'urx', 'ury', 'urz', 'usa', 'ush', 'usi', 'usk', 'usp', 'usu', 'uta', 'ute', 'utp',
-                        'utr', 'utu', 'uum', 'uun', 'uur', 'uuu', 'uve', 'uvh', 'uvl', 'uwa', 'uya', 'uzb', 'uzn',
-                        'uzs', 'vaa', 'vae', 'vaf', 'vag', 'vah', 'vai', 'vaj', 'val', 'vam', 'van', 'vao', 'vap',
-                        'var', 'vas', 'vau', 'vav', 'vay', 'vbb', 'vec', 'ved', 'vel', 'vem', 'ven', 'veo', 'vep',
-                        'ver', 'vgr', 'vgt', 'vic', 'vid', 'vie', 'vif', 'vig', 'vil', 'vin', 'vis', 'vit', 'viv',
-                        'vka', 'vki', 'vkj', 'vkk', 'vkl', 'vkm', 'vko', 'vkp', 'vkt', 'vku', 'vlp', 'vls', 'vma',
-                        'vmb', 'vmc', 'vmd', 'vme', 'vmf', 'vmg', 'vmh', 'vmi', 'vmj', 'vmk', 'vml', 'vmm', 'vmp',
-                        'vmq', 'vmr', 'vmu', 'vmv', 'vmw', 'vmx', 'vmy', 'vmz', 'vnk', 'vnm', 'vnp', 'vor', 'vot',
-                        'vra', 'vro', 'vrs', 'vrt', 'vsi', 'vsl', 'vsv', 'vto', 'vum', 'vun', 'vut', 'vwa', 'waa',
-                        'wab', 'wac', 'wad', 'wae', 'wag', 'wah', 'waj', 'wal', 'wam', 'wan', 'wao', 'wap', 'waq',
-                        'war', 'was', 'wat', 'wau', 'wav', 'waw', 'wax', 'way', 'waz', 'wba', 'wbb', 'wbe', 'wbf',
-                        'wbh', 'wbi', 'wbj', 'wbk', 'wbl', 'wbm', 'wbp', 'wbq', 'wbr', 'wbt', 'wbv', 'wbw', 'wca',
-                        'wci', 'wdd', 'wdg', 'wdj', 'wdk', 'wdu', 'wea', 'wec', 'wed', 'weg', 'weh', 'wei', 'wem',
-                        'weo', 'wep', 'wer', 'wes', 'wet', 'wew', 'wfg', 'wga', 'wgb', 'wgg', 'wgi', 'wgo', 'wgu',
-                        'wgy', 'wha', 'whg', 'whk', 'wib', 'wic', 'wie', 'wig', 'wih', 'wii', 'wij', 'wik', 'wil',
-                        'wim', 'win', 'wir', 'wiu', 'wiv', 'wiy', 'wja', 'wji', 'wka', 'wkd', 'wkl', 'wku', 'wkw',
-                        'wla', 'wlc', 'wle', 'wlg', 'wli', 'wlk', 'wll', 'wln', 'wlo', 'wlr', 'wls', 'wlu', 'wlv',
-                        'wlw', 'wlx', 'wly', 'wmb', 'wmc', 'wmd', 'wme', 'wmh', 'wmi', 'wmm', 'wmn', 'wmo', 'wms',
-                        'wmt', 'wmw', 'wmx', 'wnb', 'wnc', 'wnd', 'wne', 'wng', 'wni', 'wnk', 'wnm', 'wno', 'wnp',
-                        'wnu', 'wnw', 'wny', 'woa', 'wob', 'woc', 'wod', 'woe', 'wof', 'wog', 'woi', 'wok', 'wol',
-                        'wom', 'won', 'woo', 'wor', 'wos', 'wow', 'wpc', 'wrb', 'wrg', 'wrh', 'wri', 'wrk', 'wrl',
-                        'wrm', 'wrn', 'wro', 'wrp', 'wrr', 'wrs', 'wru', 'wrv', 'wrw', 'wrx', 'wry', 'wrz', 'wsa',
-                        'wsi', 'wsk', 'wsr', 'wss', 'wsv', 'wtf', 'wth', 'wti', 'wtk', 'wtm', 'wtw', 'wua', 'wub',
-                        'wud', 'wuh', 'wul', 'wum', 'wun', 'wur', 'wut', 'wuu', 'wuv', 'wux', 'wuy', 'wwa', 'wwo',
-                        'wwr', 'www', 'wxa', 'wxw', 'wya', 'wyb', 'wyi', 'wym', 'wyr', 'wyy', 'xaa', 'xab', 'xac',
-                        'xad', 'xag', 'xal', 'xam', 'xan', 'xap', 'xar', 'xas', 'xat', 'xau', 'xav', 'xaw', 'xay',
-                        'xbc', 'xbe', 'xbg', 'xbi', 'xbj', 'xbn', 'xbo', 'xbp', 'xbr', 'xby', 'xce', 'xcg', 'xch',
-                        'xcl', 'xcm', 'xcn', 'xco', 'xcr', 'xct', 'xcv', 'xcw', 'xcy', 'xda', 'xdc', 'xdk', 'xdm',
-                        'xdy', 'xeb', 'xed', 'xeg', 'xel', 'xem', 'xer', 'xes', 'xet', 'xeu', 'xfa', 'xga', 'xgb',
-                        'xgd', 'xgf', 'xgg', 'xgm', 'xgr', 'xgu', 'xgw', 'xhd', 'xhe', 'xho', 'xhr', 'xht', 'xhu',
-                        'xib', 'xii', 'xir', 'xis', 'xiy', 'xjb', 'xjt', 'xka', 'xkb', 'xkc', 'xkd', 'xke', 'xkf',
-                        'xkg', 'xki', 'xkj', 'xkk', 'xkl', 'xkn', 'xkp', 'xkq', 'xkr', 'xks', 'xkt', 'xku', 'xkv',
-                        'xkw', 'xkx', 'xky', 'xkz', 'xla', 'xlc', 'xld', 'xlo', 'xlp', 'xls', 'xlu', 'xma', 'xmb',
-                        'xmc', 'xmd', 'xmf', 'xmg', 'xmh', 'xmj', 'xml', 'xmm', 'xmp', 'xmr', 'xms', 'xmt', 'xmu',
-                        'xmv', 'xmw', 'xmx', 'xmy', 'xmz', 'xna', 'xnb', 'xng', 'xni', 'xnn', 'xno', 'xnr', 'xns',
-                        'xnt', 'xny', 'xnz', 'xoc', 'xod', 'xog', 'xoi', 'xok', 'xom', 'xon', 'xoo', 'xop', 'xor',
-                        'xow', 'xpa', 'xpc', 'xpe', 'xpg', 'xpj', 'xpk', 'xpm', 'xpo', 'xpq', 'xpr', 'xps', 'xpt',
-                        'xpu', 'xqt', 'xra', 'xrb', 'xrd', 'xre', 'xri', 'xrn', 'xru', 'xrw', 'xsa', 'xsb', 'xsd',
-                        'xse', 'xsh', 'xsi', 'xsl', 'xsm', 'xsn', 'xsp', 'xsq', 'xsr', 'xsu', 'xsy', 'xta', 'xtb',
-                        'xtc', 'xtd', 'xte', 'xtg', 'xth', 'xti', 'xtj', 'xtl', 'xtm', 'xtn', 'xto', 'xtp', 'xtq',
-                        'xts', 'xtt', 'xtu', 'xtv', 'xtw', 'xty', 'xua', 'xub', 'xud', 'xug', 'xuj', 'xul', 'xum',
-                        'xun', 'xuo', 'xup', 'xur', 'xut', 'xuu', 'xve', 'xvi', 'xvo', 'xwa', 'xwc', 'xwd', 'xwe',
-                        'xwg', 'xwj', 'xwk', 'xwl', 'xwr', 'xwt', 'xww', 'xxb', 'xxk', 'xxm', 'xxr', 'xxt', 'xya',
-                        'xyb', 'xyj', 'xyk', 'xyt', 'xyy', 'xzh', 'yaa', 'yab', 'yac', 'yad', 'yae', 'yaf', 'yag',
-                        'yah', 'yai', 'yaj', 'yak', 'yal', 'yam', 'yan', 'yao', 'yap', 'yaq', 'yar', 'yas', 'yat',
-                        'yau', 'yav', 'yaw', 'yay', 'yaz', 'yba', 'ybb', 'ybe', 'ybh', 'ybi', 'ybj', 'ybk', 'ybl',
-                        'ybm', 'ybn', 'ybo', 'ybx', 'yby', 'ych', 'ycl', 'ycn', 'ycp', 'yda', 'ydd', 'yde', 'ydg',
-                        'ydk', 'yea', 'yee', 'yei', 'yej', 'yel', 'yer', 'yes', 'yet', 'yeu', 'yev', 'yey', 'yga',
-                        'ygl', 'ygm', 'ygp', 'ygr', 'ygs', 'ygw', 'yha', 'yhd', 'yhl', 'yia', 'yid', 'yif', 'yig',
-                        'yih', 'yii', 'yij', 'yik', 'yil', 'yim', 'yin', 'yip', 'yiq', 'yir', 'yis', 'yit', 'yiu',
-                        'yiv', 'yix', 'yiz', 'yka', 'ykg', 'yki', 'ykk', 'ykl', 'ykm', 'ykn', 'yko', 'ykr', 'ykt',
-                        'yku', 'yky', 'yla', 'yle', 'ylg', 'yli', 'yll', 'ylm', 'yln', 'ylo', 'ylr', 'ylu', 'yly',
-                        'ymb', 'ymc', 'ymd', 'yme', 'ymh', 'ymi', 'ymk', 'yml', 'ymm', 'ymn', 'ymo', 'ymp', 'ymq',
-                        'ymr', 'yms', 'ymx', 'ymz', 'yna', 'ynd', 'yng', 'ynk', 'ynl', 'ynn', 'yno', 'ynq', 'yns',
-                        'ynu', 'yob', 'yog', 'yoi', 'yok', 'yol', 'yom', 'yon', 'yor', 'yot', 'yox', 'yoy', 'ypa',
-                        'ypb', 'ypg', 'yph', 'ypm', 'ypn', 'ypo', 'ypp', 'ypz', 'yra', 'yrb', 'yre', 'yrk', 'yrl',
-                        'yrm', 'yrn', 'yrw', 'yry', 'ysd', 'ysg', 'ysl', 'ysn', 'yso', 'ysr', 'yss', 'ysy', 'yta',
-                        'ytl', 'ytp', 'ytw', 'yua', 'yub', 'yuc', 'yud', 'yue', 'yuf', 'yug', 'yui', 'yuj', 'yuk',
-                        'yul', 'yum', 'yun', 'yup', 'yuq', 'yur', 'yut', 'yuw', 'yux', 'yuy', 'yuz', 'yva', 'yvt',
-                        'ywa', 'ywg', 'ywl', 'ywn', 'ywq', 'ywr', 'ywt', 'ywu', 'yww', 'yxg', 'yxl', 'yxm', 'yxu',
-                        'yxy', 'yyr', 'yyu', 'yyz', 'yzg', 'yzk', 'zaa', 'zab', 'zac', 'zad', 'zae', 'zaf', 'zag',
-                        'zah', 'zai', 'zaj', 'zak', 'zal', 'zam', 'zao', 'zap', 'zaq', 'zar', 'zas', 'zat', 'zau',
-                        'zav', 'zaw', 'zax', 'zay', 'zaz', 'zbc', 'zbe', 'zbt', 'zbw', 'zca', 'zch', 'zdj', 'zea',
-                        'zeg', 'zeh', 'zen', 'zga', 'zgb', 'zgh', 'zgm', 'zgn', 'zgr', 'zha', 'zhb', 'zhd', 'zhi',
-                        'zhn', 'zhw', 'zia', 'zib', 'zik', 'zil', 'zim', 'zin', 'zir', 'ziw', 'ziz', 'zka', 'zkb',
-                        'zkd', 'zkk', 'zkn', 'zko', 'zkp', 'zkr', 'zkt', 'zku', 'zlj', 'zlm', 'zln', 'zlq', 'zma',
-                        'zmb', 'zmc', 'zmd', 'zme', 'zmf', 'zmg', 'zmh', 'zmi', 'zmj', 'zmk', 'zml', 'zmm', 'zmn',
-                        'zmo', 'zmp', 'zmq', 'zmr', 'zms', 'zmt', 'zmu', 'zmv', 'zmw', 'zmx', 'zmy', 'zmz', 'zna',
-                        'zne', 'zng', 'zns', 'zoc', 'zoh', 'zom', 'zoo', 'zoq', 'zor', 'zos', 'zpa', 'zpb', 'zpc',
-                        'zpd', 'zpe', 'zpf', 'zpg', 'zph', 'zpi', 'zpj', 'zpk', 'zpl', 'zpm', 'zpn', 'zpo', 'zpp',
-                        'zpq', 'zpr', 'zps', 'zpt', 'zpu', 'zpv', 'zpw', 'zpx', 'zpy', 'zpz', 'zqe', 'zrn', 'zro',
-                        'zrs', 'zsa', 'zsl', 'zsm', 'zsr', 'zsu', 'zte', 'ztg', 'ztl', 'ztm', 'ztn', 'ztp', 'ztq',
-                        'zts', 'ztt', 'ztu', 'ztx', 'zty', 'zua', 'zuh', 'zul', 'zum', 'zun', 'zuy', 'zwa', 'zyb',
-                        'zyg', 'zyj', 'zyn', 'zyp', 'zza', 'zzj'
-                        ]
-
-    def __init__(self):
-        super().__init__(Alphabet.IPA)
-        from transphone import read_tokenizer
-        self.read_tokenizer = read_tokenizer
-        self._models = {}
-
-    @classmethod
-    def get_lang(cls, target_lang: str) -> str:
-        """
-        Validates and returns the closest supported language code.
-
-        Args:
-            target_lang (str): The language code to validate.
-
-        Returns:
-            str: The validated language code.
-
-        Raises:
-            ValueError: If the language code is unsupported.
-        """
-        if target_lang.lower() in cls.TRANSPHONE_LANGS:
-            return target_lang
-        return cls.match_lang(target_lang, cls.TRANSPHONE_LANGS)
-
-    def phonemize_string(self, text: str, lang: str) -> str:
-        lang = self.get_lang(lang)
-        pho = self._models.get(lang)
-        if pho is None:
-            self._models[lang] = pho = self.read_tokenizer(lang)
-        return "".join(
-            [p if p != "<SPACE>" else " "
-             for p in pho.tokenize(text, use_space=True)]
-        ).strip()
+__getattr__ = deprecated_getattr(__name__)

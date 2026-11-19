@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import List
 
 from . import espeak
-from .phoneme_inventory import fold_to_inventory, tokenize_ipa
+from .phoneme_inventory import INVENTORY_88, Inventory
 
 _REWRITE = [
     ("ɡ", "ɡ"),
@@ -30,22 +30,22 @@ def _rewrite(ipa: str) -> str:
     return ipa
 
 
-def english_g2p(text: str) -> str:
-    """Convert English text to an IPA string drawn from the shared inventory."""
+def english_g2p(text: str, inventory: Inventory = INVENTORY_88) -> str:
+    """Convert English text to an IPA string drawn from *inventory*."""
     if espeak.available():
         ipa = espeak.phonemize(text, voice="en-us")
         ipa = _rewrite(ipa)
         return "".join(
-            s if s == " " else fold_to_inventory(s)
-            for s in _retokenize(ipa)
+            s if s == " " else inventory.fold(s)
+            for s in _retokenize(ipa, inventory)
         )
     return _fallback(text)
 
 
-def _retokenize(ipa: str) -> List[str]:
+def _retokenize(ipa: str, inventory: Inventory) -> List[str]:
     out: List[str] = []
     for word in ipa.split(" "):
-        toks = tokenize_ipa(word).symbols
+        toks = inventory.tokenize(word).symbols
         if out:
             out.append(" ")
         out.extend(toks)

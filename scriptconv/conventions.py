@@ -25,9 +25,10 @@ draws:
   word segmentation) are orthography too, but live behind the optional
   extras, like :mod:`scriptconv.readings`;
 * transitions that need contextual *prediction* (restoring tashkeel or
-  niqqud, i.e. diacritization) are linguistic inference, out of scope for the
-  same reason grapheme-to-phoneme is.  Their absence is queryable data, not a
-  runtime surprise.
+  niqqud, i.e. diacritization) are linguistic inference, so they belong to
+  :mod:`scriptconv.diacritics` and not to this module, as grapheme-to-phoneme
+  belongs to :mod:`scriptconv.phonemizers`.  Their absence is queryable data,
+  not a runtime surprise.
 
 What is **not** a convention: marks that are letter identity rather than
 decoration.  Vietnamese tone diacritics spell different words, Arabic

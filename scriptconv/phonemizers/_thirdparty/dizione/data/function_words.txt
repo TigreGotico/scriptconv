@@ -1,0 +1,189 @@
+# Function words: weak forms and how each word takes sentence stress.
+#
+# Written by hand. The dictionary gives every word its full, stressed form;
+# in running speech these words are unstressed or half stressed, and a few
+# have a different vowel. The choices among valid weak forms (for example
+# "of" with ʌ, "has" with ɐ) follow the tokens the TTS model was trained on.
+#
+# Columns (separated by two or more spaces): word, class, form, final form.
+#   u    never stressed
+#   uf   unstressed; stressed when it is the last word of its clause
+#   ur   unstressed; stressed when no stressed word follows in the clause
+#   s    secondary stress; primary when no stressed word follows in the clause
+#   ss   always secondary stress
+#   si   secondary when it opens the clause, otherwise unstressed; primary
+#        when no stressed word follows
+#   pf   stressed as written; the final form when it closes the clause
+# The form is the medial one. The final form is used when the word is
+# promoted; without it the marked (or first) vowel takes the primary stress.
+
+# articles, pronouns, determiners
+the         u    ð ə
+a           u    ɐ
+an          u    ɐ n
+i           uf   aɪ
+you         u    j uː
+he          u    h iː
+she         u    ʃ iː
+it          u    ɪ t
+we          u    w iː
+they        u    ð eɪ
+me          ss   m ˌiː
+him         ss   h ˌɪ m
+her         u    h ɜː
+us          ss   ˌʌ s
+them        ss   ð ˌɛ m
+my          uf   m aɪ
+your        u    j ʊɹ
+his         uf   h ɪ z
+its         u    ɪ t s
+our         ss   ˌaʊ ɚ
+their       u    ð ɛɹ
+this        uf   ð ɪ s
+that        uf   ð æ t
+these       uf   ð iː z
+those       uf   ð oʊ z
+some        ss   s ˌʌ m
+any         ss   ˌɛ n i
+who         s    h ˌuː
+whose       s    h ˌuː z
+which       ss   w ˌɪ tʃ
+what        si   w ˌʌ t
+where       s    w ˌɛɹ
+when        si   w ˌɛ n
+why         s    w ˌaɪ
+how         s    h ˌaʊ
+there       uf   ð ɛɹ
+
+# auxiliaries
+am          u    æ m
+is          u    ɪ z
+are         u    ɑːɹ
+was         u    w ʌ z
+were        u    w ɜː
+be          uf   b iː
+been        ss   b ˌɪ n
+being       s    b ˌiː ɪ ŋ
+have        uf   h æ v
+has         uf   h ɐ z            h ˈæ z
+had         uf   h æ d            h ˌæ d
+having      ss   h ˌæ v ɪ ŋ
+will        ur   w ɪ l
+would       uf   w ʊ d
+shall       ss   ʃ ˌæ l
+should      s    ʃ ˌʊ d
+can         ur   k æ n
+could       uf   k ʊ d
+might       s    m ˌaɪ t
+get         ur   ɡ ɛ t
+got         ur   ɡ ɑː t
+getting     ss   ɡ ˌɛ ɾ ɪ ŋ
+go          s    ɡ ˌoʊ
+goes        ur   ɡ oʊ z
+going       s    ɡ ˌoʊ ɪ ŋ
+gone        ur   ɡ ɔ n
+went        uf   w ɛ n t
+make        ss   m ˌeɪ k
+makes       ss   m ˌeɪ k s
+making      ss   m ˌeɪ k ɪ ŋ
+made        s    m ˌeɪ d
+put         ss   p ˌʊ t
+doing       ss   d ˌuː ɪ ŋ
+became      ss   b ɪ k ˌeɪ m
+become      s    b ɪ k ˌʌ m
+
+# contractions
+i'm         u    aɪ m
+i'll        u    aɪ l
+i've        u    aɪ v
+i'd         u    aɪ d
+you're      u    j ʊɹ
+you'll      u    j uː l
+you've      u    j uː v
+you'd       u    j uː d
+he's        u    h iː z
+he'll       u    h iː l
+he'd        u    h iː d
+she's       u    ʃ iː z
+she'll      u    ʃ iː l
+she'd       u    ʃ iː d
+it's        u    ɪ t s
+it'll       ss   ˌɪ ɾ əl
+we're       u    w ɪɹ
+we'll       u    w iː l
+we've       u    w iː v
+we'd        u    w iː d
+they're     u    ð eɪ ɚ
+they'll     u    ð eɪ l
+they've     u    ð eɪ v
+they'd      u    ð eɪ d
+that's      u    ð æ t s
+there's     u    ð ɛɹ z
+what's      ss   w ˌʌ t s
+who's       ss   h ˌuː z
+where's     ss   w ˌɛɹ z
+how's       ss   h ˌaʊ z
+isn't       s    ˌɪ z ə n t
+won't       uf   w oʊ n t
+couldn't    s    k ˌʊ d ə n t
+shouldn't   s    ʃ ˌʊ d ə n t
+
+# prepositions, conjunctions, particles
+of          u    ʌ v
+to          uf   t ə              t uː
+in          uf   ɪ n
+on          s    ˌɔ n
+at          u    æ t
+by          uf   b aɪ
+for         u    f ɔːɹ
+from        u    f ɹ ʌ m
+with        u    w ɪ ð
+as          u    æ z
+than        u    ð ɐ n
+and         uf   æ n d
+or          u    ɔːɹ
+if          u    ɪ f
+but         s    b ˌʌ t
+so          s    s ˌoʊ
+not         s    n ˌɑː t
+up          s    ˌʌ p
+down        s    d ˌaʊ n
+about       s    ɐ b ˌaʊ t
+above       s    ə b ˌʌ v
+across      ss   ə k ɹ ˌɑː s
+among       ss   ɐ m ˌʌ ŋ
+before      s    b ᵻ f ˌoːɹ
+behind      s    b ᵻ h ˌaɪ n d
+below       s    b ᵻ l ˌoʊ
+beneath     ss   b ᵻ n ˌiː θ
+beside      s    b ᵻ s ˌaɪ d
+between     s    b ᵻ t w ˌiː n
+beyond      ss   b ᵻ j ˌɔ n d
+into        ss   ˌɪ n t ʊ
+onto        ss   ˌɑː n t ʊ
+unto        ss   ˌʌ n t ʊ
+upon        ss   ə p ˌɑː n
+over        s    ˌoʊ v ɚ
+under       s    ˌʌ n d ɚ
+near        s    n ˌɪɹ
+nearly      ss   n ˌɪɹ l i
+through     ur   θ ɹ uː
+within      s    w ɪ ð ˌɪ n
+without     s    w ɪ ð ˌaʊ t
+while       s    w ˌaɪ l
+though      s    ð ˌoʊ
+together    s    t ə ɡ ˌɛ ð ɚ
+already     s    ɔː l ɹ ˌɛ d i
+whenever    ss   w ɛ n ˌɛ v ɚ
+sir         s    s ˌɜː
+
+# numbers: "one" weakens at the end of a clause; the teens are stressed on the
+# first syllable before another word and on "teen" at the end
+one         pf   w ˈʌ n           w ˌʌ n
+thirteen    pf   θ ˈɜː t iː n     θ ɜː t ˈiː n
+fourteen    pf   f ˈoːɹ t iː n    f oːɹ t ˈiː n
+fifteen     pf   f ˈɪ f t iː n    f ɪ f t ˈiː n
+sixteen     pf   s ˈɪ k s t iː n  s ɪ k s t ˈiː n
+seventeen   pf   s ˈɛ v ə n t iː n  s ɛ v ə n t ˈiː n
+eighteen    pf   ˈeɪ t iː n       eɪ t ˈiː n
+nineteen    pf   n ˈaɪ n t iː n   n aɪ n t ˈiː n

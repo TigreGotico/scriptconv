@@ -9,7 +9,7 @@ import re
 from typing import List, Tuple
 
 from . import espeak
-from .phoneme_inventory import fold_to_inventory, tokenize_ipa
+from .phoneme_inventory import INVENTORY_88, Inventory, tokenize_ipa
 
 FATHA, KASRA, DAMMA = "َ", "ِ", "ُ"
 SUKUN, SHADDA = "ْ", "ّ"
@@ -303,7 +303,9 @@ def msa_ipa_to_levantine(ipa: str) -> str:
     return ipa
 
 
-def arabic_fallback_ipa(text: str, back_emphatics: bool = True) -> str:
+def arabic_fallback_ipa(
+    text: str, back_emphatics: bool = True, inventory: Inventory = INVENTORY_88
+) -> str:
     """Phonemise undiacritised Arabic via espeak-ng, then remap toward Levantine."""
     if not espeak.available():
         return levantine_g2p(text, back_emphatics=back_emphatics)
@@ -311,7 +313,7 @@ def arabic_fallback_ipa(text: str, back_emphatics: bool = True) -> str:
     raw = msa_ipa_to_levantine(raw)
     out_words = []
     for word in raw.split(" "):
-        toks = tokenize_ipa(word).symbols
-        out_words.append("".join(fold_to_inventory(t) for t in toks))
+        toks = inventory.tokenize(word).symbols
+        out_words.append("".join(inventory.fold(t) for t in toks))
     ipa = " ".join(w for w in out_words if w)
     return ipa

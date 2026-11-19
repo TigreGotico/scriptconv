@@ -1,7 +1,8 @@
-"""scriptconv — a zero-dependency core for written-script operations.
+"""scriptconv — the one stop for text conversion, on a zero-dependency core.
 
 Script identification and metadata, phoneme-notation transcoding, and
-orthographic decomposition — no phonemization.
+orthographic decomposition run on the core alone. Phonemizer integrations sit
+behind optional extras, and the core holds no grapheme-to-phoneme rules.
 
 Modules
 -------
@@ -19,7 +20,9 @@ translit:
     Hiragana ↔ Katakana).
 readings:
     Dictionary-backed respelling (Japanese kanji → kana via the ``ja``
-    extra; Chinese hanzi → pinyin/bopomofo via the ``zh`` extra).
+    extra; Chinese hanzi → pinyin/bopomofo via the ``zh`` extra).  The
+    Japanese names (``tokens``, ``to_hiragana``, ``to_katakana``,
+    ``ReadingToken``) are in scriptconv-copyleft and import on first use.
 cangjie:
     Hanzi → Cangjie5 input codes (shape decomposition, vendored table).
 graph:
@@ -69,6 +72,7 @@ from scriptconv.notation import (
     ipa_to_cotovia,
     rfe_to_ipa,
     ipa_to_rfe,
+    halabi_to_ipa,
     looks_like_ipa,
 )
 from scriptconv.translit import (
@@ -76,11 +80,8 @@ from scriptconv.translit import (
     hira_to_kana,
     kana_to_hira,
 )
+from scriptconv import readings as _readings
 from scriptconv.readings import (
-    ReadingToken,
-    tokens,
-    to_hiragana,
-    to_katakana,
     to_pinyin,
     to_bopomofo,
 )
@@ -140,16 +141,12 @@ __all__ = [
     "ipa_to_cotovia",
     "rfe_to_ipa",
     "ipa_to_rfe",
+    "halabi_to_ipa",
     "looks_like_ipa",
     # translit
     "decompose_hangul",
     "hira_to_kana",
     "kana_to_hira",
-    # readings (dictionary-backed, needs scriptconv[ja])
-    "ReadingToken",
-    "tokens",
-    "to_hiragana",
-    "to_katakana",
     # conventions (orthographic decorations, orthogonal to script identity)
     "Convention",
     "Transition",
@@ -171,3 +168,10 @@ __all__ = [
     "to_pinyin",
     "to_bopomofo",
 ]
+
+
+def __getattr__(name: str):
+    # the Japanese readings import from scriptconv-copyleft on first use
+    if name in _readings._JAPANESE:
+        return getattr(_readings, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

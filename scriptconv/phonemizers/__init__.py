@@ -4,13 +4,24 @@ Public surface: the :class:`BasePhonemizer` contract, the ``Alphabet``/
 ``Phonemizer`` enums, the lazy registry (``get_phonemizer``,
 ``phonemizer_for_lang``), and the per-language wrapper modules.  Backing
 engines are optional extras; a missing one raises :class:`ImportError`
-naming the extra to install.
+naming the extra to install.  The wrappers under a copyleft or a
+non-commercial licence are in the scriptconv-copyleft and scriptconv-nonfree
+packages (see :mod:`scriptconv.phonemizers._moved`); the registry imports
+them from there.
 """
 from scriptconv.phonemizers.enums import Alphabet, Phonemizer
 from scriptconv.phonemizers.base import (
     BasePhonemizer,
+    FrontendError,
     GraphemePhonemizer,
+    MissingLanguageError,
+    ModelUnavailableError,
+    PhonemizerIdentity,
+    Segment,
+    StageError,
     UnicodeCodepointPhonemizer,
+    UnreadTextError,
+    UnsupportedLanguageError,
     TextChunks,
     RawPhonemizedChunks,
     PhonemizedChunks,
@@ -29,8 +40,16 @@ __all__ = [
     "Alphabet",
     "Phonemizer",
     "BasePhonemizer",
+    "FrontendError",
     "GraphemePhonemizer",
+    "MissingLanguageError",
+    "ModelUnavailableError",
+    "PhonemizerIdentity",
+    "Segment",
+    "StageError",
     "UnicodeCodepointPhonemizer",
+    "UnreadTextError",
+    "UnsupportedLanguageError",
     "TextChunks",
     "RawPhonemizedChunks",
     "PhonemizedChunks",

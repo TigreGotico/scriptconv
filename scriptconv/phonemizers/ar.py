@@ -1,69 +1,8 @@
 from typing import Optional
 
-from scriptconv.phonemizers.enums import Alphabet
+from scriptconv.phonemizers._moved import deprecated_getattr
 from scriptconv.phonemizers.base import BasePhonemizer
-
-
-# Module-level indirection for the mantoq backend: resolved lazily on first
-# construction, kept as module globals so tests and callers can patch them.
-mantoq = None  # the g2p callable
-from scriptconv.notation import mantoq_to_ipa  # noqa: E402  (patchable name)
-
-
-def _load_mantoq_g2p():
-    try:
-        # an externally-installed upstream mantoq wins
-        import mantoq as _pkg
-    except ImportError:
-        # quarantined vendored copy under its OWN license (the phonetisation
-        # core is CC BY-NC 4.0 — see _vendored/mantoq/LICENSE.md); using it
-        # is an explicit opt-in by requesting this phonemizer
-        from scriptconv.phonemizers import _vendored
-        from scriptconv.phonemizers._vendored import mantoq as _pkg
-    return _pkg.g2p
-
-
-class MantoqPhonemizer(BasePhonemizer):
-    """Arabic phonemizer backed by mantoq (Halabi Arabic-Phonetiser pipeline).
-
-    Distributed under its own license from the quarantined vendored copy —
-    the phonetisation core is CC BY-NC 4.0, non-commercial — unless an
-    externally-installed ``mantoq`` package is present.  Never selected
-    automatically; :class:`ArbtokPhonemizer` is the Arabic default.
-
-    Historical contract, preserved for models in the wild: the default
-    ``alphabet=Alphabet.BUCKWALTER`` returns the raw mantoq inventory (its
-    long-standing, if imprecise, label — ``Alphabet.MANTOQ`` is the accurate
-    alias); ``Alphabet.IPA`` converts via
-    :func:`scriptconv.notation.mantoq_to_ipa`.
-    """
-
-    def __init__(self, alphabet: Alphabet = Alphabet.BUCKWALTER):
-        if alphabet not in (Alphabet.IPA, Alphabet.BUCKWALTER, Alphabet.MANTOQ):
-            raise ValueError("unsupported alphabet")
-        super().__init__(alphabet)
-        global mantoq
-        if mantoq is None:
-            mantoq = _load_mantoq_g2p()
-
-    @classmethod
-    def get_lang(cls, target_lang: str) -> str:
-        return cls.match_lang(target_lang, ["ar"])
-
-    def phonemize_string(self, text: str, lang: str = "ar") -> str:
-        """Phonemize Arabic text via mantoq's G2P.
-
-        Tokens are joined and the ``_+_`` word separator becomes a space —
-        the byte-exact historical behavior; IPA output converts the joined
-        string with :func:`mantoq_to_ipa`.
-        """
-        lang = self.get_lang(lang)
-        normalized_text, phonemes = mantoq(text)
-        phonemes = "".join(phonemes).replace("_+_", " ")
-        if self.alphabet == Alphabet.IPA:
-            return mantoq_to_ipa(phonemes)
-        return phonemes
-
+from scriptconv.phonemizers.enums import Alphabet
 
 
 class ArbtokPhonemizer(BasePhonemizer):
@@ -85,6 +24,9 @@ class ArbtokPhonemizer(BasePhonemizer):
 
     ``arbtok`` is imported lazily so importing ``scriptconv`` does not hard-require it.
     """
+
+    owned_stages = frozenset({"diacritize"})
+    engine_distribution = "arbtok"
 
     def __init__(self, register: Optional[str] = None,
                  alphabet: Alphabet = Alphabet.IPA):
@@ -138,3 +80,6 @@ class ArbtokPhonemizer(BasePhonemizer):
 
     def phonemize_string(self, text: str, lang: str = "ar") -> str:
         return self._engine(self.get_lang(lang)).transcribe(text)
+
+
+__getattr__ = deprecated_getattr(__name__)

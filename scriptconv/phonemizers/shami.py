@@ -14,19 +14,51 @@ from typing import Iterator, List, Tuple
 from quebra_frases import sentence_tokenize
 
 from scriptconv.phonemizers.enums import Alphabet
-from scriptconv.phonemizers.base import BasePhonemizer, PhonemizedChunks
-from scriptconv.phonemizers._thirdparty.shami import TextFrontend
+from scriptconv.phonemizers.base import BasePhonemizer, PhonemizedChunks, Segment
+from scriptconv.phonemizers._thirdparty.shami import (
+    Lang,
+    TextFrontend,
+    SYMBOL_TO_ID,
+    ID_TO_SYMBOL,
+    VOCAB_SIZE,
+    SYMBOL_TO_ID_90,
+    ID_TO_SYMBOL_90,
+    VOCAB_SIZE_90,
+    get_default_frontend,
+)
+
+__all__ = [
+    "ShamiPhonemizer",
+    "TextFrontend",
+    "SYMBOL_TO_ID",
+    "ID_TO_SYMBOL",
+    "VOCAB_SIZE",
+    "SYMBOL_TO_ID_90",
+    "ID_TO_SYMBOL_90",
+    "VOCAB_SIZE_90",
+    "get_default_frontend",
+]
 
 
 class ShamiPhonemizer(BasePhonemizer):
-    """Phonemizer for Levantine Arabic + English code-switching (ShamiVITS)."""
+    """Phonemizer for Levantine Arabic + English code-switching (ShamiVITS).
+
+    ``inventory`` is the symbol count of the model the symbols are for. 88, the
+    default, is the single-speaker inventory. 90 adds the pause symbols ``sil``
+    (id 88) and ``brk`` (89), read from punctuation, and folds ``ᵻ`` to ``ə``.
+
+    Raises:
+        ValueError: If ``alphabet`` is not IPA, or ``inventory`` is not 88 or 90.
+    """
 
     def __init__(self, alphabet: Alphabet = Alphabet.IPA,
-                 diacritizer_backend: str = "auto"):
+                 diacritizer_backend: str = "auto",
+                 inventory: int = 88):
         if alphabet != Alphabet.IPA:
             raise ValueError("ShamiPhonemizer only supports IPA")
         super().__init__(alphabet)
-        self.frontend = TextFrontend(diacritizer_backend=diacritizer_backend)
+        self.frontend = TextFrontend(diacritizer_backend=diacritizer_backend,
+                                     inventory=inventory)
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
@@ -43,8 +75,38 @@ class ShamiPhonemizer(BasePhonemizer):
 
     def phonemize(self, text: str, lang: str) -> PhonemizedChunks:
         """Return sentence-level phoneme lists."""
-        phonemes, _ = self.phonemize_with_language_ids(text, lang)
-        return phonemes
+        return list(self.phonemize_lazy(text, lang))
+
+    def phonemize_lazy(self, text: str, lang: str) -> Iterator[List[str]]:
+        """Sentence-level lists of ShamiVITS symbols, one sentence at a time.
+
+        The front-end emits the model's own inventory. In the 88-symbol inventory 24
+        symbols are multi-character (``d\u0361\u0292``, ``t\u0361\u0283``, ``s\u02e4``, the long vowels ``a\u02d0``/``i\u02d0``/``u\u02d0``,
+        the diphthongs ``a\u0361\u026a``/``o\u0361\u028a`` \u2026) plus the ``<bos>``/``<eos>`` sentinels; the 90-symbol
+        inventory adds ``sil`` and ``brk``.
+        :meth:`BasePhonemizer.phonemize_lazy` splits the phoneme *string* per
+        character, which would shred ``i\u02d0`` into ``i`` + ``\u02d0`` \u2014 and a bare ``\u02d0`` is
+        not in the inventory, so the tokenizer drops it as OOV and the model is
+        fed a shorter, wrong sequence. Yield the front-end's own tokens instead.
+        """
+        for phonemes, _ in self.phonemize_with_language_ids_lazy(text, lang):
+            yield phonemes
+
+    def phonemize_segments(self, text: str, lang: str) -> Iterator[Segment]:
+        """One segment per sentence of *text*, with the ``language_ids`` stream.
+
+        Each sentence starts with ``<bos>`` and ends with ``<eos>``
+        (``bounded``), so where :class:`~scriptconv.frontend.TextFrontend`
+        joins two sentences, the inner pair goes with its language ids and a
+        word break takes its place, as the front-end reads the two sentences
+        in one call.
+        """
+        for phonemes, lang_ids in self.phonemize_with_language_ids_lazy(text, lang):
+            yield Segment(tuple(phonemes), streams={"language_ids": tuple(lang_ids)}, bounded=True)
+
+    def word_break(self) -> Segment:
+        """A space, with the language id that the front-end gives a space."""
+        return Segment((" ",), streams={"language_ids": (int(Lang.NEUTRAL),)})
 
     def phonemize_with_language_ids(
         self, text: str, lang: str

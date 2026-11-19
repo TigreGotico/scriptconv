@@ -1,0 +1,39 @@
+# Grammar and context rules for a few very common homographs. Written by hand.
+#
+# They are tried before the trained classifier, in order; the first rule whose
+# conditions all hold decides. The training sentences come from Wikipedia,
+# where questions, commands and first-person speech are rare, so the cases
+# below ("have you read", "will you read", "take a bow") need saying outright.
+#
+# Columns (two or more spaces): word, sense, conditions separated by ";".
+#   aux: ...     the nearest word to the left, skipping adverbs, "not",
+#                pronouns and articles, is one of these
+#   before: ...  the word just before (adverbs and "not" skipped) is one of these
+#   next: ...    the word just after is one of these; </s> = end of sentence
+#   near: ...    one of these occurs within six words
+#   first        the word opens the sentence
+#   joined: ...  a hyphen joins the word to one of these before it ("well-read")
+
+read     past      joined: well widely best better most least little much oft often rarely seldom never half un
+read     past      aux: have has had having haven't hasn't hadn't was were been being is are be am got
+read     present   aux: to will would can could should shall may might must do does did don't doesn't didn't let let's please cannot can't won't wouldn't couldn't shouldn't
+read     present   first
+
+live     vrb       before: i you we they who people to
+live     adj       next: music show shows broadcast performance performances concert concerts stream streaming coverage tv television album recording audience action event events demo feed wire ammunition
+
+wound    vrb       aux: has have had having was were been got get tightly
+wound    vrb       next: up around round down through back tightly
+wound    vrb       before: he she it and then
+
+bow      nou-ship  aux: take took takes taking taken to will would must
+bow      nou-knot  near: tie tied tying ties ribbon ribbons hair arrow arrows violin cello fiddle string strings rainbow gift shoelace shoelaces
+bow      nou-ship  near: ship ships boat deck stern captain audience curtain applause stage head knee knees waist
+
+bass     corp      near: fish fishing fished caught catch lake river pond sea striped largemouth smallmouth angler trout
+
+lead     nou       near: pipe pipes paint pencil poisoning metal metals bullet bullets zinc copper tin mercury ore
+
+minute   adj       before: is are was were so very extremely too such ; next: </s> , . ! ? and but details detail amount amounts quantities quantity particles differences changes fraction
+
+content  adj-nou-vrb  before: is are was were am be been feel feels felt seem seems seemed quite so very perfectly not ; next: </s> , . ! ? with to in and
