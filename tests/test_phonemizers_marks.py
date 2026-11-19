@@ -1,6 +1,7 @@
 """Clause marks next to a digit, and a colon inside a word, in ``remove_punctuation`` and ``chunk_text``."""
 import unittest
 
+from scriptconv.frontend import FrontendConfig, TextFrontend
 from scriptconv.phonemizers import BasePhonemizer, GraphemePhonemizer
 
 
@@ -18,11 +19,13 @@ class TestMarksAfterADigitAndInAWord(unittest.TestCase):
         self.assertEqual(BasePhonemizer.remove_punctuation("16!30"), "16!30")
 
     def test_the_grapheme_backend_reads_a_mark_after_a_digit_as_a_space(self):
-        from scriptconv.frontend import FrontendConfig, TextFrontend
         for keep, end in ((False, ""), (True, ".")):
             with self.subTest(keep_punctuation=keep):
                 frontend = TextFrontend(FrontendConfig("en", keep_punctuation=keep), GraphemePhonemizer())
                 self.assertEqual(frontend.phonemize_flat("Pay 4.50!They go."), list("pay 4.50 they go" + end))
+
+    def test_a_colon_at_the_end_of_the_text_cuts_it(self):
+        self.assertEqual(BasePhonemizer.chunk_text("Disse isto:")[0], ("Disse isto", ":", False))
 
     def test_a_colon_inside_a_word_does_not_cut_it(self):
         # FLORES-200 ben_Beng devtest writes "নি:সন্দেহে" ("without doubt") with an ASCII colon

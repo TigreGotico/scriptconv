@@ -761,6 +761,7 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         Parameters:
             text (str): Input text to split. If empty, returns a single empty chunk.
             delimiters (Optional[List[str]]): List of substring delimiters to split sentences by (defaults to [":", ";", "...", "|"]).
+                ":" and ";" cut only before whitespace or the end of the text.
 
         Returns:
             TextChunks: A list of tuples (substring, terminator, end_of_sentence) where:
@@ -781,17 +782,12 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         results: TextChunks = []
         delimiters = delimiters or [":", ";", "...", "|"]
 
-        # Create a regex pattern that matches any of the delimiters. A
-        # delimiter sitting directly between two digits (eg. the ":" in a
-        # clock time "16:30" or a score "3:2") is not a sentence-internal
-        # boundary, so it is only excluded when *both* neighbours are
-        # digits — a delimiter with a digit on just one side (eg. "12: ")
-        # still splits as before.
+        # ":" and ";" cut only before whitespace or the end, as in
+        # split_clauses, so "16:30" and the Bengali "নি:সন্দেহে" stay whole.
+        # Any other delimiter cuts unless it stands between two digits.
         def _delim_alt(delimiter: str) -> str:
             escaped = re.escape(delimiter)
             if delimiter in (":", ";"):
-                # as in split_clauses, only before whitespace, so the ":" in
-                # the Bengali word "নি:সন্দেহে" stays in its word
                 return f"{escaped}(?=\\s|$)"
             return f"(?:(?<!\\d){escaped}|{escaped}(?!\\d))"
 
