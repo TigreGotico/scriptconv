@@ -1,8 +1,22 @@
 # Changelog
 
+## [0.0.4a128](https://github.com/TigreGotico/scriptconv/tree/0.0.4a128) (2026-11-19)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a127...0.0.4a128)
+
+**Merged pull requests:**
+
+- fix\(frontend\): a hyphen or dash next to a word, and a mark before a block, separate two words [\#361](https://github.com/TigreGotico/scriptconv/pull/361) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- docs: state which import errors give the tugaphone identity no revision [\#354](https://github.com/TigreGotico/scriptconv/pull/354) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- fix: clause splitting takes linear time [\#353](https://github.com/TigreGotico/scriptconv/pull/353) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a127](https://github.com/TigreGotico/scriptconv/tree/0.0.4a127) (2026-11-18)
 
-[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a125...0.0.4a127)
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a126...0.0.4a127)
+
+## [0.0.4a126](https://github.com/TigreGotico/scriptconv/tree/0.0.4a126) (2026-11-18)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a125...0.0.4a126)
 
 **Merged pull requests:**
 
@@ -365,10 +379,6 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a78...0.0.4a79)
 
-**Merged pull requests:**
-
-- fix: with keep\_punctuation off, phonemize\_to\_list returns the joined synthesis chunks [\#225](https://github.com/TigreGotico/scriptconv/pull/225) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a78](https://github.com/TigreGotico/scriptconv/tree/0.0.4a78) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a77...0.0.4a78)
@@ -396,10 +406,6 @@
 ## [0.0.4a74](https://github.com/TigreGotico/scriptconv/tree/0.0.4a74) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a73...0.0.4a74)
-
-**Merged pull requests:**
-
-- fix: keep the joint space out of synthesis chunks and read clause breaks as spaces [\#223](https://github.com/TigreGotico/scriptconv/pull/223) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a73](https://github.com/TigreGotico/scriptconv/tree/0.0.4a73) (2026-11-14)
 
