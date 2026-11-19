@@ -726,8 +726,8 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         is preserved so the per-language normalizers still see it as a single token,
         matching the digit:digit exemption in ``chunk_text``.
 
-        A hyphen in any of its forms (U+2010, U+2011, U+FE63, U+FF0D) between
-        two letters is written as ``-``, so "guarda‐chuva" with U+2010 reads
+        A hyphen written as U+2010, U+2011, U+FE63 or U+FF0D between two
+        letters becomes ``-``, so "guarda‐chuva" with U+2010 reads
         as "guarda-chuva". A hyphen between a letter and a digit, as in
         "COVID-19", is no letter of a word, and neither is a dash (U+2012 to
         U+2015 and their other forms) between two letters or a letter and a

@@ -1060,7 +1060,8 @@ class TextFrontend:
         A space, tab or line break before the block in the text, also with
         marks between it and the block, a hyphen, ``!`` or ``?`` between a
         word and the block, or a space after the block, becomes the backend's
-        word break, unless *piece* is empty or already ends in one. :meth:`_before_block` reads what comes before the block, and
+        word break, unless *piece* is empty or already ends in one.
+        :meth:`_before_block` reads what comes before the block, and
         :meth:`_mark_after` reads the clause symbol after it. A block whose
         symbols end in a character that is also a clause symbol, with no
         clause symbol after it, takes a word break before the next word,
@@ -1082,7 +1083,6 @@ class TextFrontend:
         piece.text = " ".join(filter(None, (piece.text, parts[index])))
         phonemes = piece.phonemes
         space, space_streams = self._space.phonemes, self._space.streams
-        # a hyphen at the edge of a word, or a "!" or "?" between two words, separates them
         tail = text.rsplit(None, 1)[-1] if text[-1:].strip() else ""
         separated = (_SPACE_BEFORE_BLOCK.search(text) or tail[-1:] in _HYPHENS
                      or self.backend.remove_punctuation(tail + _BLOCK_WORD).endswith(" " + _BLOCK_WORD))
