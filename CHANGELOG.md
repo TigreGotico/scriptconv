@@ -1,8 +1,33 @@
 # Changelog
 
+## [0.0.4a133](https://github.com/TigreGotico/scriptconv/tree/0.0.4a133) (2026-11-19)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a132...0.0.4a133)
+
+**Merged pull requests:**
+
+- fix: the dizione revision covers the scriptconv wrapper code [\#357](https://github.com/TigreGotico/scriptconv/pull/357) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a132](https://github.com/TigreGotico/scriptconv/tree/0.0.4a132) (2026-11-19)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a131...0.0.4a132)
+
+**Merged pull requests:**
+
+- fix: a module loaded before the revision probe counts when the backend imports it [\#358](https://github.com/TigreGotico/scriptconv/pull/358) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- fix: keep\_punctuation and the whitespace pattern join the backend revision [\#356](https://github.com/TigreGotico/scriptconv/pull/356) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a131](https://github.com/TigreGotico/scriptconv/tree/0.0.4a131) (2026-11-19)
 
-[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a128...0.0.4a131)
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a130...0.0.4a131)
+
+## [0.0.4a130](https://github.com/TigreGotico/scriptconv/tree/0.0.4a130) (2026-11-19)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a129...0.0.4a130)
+
+## [0.0.4a129](https://github.com/TigreGotico/scriptconv/tree/0.0.4a129) (2026-11-19)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a128...0.0.4a129)
 
 **Merged pull requests:**
 
@@ -351,10 +376,6 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a84...0.0.4a85)
 
-**Merged pull requests:**
-
-- fix\(frontend\): one space around a block and keep the mark after it [\#236](https://github.com/TigreGotico/scriptconv/pull/236) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a84](https://github.com/TigreGotico/scriptconv/tree/0.0.4a84) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a83...0.0.4a84)
@@ -379,10 +400,6 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a79...0.0.4a80)
 
-**Merged pull requests:**
-
-- fix\(phonemizers\): break a Preferred-Value tie by the requested code [\#231](https://github.com/TigreGotico/scriptconv/pull/231) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a79](https://github.com/TigreGotico/scriptconv/tree/0.0.4a79) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a78...0.0.4a79)
@@ -390,10 +407,6 @@
 ## [0.0.4a78](https://github.com/TigreGotico/scriptconv/tree/0.0.4a78) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a77...0.0.4a78)
-
-**Merged pull requests:**
-
-- docs\(diacritics\): state the strip NFD claim and the §325 citation exactly [\#230](https://github.com/TigreGotico/scriptconv/pull/230) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a77](https://github.com/TigreGotico/scriptconv/tree/0.0.4a77) (2026-11-14)
 
