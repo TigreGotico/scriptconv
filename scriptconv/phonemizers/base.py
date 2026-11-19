@@ -740,8 +740,9 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         digit, as in "Lisboa–Porto". Each becomes a space.
 
         A mark that :data:`CLAUSE_PUNCTUATION` reads as ``!`` or ``?``, such as
-        the Arabic ``؟``, between two letters, as in "Sim!Não", still
-        separates two words, so a run of them becomes one space.
+        the Arabic ``؟``, between two letters, as in "Sim!Não", or between a
+        digit and a letter, as in "4.50!They", still separates two words, so a
+        run of them becomes one space.
         """
         out = []
         chars = list(text)
@@ -761,7 +762,7 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
                     letter = i - 1
                     while letter > 0 and unicodedata.category(chars[letter]).startswith("M"):
                         letter -= 1
-                    separates = (i > 0 and chars[letter].isalpha()
+                    separates = (i > 0 and chars[letter].isalnum()
                                  and end < len(chars) and chars[end].isalpha())
                     if separates:
                         out.append(" ")
@@ -787,6 +788,7 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         Parameters:
             text (str): Input text to split. If empty, returns a single empty chunk.
             delimiters (Optional[List[str]]): List of substring delimiters to split sentences by (defaults to [":", ";", "...", "|"]).
+                ":" and ";" cut only before whitespace or the end of the text.
 
         Returns:
             TextChunks: A list of tuples (substring, terminator, end_of_sentence) where:
@@ -807,14 +809,13 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         results: TextChunks = []
         delimiters = delimiters or [":", ";", "...", "|"]
 
-        # Create a regex pattern that matches any of the delimiters. A
-        # delimiter sitting directly between two digits (eg. the ":" in a
-        # clock time "16:30" or a score "3:2") is not a sentence-internal
-        # boundary, so it is only excluded when *both* neighbours are
-        # digits — a delimiter with a digit on just one side (eg. "12: ")
-        # still splits as before.
+        # ":" and ";" cut only before whitespace or the end, as in
+        # split_clauses, so "16:30" and the Bengali "নি:সন্দেহে" stay whole.
+        # Any other delimiter cuts unless it stands between two digits.
         def _delim_alt(delimiter: str) -> str:
             escaped = re.escape(delimiter)
+            if delimiter in (":", ";"):
+                return f"{escaped}(?=\\s|$)"
             return f"(?:(?<!\\d){escaped}|{escaped}(?!\\d))"
 
         delimiter_pattern = _delim_alt(delimiters[0])
