@@ -54,6 +54,12 @@ _CLAUSE_TOKENS = frozenset(CLAUSE_PUNCTUATION.values())
 # after it, is no clause break, but it still separates two words.
 _SEPARATING_MARKS = frozenset(mark for mark, symbol in CLAUSE_PUNCTUATION.items()
                               if symbol in ("!", "?"))
+# The characters that Unicode names a hyphen. Between two letters each one is
+# the hyphen of a compound, and the backend reads it as "-".
+_HYPHENS = frozenset("-\u2010\u2011\ufe63\uff0d")
+# The dashes. A dash is no letter of a word, so between two words, as in
+# "Lisboa–Porto", it separates them.
+_DASHES = frozenset("\u2012\u2013\u2014\u2015\u2e3a\u2e3b\ufe31\ufe32\ufe58")
 # A clause ends at punctuation followed by whitespace, as in espeak-ng, so the
 # "," in "10,4" or the ":" in "16:30" never splits. A lone "." is left to the
 # sentence tokenizer, which knows abbreviations; inside a sentence an ellipsis
@@ -124,17 +130,19 @@ def _clause_breaks_as_spaces(phonemes: str) -> str:
     return " ".join(line.strip() for line in phonemes.split("\n") if line.strip())
 
 
-def _between_letters(text: str, index: int) -> bool:
+def _between_letters(text: str, index: int, is_letter: Callable[[str], bool] = str.isalpha) -> bool:
     """Whether the character at *index* of *text* stands between two letters.
 
-    The letter before it may carry combining marks, such as a stress mark (U+0301).
+    The letter before it may carry combining marks, such as a stress mark
+    (U+0301). *is_letter* tells what counts as a letter: ``str.isalnum``
+    counts a digit too.
     """
-    if not 0 < index < len(text) - 1 or not text[index + 1].isalpha():
+    if not 0 < index < len(text) - 1 or not is_letter(text[index + 1]):
         return False
     letter = index - 1
     while letter > 0 and unicodedata.category(text[letter]).startswith("M"):
         letter -= 1
-    return text[letter].isalpha()
+    return is_letter(text[letter])
 
 
 def _clause_mark(punctuation: str) -> Optional[str]:
@@ -724,6 +732,13 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         is preserved so the per-language normalizers still see it as a single token,
         matching the digit:digit exemption in ``chunk_text``.
 
+        A hyphen written as U+2010, U+2011, U+FE63 or U+FF0D between two
+        letters becomes ``-``, so "guarda‐chuva" with U+2010 reads
+        as "guarda-chuva". A hyphen between a letter and a digit, as in
+        "COVID-19", is no letter of a word, and neither is a dash (U+2012 to
+        U+2015 and their other forms) between two letters or a letter and a
+        digit, as in "Lisboa–Porto". Each becomes a space.
+
         A mark that :data:`CLAUSE_PUNCTUATION` reads as ``!`` or ``?``, such as
         the Arabic ``؟``, between two letters, as in "Sim!Não", still
         separates two words, so a run of them becomes one space.
@@ -732,8 +747,11 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         chars = list(text)
         separates = False
         for i, c in enumerate(chars):
-            if c in ("'", "’", "-") and _between_letters(text, i):
+            if c in ("'", "’") and _between_letters(text, i):
                 out.append(c)
+                continue
+            if c in _HYPHENS and _between_letters(text, i):
+                out.append("-")
                 continue
             if c in _SEPARATING_MARKS:
                 if i == 0 or chars[i - 1] not in _SEPARATING_MARKS:
@@ -752,6 +770,9 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
             if 0 < i < len(chars) - 1 \
                     and chars[i - 1].isdigit() and chars[i + 1].isdigit():
                 out.append(c)
+                continue
+            if (c in _HYPHENS or c in _DASHES) and _between_letters(text, i, str.isalnum):
+                out.append(" ")
                 continue
             if unicodedata.category(c).startswith("P"):
                 continue

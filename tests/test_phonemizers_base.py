@@ -436,3 +436,33 @@ class TestGraphemeHyphen(unittest.TestCase):
         self.assertEqual(g.phonemize_string("-kum ayibo-", "xh"), "kum ayibo")
         self.assertEqual(g.phonemize_string("-kum", "xh"), "kum")
         self.assertEqual(g.phonemize_string("10-20", "en"), "10 20")
+
+
+class TestRemovePunctuationHyphensAndDashes(unittest.TestCase):
+    """tts-punctuation: "A hyphen between two letters is part of the word",
+    and "A hyphen with a space next to it, or at a word edge, is no part of a
+    word: it gives no symbol, and a space separates the two words." A dash is
+    no letter of a word either. The hyphen forms are the characters that
+    Unicode names HYPHEN, NON-BREAKING HYPHEN, SMALL HYPHEN-MINUS and
+    FULLWIDTH HYPHEN-MINUS."""
+
+    def test_every_form_of_the_hyphen_between_two_letters_is_a_hyphen(self):
+        for hyphen in "‐‑﹣－":
+            with self.subTest(hyphen=hex(ord(hyphen))):
+                self.assertEqual(BasePhonemizer.remove_punctuation(f"guarda{hyphen}chuva."), "guarda-chuva")
+
+    def test_a_dash_between_two_letters_is_a_space(self):
+        self.assertEqual(BasePhonemizer.remove_punctuation("Lisboa–Porto."), "Lisboa Porto")
+        self.assertEqual(BasePhonemizer.remove_punctuation("sim—não"), "sim não")
+
+    def test_a_hyphen_between_a_letter_and_a_digit_is_a_space(self):
+        self.assertEqual(BasePhonemizer.remove_punctuation("COVID-19 chegou."), "COVID 19 chegou")
+        self.assertEqual(BasePhonemizer.remove_punctuation("3-D"), "3 D")
+        self.assertEqual(BasePhonemizer.remove_punctuation("COVID–19"), "COVID 19")
+
+    def test_a_mark_between_two_digits_stays(self):
+        self.assertEqual(BasePhonemizer.remove_punctuation("1139-1185"), "1139-1185")
+        self.assertEqual(BasePhonemizer.remove_punctuation("1139–1185"), "1139–1185")
+
+    def test_the_grapheme_backend_reads_the_hyphen_at_a_digit_as_a_space(self):
+        self.assertEqual(GraphemePhonemizer().phonemize_to_list("COVID-19", "en"), list("covid 19"))

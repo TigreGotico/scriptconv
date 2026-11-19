@@ -49,8 +49,8 @@ differences stay:
   only digits to nothing without a normaliser.
 - A block gives one space symbol for a run of whitespace, but the unicode
   backend copies each tab and space.
-- A mark directly before a block gives no symbol and no space, but plain
-  text reads ``!`` or ``?`` between two words as a space.
+- A hyphen directly before or after a block stands at the edge of a word, so
+  it gives a space, but plain text keeps a hyphen between two letters.
 """
 import copy
 import dataclasses
@@ -70,6 +70,7 @@ from scriptconv.graph import ConversionGraph, Edge
 from scriptconv.phonemizers.base import (
     _CLAUSE_BREAK,
     _CLAUSE_TOKENS,
+    _HYPHENS,
     _PARAGRAPH_BREAK,
     _PAUSE_PUNCTUATION,
     BasePhonemizer,
@@ -1058,9 +1059,10 @@ class TextFrontend:
         """Append the symbols of the inline block at *index* of a split text to *piece*.
 
         A space, tab or line break before the block in the text, also with
-        marks between it and the block, or a space after the block, becomes
-        the backend's word break, unless *piece* is empty or already ends in
-        one. :meth:`_before_block` reads what comes before the block, and
+        marks between it and the block, a hyphen, ``!`` or ``?`` between a
+        word and the block, or a space after the block, becomes the backend's
+        word break, unless *piece* is empty or already ends in one.
+        :meth:`_before_block` reads what comes before the block, and
         :meth:`_mark_after` reads the clause symbol after it. A block whose
         symbols end in a character that is also a clause symbol, with no
         clause symbol after it, takes a word break before the next word,
@@ -1082,8 +1084,11 @@ class TextFrontend:
         piece.text = " ".join(filter(None, (piece.text, parts[index])))
         phonemes = piece.phonemes
         space, space_streams = self._space.phonemes, self._space.streams
+        tail = text.rsplit(None, 1)[-1] if text[-1:].strip() else ""
+        separated = (_SPACE_BEFORE_BLOCK.search(text) or tail[-1:] in _HYPHENS
+                     or self.backend.remove_punctuation(tail + _BLOCK_WORD).endswith(" " + _BLOCK_WORD))
         if piece.bounds is not None:
-            if _SPACE_BEFORE_BLOCK.search(text) and phonemes and phonemes[-1] != space[0] and not piece.ends_in_token:
+            if separated and phonemes and phonemes[-1] != space[0] and not piece.ends_in_token:
                 piece.add(space, space_streams)
             piece.add(symbols)
             piece.ends_in_token = not after[:1].isspace() and not _leading_marks(after)
@@ -1093,7 +1098,7 @@ class TextFrontend:
         before = self._before_block(phonemes, text, index > 1)
         if before is False:
             piece.pop()
-        if _SPACE_BEFORE_BLOCK.search(text) and phonemes and phonemes[-1] != space[0] and not before:
+        if separated and phonemes and phonemes[-1] != space[0] and not before:
             piece.add(space, space_streams)
         piece.add(symbols)
         mark = self._mark_after(after, index + 2 < len(parts), stages)
