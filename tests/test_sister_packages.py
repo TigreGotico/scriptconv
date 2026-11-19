@@ -27,12 +27,16 @@ ROOT = Path(__file__).resolve().parent.parent
 FLOOR = {"scriptconv-copyleft": Version("0.1.2a1"), "scriptconv-nonfree": Version("0.1.0a1")}
 # scriptconv-copyleft 0.2.0a1 installs pyopenjtalk-plus in its misaki extra, where
 # 0.1.2a1 installs pyopenjtalk, the module that the openjtalk backend refuses.
-EXTRA_FLOOR = {"misaki": Version("0.2.0a1")}
+# 0.2.2a1 (TODO: the alpha with hebrew_ipa, openjtalk_prosody and tltk) holds the
+# backends of the he, ja-phonemizers and th extras.
+EXTRA_FLOOR = {"misaki": Version("0.2.0a1"), "he": Version("0.2.2a1"),
+               "ja-phonemizers": Version("0.2.2a1"), "th": Version("0.2.2a1")}
 
 COPYLEFT = {Phonemizer.ESPEAK, Phonemizer.TRANSPHONE, Phonemizer.MISAKI, Phonemizer.MISAKI_EN,
             Phonemizer.MISAKI_JA, Phonemizer.MISAKI_ZH, Phonemizer.MISAKI_KO,
             Phonemizer.MISAKI_VI, Phonemizer.COTOVIA, Phonemizer.AHOTTS, Phonemizer.G2PFA,
-            Phonemizer.PYKAKASI, Phonemizer.G2PK, Phonemizer.KOG2PK}
+            Phonemizer.PYKAKASI, Phonemizer.G2PK, Phonemizer.KOG2PK,
+            Phonemizer.HEBREW_IPA, Phonemizer.OPENJTALK_PROSODY, Phonemizer.TLTK}
 NONFREE = {Phonemizer.MANTOQ, Phonemizer.HALABI, Phonemizer.IQRA, Phonemizer.VIPHONEME,
            Phonemizer.AFRICA_G2P, Phonemizer.GHANA_G2P}
 MOVED_MEMBERS = sorted(COPYLEFT | NONFREE, key=lambda m: m.value)

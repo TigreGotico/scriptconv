@@ -52,6 +52,7 @@ OWNED = {
     Phonemizer.TUGAPHONE: {"normalize", "diacritize"},
     Phonemizer.ARBTOK: {"diacritize"},
     Phonemizer.DIZIONE: {"normalize"},
+    Phonemizer.TLTK: {"normalize"},
 }
 
 # Code written or vendored in scriptconv, scriptconv-copyleft or
@@ -61,7 +62,7 @@ IN_TREE = {
     Phonemizer.UNICODE, Phonemizer.GRAPHEMES, Phonemizer.MATOUB_KAB,
     Phonemizer.MANTOQ, Phonemizer.HALABI, Phonemizer.IQRA, Phonemizer.KOG2PK,
     Phonemizer.SHAMI, Phonemizer.VOSK, Phonemizer.BYT5, Phonemizer.CHARSIU,
-    Phonemizer.DIZIONE, Phonemizer.G2PW, Phonemizer.F5TTS_CHAR,
+    Phonemizer.DIZIONE, Phonemizer.G2PW, Phonemizer.F5TTS_CHAR, Phonemizer.HEBREW_IPA,
 }
 # An engine that no extra can name: a binary, and a distribution the zh extra
 # does not list.
