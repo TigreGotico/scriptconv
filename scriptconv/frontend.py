@@ -110,6 +110,7 @@ _SPACE_BEFORE_BLOCK = re.compile(r"\s\W*$")
 _OPENING_MARKS = frozenset("\"'\u2019\u2018\u201a\u201e\u00ab\u00bb\u2039\u203a\u00a1\u00bf")
 # The text before the first letter or digit: whitespace and marks.
 _WORDLESS_START = re.compile(r"[\W_]*")
+_SPACES = re.compile(r"\s*")
 # The text after the closing marks that follow a block, up to the end of the next word.
 _FOLLOWING = re.compile(r"\S*\s*\S*")
 
@@ -252,7 +253,7 @@ def _clauses(sentence: str) -> List[str]:
     clauses = []
     start = 0
     for match in _CLAUSE_BREAK.finditer(sentence):
-        end = match.end() + len(sentence[match.end():]) - len(sentence[match.end():].lstrip())
+        end = _SPACES.match(sentence, match.end()).end()
         clauses.append(sentence[start:end])
         start = end
     clauses.append(sentence[start:])
