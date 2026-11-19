@@ -1,14 +1,22 @@
 # Changelog
 
+## [0.0.4a129](https://github.com/TigreGotico/scriptconv/tree/0.0.4a129) (2026-11-19)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a128...0.0.4a129)
+
+**Merged pull requests:**
+
+- fix: a mark after a digit separates two words, and a colon inside a word stays in it [\#362](https://github.com/TigreGotico/scriptconv/pull/362) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- fix\(frontend\): a hyphen or dash next to a word, and a mark before a block, separate two words [\#361](https://github.com/TigreGotico/scriptconv/pull/361) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- fix: clause splitting takes linear time [\#353](https://github.com/TigreGotico/scriptconv/pull/353) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a128](https://github.com/TigreGotico/scriptconv/tree/0.0.4a128) (2026-11-19)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a127...0.0.4a128)
 
 **Merged pull requests:**
 
-- fix\(frontend\): a hyphen or dash next to a word, and a mark before a block, separate two words [\#361](https://github.com/TigreGotico/scriptconv/pull/361) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 - docs: state which import errors give the tugaphone identity no revision [\#354](https://github.com/TigreGotico/scriptconv/pull/354) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-- fix: clause splitting takes linear time [\#353](https://github.com/TigreGotico/scriptconv/pull/353) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a127](https://github.com/TigreGotico/scriptconv/tree/0.0.4a127) (2026-11-18)
 
@@ -390,10 +398,6 @@
 ## [0.0.4a77](https://github.com/TigreGotico/scriptconv/tree/0.0.4a77) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a76...0.0.4a77)
-
-**Merged pull requests:**
-
-- fix\(diacritics\): keep the acute of Macedonian ѓ and ќ in NFD text [\#228](https://github.com/TigreGotico/scriptconv/pull/228) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a76](https://github.com/TigreGotico/scriptconv/tree/0.0.4a76) (2026-11-14)
 
