@@ -98,11 +98,15 @@ class TugaphonePhonemizer(BasePhonemizer):
 @functools.lru_cache(maxsize=None)
 def _tugaphone_revision(lect: str) -> Optional[Tuple[str, FrozenSet[str]]]:
     """``tugaphone.revision`` of *lect* and the distributions it covers, or
-    ``None`` and one warning in this process when tugaphone gives no revision:
-    a tugaphone with no ``content_revision`` module, as 1.7.1, or an engine
-    whose source cannot be read, as orthography2ipa installed as byte code.
-    Only a missing module counts: an ImportError that ``tugaphone.revision``
-    raises is a bug in that install, so it propagates."""
+    ``None`` and one warning for each lect when tugaphone gives no revision.
+
+    Each ImportError from the two guarded imports gives ``None``: a tugaphone
+    with no ``content_revision`` module, as 1.7.1, or an orthography2ipa with
+    no ``EngineSourceUnavailable``, as each release before 7.123.0a1. A
+    ``RevisionError`` or an ``EngineSourceUnavailable`` from the revision call
+    gives ``None`` too, as for an orthography2ipa installed as byte code. An
+    ImportError that ``tugaphone.revision`` raises is a bug in that install,
+    so it propagates."""
     import tugaphone
     try:
         from orthography2ipa.exceptions import EngineSourceUnavailable
