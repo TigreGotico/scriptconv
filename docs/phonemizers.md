@@ -82,11 +82,19 @@ clause mark through `phonemize` and `phonemize_to_list`, with
 - each scriptconv module that the probe loads, and each scriptconv data file
   that it opens
 - each other distribution that the probe loads, such as quebra-frases, whole.
-  The engine distribution, whose version the `revision` holds, is left out.
+  A top-level module of it that the probe does not load counts by the files
+  that the `RECORD` of the distribution lists, so the working directory and
+  another distribution with a module of the same name, such as `tests`, do
+  not count. The engine distribution, whose version the `revision` holds, is
+  left out.
 - the source file of each class of the backend outside scriptconv, so a
   subclass counts
 - the arguments of the backend, a character rule set on the instance, the
   language and the Unicode version of Python
+
+The modules of the Python installation do not count. One of them, the build
+configuration `_sysconfigdata_*`, differs between two builds of one Python
+version, so two machines with the same packages give the same `revision`.
 
 The code of a module counts as its tokens. Comments, blank lines, docstrings
 and `version.py` do not count. A release that changes code or data on the path

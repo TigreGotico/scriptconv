@@ -6,9 +6,11 @@ import json
 import logging
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
+import sysconfig
 import time
 import tomllib
 import unicodedata
@@ -250,9 +252,9 @@ def hashed_tops(monkeypatch):
     tops = []
     digest = _revision._top_level_digest
 
-    def recorded(name):
+    def recorded(name, *holders):
         tops.append(name)
-        return digest(name)
+        return digest(name, *holders)
     monkeypatch.setattr(_revision, "_top_level_digest", recorded)
     return tops
 
@@ -768,6 +770,13 @@ class TestEngineRevision:
         assert None not in engine_pristine.values()
         assert revisions_in_a_copy(tmp_path, NEUTRAL_EDITS[edit], ENGINE_REVISIONS) == engine_pristine
 
+    def test_the_engine_files_leave_the_hash(self, monkeypatch):
+        from scriptconv.phonemizers import _revision
+        _revision._probe_outcome.cache_clear()
+        tops = hashed_tops(monkeypatch)
+        assert get_phonemizer(Phonemizer.EPITRAN).identity("rus-Cyrl").revision is not None
+        assert "panphon" in tops and "epitran" not in tops
+
     def test_a_backend_on_the_base_class_itself_gives_no_revision_and_no_warning(self, caplog):
         class Custom(BasePhonemizer):
             def phonemize_string(self, text, lang):
@@ -964,6 +973,80 @@ class TestProbeFailures:
         monkeypatch.syspath_prepend(str(tmp_path))
         assert expected is not None
         assert GraphemePhonemizer().identity("en").revision == expected
+
+
+def sloppy_site(tmp_path):
+    """A site directory with ``sloppy``, a distribution that holds ``quebra_frases``,
+    which the grapheme probe loads, and ships a top-level ``tests`` package, as gruut-ipa does."""
+    site = tmp_path / "site"
+    (site / "tests").mkdir(parents=True)
+    (site / "tests" / "__init__.py").write_text("SLOPPY = 1\n")
+    info = site / "sloppy-1.0.dist-info"
+    info.mkdir()
+    (info / "METADATA").write_text("Metadata-Version: 2.1\nName: sloppy\nVersion: 1.0\n")
+    (info / "top_level.txt").write_text("quebra_frases\ntests\n")
+    (info / "RECORD").write_text("tests/__init__.py,,\nsloppy-1.0.dist-info/METADATA,,\n")
+    return site
+
+
+def revision_from(cwd, site):
+    """The grapheme revision for ``en`` in a ``python -c`` process in *cwd*, which puts *cwd* first on its path."""
+    done = subprocess.run([sys.executable, "-c", GRAPHEMES_EN_REVISION], cwd=cwd, check=True,
+                          capture_output=True, text=True,
+                          env={**os.environ, "PYTHONPATH": os.pathsep.join([str(site), str(ROOT)]),
+                               "PYTHONDONTWRITEBYTECODE": "1"})
+    return json.loads(done.stdout.splitlines()[-1])
+
+
+class TestStableRevision:
+    """Two machines with the same packages, or two working directories, give one revision."""
+
+    def test_the_build_configuration_of_the_interpreter_stays_out(self, fresh_probes, tmp_path, monkeypatch):
+        from scriptconv.phonemizers import _revision
+        import scriptconv
+        # the probe of epitran and gruut loads it; another build of the same Python differs in it
+        name = sysconfig._get_sysconfigdata_name()
+        build = Path(importlib.util.find_spec(name).origin)
+        probe = {"modules": {"scriptconv": scriptconv.__file__, name: str(build)}, "opened": []}
+        monkeypatch.setattr(sys, "executable",
+                            fake_python(tmp_path, f"printf '%s%s\\n' \"$4\" {shlex.quote(json.dumps(probe))}"))
+        here = GraphemePhonemizer().identity("en").revision
+        _revision._probe_outcome.cache_clear()
+        digest = _revision.file_digest
+        monkeypatch.setattr(_revision, "file_digest",
+                            lambda path: "another build" if Path(path) == build else digest(path))
+        assert here is not None
+        assert GraphemePhonemizer().identity("en").revision == here
+
+    def test_a_tests_package_in_the_working_directory_keeps_the_revision(self, tmp_path):
+        site = sloppy_site(tmp_path)
+        plain, checkout = tmp_path / "plain", tmp_path / "checkout"
+        plain.mkdir()
+        (checkout / "tests").mkdir(parents=True)
+        (checkout / "tests" / "__init__.py").write_text("CHECKOUT = 1\n")
+        revision = revision_from(plain, site)
+        assert revision is not None
+        assert revision_from(checkout, site) == revision
+
+    def test_another_distribution_with_a_tests_package_keeps_the_revision(self, tmp_path):
+        site = sloppy_site(tmp_path)
+        (tmp_path / "plain").mkdir()
+        revision = revision_from(tmp_path / "plain", site)
+        info = site / "unrelated-1.0.dist-info"
+        info.mkdir()
+        (info / "METADATA").write_text("Metadata-Version: 2.1\nName: unrelated\nVersion: 1.0\n")
+        (info / "RECORD").write_text("tests/test_unrelated.py,,\nunrelated-1.0.dist-info/METADATA,,\n")
+        (site / "tests" / "test_unrelated.py").write_text("UNRELATED = 1\n")
+        assert revision is not None
+        assert revision_from(tmp_path / "plain", site) == revision
+
+    def test_a_file_of_a_distribution_that_holds_a_loaded_module_changes_the_revision(self, tmp_path):
+        site = sloppy_site(tmp_path)
+        (tmp_path / "plain").mkdir()
+        revision = revision_from(tmp_path / "plain", site)
+        (site / "tests" / "__init__.py").write_text("SLOPPY = 2\n")
+        assert revision is not None
+        assert revision_from(tmp_path / "plain", site) != revision
 
 
 class TestDeclarations:
