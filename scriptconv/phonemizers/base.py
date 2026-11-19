@@ -871,7 +871,7 @@ class GraphemePhonemizer(BasePhonemizer):
     """Each character and the text that replaces it."""
     drop_chars: str = '<>()[]"'
     """Characters removed after :attr:`replace_chars`."""
-    _RULES = ("lowercase", "in_word_chars", "replace_chars", "drop_chars")
+    _RULES = ("lowercase", "in_word_chars", "replace_chars", "drop_chars", "whitespace_re")
 
     def __init__(self, alphabet: Alphabet = Alphabet.UNICODE,
                  normalizer: Optional[Callable[[str, str], str]] = None,
@@ -930,17 +930,20 @@ class GraphemePhonemizer(BasePhonemizer):
         """The base identity, with ``revision`` the hash of the code and data
         on the path of this backend, as
         :func:`~scriptconv.phonemizers._revision.code_revision` gives it. A
-        character rule set on the instance joins the hash."""
+        character rule or a whitespace pattern set on the instance joins the hash."""
         from scriptconv.phonemizers._revision import code_revision
         revision = code_revision(self, lang, self._identity_settings())
         return dataclasses.replace(super().identity(lang), revision=revision)
 
     def _identity_settings(self) -> Dict[str, object]:
-        """Each character rule set on the instance to a value other than the class default."""
+        """Each character rule and the whitespace pattern, when set on the
+        instance to a value other than the class default."""
         settings = {name: getattr(self, name) for name in self._RULES
                     if name in vars(self) and getattr(self, name) != getattr(type(self), name)}
         if "replace_chars" in settings:
             settings["replace_chars"] = dict(settings["replace_chars"])
+        if "whitespace_re" in settings:
+            settings["whitespace_re"] = [settings["whitespace_re"].pattern, settings["whitespace_re"].flags]
         return settings
 
 
