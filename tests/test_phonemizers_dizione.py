@@ -259,12 +259,15 @@ class TestOverrides:
 
 
 class TestIdentity:
-    def test_the_revision_is_dizione_s_build_fingerprint(self, phonemizer, data_dir):
+    def test_the_revision_holds_dizione_s_build_fingerprint(self, phonemizer, data_dir):
         identity = phonemizer.identity("en-us")
         assert (identity.backend, identity.lang) == ("dizione", "en-US")
-        assert identity.revision == dizione.identity(data_dir)["fingerprint"]
-        assert identity.revision == \
+        assert dizione.identity(data_dir)["fingerprint"] == \
             "f41b6f9dac16c0b3ac492e255fcbebf6b73f737b20a62dfba7576ceb208f9190"
+        assert identity.revision.startswith("sc1:")
+        other = DizionePhonemizer(data_dir=data_dir)
+        other.__dict__["fingerprint"] = "another build"
+        assert other.identity("en-US").revision != identity.revision
 
     def test_the_revision_hashes_the_given_data(self, phonemizer, tmp_path):
         data = tmp_path / "built"
@@ -272,8 +275,21 @@ class TestIdentity:
         with open(data / "g2p.json", "a", encoding="utf-8") as f:
             f.write("\n")
         revision = DizionePhonemizer(data_dir=data).identity("en-US").revision
-        assert revision == dizione.identity(data)["fingerprint"]
+        assert dizione.identity(data)["fingerprint"] != dizione.identity(DATA_DIR)["fingerprint"]
+        assert None not in (revision, phonemizer.identity("en-US").revision)
         assert revision != phonemizer.identity("en-US").revision
+
+    def test_the_revision_is_the_same_for_two_instances(self, phonemizer, data_dir):
+        assert phonemizer.identity("en-US").revision is not None
+        assert DizionePhonemizer(data_dir=data_dir).identity("en-US") == phonemizer.identity("en-US")
+
+    def test_a_kept_frontend_identity_is_not_read_for_other_overrides(self, phonemizer, data_dir,
+                                                                       identity_cache):
+        taught = DizionePhonemizer(data_dir=data_dir, overrides={"cat": "K IH1 T"})
+        plain = TextFrontend(FrontendConfig("en-US"), phonemizer).identity()
+        assert plain.revision is not None
+        assert list(identity_cache.glob("*.json"))
+        assert TextFrontend(FrontendConfig("en-US"), taught).identity().revision != plain.revision
 
     def test_overrides_change_the_revision(self, phonemizer, data_dir):
         plain = phonemizer.identity("en-US").revision

@@ -339,12 +339,14 @@ WRAPPER_BACKENDS = {
     "orthography2ipa": ("Orthography2IPAPhonemizer()", "pt-PT"),
     "barranquenho": ("BarranquenhoPhonemizer()", "ext-PT-x-barrancos"),
     "mirandese": ("MirandesePhonemizer()", "mwl-x-sendim"),
+    "dizione": ("DizionePhonemizer()", "en-US"),
 }
 WRAPPER_FRONTENDS = {"frontend-tugaphone": ("TugaphonePhonemizer()", "pt-PT")}
 
 
-def revisions_script(backends, frontends):
-    """Python source that prints the revision of each of *backends* and *frontends*."""
+def revisions_script(backends, frontends, imports=""):
+    """Python source that prints the revision of each of *backends* and *frontends*. *imports* holds the import
+    lines that only these backends need, so a mutant of another module cannot break their import."""
     return f"""
 import json, scriptconv
 from scriptconv.frontend import FrontendConfig, TextFrontend
@@ -353,6 +355,7 @@ from scriptconv.phonemizers.ber import MatoubKabylePhonemizer
 from scriptconv.phonemizers.mwl import MirandesePhonemizer
 from scriptconv.phonemizers.o2ipa import Orthography2IPAPhonemizer
 from scriptconv.phonemizers.pt import BarranquenhoPhonemizer, TugaphonePhonemizer
+{imports}
 revisions = {{name: eval(source).identity(lang).revision for name, (source, lang) in {backends!r}.items()}}
 revisions.update({{name: TextFrontend(FrontendConfig(lang), eval(source)).identity().revision
                   for name, (source, lang) in {frontends!r}.items()}})
@@ -361,7 +364,8 @@ print(json.dumps({{"scriptconv": scriptconv.__file__, **revisions}}))
 
 
 REVISIONS = revisions_script(CODE_BACKENDS, CODE_FRONTENDS)
-WRAPPER_REVISIONS = revisions_script(WRAPPER_BACKENDS, WRAPPER_FRONTENDS)
+WRAPPER_REVISIONS = revisions_script(WRAPPER_BACKENDS, WRAPPER_FRONTENDS,
+                                     "from scriptconv.phonemizers.dizione import DizionePhonemizer")
 SCRIPTCONV = Path(sys.modules["scriptconv"].__file__).parent
 
 # Edits of the scriptconv source, (file, old text, new text), on the path of the
@@ -668,6 +672,9 @@ WRAPPER_MUTANTS = {
         "mirandese", "phonemizers/mwl.py",
         "return self._o2i.phonemize_string(text, DIALECTS[self.get_lang(lang)])",
         'return self._o2i.phonemize_string(text, DIALECTS[self.get_lang(lang)]).replace("ˈ", "")'),
+    "D1 the dizione wrapper joins two sentences with a bar": (
+        "dizione", "phonemizers/dizione.py",
+        'return " ".join(self._ipa_sentences(text))', 'return " | ".join(self._ipa_sentences(text))'),
 }
 
 
