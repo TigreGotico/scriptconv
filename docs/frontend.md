@@ -47,8 +47,9 @@ block marks the `ي`, not the space after it.
 
 A backend can own a stage. It then runs that stage itself, and the frontend
 skips it. A backend can own `normalize`, `diacritize` or both. Tugaphone owns
-`normalize` and `diacritize`, Arbtok owns `diacritize`, and dizione owns
-`normalize`. The normalisation hook
+`normalize` and `diacritize`, Arbtok owns `diacritize`, and dizione and Shami
+own `normalize`. Shami reads each Arabic span through text2spoken's Levantine
+(`apc`) reading and each English span through its English one. The normalisation hook
 runs for every backend that does not own `normalize`, because the caller
 chooses it.
 
