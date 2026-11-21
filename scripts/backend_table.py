@@ -4,6 +4,9 @@
     python scripts/backend_table.py --write   # rewrite the table in docs/backends.md
     python scripts/backend_table.py --check   # exit 1 when docs/backends.md differs
 
+``--write`` and ``--check`` exit 1 and write nothing when the page lacks one of
+the two markers.
+
 The rows come from ``Phonemizer`` (enums.py), ``PHONEMIZER_REGISTRY`` and
 ``LANG_DEFAULTS`` (registry.py), in the order of the enum.
 """
@@ -38,7 +41,13 @@ def main(argv) -> int:
     if not argv:
         print(table(), end="")
         return 0
+    if argv not in (["--check"], ["--write"]):
+        print(__doc__)
+        return 2
     text = DOC.read_text(encoding="utf-8")
+    if text.count(START + "\n") != 1 or text.count(END) != 1 or text.index(START) > text.index(END):
+        print(f"{DOC} needs one {START} line and one {END} after it")
+        return 1
     head, _, rest = text.partition(START + "\n")
     _, _, tail = rest.partition(END)
     updated = f"{head}{START}\n{table()}{END}{tail}"
@@ -47,11 +56,8 @@ def main(argv) -> int:
             print(f"{DOC} is out of date: run python scripts/backend_table.py --write")
             return 1
         return 0
-    if argv == ["--write"]:
-        DOC.write_text(updated, encoding="utf-8")
-        return 0
-    print(__doc__)
-    return 2
+    DOC.write_text(updated, encoding="utf-8")
+    return 0
 
 
 if __name__ == "__main__":
