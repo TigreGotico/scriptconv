@@ -1,10 +1,10 @@
 # Phonemizer backends
 
 <!-- agent-hint
-covers: every phonemizer backend, its class, its extra and its package, and the models that download
-source: the Phonemizer enum in scriptconv/phonemizers/enums.py, PHONEMIZER_REGISTRY and LANG_DEFAULTS in scriptconv/phonemizers/registry.py
+covers: every phonemizer backend, its class, its extra, its package and its language default, and the models that download
+source: the Phonemizer enum in scriptconv/phonemizers/enums.py, PHONEMIZER_REGISTRY and LANG_DEFAULTS in scriptconv/phonemizers/registry.py, COPYLEFT and NONFREE in scriptconv/phonemizers/_moved.py, the download sites in scriptconv/diacritics.py, scriptconv/phonemizers/g2pw.py, scriptconv/phonemizers/en.py and scriptconv/phonemizers/mul.py
 generated: no
-verify: python -c "import re; from scriptconv.phonemizers import Phonemizer, PHONEMIZER_REGISTRY as R; rows = re.findall(r'^\| \x60([^\x60]+)\x60 \| \x60([^\x60]+)\x60 \| \x60([^\x60]+)\x60 \|', open('docs/backends.md', encoding='utf-8').read(), re.M); want = [(p.value, R[p][1], R[p][2] or 'phonemizers') for p in Phonemizer]; assert rows == want, sorted(set(rows) ^ set(want)); print(len(rows), 'rows match')"
+verify: python -c '(I:=__import__,ast:=I("ast"),re:=I("re"),sys:=I("sys"),inspect:=I("inspect"),enum:=I("enum"),dataclasses:=I("dataclasses"),unittest:=I("unittest"),f:=sys.argv[1],g:={},T:=unittest.TestCase(),B:=re.findall(r"\x60{3}python\n(.*?)\x60{3}",open(f,encoding="utf-8").read(),re.S),K:=lambda o:[(p.name,p.kind,p.default) for p in inspect.signature(o).parameters.values()] if not isinstance(o,type) else [(m.name,m.value) for m in o] if issubclass(o,enum.Enum) else [x.name for x in dataclasses.fields(o)],D:=lambda b:((s:=re.sub(r"\)( -> .+)?$",r")\1: ...",b.strip()) if b.startswith("def") else b),(h:=dict(g)),exec("from __future__ import annotations\nfrom enum import Enum\nfrom dataclasses import dataclass\n"+s,h),[K(h[d.name])==K(g[d.name]) or (d.name,K(h[d.name]),K(g[d.name])) for d in ast.parse(s).body])[-1],C:=lambda s,L:None if not isinstance(s,ast.Expr) else (m.group(1) if (m:=re.search(r"\s#\s?(.*)$",L[s.end_lineno-1])) else L[s.end_lineno][2:] if s.end_lineno<len(L) and L[s.end_lineno].startswith("# ") else None),X:=lambda s:compile(ast.Expression(s.value),f,"eval"),Q:=lambda s,e:(T.assertRaisesRegex(eval(e.split(":")[0],g),re.escape(e.partition(":")[2].strip()),eval,X(s),g) or True) if re.match(r"\w+Error\b",e) else (True if (v:=eval(X(s),g))==ast.literal_eval(e) else (ast.unparse(s),e,v)),R:=lambda s,L:exec(compile(ast.Module([s],[]),f,"exec"),g) if (c:=C(s,L)) is None else Q(s,c.split("  ")[0].strip()),r:=[y for b in B for y in (D(b) if re.match(r"def |class |@",b) else [R(s,b.splitlines()) for s in ast.parse(b).body]) if y is not None],w:=[y for y in r if y is not True],print("OK",len(r)) if not w else sys.exit("MISMATCH "+repr(w)))' docs/backends.md
 see: docs/phonemizers.md, docs/stack.md
 -->
 
@@ -23,13 +23,29 @@ python -c "from scriptconv.phonemizers import Phonemizer; print(' '.join(p.value
 ## Check the table
 
 The table has one row per `Phonemizer` member, in the order of the enum. A
-backend that the registry gains needs its row here. Run this command from the
-repository root. It exits with an error that names each row that differs from
-the registry:
+backend that the registry gains needs its row here. This code, run from the
+repository root, compares all five columns of each row with the registry:
 
-```bash
-python -c "import re; from scriptconv.phonemizers import Phonemizer, PHONEMIZER_REGISTRY as R; rows = re.findall(r'^\| \x60([^\x60]+)\x60 \| \x60([^\x60]+)\x60 \| \x60([^\x60]+)\x60 \|', open('docs/backends.md', encoding='utf-8').read(), re.M); want = [(p.value, R[p][1], R[p][2] or 'phonemizers') for p in Phonemizer]; assert rows == want, sorted(set(rows) ^ set(want)); print(len(rows), 'rows match')"
+```python
+import re
+from scriptconv.phonemizers import LANG_DEFAULTS, PHONEMIZER_REGISTRY, Phonemizer
+from scriptconv.phonemizers._moved import COPYLEFT, NONFREE
+
+page = open("docs/backends.md", encoding="utf-8").read()
+rows = re.findall(r"^\| `(\w+)` \| `(\w+)` \| `([\w-]+)` \| ([\w-]+) \| (.*?) \|$", page, re.M)
+want = [(member.value, cls, extra or "phonemizers",
+         "scriptconv-copyleft" if module.startswith(COPYLEFT)
+         else "scriptconv-nonfree" if module.startswith(NONFREE) else "scriptconv",
+         ", ".join(f"`{lang}`" for lang, chain in LANG_DEFAULTS.items() if member in chain))
+        for member in Phonemizer for module, cls, extra in [PHONEMIZER_REGISTRY[member]]]
+[row for row in rows if row not in want]   # []
+[row for row in want if row not in rows]   # []
+rows == want                               # True
 ```
+
+The first list holds each row of the page that the registry does not give. The
+second list holds each row of the registry that the page does not hold. The
+last line checks the order.
 
 ## The table
 
@@ -103,18 +119,57 @@ orthography2ipa when it has a spec for the language, and to espeak otherwise.
 ## Model files
 
 ByT5, Charsiu and phonetisaurus never download a model. Each needs a local
-path through `model=`, and `get_phonemizer(backend, model=...)` passes that
-path to the constructor. Four models download on first use:
+model path through `model=`, and `get_phonemizer(backend, model=...)` passes
+that path to the constructor. ByT5 and Charsiu also need `tokenizer_config=`,
+the path of a local tokenizer JSON file. Without a model path, the
+constructor raises an error:
 
-| Model | Used by | Cache location |
-|---|---|---|
-| phonikud ONNX diacritizer | `diacritize(text, "he")` | `scriptconv/phonikud` under `$SCRIPTCONV_CACHE`, else under `$XDG_CACHE_HOME` (default `~/.cache`) |
-| Nakdimon diacritizer, pinned to a sha256 | `diacritize(text, "he", diacritizer_model="nakdimon")` | `scriptconv/nakdimon` under the same base directory |
-| g2pW polyphone model, pinned to a sha256 | the `g2pw` backend | the Hugging Face cache |
-| a DeepPhonemizer checkpoint named in `DeepPhonemizer.MODELS` | the `deepphonemizer` backend | `~/.local/share/deepphonemizer` |
+```python
+from scriptconv.phonemizers import Phonemizer, get_phonemizer
 
-Pass a local path through `diacritizer_model=` or `model=` to skip the
-download.
+get_phonemizer(Phonemizer.BYT5)      # ValueError: ByT5 phonemization needs a local ONNX model file
+get_phonemizer(Phonemizer.CHARSIU)   # ValueError: ByT5 phonemization needs a local ONNX model file
+```
+
+These models and data download on first use:
+
+| Model or data | Used by | Downloaded by | Cache location |
+|---|---|---|---|
+| phonikud ONNX diacritizer | `diacritize(text, "he")` | `_default_phonikud_model` in `diacritics.py` | `scriptconv/phonikud` under `$SCRIPTCONV_CACHE`, else under `$XDG_CACHE_HOME` (default `~/.cache`) |
+| Nakdimon diacritizer, pinned to a sha256 | `diacritize(text, "he", diacritizer_model="nakdimon")` | `_download_nakdimon` in `diacritics.py` | `scriptconv/nakdimon` under the same base directory |
+| the fp32 weights of a text2tashkeel model, such as `rawi` | `diacritize(text, "ar", diacritizer_model="rawi")` | text2tashkeel | the Hugging Face cache |
+| the stressonnx model of the language, from `TigreGotico/stressonnx-models` at a pinned revision | `diacritize(text, lang)` for a language in `STRESS_LANGS` | stressonnx | the Hugging Face cache |
+| g2pW polyphone model, pinned to a sha256 | the `g2pw` backend | `g2pw.py` | the Hugging Face cache |
+| a DeepPhonemizer checkpoint named in `DeepPhonemizer.MODELS` | the `deepphonemizer` backend | `DeepPhonemizer.__init__` in `en.py` | `~/.local/share/deepphonemizer` |
+| the NLTK data `averaged_perceptron_tagger_eng` and `cmudict` | the `g2pen` backend | `nltk.download` in `G2PEnPhonemizer.__init__` in `en.py` | the NLTK data directory |
+
+The default Arabic diacritizer, `rawi-ensemble`, and the INT8 text2tashkeel
+models ship in the text2tashkeel wheel, so `diacritize(text, "ar")` downloads
+nothing.
+
+To skip a download, give a local file where the code accepts one:
+
+- Hebrew: pass the path of a phonikud ONNX model through
+  `diacritizer_model=`.
+- DeepPhonemizer: pass the path of a checkpoint through `model=`.
+- Nakdimon: put the file with the pinned sha256 in its cache location.
+
+The g2pW backend takes no model path. Its constructor has only an `alphabet`
+parameter, and `get_phonemizer` drops a `model=` value for it. The g2pW
+model, the stressonnx models and the fp32 text2tashkeel weights come from the
+Hugging Face cache. To run these offline, fill the cache first and then set
+`HF_HUB_OFFLINE=1`:
+
+```python
+import inspect
+from scriptconv.phonemizers.g2pw import G2PWPhonemizer
+
+list(inspect.signature(G2PWPhonemizer).parameters)   # ['alphabet']
+```
+
+Some engine packages download data of their own. For example, pygoruut
+fetches its executable, and openphonemizer fetches its checkpoint from the
+Hugging Face Hub. The documentation of each engine names its downloads.
 
 ## The phonetisaurus engine and its libraries
 

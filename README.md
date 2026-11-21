@@ -14,7 +14,7 @@
 covers: what scriptconv does, the quickstart, the extras and the licences
 source: `__all__` in scriptconv/__init__.py, scriptconv/phonemizers/registry.py, scriptconv/phonemizers/_moved.py, pyproject.toml
 generated: no
-verify: pytest tests/test_cli.py tests/test_graph.py tests/test_conventions.py tests/test_sister_packages.py tests/test_wheel_licences.py
+verify: python -c '(I:=__import__,ast:=I("ast"),re:=I("re"),sys:=I("sys"),inspect:=I("inspect"),enum:=I("enum"),dataclasses:=I("dataclasses"),unittest:=I("unittest"),f:=sys.argv[1],g:={},T:=unittest.TestCase(),B:=re.findall(r"\x60{3}python\n(.*?)\x60{3}",open(f,encoding="utf-8").read(),re.S),K:=lambda o:[(p.name,p.kind,p.default) for p in inspect.signature(o).parameters.values()] if not isinstance(o,type) else [(m.name,m.value) for m in o] if issubclass(o,enum.Enum) else [x.name for x in dataclasses.fields(o)],D:=lambda b:((s:=re.sub(r"\)( -> .+)?$",r")\1: ...",b.strip()) if b.startswith("def") else b),(h:=dict(g)),exec("from __future__ import annotations\nfrom enum import Enum\nfrom dataclasses import dataclass\n"+s,h),[K(h[d.name])==K(g[d.name]) or (d.name,K(h[d.name]),K(g[d.name])) for d in ast.parse(s).body])[-1],C:=lambda s,L:None if not isinstance(s,ast.Expr) else (m.group(1) if (m:=re.search(r"\s#\s?(.*)$",L[s.end_lineno-1])) else L[s.end_lineno][2:] if s.end_lineno<len(L) and L[s.end_lineno].startswith("# ") else None),X:=lambda s:compile(ast.Expression(s.value),f,"eval"),Q:=lambda s,e:(T.assertRaisesRegex(eval(e.split(":")[0],g),re.escape(e.partition(":")[2].strip()),eval,X(s),g) or True) if re.match(r"\w+Error\b",e) else (True if (v:=eval(X(s),g))==ast.literal_eval(e) else (ast.unparse(s),e,v)),R:=lambda s,L:exec(compile(ast.Module([s],[]),f,"exec"),g) if (c:=C(s,L)) is None else Q(s,c.split("  ")[0].strip()),r:=[y for b in B for y in (D(b) if re.match(r"def |class |@",b) else [R(s,b.splitlines()) for s in ast.parse(b).body]) if y is not None],w:=[y for y in r if y is not True],print("OK",len(r)) if not w else sys.exit("MISMATCH "+repr(w)))' README.md
 see: docs/index.md, docs/stack.md, AGENTS.md
 -->
 
@@ -104,8 +104,7 @@ from scriptconv import detect_script, script_runs, lang_to_script, base_directio
 detect_script("Здравствуйте")        # 'Cyrl'
 script_runs("привет hello")          # [('Cyrl', 'привет '), ('Latn', 'hello')]
 base_direction("مرحبا hello")        # 'mixed'
-lang_to_script("uzb_cyr")            # 'Cyrl'  (639-1/2/3 codes, BCP-47 tags,
-                                     #           informal _cyr/_lat variants
+lang_to_script("uzb_cyr")            # 'Cyrl'  (ISO 639 codes, BCP-47 tags, _cyr/_lat variants)
 ```
 
 The returned ISO 15924 tags are **stable API**: downstream code compares
@@ -272,7 +271,7 @@ from scriptconv import phonemizers
 
 g = DEFAULT_GRAPH.extend(phonemizers.register)
 g.convert("bom dia", "text", "ipa", lang="pt")     # 'ˈbõ ˈdiɐ'
-g.can_convert("text", "arpa")                      # True (chains through IPA)
+g.can_convert("text", "arpa")                      # True  (chains through IPA)
 ```
 
 Diacritization restores marks that ordinary spelling leaves out but a
@@ -308,10 +307,11 @@ Three rules hold for every backend:
   for that hook, behind the `normalize` extra. Without a hook, the text is
   phonemized as written.
 - **Some models download on first use, and others never do.** ByT5, Charsiu
-  and phonetisaurus need a local `model=` path. The phonikud and Nakdimon
-  Hebrew diacritizers, the g2pW model and a named DeepPhonemizer checkpoint
-  download on first use. [docs/backends.md](docs/backends.md#model-files)
-  names each cache location.
+  and phonetisaurus need a local `model=` path. These download on first use:
+  the phonikud and Nakdimon Hebrew diacritizers, the fp32 text2tashkeel
+  weights, the stressonnx models, the g2pW model, a named DeepPhonemizer
+  checkpoint and the NLTK data of the `g2pen` backend.
+  [docs/backends.md](docs/backends.md#model-files) names each cache location.
 - **orthography2ipa uses the packaged lexicons.** The `o2i` extra installs
   [o2i-lexicons](https://github.com/TigreGotico/o2i-lexicons), which holds
   the words that the orthography2ipa rules get wrong. Pass

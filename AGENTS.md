@@ -15,7 +15,7 @@ core has no dependencies, and each phonemizer engine sits behind an extra.
 | `scriptconv/phonemizers/registry.py` | `PHONEMIZER_REGISTRY`, `LANG_DEFAULTS`, `get_phonemizer` |
 | `scriptconv/phonemizers/_moved.py` | The wrappers that live in scriptconv-copyleft and scriptconv-nonfree |
 | `scriptconv/phonemizers/_thirdparty/`, `_vendored/` | Vendored engines, each with its licence notice |
-| `scripts/` | The licence check, the backend table generator and measurement scripts |
+| `scripts/` | The licence check and measurement scripts |
 | `examples/` | Runnable examples, run by `tests/test_examples.py` |
 | `docs/` | The documentation. [docs/index.md](docs/index.md) gives the reading order |
 
@@ -40,8 +40,9 @@ installed (`.github/workflows/build-tests.yml`).
   `ImportError` that names the extra
   (`tests/test_phonemizers_friendly_import_errors.py`).
 - [docs/backends.md](docs/backends.md) holds one row per `Phonemizer`
-  member, in enum order. Its check command names each row that differs from
-  the registry.
+  member, in enum order. The code in its
+  [Check the table](docs/backends.md#check-the-table) section compares each
+  row with the registry.
 - No extra installs a copyleft or non-commercial distribution, except the two
   that `scripts/check_extra_licences.py` lists. Such a wrapper goes to
   scriptconv-copyleft or scriptconv-nonfree. `tests/test_wheel_licences.py`
@@ -60,8 +61,10 @@ pytest tests/
 python scripts/check_extra_licences.py
 ```
 
-Run the check command of [docs/backends.md](docs/backends.md#check-the-table)
-after a change to the registry.
+After a change to the code or to a page, run the `verify` command in the
+agent hint of each page that the change touches. The hint is the HTML comment
+under the title of the page. [docs/backends.md](docs/backends.md) needs this
+after each change to the registry.
 
 The build workflow runs on pull requests to `dev` and `master`. The two licence
 workflows run on pull requests to `dev`.
