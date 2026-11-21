@@ -227,23 +227,32 @@ class DizionePhonemizer(BasePhonemizer):
         """dizione's build fingerprint: its version, data, tables and code."""
         return dizione.identity(self.data_dir)["fingerprint"]
 
-    def identity(self, lang: str) -> PhonemizerIdentity:
-        """What phonemizes *lang*.
+    def _revision_arguments(self) -> Dict[str, object]:
+        return {"tokens": self.tokens_mode}
 
-        ``revision`` is dizione's build fingerprint. When overrides take effect,
-        from ``overrides=`` or from the file that ``DIZIONE_OVERRIDES`` names,
-        ``revision`` is the sha256 of the fingerprint and of the overrides, so
-        phonemes read with two sets of overrides never mix.
+    def _identity_settings(self) -> Dict[str, object]:
+        """dizione's build fingerprint, hashed with the overrides when they take effect.
+
+        The overrides come from ``overrides=`` or from the file that ``DIZIONE_OVERRIDES`` names.
         """
         engine = self.engine
         names = {" ".join(key): engine.names[key] for key in engine.user_names}
-        revision = self.fingerprint
+        build = self.fingerprint
         if engine.overrides or names:
             overrides = json.dumps({"words": engine.overrides, "names": names},
                                    sort_keys=True, ensure_ascii=False)
             digest = hashlib.sha256(overrides.encode()).hexdigest()
-            revision = hashlib.sha256(f"{revision}\n{digest}".encode()).hexdigest()
-        return dataclasses.replace(super().identity(lang), revision=revision)
+            build = hashlib.sha256(f"{build}\n{digest}".encode()).hexdigest()
+        return {"dizione": build}
+
+    def identity(self, lang: str) -> PhonemizerIdentity:
+        """The base identity, with ``revision`` the code revision of this
+        backend that holds the settings of :meth:`_identity_settings`, as
+        :func:`~scriptconv.phonemizers._revision.code_revision` gives it."""
+        from scriptconv.phonemizers._revision import code_revision
+        identity = super().identity(lang)
+        return dataclasses.replace(
+            identity, revision=code_revision(self, identity.lang, self._identity_settings()))
 
     def _clauses(self, text: str, tokens: bool = False) -> Iterator[Segment]:
         """Each clause of *text*, as :func:`_clause_spans` cuts dizione's tokens.

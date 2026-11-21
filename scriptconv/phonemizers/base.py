@@ -54,13 +54,25 @@ _CLAUSE_TOKENS = frozenset(CLAUSE_PUNCTUATION.values())
 # after it, is no clause break, but it still separates two words.
 _SEPARATING_MARKS = frozenset(mark for mark, symbol in CLAUSE_PUNCTUATION.items()
                               if symbol in ("!", "?"))
+# The characters that Unicode names a hyphen. Between two letters each one is
+# the hyphen of a compound, and the backend reads it as "-".
+_HYPHENS = frozenset("-\u2010\u2011\ufe63\uff0d")
+# The dashes. A dash is no letter of a word, so between two words, as in
+# "Lisboa–Porto", it separates them.
+_DASHES = frozenset("\u2012\u2013\u2014\u2015\u2e3a\u2e3b\ufe31\ufe32\ufe58")
 # A clause ends at punctuation followed by whitespace, as in espeak-ng, so the
 # "," in "10,4" or the ":" in "16:30" never splits. A lone "." is left to the
 # sentence tokenizer, which knows abbreviations; inside a sentence an ellipsis
 # or "|" still ends a clause, as in chunk_text, but carries no symbol (espeak-ng
 # reads an ellipsis as a spoken-name pause, which Piper does not keep).
-_CLAUSE_BREAK = re.compile(r"(?:\.\.+|\u2026|[,:;!?|\u060c\u061b\u061f])[^\w\s]*(?=\s)")
-_TRAILING_PUNCTUATION = re.compile(r"[^\w\s]+\s*$")
+# A match starts only where a run of marks starts, and the run must reach
+# whitespace, so each run is read a fixed number of times and the split takes
+# linear time. Group 1 is the break: the first mark of the run that ends a
+# clause, through the end of the run.
+_CLAUSE_BREAK = re.compile(
+    r"(?<![^\w\s])(?=[^\w\s]*+\s)[^\w\s]*?((?:\.\.|\u2026|[,:;!?|\u060c\u061b\u061f])[^\w\s]*+)")
+# Starts only where a run of marks starts, so a long run is read once.
+_TRAILING_PUNCTUATION = re.compile(r"(?<![^\w\s])[^\w\s]++\s*+$")
 # One or more blank lines: a paragraph break.
 _PARAGRAPH_BREAK = re.compile(r"(\n(?:[^\S\n]*\n)+)")
 _LANG_FLAGS = re.compile(r"\([^)]+\)")
@@ -118,17 +130,19 @@ def _clause_breaks_as_spaces(phonemes: str) -> str:
     return " ".join(line.strip() for line in phonemes.split("\n") if line.strip())
 
 
-def _between_letters(text: str, index: int) -> bool:
+def _between_letters(text: str, index: int, is_letter: Callable[[str], bool] = str.isalpha) -> bool:
     """Whether the character at *index* of *text* stands between two letters.
 
-    The letter before it may carry combining marks, such as a stress mark (U+0301).
+    The letter before it may carry combining marks, such as a stress mark
+    (U+0301). *is_letter* tells what counts as a letter: ``str.isalnum``
+    counts a digit too.
     """
-    if not 0 < index < len(text) - 1 or not text[index + 1].isalpha():
+    if not 0 < index < len(text) - 1 or not is_letter(text[index + 1]):
         return False
     letter = index - 1
     while letter > 0 and unicodedata.category(text[letter]).startswith("M"):
         letter -= 1
-    return text[letter].isalpha()
+    return is_letter(text[letter])
 
 
 def _clause_mark(punctuation: str) -> Optional[str]:
@@ -151,7 +165,7 @@ def split_clauses(sentence: str) -> List[Tuple[str, Optional[str]]]:
     clauses: List[Tuple[str, Optional[str]]] = []
     start = 0
     for match in _CLAUSE_BREAK.finditer(sentence):
-        clauses.append((sentence[start:match.start()], _clause_mark(match.group())))
+        clauses.append((sentence[start:match.start(1)], _clause_mark(match.group(1))))
         start = match.end()
     tail = sentence[start:]
     trailing = _TRAILING_PUNCTUATION.search(tail)
@@ -718,16 +732,27 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         is preserved so the per-language normalizers still see it as a single token,
         matching the digit:digit exemption in ``chunk_text``.
 
+        A hyphen written as U+2010, U+2011, U+FE63 or U+FF0D between two
+        letters becomes ``-``, so "guarda‐chuva" with U+2010 reads
+        as "guarda-chuva". A hyphen between a letter and a digit, as in
+        "COVID-19", is no letter of a word, and neither is a dash (U+2012 to
+        U+2015 and their other forms) between two letters or a letter and a
+        digit, as in "Lisboa–Porto". Each becomes a space.
+
         A mark that :data:`CLAUSE_PUNCTUATION` reads as ``!`` or ``?``, such as
-        the Arabic ``؟``, between two letters, as in "Sim!Não", still
-        separates two words, so a run of them becomes one space.
+        the Arabic ``؟``, between two letters, as in "Sim!Não", or between a
+        digit and a letter, as in "4.50!They", still separates two words, so a
+        run of them becomes one space.
         """
         out = []
         chars = list(text)
         separates = False
         for i, c in enumerate(chars):
-            if c in ("'", "’", "-") and _between_letters(text, i):
+            if c in ("'", "’") and _between_letters(text, i):
                 out.append(c)
+                continue
+            if c in _HYPHENS and _between_letters(text, i):
+                out.append("-")
                 continue
             if c in _SEPARATING_MARKS:
                 if i == 0 or chars[i - 1] not in _SEPARATING_MARKS:
@@ -737,7 +762,7 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
                     letter = i - 1
                     while letter > 0 and unicodedata.category(chars[letter]).startswith("M"):
                         letter -= 1
-                    separates = (i > 0 and chars[letter].isalpha()
+                    separates = (i > 0 and chars[letter].isalnum()
                                  and end < len(chars) and chars[end].isalpha())
                     if separates:
                         out.append(" ")
@@ -746,6 +771,9 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
             if 0 < i < len(chars) - 1 \
                     and chars[i - 1].isdigit() and chars[i + 1].isdigit():
                 out.append(c)
+                continue
+            if (c in _HYPHENS or c in _DASHES) and _between_letters(text, i, str.isalnum):
+                out.append(" ")
                 continue
             if unicodedata.category(c).startswith("P"):
                 continue
@@ -760,6 +788,7 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         Parameters:
             text (str): Input text to split. If empty, returns a single empty chunk.
             delimiters (Optional[List[str]]): List of substring delimiters to split sentences by (defaults to [":", ";", "...", "|"]).
+                ":" and ";" cut only before whitespace or the end of the text.
 
         Returns:
             TextChunks: A list of tuples (substring, terminator, end_of_sentence) where:
@@ -780,14 +809,13 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         results: TextChunks = []
         delimiters = delimiters or [":", ";", "...", "|"]
 
-        # Create a regex pattern that matches any of the delimiters. A
-        # delimiter sitting directly between two digits (eg. the ":" in a
-        # clock time "16:30" or a score "3:2") is not a sentence-internal
-        # boundary, so it is only excluded when *both* neighbours are
-        # digits — a delimiter with a digit on just one side (eg. "12: ")
-        # still splits as before.
+        # ":" and ";" cut only before whitespace or the end, as in
+        # split_clauses, so "16:30" and the Bengali "নি:সন্দেহে" stay whole.
+        # Any other delimiter cuts unless it stands between two digits.
         def _delim_alt(delimiter: str) -> str:
             escaped = re.escape(delimiter)
+            if delimiter in (":", ";"):
+                return f"{escaped}(?=\\s|$)"
             return f"(?:(?<!\\d){escaped}|{escaped}(?!\\d))"
 
         delimiter_pattern = _delim_alt(delimiters[0])
@@ -843,7 +871,7 @@ class GraphemePhonemizer(BasePhonemizer):
     """Each character and the text that replaces it."""
     drop_chars: str = '<>()[]"'
     """Characters removed after :attr:`replace_chars`."""
-    _RULES = ("lowercase", "in_word_chars", "replace_chars", "drop_chars")
+    _RULES = ("lowercase", "in_word_chars", "replace_chars", "drop_chars", "whitespace_re")
 
     def __init__(self, alphabet: Alphabet = Alphabet.UNICODE,
                  normalizer: Optional[Callable[[str, str], str]] = None,
@@ -902,17 +930,20 @@ class GraphemePhonemizer(BasePhonemizer):
         """The base identity, with ``revision`` the hash of the code and data
         on the path of this backend, as
         :func:`~scriptconv.phonemizers._revision.code_revision` gives it. A
-        character rule set on the instance joins the hash."""
+        character rule or a whitespace pattern set on the instance joins the hash."""
         from scriptconv.phonemizers._revision import code_revision
         revision = code_revision(self, lang, self._identity_settings())
         return dataclasses.replace(super().identity(lang), revision=revision)
 
     def _identity_settings(self) -> Dict[str, object]:
-        """Each character rule set on the instance to a value other than the class default."""
+        """Each character rule and the whitespace pattern, when set on the
+        instance to a value other than the class default."""
         settings = {name: getattr(self, name) for name in self._RULES
                     if name in vars(self) and getattr(self, name) != getattr(type(self), name)}
         if "replace_chars" in settings:
             settings["replace_chars"] = dict(settings["replace_chars"])
+        if "whitespace_re" in settings:
+            settings["whitespace_re"] = [settings["whitespace_re"].pattern, settings["whitespace_re"].flags]
         return settings
 
 

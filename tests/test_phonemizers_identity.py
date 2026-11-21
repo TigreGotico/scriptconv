@@ -340,12 +340,14 @@ WRAPPER_BACKENDS = {
     "orthography2ipa": ("Orthography2IPAPhonemizer()", "pt-PT"),
     "barranquenho": ("BarranquenhoPhonemizer()", "ext-PT-x-barrancos"),
     "mirandese": ("MirandesePhonemizer()", "mwl-x-sendim"),
+    "dizione": ("DizionePhonemizer()", "en-US"),
 }
 WRAPPER_FRONTENDS = {"frontend-tugaphone": ("TugaphonePhonemizer()", "pt-PT")}
 
 
-def revisions_script(backends, frontends):
-    """Python source that prints the revision of each of *backends* and *frontends*."""
+def revisions_script(backends, frontends, imports=""):
+    """Python source that prints the revision of each of *backends* and *frontends*. *imports* holds the import
+    lines that only these backends need, so a mutant of another module cannot break their import."""
     return f"""
 import json, scriptconv
 from scriptconv.frontend import FrontendConfig, TextFrontend
@@ -354,6 +356,7 @@ from scriptconv.phonemizers.ber import MatoubKabylePhonemizer
 from scriptconv.phonemizers.mwl import MirandesePhonemizer
 from scriptconv.phonemizers.o2ipa import Orthography2IPAPhonemizer
 from scriptconv.phonemizers.pt import BarranquenhoPhonemizer, TugaphonePhonemizer
+{imports}
 revisions = {{name: eval(source).identity(lang).revision for name, (source, lang) in {backends!r}.items()}}
 revisions.update({{name: TextFrontend(FrontendConfig(lang), eval(source)).identity().revision
                   for name, (source, lang) in {frontends!r}.items()}})
@@ -362,7 +365,8 @@ print(json.dumps({{"scriptconv": scriptconv.__file__, **revisions}}))
 
 
 REVISIONS = revisions_script(CODE_BACKENDS, CODE_FRONTENDS)
-WRAPPER_REVISIONS = revisions_script(WRAPPER_BACKENDS, WRAPPER_FRONTENDS)
+WRAPPER_REVISIONS = revisions_script(WRAPPER_BACKENDS, WRAPPER_FRONTENDS,
+                                     "from scriptconv.phonemizers.dizione import DizionePhonemizer")
 SCRIPTCONV = Path(sys.modules["scriptconv"].__file__).parent
 
 # Edits of the scriptconv source, (file, old text, new text), on the path of the
@@ -470,6 +474,24 @@ class LongVowel(GraphemePhonemizer):
         return super().phonemize_string(text, lang).replace("a", "a:")
 
 
+class OwnLazy(GraphemePhonemizer):
+    """Graphemes, with a ``phonemize_lazy`` of its own, so ``keep_punctuation`` changes nothing."""
+
+    def phonemize_lazy(self, text, lang):
+        yield list(self.phonemize_string(text, lang))
+
+
+# The revision of a grapheme backend with instance settings, in a fresh process.
+INSTANCE_SETTINGS_REVISION = """
+import json, re
+from scriptconv.phonemizers import GraphemePhonemizer
+backend = GraphemePhonemizer()
+backend.keep_punctuation = True
+backend.whitespace_re = re.compile(r"\\s+", re.ASCII)
+print(json.dumps(backend.identity("ru").revision))
+"""
+
+
 class TestCodeRevision:
     def test_the_revision_is_the_same_in_every_process(self, tmp_path):
         runs = [subprocess.run([sys.executable, "-c", REVISIONS], cwd=ROOT, check=True,
@@ -527,6 +549,60 @@ class TestCodeRevision:
         changed.replace_chars = {";": ",", "-": " ", ":": ","}
         assert GraphemePhonemizer().identity("en").revision is not None
         assert changed.identity("en").revision == GraphemePhonemizer().identity("en").revision
+
+    # keep_punctuation: a clause symbol comes before its space, and a symbol
+    # that ends the text stays (BasePhonemizer.phonemize_to_list).
+    @pytest.mark.parametrize("source, lang, plain, kept", [
+        ("GraphemePhonemizer()", "ru", "a b", "a, b."),
+        ("UnicodeCodepointPhonemizer()", "xx", "a b", "a, b."),
+    ])
+    def test_keep_punctuation_set_on_the_instance_changes_the_revision(self, source, lang, plain, kept):
+        original, keeping = eval(source), eval(source)
+        keeping.keep_punctuation = True
+        assert ("".join(original.phonemize_to_list("a, b.", lang)),
+                "".join(keeping.phonemize_to_list("a, b.", lang))) == (plain, kept)
+        assert original.identity(lang).revision is not None
+        assert keeping.identity(lang).revision != original.identity(lang).revision
+
+    def test_keep_punctuation_that_the_backend_ignores_keeps_the_revision(self):
+        original, keeping = OwnLazy(), OwnLazy()
+        keeping.keep_punctuation = True
+        assert keeping.phonemize_to_list("a, b.", "ru") == original.phonemize_to_list("a, b.", "ru")
+        assert original.identity("ru").revision is not None
+        assert keeping.identity("ru").revision == original.identity("ru").revision
+
+    def test_a_whitespace_pattern_set_on_the_instance_changes_the_revision(self):
+        original, ascii_only = GraphemePhonemizer(), GraphemePhonemizer()
+        ascii_only.whitespace_re = re.compile(r"\s+", re.ASCII)
+        # U+00A0 is whitespace to str patterns, and not to ASCII ones
+        assert (original.phonemize_string("a\xa0b", "ru"), ascii_only.phonemize_string("a\xa0b", "ru")) == \
+            ("a b", "a\xa0b")
+        assert original.identity("ru").revision is not None
+        assert ascii_only.identity("ru").revision != original.identity("ru").revision
+
+    def test_settings_set_on_the_instance_to_their_defaults_keep_the_revision(self):
+        changed = GraphemePhonemizer()
+        changed.keep_punctuation = False
+        changed.whitespace_re = re.compile(r"\s+")
+        assert GraphemePhonemizer().identity("ru").revision is not None
+        assert changed.identity("ru").revision == GraphemePhonemizer().identity("ru").revision
+
+    def test_instance_settings_give_the_same_revision_in_every_process(self, tmp_path):
+        runs = [subprocess.run([sys.executable, "-c", INSTANCE_SETTINGS_REVISION], cwd=ROOT, check=True,
+                               capture_output=True, text=True,
+                               env={**os.environ, "PYTHONHASHSEED": seed,
+                                    "XDG_CACHE_HOME": str(tmp_path / seed)}).stdout.splitlines()[-1]
+                for seed in ("0", "1")]
+        assert json.loads(runs[0]).startswith("sc1:")
+        assert runs[0] == runs[1]
+        assert json.loads(runs[0]) != GraphemePhonemizer().identity("ru").revision
+
+    def test_the_normaliser_hook_stays_out_of_the_revision(self):
+        import text2spoken
+        hooked = GraphemePhonemizer(normalizer=text2spoken.normalize)
+        assert hooked.phonemize("2 gatos", "pt-PT") != GraphemePhonemizer().phonemize("2 gatos", "pt-PT")
+        assert GraphemePhonemizer().identity("pt-PT").revision is not None
+        assert hooked.identity("pt-PT").revision == GraphemePhonemizer().identity("pt-PT").revision
 
     def test_the_stress_notation_changes_the_revision(self):
         revisions = {GraphemePhonemizer(stress_notation=notation).identity("ru").revision
@@ -597,6 +673,9 @@ WRAPPER_MUTANTS = {
         "mirandese", "phonemizers/mwl.py",
         "return self._o2i.phonemize_string(text, DIALECTS[self.get_lang(lang)])",
         'return self._o2i.phonemize_string(text, DIALECTS[self.get_lang(lang)]).replace("ˈ", "")'),
+    "D1 the dizione wrapper joins two sentences with a bar": (
+        "dizione", "phonemizers/dizione.py",
+        'return " ".join(self._ipa_sentences(text))', 'return " | ".join(self._ipa_sentences(text))'),
 }
 
 
@@ -684,6 +763,13 @@ class TestFrontendRevision:
         assert frontend(Custom()).identity().revision is None
 
 
+GRAPHEMES_EN_REVISION = """
+import json
+from scriptconv.phonemizers import GraphemePhonemizer
+print(json.dumps(GraphemePhonemizer().identity("en").revision))
+"""
+
+
 @pytest.fixture
 def fresh_probes():
     """Probe results and warnings kept by no earlier test, and none kept after this one."""
@@ -756,6 +842,46 @@ class TestProbeFailures:
         (tmp_path / "sitecustomize.py").write_text("import scriptconv.phonemizers.base\n")
         monkeypatch.syspath_prepend(str(tmp_path))
         self.assert_no_revision_and_one_warning(caplog, "scriptconv loaded before it started")
+
+    def test_a_distribution_loaded_before_the_probe_still_counts(self, fresh_probes, tmp_path,
+                                                                 monkeypatch):
+        from scriptconv.phonemizers import _revision
+        expected = GraphemePhonemizer().identity("en").revision
+        _revision._probe_outcome.cache_clear()
+        (tmp_path / "sitecustomize.py").write_text("import quebra_frases\n")
+        monkeypatch.syspath_prepend(str(tmp_path))
+        assert expected is not None
+        assert GraphemePhonemizer().identity("en").revision == expected
+
+    def test_a_change_to_a_distribution_loaded_before_the_probe_changes_the_revision(self, tmp_path):
+        import quebra_frases
+        shutil.copytree(Path(quebra_frases.__file__).parent, tmp_path / "quebra_frases",
+                        ignore=shutil.ignore_patterns("__pycache__"))
+        (tmp_path / "sitecustomize.py").write_text("import quebra_frases\n")
+
+        def revision():
+            done = subprocess.run([sys.executable, "-c", GRAPHEMES_EN_REVISION], cwd=ROOT, check=True,
+                                  capture_output=True, text=True,
+                                  env={**os.environ, "PYTHONPATH": os.pathsep.join([str(tmp_path), str(ROOT)]),
+                                       "PYTHONDONTWRITEBYTECODE": "1"})
+            return json.loads(done.stdout.splitlines()[-1])
+        before = revision()
+        with open(tmp_path / "quebra_frases" / "tokenization.py", "a", encoding="utf-8") as module:
+            module.write("\n_split = sentence_tokenize\n\n\n"
+                         "def sentence_tokenize(input_string):\n    return _split(input_string)[::-1]\n")
+        after = revision()
+        assert None not in (before, after)
+        assert after != before
+
+    def test_another_distribution_loaded_before_the_probe_keeps_the_revision(self, fresh_probes, tmp_path,
+                                                                             monkeypatch):
+        from scriptconv.phonemizers import _revision
+        expected = GraphemePhonemizer().identity("en").revision
+        _revision._probe_outcome.cache_clear()
+        (tmp_path / "sitecustomize.py").write_text("import pytest\n")
+        monkeypatch.syspath_prepend(str(tmp_path))
+        assert expected is not None
+        assert GraphemePhonemizer().identity("en").revision == expected
 
     def test_a_print_after_the_probe_result_keeps_the_revision(self, fresh_probes, tmp_path,
                                                                monkeypatch):

@@ -5,6 +5,7 @@ both phonemize, so their identity must not raise. The expected identity is the b
 has no revision."""
 import logging
 import sys
+import types
 
 import pytest
 import tugaphone
@@ -55,4 +56,11 @@ def test_an_import_error_inside_the_revision_call_propagates(monkeypatch):
 
 def test_an_orthography2ipa_with_no_exceptions_module(monkeypatch, caplog):
     monkeypatch.setitem(sys.modules, "orthography2ipa.exceptions", None)
+    _check(TugaphonePhonemizer(), caplog)
+
+
+def test_an_orthography2ipa_before_engine_source_unavailable(monkeypatch, caplog):
+    # Each orthography2ipa before 7.123.0a1 has an exceptions module with no EngineSourceUnavailable,
+    # so the import fails with "cannot import name", not with a missing module.
+    monkeypatch.setitem(sys.modules, "orthography2ipa.exceptions", types.ModuleType("orthography2ipa.exceptions"))
     _check(TugaphonePhonemizer(), caplog)

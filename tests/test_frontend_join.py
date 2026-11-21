@@ -845,6 +845,11 @@ class TestRulesOfTheFix:
         assert sum(s.phonemes.count("<s>") for s in segments) == len(segments)
         assert sum(s.phonemes.count("q") for s in segments) == 2
 
+    def test_a_hyphen_before_a_block_separates_it_in_a_bounded_piece(self):
+        frontend = TextFrontend(FrontendConfig("xx"), Bounded())
+        assert [s.phonemes for s in frontend.segments("Sim vem-[[xy]].")] == [
+            ("<s>", *"Sim vem- xy.", "</s>")]
+
 
 class TestDizioneReadsOnce:
     """dizione rewrites a text once for its paragraphs and quotes, and tokenizes it once."""

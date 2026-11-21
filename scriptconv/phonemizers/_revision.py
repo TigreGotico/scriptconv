@@ -16,8 +16,11 @@ open. The hash then covers:
 - the source file of each class in the MRO of the backend that is not in
   scriptconv, so a subclass that changes a method changes the revision;
 - the class of the backend, the arguments that build it, the settings that
-  change the output besides the code, the language and
-  :data:`unicodedata.unidata_version`.
+  change the output besides the code, whether the backend keeps clause
+  punctuation, the language and :data:`unicodedata.unidata_version`.
+
+The ``normalizer`` hook of a backend stays out: it is the ``normalize``
+stage, which :meth:`~scriptconv.frontend.TextFrontend.identity` covers.
 
 A backend that wraps an engine with a revision of its own, as tugaphone or
 orthography2ipa, names the distributions that the engine revision covers in
@@ -36,7 +39,9 @@ docs, docstrings, ``version.py`` or the modules of other backends keeps it.
 
 A module on the path that does not load from a file in a directory, as from a
 zip archive, raises :class:`RevisionSourceUnavailable`, so it never counts as
-an empty digest. A probe that exits with an error, runs longer than
+an empty digest. A module of another distribution that loads before the
+probe, as from a ``sitecustomize.py`` or a ``.pth`` file, counts when the
+calls import its package. A probe that exits with an error, runs longer than
 :data:`PROBE_TIMEOUT`, prints no readable result, or finds scriptconv loaded
 before it starts, as from a ``sitecustomize.py``, raises
 :class:`RevisionProbeFailed`. In each case :func:`code_revision` gives no
@@ -80,14 +85,24 @@ engine of the backend, and an engine such as tugaphone takes tens of seconds
 to start on a loaded machine."""
 
 _PROBE = """
-import sys
+import builtins, importlib, sys
 before = set(sys.modules)
 opened = set()
+imported = set()
 def audit(event, args):
     if event == "open" and isinstance(args[0], (str, bytes)):
         opened.add(args[0] if isinstance(args[0], str) else args[0].decode(errors="replace"))
 sys.addaudithook(audit)
-import importlib, json, warnings
+load, load_module = builtins.__import__, importlib.import_module
+def recorded_import(name, globals=None, locals=None, fromlist=(), level=0):
+    if not level:
+        imported.add(name.partition(".")[0])
+    return load(name, globals, locals, fromlist, level)
+def recorded_import_module(name, package=None):
+    imported.add(name.partition(".")[0])
+    return load_module(name, package)
+builtins.__import__, importlib.import_module = recorded_import, recorded_import_module
+import json, warnings
 marker, module, qualname, lang, mode = sys.argv[1:6]
 arguments, texts = (json.loads(a) for a in sys.argv[6:8])
 backend_class = importlib.import_module(module)
@@ -114,12 +129,14 @@ with warnings.catch_warnings():
                     call(text)
                 except Exception:
                     pass
-modules = {name: getattr(loaded, "__file__", None)
-           for name, loaded in list(sys.modules.items()) if name not in before}
+# a module loaded before the probe, as by a sitecustomize.py, counts when the calls import its package
+used = imported - {"scriptconv"}
+modules = {name: getattr(loaded, "__file__", None) for name, loaded in list(sys.modules.items())
+           if name not in before or name.partition(".")[0] in used}
 print(marker + json.dumps({"modules": modules, "opened": sorted(opened)}), flush=True)
 """
 """Prints, after a marker, the modules that a backend, or a frontend that reads
-through it, loads and the files that it opens."""
+through it, loads or imports, and the files that it opens."""
 
 _NOT_CODE = frozenset({tokenize.COMMENT, tokenize.NL, tokenize.ENCODING, tokenize.ENDMARKER})
 _LINE = frozenset({"NEWLINE", "INDENT", "DEDENT"})
@@ -166,7 +183,8 @@ def code_revision(backend, lang: str, settings: Mapping, frontend: bool = False)
     digest = hashlib.sha256(json.dumps(
         [FORMAT, mode, f"{probed.__module__}:{probed.__qualname__}",
          f"{type(backend).__module__}:{type(backend).__qualname__}", lang, arguments, settings,
-         unicodedata.unidata_version], sort_keys=True, ensure_ascii=False).encode())
+         backend._keeps_punctuation(), unicodedata.unidata_version],
+        sort_keys=True, ensure_ascii=False).encode())
     try:
         covered = sorted({_canonical(name) for name in backend._covered_distributions(lang)})
         outcome = _probe_outcome(probed.__module__, probed.__qualname__, lang, mode,
