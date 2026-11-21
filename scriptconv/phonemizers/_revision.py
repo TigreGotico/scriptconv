@@ -41,7 +41,9 @@ A module on the path that does not load from a file in a directory, as from a
 zip archive, raises :class:`RevisionSourceUnavailable`, so it never counts as
 an empty digest. A module of another distribution that loads before the
 probe, as from a ``sitecustomize.py`` or a ``.pth`` file, counts when the
-calls import its package. A probe that exits with an error, runs longer than
+calls import its package, or when a module that counts holds its package as
+a module-level global, as ``regex`` in ``import regex`` or ``from regex import
+compile``. A probe that exits with an error, runs longer than
 :data:`PROBE_TIMEOUT`, prints no readable result, or finds scriptconv loaded
 before it starts, as from a ``sitecustomize.py``, raises
 :class:`RevisionProbeFailed`. In each case :func:`code_revision` gives no
@@ -129,8 +131,19 @@ with warnings.catch_warnings():
                     call(text)
                 except Exception:
                     pass
-# a module loaded before the probe, as by a sitecustomize.py, counts when the calls import its package
+# a module loaded before the probe, as by a sitecustomize.py, counts when the calls import its package,
+# or when a used module holds a package as a global, as in "import regex" or "from regex import compile"
 used = imported - {"scriptconv"}
+pending = list(used)
+while pending:
+    top = pending.pop()
+    for name, loaded in list(sys.modules.items()):
+        if name.partition(".")[0] == top:
+            for value in list(vars(loaded).values()):
+                owner = value.__name__ if isinstance(value, type(sys)) else getattr(value, "__module__", None)
+                if isinstance(owner, str) and owner.partition(".")[0] not in used | {"scriptconv"}:
+                    used.add(owner.partition(".")[0])
+                    pending.append(owner.partition(".")[0])
 modules = {name: getattr(loaded, "__file__", None) for name, loaded in list(sys.modules.items())
            if name not in before or name.partition(".")[0] in used}
 print(marker + json.dumps({"modules": modules, "opened": sorted(opened)}), flush=True)

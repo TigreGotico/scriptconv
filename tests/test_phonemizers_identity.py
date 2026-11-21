@@ -872,6 +872,34 @@ class TestProbeFailures:
         assert None not in (before, after)
         assert after != before
 
+    def test_a_dependency_imported_by_a_preloaded_distribution_counts(self, tmp_path):
+        import quebra_frases
+        shutil.copytree(Path(quebra_frases.__file__).parent, tmp_path / "quebra_frases",
+                        ignore=shutil.ignore_patterns("__pycache__"))
+        init = tmp_path / "quebra_frases" / "__init__.py"
+        init.write_text("import stubdep\nfrom stubdep2 import helper\n" + init.read_text(encoding="utf-8"),
+                        encoding="utf-8")
+        for name, body in (("stubdep", "VALUE = 1\n"), ("stubdep2", "def helper():\n    return 1\n")):
+            (tmp_path / name).mkdir()
+            (tmp_path / name / "__init__.py").write_text(body)
+        (tmp_path / "sitecustomize.py").write_text("import quebra_frases\n")
+
+        def revision():
+            done = subprocess.run([sys.executable, "-c", GRAPHEMES_EN_REVISION], cwd=ROOT, check=True,
+                                  capture_output=True, text=True,
+                                  env={**os.environ, "PYTHONPATH": os.pathsep.join([str(tmp_path), str(ROOT)]),
+                                       "PYTHONDONTWRITEBYTECODE": "1"})
+            return json.loads(done.stdout.splitlines()[-1])
+        base = revision()
+        results = {}
+        for name, file in (("stubdep", "__init__.py"), ("stubdep2", "__init__.py")):
+            with open(tmp_path / name / file, "a", encoding="utf-8") as module:
+                module.write("\nCHANGED = 1\n")
+            results[name] = revision()
+        assert base is not None
+        assert results["stubdep"] != base
+        assert results["stubdep2"] != results["stubdep"]
+
     def test_another_distribution_loaded_before_the_probe_keeps_the_revision(self, fresh_probes, tmp_path,
                                                                              monkeypatch):
         from scriptconv.phonemizers import _revision
