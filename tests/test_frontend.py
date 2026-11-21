@@ -224,7 +224,7 @@ class TestSegmentText:
         (Chunk.SENTENCE, "اقرأ [[h a l o]] الآن.", ["اقرأ [[h a l o]]", "الآن."]),
         (Chunk.CLAUSE, "اقرأ [[h a l o]] الآن.", ["اقرأ [[h a l o]]", "الآن."]),
         (Chunk.PARAGRAPH, "اقرأ [[h a l o]] الآن.", ["اقرأ [[h a l o]] الآن."]),
-        (Chunk.SENTENCE, "ab [[xy]] cd. ef.", ["ab [[xy]]", "cd.", "ef."]),
+        (Chunk.SENTENCE, "ab [[xy]] gato. ef.", ["ab [[xy]]", "gato.", "ef."]),
         (Chunk.PARAGRAPH, "ab [[xy]] cd. ef.", ["ab [[xy]] cd. ef."]),
         (Chunk.SENTENCE, "a [[x]] b [[y]] c.", ["a [[x]]", "b [[y]]", "c."]),
         (Chunk.CLAUSE, "a [[x]] b [[y]] c.", ["a [[x]]", "b [[y]]", "c."]),
@@ -346,7 +346,7 @@ class TestInlineBlocks:
         ("Tu viens [[x]] ?", "Tu viens x ?"),
         ("Tu viens [[x]] ?", "Tu viens x ?"),
         ("[[x]] , b", "x , b"),
-        ("Um [[x]]. Dois; três.", "Um x. Dois; três."),
+        ("Um [[gato]]. Dois; três.", "Um gato. Dois; três."),
         ("[[x]] ; [[y]] !", "x ; y !"),
         ("[[x]],[[y]]", "x,y"),
         ("[[x]].[[y]]", "x.y"),
@@ -397,7 +397,7 @@ class TestInlineBlocks:
 
     @pytest.mark.parametrize("text, lazy, flat", [
         ("Olá [[x]] sim. [[y]], b.",
-         ["Olá", "sim.", "a, b.", ", b."], ["Olá", "sim.", "a, b.", ", b."]),
+         ["Olá", "sim.", "casa, b.", ", b."], ["Olá", "sim.", "casa, b.", ", b."]),
         # a digit gives the clause a word, as a letter does
         ("Olá [[x]] 2 gatos, b.", ["Olá", "2 gatos, b."], ["Olá", "2 gatos, b."]),
         # no text after the block gives no mark
@@ -545,11 +545,11 @@ class TestInlineBlocks:
 
     @pytest.mark.parametrize("keep", [True, False])
     @pytest.mark.parametrize("text", [
-        "[[x]]. [[?]]... vem.",
-        "[[x]]. [[?]] vem.",
-        "[[x]]. [[!]] vem.",
+        "[[gato]]. [[?]]... vem.",
+        "[[gato]]. [[?]] vem.",
+        "[[gato]]. [[!]] vem.",
         "Sim. [[,]] vem.",
-        "[[x]]? [[?]]. vem.",
+        "[[gato]]? [[?]]. vem.",
         "Olá [[x]] [[?]] sim.",
         "Sim [[x.]]...",
         "Sim [[x.]][[]] vem.",
@@ -559,10 +559,10 @@ class TestInlineBlocks:
                                                keep_punctuation=keep,
                                                stages=Stages(diacritize=False)))
         symbols = re.search(r"\[\[([^\]]*\W)\]\]", text)[1]
-        # "k" stands for that block in the plain text, and its symbols take its place
-        plain = (text.replace(f"[[{symbols}]]", "k").replace("[[]]", "")
+        # "já" stands for that block in the plain text, and its symbols take its place
+        plain = (text.replace(f"[[{symbols}]]", "já").replace("[[]]", "")
                  .replace("[[", "").replace("]]", ""))
-        expected = list("".join(frontend.phonemize_flat(plain)).replace("k", symbols))
+        expected = list("".join(frontend.phonemize_flat(plain)).replace("já", symbols))
         assert frontend.phonemize_flat(text) == expected
         assert join_sentences(frontend.phonemize(text), keep) == expected
 
@@ -942,8 +942,8 @@ class TestFailurePolicy:
 class TestBackends:
     def test_grapheme_and_unicode_backends_build_without_get_lang(self):
         graphemes = TextFrontend(FrontendConfig("xx-Test", Phonemizer.GRAPHEMES))
-        assert graphemes.phonemize("Ab-c. Dé!", Stages(diacritize=False)) == [
-            ["a", "b", "-", "c"], ["d", "é"]]
+        assert graphemes.phonemize("Pô-lo. Dé!", Stages(diacritize=False)) == [
+            ["p", "ô", "-", "l", "o"], ["d", "é"]]
         codepoints = TextFrontend(FrontendConfig("xx-Test", Phonemizer.UNICODE))
         assert codepoints.phonemize("Dé", Stages(diacritize=False)) == [["D", "e", "́"]]
 
