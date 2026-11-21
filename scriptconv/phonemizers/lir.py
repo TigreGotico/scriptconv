@@ -49,7 +49,6 @@ class KolokwaPhonemizer(BasePhonemizer):
     def __init__(self):
         try:
             import onnxruntime
-            import numpy
         except ImportError as e:
             raise ImportError(
                 "numpy, onnxruntime and huggingface_hub are required for the Kolokwa "
@@ -61,7 +60,6 @@ class KolokwaPhonemizer(BasePhonemizer):
         with open(paths["kolokwa.json"], encoding="utf-8") as f:
             tables = json.load(f)
         self.session = onnxruntime.InferenceSession(paths["model.onnx"], providers=["CPUExecutionProvider"])
-        self.numpy = numpy
         self.dictionary = tables["dictionary"]
         self.char_repeats = tables["char_repeats"]
         self.text_tokens = tables["text_tokens"]
@@ -113,11 +111,13 @@ class KolokwaPhonemizer(BasePhonemizer):
     def _predict(self, word: str) -> str:
         """The model's phonemes for *word*: the most likely symbol at each
         position, without padding and repeats, up to the end symbol."""
+        import numpy as np
+
         letters = [self.text_tokens[c.lower()] for c in word if c.lower() in self.text_tokens]
         if not letters:
             return ""
         ids = [self.text_start] + [i for i in letters for _ in range(self.char_repeats)] + [self.text_end]
-        logits = self.session.run(None, {"text": self.numpy.array([ids], dtype=self.numpy.int64)})[0][0]
+        logits = self.session.run(None, {"text": np.array([ids], dtype=np.int64)})[0][0]
         best = [int(i) for i in logits.argmax(-1) if i != 0]
         symbols = []
         for i, token in enumerate(best):

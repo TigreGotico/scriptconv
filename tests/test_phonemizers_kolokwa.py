@@ -34,6 +34,10 @@ REFERENCE = {
     # DIY splits before each capital; the hyphens and the brackets stay
     "DIY Liberia-Monrovia (wetin?)": "d-a-j la-mɔɹojo (wɛtɪ̃ŋ?)",
     "McDonald's pikin, palava / bluff: 25 people": "mi-tontʰ pʰɪɪ̃, plawɔ / plʌf:  pʰipəl",
+    # the model gives id 0 between two ids of k; without it they are one k
+    "gaaiqqot": "kɑt",
+    # the digit stays in the word, so "man2" is not in the dictionary and the model reads it
+    "man2": "mɛ̃n",
 }
 
 

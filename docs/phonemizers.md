@@ -424,10 +424,12 @@ phonemizer_for_lang("lir").phonemize_string("da man dey go drink cold water", "l
 ```
 
 The text reads as `phonemize` 0.2.4 reads it, and the output is the same.
-Characters that are neither letters, digits nor `().,:?!/–` go, so a digit
-gives no symbol and an apostrophe goes. The text splits at spaces and at
-those marks, which stay in the output. A word that is not in the dictionary
-splits at hyphens and before each inner capital, so `DIY` gives `d-a-j`.
+Each character that is not a letter, a digit, a space, a hyphen or one of
+`().,:?!/–` goes, so an apostrophe goes. A digit stays in the text, but the
+model has no symbol for it, so it gives no phonemes. The text splits at
+spaces and at those marks, which stay in the output. A word that is not in the
+dictionary splits at hyphens and before each inner capital, so `DIY` gives
+`d-a-j`.
 
 The model files must have their pinned sha256. With no network and no cached
 copy that passes the check, the constructor raises `ModelUnavailableError`.
