@@ -43,8 +43,9 @@ an empty digest. A module of another distribution that loads before the
 probe, as from a ``sitecustomize.py`` or a ``.pth`` file, counts when the
 calls import its package, or when a module that counts holds its package as
 a module-level global, as ``regex`` in ``import regex`` or ``from regex import
-compile``. The walk never enters a standard-library module, which holds the
-hooks that any package installed at startup. A probe that exits with an error, runs longer than
+compile``. The walk never enters a standard-library module, because any package
+installed at startup can put a hook there, and it skips a blocked import
+(``None`` in ``sys.modules``). A probe that exits with an error, runs longer than
 :data:`PROBE_TIMEOUT`, prints no readable result, or finds scriptconv loaded
 before it starts, as from a ``sitecustomize.py``, raises
 :class:`RevisionProbeFailed`. In each case :func:`code_revision` gives no

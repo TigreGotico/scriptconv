@@ -935,6 +935,17 @@ class TestProbeFailures:
             module.write("\nCHANGED = 1\n")
         assert self.preloaded_revision(tmp_path) not in (None, before)
 
+    def test_a_hook_on_a_standard_library_module_a_used_package_holds_keeps_the_revision(self, tmp_path):
+        (tmp_path / "hookpkg").mkdir()
+        (tmp_path / "hookpkg" / "__init__.py").write_text("def hook(*args):\n    return None\n")
+        (tmp_path / "empty").mkdir()
+        expected = self.preloaded_revision(tmp_path / "empty")
+        hooked = self.preloaded_revision(
+            tmp_path, "import quebra_frases, hookpkg, xml.dom\n"
+                      "quebra_frases.held = xml.dom\nxml.dom.hook = hookpkg.hook\n")
+        assert expected is not None
+        assert hooked == expected
+
     def test_a_blocked_import_in_sys_modules_keeps_the_revision(self, tmp_path):
         (tmp_path / "empty").mkdir()
         expected = self.preloaded_revision(tmp_path / "empty", None)
