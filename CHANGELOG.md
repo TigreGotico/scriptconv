@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a134](https://github.com/TigreGotico/scriptconv/tree/0.0.4a134) (2026-11-21)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a133...0.0.4a134)
+
+**Merged pull requests:**
+
+- feat: euskaphone owns normalize [\#360](https://github.com/TigreGotico/scriptconv/pull/360) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a133](https://github.com/TigreGotico/scriptconv/tree/0.0.4a133) (2026-11-19)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a132...0.0.4a133)
@@ -364,10 +372,6 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a86...0.0.4a87)
 
-**Merged pull requests:**
-
-- fix: prefix Charsiu input with the Charsiu language label [\#238](https://github.com/TigreGotico/scriptconv/pull/238) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a86](https://github.com/TigreGotico/scriptconv/tree/0.0.4a86) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a85...0.0.4a86)
@@ -379,10 +383,6 @@
 ## [0.0.4a84](https://github.com/TigreGotico/scriptconv/tree/0.0.4a84) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a83...0.0.4a84)
-
-**Merged pull requests:**
-
-- fix: match Charsiu labels by the script of their data [\#237](https://github.com/TigreGotico/scriptconv/pull/237) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a83](https://github.com/TigreGotico/scriptconv/tree/0.0.4a83) (2026-11-14)
 
