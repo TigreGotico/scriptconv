@@ -35,12 +35,12 @@ def variant(request):
     repo, revision = UPSTREAM
     with open(hf_hub_download(repo, GOLDENS[request.param], revision=revision), encoding="utf-8") as f:
         gold = json.load(f)
-    return LeokaniPhonemizer(variant=request.param), gold
+    return LeokaniPhonemizer(model=request.param), gold
 
 
 def test_the_goldens_are_of_the_variant(variant):
     backend, gold = variant
-    assert gold["variant"] == backend.variant == backend.engine.variant
+    assert gold["variant"] == backend.model == backend.engine.variant
 
 
 def test_a_sample_of_the_piece_goldens_reads_as_upstream(variant):
@@ -83,14 +83,14 @@ def test_phonemize_reads_the_words_without_the_punctuation(leokani):
 
 
 def test_the_mini_variant_comes_from_the_registry():
-    mini = get_phonemizer(Phonemizer.LEOKANI, variant="mini")
+    mini = get_phonemizer(Phonemizer.LEOKANI, model="mini")
     assert mini.engine.variant == "mini"
     assert mini.engine.directory.endswith("/mini")
 
 
 def test_an_unknown_variant_is_refused():
     with pytest.raises(ValueError, match="'huge'"):
-        LeokaniPhonemizer(variant="huge")
+        LeokaniPhonemizer(model="huge")
 
 
 @pytest.mark.parametrize("lang, tag", [("en-US", "en-US"), ("en-Latn-US", "en-US"), ("en-US-x-nyc", "en-US-x-nyc")])
@@ -106,7 +106,7 @@ def test_other_english_and_other_languages_are_refused(lang):
 
 def test_the_identity_has_a_revision_per_variant(leokani):
     micro = leokani.identity("en-US")
-    mini = LeokaniPhonemizer(variant="mini").identity("en-US")
+    mini = LeokaniPhonemizer(model="mini").identity("en-US")
     assert (micro.backend, micro.distribution, micro.lang) == ("leokani", "scriptconv", "en-US")
     assert micro.revision.startswith("sc1:")
     assert mini.revision.startswith("sc1:")

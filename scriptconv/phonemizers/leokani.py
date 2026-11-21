@@ -41,7 +41,7 @@ __all__ = ["LeokaniPhonemizer", "MODEL_REPO", "MODEL_REVISION", "MODEL_FILES"]
 
 MODEL_REPO = "milliwattlabs/leokani-g2p"
 MODEL_REVISION = "a819acc86471a04a01ba3d3f30f3765e4675c7ca"
-#: variant -> {path in :data:`MODEL_REPO`: sha256}. ``micro`` is upstream's default.
+#: model -> {path in :data:`MODEL_REPO`: sha256}. ``micro`` is upstream's default.
 MODEL_FILES = {
     "micro": {
         "leokani-g2p.data": "b25d3baf82efc5da668b47bf34a86e7900378b2236d56bcf75cfd4a167d61a1b",
@@ -71,20 +71,20 @@ class LeokaniPhonemizer(BasePhonemizer):
 
     Args:
         alphabet: must be :attr:`Alphabet.IPA`.
-        variant: ``"micro"`` (the default) or ``"mini"``, which is larger and
+        model: ``"micro"`` (the default) or ``"mini"``, which is larger and
             reads names and rare words better.
     """
 
-    def __init__(self, alphabet: Alphabet = Alphabet.IPA, variant: str = "micro"):
+    def __init__(self, alphabet: Alphabet = Alphabet.IPA, model: str = "micro"):
         _check_alphabet(self, alphabet, [Alphabet.IPA])
-        if variant not in MODEL_FILES:
-            raise ValueError(f"unknown Leokani G2P variant {variant!r}; use one of {', '.join(MODEL_FILES)}")
+        if model not in MODEL_FILES:
+            raise ValueError(f"unknown Leokani G2P model {model!r}; use one of {', '.join(MODEL_FILES)}")
         super().__init__(alphabet)
-        self.variant = variant
-        for name, sha256 in MODEL_FILES[variant].items():
+        self.model = model
+        for name, sha256 in MODEL_FILES[model].items():
             path = _hub_file(MODEL_REPO, "model", name, MODEL_REVISION, sha256)
         # the cached path ends in the repository path; before it is the snapshot of the revision
-        self.engine = LeokaniG2P(path.removesuffix(name), variant=variant)
+        self.engine = LeokaniG2P(path.removesuffix(name), variant=model)
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
@@ -111,7 +111,7 @@ class LeokaniPhonemizer(BasePhonemizer):
         return self.engine.phonemize(text)
 
     def _revision_arguments(self) -> Dict[str, object]:
-        return {"variant": self.variant}
+        return {"model": self.model}
 
     def identity(self, lang: str) -> PhonemizerIdentity:
         """The base identity, with ``revision`` the hash of the code on the

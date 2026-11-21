@@ -557,9 +557,9 @@ unchanged, with the punctuation that the text holds. `phonemize` and the
 frontend remove the punctuation before the engine reads the text, as for
 the other backends.
 
-`variant="mini"` loads the larger model, which reads names and rare words
+`model="mini"` loads the larger model, which reads names and rare words
 better. `micro` is the default:
-`get_phonemizer(Phonemizer.LEOKANI, variant="mini")`.
+`get_phonemizer(Phonemizer.LEOKANI, model="mini")`.
 
 The model files come from the Hugging Face Hub, at a fixed revision, into the
 shared Hugging Face cache, from the upstream repository

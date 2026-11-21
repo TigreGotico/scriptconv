@@ -20,6 +20,7 @@ license-files = [
     "scriptconv/phonemizers/_thirdparty/g2pw/LICENSE",
     "scriptconv/phonemizers/_thirdparty/leokani/LICENSE",
     "scriptconv/phonemizers/_thirdparty/leokani/NOTICE",
+    "scriptconv/phonemizers/_thirdparty/leokani/LICENSE-CC-BY-4.0.txt",
     "scriptconv/phonemizers/_thirdparty/nakdimon/LICENSE",
 ]
 requires-python = ">=3.11"
