@@ -1,10 +1,10 @@
 # scriptconv documentation
 
 <!-- agent-hint
-covers: the reading order of every page in docs/
-source: the pages in docs/, and scriptconv/__main__.py for the CLI
+covers: the reading order of every page in docs/, and the subcommands of the command line
+source: the pages in docs/, and scriptconv/__main__.py for the command line
 generated: no
-verify: ls docs/*.md lists the same pages as this index
+verify: python -c '(I:=__import__,re:=I("re"),os:=I("os"),glob:=I("glob"),subprocess:=I("subprocess"),sys:=I("sys"),P:=sorted(os.path.basename(p) for p in glob.glob("docs/*.md") if not p.endswith("index.md")),t:=re.sub(r"<!--.*?--\x3e","",open("docs/index.md",encoding="utf-8").read(),flags=re.S),o:=re.findall(r"^\d+\. \*\*\[([\w-]+\.md)\]",t,re.M),R:=lambda p:re.sub(r"<!--.*?--\x3e|\x60{3}.*?\x60{3}","",open(p,encoding="utf-8").read(),flags=re.S),L:=[(f,u) for f in ["README.md","AGENTS.md"]+["docs/"+p for p in P+["index.md"]] for u in re.findall(r"\]\(([^)#\s]+)",R(f)) if "://" not in u and not os.path.exists(os.path.join(os.path.dirname(f),u))],N:=[(x,y) for x,y in zip(o,o[1:]) if "→\x5d("+y+")" not in R("docs/"+x) or not re.search(r"\[← [^]]*\]\("+re.escape(x)+r"\)",R("docs/"+y))],c:=re.search(r"\{([\w,]+)\}",subprocess.run([sys.executable,"-m","scriptconv","--help"],capture_output=True,text=True).stdout).group(1).split(","),d:=re.findall(r"\x60(\w+)\x60",re.search(r"subcommands: (.*?)\.\n",t,re.S).group(1)),w:=([("pages",P,sorted(o))] if sorted(o)!=P else [])+L+N+([("cli",c,d)] if c!=d else []),print("OK",len(o),"pages",len(c),"subcommands") if not w else sys.exit("BROKEN "+repr(w)))'
 see: README.md, AGENTS.md
 -->
 
@@ -40,8 +40,11 @@ representation, how to add or remove its optional marks, and how it sounds.
 10. **[ovos.md](ovos.md)**: scriptconv phonemizers in OVOS through
     `ovos-scriptconv-g2p-plugin`.
 11. **[backends.md](backends.md)**: every phonemizer backend with its class,
-    extra and package, generated from the registry, and the models that
-    download on first use.
+    extra, package and language default, and the models that download on
+    first use.
 
-Every command in these pages is also a CLI command:
-`python -m scriptconv --help` lists them.
+The command line, `python -m scriptconv`, has these subcommands: `convert`,
+`detect`, `distribution`, `direction`, `decompose`, `lang`, `strip`,
+`restyle`, `conventions`, `route` and `phonemize`.
+`python -m scriptconv <subcommand> --help` shows the arguments of each one.
+The other functions in these pages have no subcommand.

@@ -61,5 +61,9 @@ python scripts/check_extra_licences.py
 python scripts/backend_table.py --check
 ```
 
+After a change to the code or to a page, run the `verify` command in the
+agent hint of each page that the change touches. The hint is the HTML comment
+under the title of the page.
+
 The build workflow runs on pull requests to `dev` and `master`. The two licence
 workflows run on pull requests to `dev`.

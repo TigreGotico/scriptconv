@@ -4,7 +4,7 @@
 covers: the notation converters, the errors= policy and the NOTATION_INFO fidelity flags
 source: scriptconv/notation.py
 generated: no
-verify: pytest tests/test_notation.py tests/test_notation_strict.py tests/test_errors_policy.py
+verify: python -c '(I:=__import__,ast:=I("ast"),re:=I("re"),sys:=I("sys"),inspect:=I("inspect"),enum:=I("enum"),dataclasses:=I("dataclasses"),unittest:=I("unittest"),f:=sys.argv[1],g:={},T:=unittest.TestCase(),B:=re.findall(r"\x60{3}python\n(.*?)\x60{3}",open(f,encoding="utf-8").read(),re.S),K:=lambda o:[(p.name,p.kind,p.default) for p in inspect.signature(o).parameters.values()] if not isinstance(o,type) else [(m.name,m.value) for m in o] if issubclass(o,enum.Enum) else [x.name for x in dataclasses.fields(o)],D:=lambda b:((s:=re.sub(r"\)( -> .+)?$",r")\1: ...",b.strip()) if b.startswith("def") else b),(h:=dict(g)),exec("from __future__ import annotations\nfrom enum import Enum\nfrom dataclasses import dataclass\n"+s,h),[K(h[d.name])==K(g[d.name]) or (d.name,K(h[d.name]),K(g[d.name])) for d in ast.parse(s).body])[-1],C:=lambda s,L:None if not isinstance(s,ast.Expr) else (m.group(1) if (m:=re.search(r"\s#\s?(.*)$",L[s.end_lineno-1])) else L[s.end_lineno][2:] if s.end_lineno<len(L) and L[s.end_lineno].startswith("# ") else None),X:=lambda s:compile(ast.Expression(s.value),f,"eval"),Q:=lambda s,e:(T.assertRaisesRegex(eval(e.split(":")[0],g),re.escape(e.partition(":")[2].strip()),eval,X(s),g) or True) if re.match(r"\w+Error\b",e) else (True if (v:=eval(X(s),g))==ast.literal_eval(e) else (ast.unparse(s),e,v)),R:=lambda s,L:exec(compile(ast.Module([s],[]),f,"exec"),g) if (c:=C(s,L)) is None else Q(s,c.split("  ")[0].strip()),r:=[y for b in B for y in (D(b) if re.match(r"def |class |@",b) else [R(s,b.splitlines()) for s in ast.parse(b).body]) if y is not None],w:=[y for y in r if y is not True],print("OK",len(r)) if not w else sys.exit("MISMATCH "+repr(w)))' docs/notation.md
 see: docs/graph.md for routing between notations
 -->
 
@@ -34,14 +34,18 @@ class Notation(str, Enum):
     BUCKWALTER = "buckwalter"
     ARABIC     = "arabic"
     LEXIQUE    = "lexique"
+    KIRSHENBAUM = "kirshenbaum"
+    COTOVIA    = "cotovia"
+    RFE        = "rfe"
+    HALABI     = "halabi"
 ```
 
 `Notation` is a `str` subclass. Its string values (`"ipa"`, `"arpa"`, etc.) are accepted
 anywhere a `Notation` is expected:
 
 ```python
-convert("S", "x-sampa", "ipa")            # string values
-convert("S", Notation.XSAMPA, Notation.IPA)  # enum members, equivalent
+convert("S", "x-sampa", "ipa")                # 'ʃ'  (string values)
+convert("S", Notation.XSAMPA, Notation.IPA)   # 'ʃ'  (enum members, the same result)
 ```
 
 ---
@@ -411,7 +415,7 @@ lexique_to_ipa("v5")      # "vɛ̃"     (vin)
 lexique_to_ipa("aNo")     # "aɲo"    (agneau, N=ɲ palatal nasal)
 lexique_to_ipa("kaGiG")   # "kaŋiŋ"  (camping, G=ŋ velar nasal)
 lexique_to_ipa("d@s")     # "dɑ̃s"   (dans)
-lexique_to_ipa("abd°Ra")  # "abdəʁa" (° = schwa élidable)
+lexique_to_ipa("abd°Ra")  # "abdəʁa"  (° = schwa élidable)
 ```
 
 ### ipa_to_lexique
@@ -501,8 +505,8 @@ through IPA). Does not perform any conversion.
 ```python
 can_convert("arpa", "ipa")         # True  (direct)
 can_convert("arpa", "x-sampa")     # True  (indirect: arpa→ipa→x-sampa)
-can_convert("buckwalter", "ipa")   # False (not supported)
-can_convert("ipa", "ipa")          # False (identity, use convert() instead)
+can_convert("buckwalter", "ipa")   # False  (not supported)
+can_convert("ipa", "ipa")          # False  (identity: use convert() instead)
 ```
 
 ---
@@ -534,6 +538,8 @@ the factual ASCII → IPA codepoint correspondence of that standard (index *i* �
 the IPA codepoint for ASCII `0x20+i`), cross-checked against espeak-ng.
 
 ```python
+from scriptconv.notation import kirshenbaum_to_ipa, ipa_to_kirshenbaum
+
 kirshenbaum_to_ipa("S")   # "ʃ"
 ipa_to_kirshenbaum("ŋ")   # "N"
 ```
@@ -549,9 +555,9 @@ instead of reading prose:
 ```python
 from scriptconv import NOTATION_INFO, Notation
 info = NOTATION_INFO[Notation.ARPA]
-info.lossless_from_ipa   # False, restricted English inventory
-info.token_separated     # True (space-separated ARPABET tokens)
-info.reference           # citation URL/string
+info.lossless_from_ipa   # False  (restricted English inventory)
+info.token_separated     # True  (space-separated ARPABET tokens)
+info.reference           # 'http://www.speech.cs.cmu.edu/cgi-bin/cmudict; https://en.wikipedia.org/wiki/ARPABET'
 ```
 
 Each `NotationInfo` carries `lossless_to_ipa`, `lossless_from_ipa`,
@@ -597,9 +603,11 @@ Extensions, Spacing Modifier Letters, or Phonetic Extensions blocks, or an IPA
 combining diacritic:
 
 ```python
+from scriptconv.notation import looks_like_ipa
+
 looks_like_ipa("pʰɑtʃ")   # True
 looks_like_ipa("ˈhɛloʊ")  # True
-looks_like_ipa("hello")   # False, no distinctive marker
+looks_like_ipa("hello")   # False  (no distinctive marker)
 ```
 
 A transcription written only with characters IPA shares with the Latin
@@ -618,6 +626,8 @@ its `fonemas.cpp`, symbols are matched longest-first (`tS`, `rr` before single
 characters).
 
 ```python
+from scriptconv.notation import cotovia_to_ipa, ipa_to_cotovia
+
 cotovia_to_ipa("tS")      # "tʃ"
 cotovia_to_ipa("karro")   # "karo"  (rr = trill r, single r = tap ɾ)
 ipa_to_cotovia("ʎ")       # "L"     (canonical palatal-lateral symbol)
@@ -636,9 +646,11 @@ philology. scriptconv provides its core, well-attested inventory (rare
 interdental and variant diacritic symbols from the full standard are omitted).
 
 ```python
+from scriptconv.notation import rfe_to_ipa, ipa_to_rfe
+
 rfe_to_ipa("kaša")   # "kaʃa"
 ipa_to_rfe("ɲ")      # "ñ"     (canonical, n̮ is also accepted on input)
-rfe_to_ipa("far̄a")  # trill r (r̄), single r is the tap ɾ
+rfe_to_ipa("far̄a")  # "fara"  (r̄ is the trill r, a single r is the tap ɾ)
 ```
 
 The palatal nasal accepts both `ñ` and `n̮` on input and emits `ñ`, the
@@ -677,8 +689,8 @@ from scriptconv import convert, can_convert
 
 halabi_to_ipa("s a l aa m")        # 's a l aː m'
 halabi_to_ipa("b_dbl_a")           # 'bːa'      (consonant gemination)
-convert("mrHbaa", "halabi", "x-sampa")   # routes halabi → ipa → x-sampa
-can_convert("ipa", "halabi")       # False, one-directional by design
+convert("mrHbaa", "halabi", "x-sampa")   # "mrX\\ba:"  (halabi → ipa → x-sampa)
+can_convert("ipa", "halabi")       # False  (one-directional by design)
 ```
 
 The inventory's semantics are honoured precisely: `_dbl_` geminates only

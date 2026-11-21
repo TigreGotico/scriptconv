@@ -1,10 +1,10 @@
 # Phonemizer backends
 
 <!-- agent-hint
-covers: every phonemizer backend, its class, its extra and its package, and the models that download
-source: the Phonemizer enum in scriptconv/phonemizers/enums.py, PHONEMIZER_REGISTRY and LANG_DEFAULTS in scriptconv/phonemizers/registry.py
-generated: yes, by scripts/backend_table.py. Edit the registry and run `python scripts/backend_table.py --write`, not the table
-verify: python scripts/backend_table.py --check, which tests/test_backend_table.py runs
+covers: every phonemizer backend, its class, its extra, its package and its language default, and the models that download
+source: the Phonemizer enum in scriptconv/phonemizers/enums.py, PHONEMIZER_REGISTRY and LANG_DEFAULTS in scriptconv/phonemizers/registry.py, COPYLEFT and NONFREE in scriptconv/phonemizers/_moved.py, the download sites in scriptconv/diacritics.py, scriptconv/phonemizers/g2pw.py, scriptconv/phonemizers/en.py and scriptconv/phonemizers/mul.py, and scripts/backend_table.py for the table
+generated: yes for the table between the backends markers, by scripts/backend_table.py. Edit the registry and run `python scripts/backend_table.py --write`, not the table
+verify: python scripts/backend_table.py --check
 see: docs/phonemizers.md, docs/stack.md
 -->
 
@@ -100,18 +100,57 @@ orthography2ipa when it has a spec for the language, and to espeak otherwise.
 ## Model files
 
 ByT5, Charsiu and phonetisaurus never download a model. Each needs a local
-path through `model=`, and `get_phonemizer(backend, model=...)` passes that
-path to the constructor. Four models download on first use:
+model path through `model=`, and `get_phonemizer(backend, model=...)` passes
+that path to the constructor. ByT5 and Charsiu also need `tokenizer_config=`,
+the path of a local tokenizer JSON file. Without a model path, the
+constructor raises an error:
 
-| Model | Used by | Cache location |
-|---|---|---|
-| phonikud ONNX diacritizer | `diacritize(text, "he")` | `scriptconv/phonikud` under `$SCRIPTCONV_CACHE`, else under `$XDG_CACHE_HOME` (default `~/.cache`) |
-| Nakdimon diacritizer, pinned to a sha256 | `diacritize(text, "he", diacritizer_model="nakdimon")` | `scriptconv/nakdimon` under the same base directory |
-| g2pW polyphone model, pinned to a sha256 | the `g2pw` backend | the Hugging Face cache |
-| a DeepPhonemizer checkpoint named in `DeepPhonemizer.MODELS` | the `deepphonemizer` backend | `~/.local/share/deepphonemizer` |
+```python
+from scriptconv.phonemizers import Phonemizer, get_phonemizer
 
-Pass a local path through `diacritizer_model=` or `model=` to skip the
-download.
+get_phonemizer(Phonemizer.BYT5)      # ValueError: ByT5 phonemization needs a local ONNX model file
+get_phonemizer(Phonemizer.CHARSIU)   # ValueError: ByT5 phonemization needs a local ONNX model file
+```
+
+These models and data download on first use:
+
+| Model or data | Used by | Downloaded by | Cache location |
+|---|---|---|---|
+| phonikud ONNX diacritizer | `diacritize(text, "he")` | `_default_phonikud_model` in `diacritics.py` | `scriptconv/phonikud` under `$SCRIPTCONV_CACHE`, else under `$XDG_CACHE_HOME` (default `~/.cache`) |
+| Nakdimon diacritizer, pinned to a sha256 | `diacritize(text, "he", diacritizer_model="nakdimon")` | `_download_nakdimon` in `diacritics.py` | `scriptconv/nakdimon` under the same base directory |
+| the fp32 weights of a text2tashkeel model, such as `rawi` | `diacritize(text, "ar", diacritizer_model="rawi")` | text2tashkeel | the Hugging Face cache |
+| the stressonnx model of the language, from `TigreGotico/stressonnx-models` at a pinned revision | `diacritize(text, lang)` for a language in `STRESS_LANGS` | stressonnx | the Hugging Face cache |
+| g2pW polyphone model, pinned to a sha256 | the `g2pw` backend | `g2pw.py` | the Hugging Face cache |
+| a DeepPhonemizer checkpoint named in `DeepPhonemizer.MODELS` | the `deepphonemizer` backend | `DeepPhonemizer.__init__` in `en.py` | `~/.local/share/deepphonemizer` |
+| the NLTK data `averaged_perceptron_tagger_eng` and `cmudict` | the `g2pen` backend | `nltk.download` in `G2PEnPhonemizer.__init__` in `en.py` | the NLTK data directory |
+
+The default Arabic diacritizer, `rawi-ensemble`, and the INT8 text2tashkeel
+models ship in the text2tashkeel wheel, so `diacritize(text, "ar")` downloads
+nothing.
+
+To skip a download, give a local file where the code accepts one:
+
+- Hebrew: pass the path of a phonikud ONNX model through
+  `diacritizer_model=`.
+- DeepPhonemizer: pass the path of a checkpoint through `model=`.
+- Nakdimon: put the file with the pinned sha256 in its cache location.
+
+The g2pW backend takes no model path. Its constructor has only an `alphabet`
+parameter, and `get_phonemizer` drops a `model=` value for it. The g2pW
+model, the stressonnx models and the fp32 text2tashkeel weights come from the
+Hugging Face cache. To run these offline, fill the cache first and then set
+`HF_HUB_OFFLINE=1`:
+
+```python
+import inspect
+from scriptconv.phonemizers.g2pw import G2PWPhonemizer
+
+list(inspect.signature(G2PWPhonemizer).parameters)   # ['alphabet']
+```
+
+Some engine packages download data of their own. For example, pygoruut
+fetches its executable, and openphonemizer fetches its checkpoint from the
+Hugging Face Hub. The documentation of each engine names its downloads.
 
 ## The phonetisaurus engine and its libraries
 
