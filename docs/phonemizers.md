@@ -410,11 +410,11 @@ as `《》`, gives no symbol and no warning.
 ## Kolokwa, Liberian English
 
 `Phonemizer.KOLOKWA` reads Liberian English (Kolokwa, ISO 639-3 `lir`) with
-the kolokwa-g2p model, a Forward Transformer of the `phonemize` package. It
-is the default for `lir`. It does not read `en` or `en-LR`, so the default
-for those tags does not change. Install it with `pip install scriptconv[lir]`.
-`phonemize` requires torch below 2.9 and numpy 2, so it has an extra of its
-own.
+the kolokwa-g2p model of michsethowusu, a Forward Transformer of the
+`phonemize` package, with a pronouncing dictionary of 12,006 words. It runs an
+ONNX export of the model on onnxruntime, with no torch. It is the default for
+`lir`. It does not read `en` or `en-LR`, so the default for those tags does
+not change. Install it with `pip install scriptconv[lir]`.
 
 ```python
 from scriptconv.phonemizers import phonemizer_for_lang
@@ -423,12 +423,18 @@ phonemizer_for_lang("lir").phonemize_string("da man dey go drink cold water", "l
 # 'ðæ mæ̃n de ko tɹɪ̃ŋk ko wɔtə˞'
 ```
 
-With no network and no cached model, the constructor raises
-`ModelUnavailableError`.
+The text reads as `phonemize` 0.2.4 reads it, and the output is the same.
+Characters that are neither letters, digits nor `().,:?!/–` go, so a digit
+gives no symbol and an apostrophe goes. The text splits at spaces and at
+those marks, which stay in the output. A word that is not in the dictionary
+splits at hyphens and before each inner capital, so `DIY` gives `d-a-j`.
+
+The model files must have their pinned sha256. With no network and no cached
+copy that passes the check, the constructor raises `ModelUnavailableError`.
 
 | File | Source | Revision | Size | Licence |
 |---|---|---|---|---|
-| `best_model.pt` | Hugging Face model `michsethowusu/kolokwa-g2p` | `92ed3b721a4f80f98d5b741fdd16352ca320f121` | 59 MB | MIT (model card) |
+| `model.onnx`, `kolokwa.json` | Hugging Face model `TigreGotico/kolokwa-g2p-onnx`, the ONNX export of `michsethowusu/kolokwa-g2p` at `92ed3b721a4f80f98d5b741fdd16352ca320f121` | `3729a707e532ba2929c884288bacf5d5d76f7316` | 59 MB | MIT |
 
 ## dizione, American English
 

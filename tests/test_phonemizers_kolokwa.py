@@ -2,17 +2,20 @@
 
 Each expected value comes from the upstream code: ``phonemize`` 0.2.4 with
 ``best_model.pt`` of michsethowusu/kolokwa-g2p at revision
-92ed3b721a4f80f98d5b741fdd16352ca320f121, run as::
+92ed3b721a4f80f98d5b741fdd16352ca320f121, on torch 2.8.0, run as::
 
     Phonemizer.from_checkpoint("best_model.pt")(text, lang="en_lr")
 
 For the word ``wetin``, the ``lexicon.tsv`` of that revision gives the same IPA.
+The words of the first three texts are in the dictionary of the checkpoint.
+The other texts hold words that are not, so the ONNX model reads them.
 """
 import subprocess
 import sys
 
 import pytest
 
+from scriptconv.frontend import FrontendConfig, TextFrontend
 from scriptconv.phonemizers import (
     Phonemizer,
     UnsupportedLanguageError,
@@ -26,6 +29,11 @@ REFERENCE = {
     "wetin we coming learn about our brother and sister them":
         "wɛtɪ̃ŋ wi kʰʌmɪ̃ŋ læ̃n əbaʊt aʊə˞ pɹʌðə˞ nd sɪstə˞ ðɛ̃m",
     "wetin": "wɛtɪ̃ŋ",
+    # the apostrophe goes, and "aarons" and "abigails" are not in the dictionary
+    "aaron's abigail's": "ɛɹənz æbɪɡɪlz",
+    # DIY splits before each capital; the hyphens and the brackets stay
+    "DIY Liberia-Monrovia (wetin?)": "d-a-j la-mɔɹojo (wɛtɪ̃ŋ?)",
+    "McDonald's pikin, palava / bluff: 25 people": "mi-tontʰ pʰɪɪ̃, plawɔ / plʌf:  pʰipəl",
 }
 
 
@@ -53,9 +61,11 @@ def test_lir_defaults_to_kolokwa(kolokwa):
     assert type(phonemizer_for_lang("lir")) is KolokwaPhonemizer
 
 
-def test_identity_names_the_phonemize_distribution(kolokwa):
+def test_identity_has_a_revision(kolokwa):
     identity = kolokwa.identity("lir")
-    assert (identity.backend, identity.distribution, identity.lang) == ("kolokwa", "phonemize", "en_lr")
+    assert (identity.backend, identity.distribution, identity.lang) == ("kolokwa", "scriptconv", "en_lr")
+    assert identity.revision.startswith("sc1:")
+    assert TextFrontend(FrontendConfig("lir", Phonemizer.KOLOKWA)).identity().revision.startswith("sc1:")
 
 
 def test_offline_with_no_cache_raises_model_unavailable(tmp_path):
@@ -68,4 +78,4 @@ def test_offline_with_no_cache_raises_model_unavailable(tmp_path):
     env = {"PATH": "", "HOME": str(tmp_path), "HF_HOME": str(tmp_path / "hf"), "HF_HUB_OFFLINE": "1"}
     result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True)
     assert result.stdout.startswith("ModelUnavailableError"), result.stderr
-    assert "michsethowusu/kolokwa-g2p" in result.stdout
+    assert "TigreGotico/kolokwa-g2p-onnx" in result.stdout

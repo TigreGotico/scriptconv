@@ -49,7 +49,7 @@ CASES = {
     Phonemizer.EPITRAN: ("epitran", _trigger_construct),
     Phonemizer.PHONETISAURUS: ("phonetisaurus", _trigger_construct),
     Phonemizer.DEEPPHONEMIZER: ("dp", _trigger_construct),
-    Phonemizer.KOLOKWA: ("phonemize", _trigger_construct),
+    Phonemizer.KOLOKWA: ("onnxruntime", _trigger_construct),
     Phonemizer.OPENPHONEMIZER: ("openphonemizer", _trigger_construct),
     Phonemizer.G2PEN: ("nltk", _trigger_construct),
     Phonemizer.TUGAPHONE: ("tugaphone", _trigger_construct),
