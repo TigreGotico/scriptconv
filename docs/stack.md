@@ -4,7 +4,7 @@
 covers: the stage order of TextFrontend and the library that runs each stage
 source: scriptconv/frontend.py (module docstring, `TextFrontend._text_pieces`), `diacritize` in scriptconv/diacritics.py
 generated: no
-verify: pytest tests/test_frontend_order.py
+verify: pytest tests/test_frontend_order.py tests/test_frontend.py
 see: docs/frontend.md, docs/backends.md
 -->
 

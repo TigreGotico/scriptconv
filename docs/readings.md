@@ -4,7 +4,7 @@
 covers: kanji to kana, the token stream, and hanzi to pinyin or bopomofo
 source: scriptconv/readings.py, and the Japanese functions in scriptconv-copyleft
 generated: no
-verify: pytest tests/test_readings_zh.py
+verify: pytest tests/test_readings_zh.py tests/test_sister_packages.py
 see: docs/conventions.md for the wakachigaki and pinyin-tone conventions
 -->
 

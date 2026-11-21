@@ -4,7 +4,7 @@
 covers: the OVOS G2P plugin, its config keys and how it picks a backend
 source: `ScriptconvG2PPlugin` in ovos_scriptconv_g2p_plugin/__init__.py of TigreGotico/ovos-scriptconv-g2p-plugin, scriptconv/phonemizers/registry.py
 generated: no
-verify: python -c "from scriptconv.phonemizers import Phonemizer; print(' '.join(p.value for p in Phonemizer))"
+verify: pytest test/test_plugin.py in TigreGotico/ovos-scriptconv-g2p-plugin
 see: docs/backends.md, docs/phonemizers.md
 -->
 

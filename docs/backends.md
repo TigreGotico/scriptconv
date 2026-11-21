@@ -3,8 +3,8 @@
 <!-- agent-hint
 covers: every phonemizer backend, its class, its extra and its package, and the models that download
 source: the Phonemizer enum in scriptconv/phonemizers/enums.py, PHONEMIZER_REGISTRY and LANG_DEFAULTS in scriptconv/phonemizers/registry.py
-generated: no. The table rows follow the order of the Phonemizer enum, one row per member
-verify: the second command under "List the backends" prints the value, class and extra of each row, in table order
+generated: no
+verify: python -c "import re; from scriptconv.phonemizers import Phonemizer, PHONEMIZER_REGISTRY as R; rows = re.findall(r'^\| \x60([^\x60]+)\x60 \| \x60([^\x60]+)\x60 \| \x60([^\x60]+)\x60 \|', open('docs/backends.md', encoding='utf-8').read(), re.M); want = [(p.value, R[p][1], R[p][2] or 'phonemizers') for p in Phonemizer]; assert rows == want, sorted(set(rows) ^ set(want)); print(len(rows), 'rows match')"
 see: docs/phonemizers.md, docs/stack.md
 -->
 
@@ -20,11 +20,15 @@ The registry holds the list. This command prints the value of each backend:
 python -c "from scriptconv.phonemizers import Phonemizer; print(' '.join(p.value for p in Phonemizer))"
 ```
 
-This command prints the value, class and extra of each backend, in the order
-of the table below. Compare its output with the table to check the table:
+## Check the table
+
+The table has one row per `Phonemizer` member, in the order of the enum. A
+backend that the registry gains needs its row here. Run this command from the
+repository root. It exits with an error that names each row that differs from
+the registry:
 
 ```bash
-python -c "from scriptconv.phonemizers import Phonemizer, PHONEMIZER_REGISTRY as R; [print(p.value, R[p][1], R[p][2] or 'phonemizers') for p in Phonemizer]"
+python -c "import re; from scriptconv.phonemizers import Phonemizer, PHONEMIZER_REGISTRY as R; rows = re.findall(r'^\| \x60([^\x60]+)\x60 \| \x60([^\x60]+)\x60 \| \x60([^\x60]+)\x60 \|', open('docs/backends.md', encoding='utf-8').read(), re.M); want = [(p.value, R[p][1], R[p][2] or 'phonemizers') for p in Phonemizer]; assert rows == want, sorted(set(rows) ^ set(want)); print(len(rows), 'rows match')"
 ```
 
 ## The table

@@ -39,8 +39,9 @@ installed (`.github/workflows/build-tests.yml`).
 - A backend imports its engine lazily. A missing engine raises an
   `ImportError` that names the extra
   (`tests/test_phonemizers_friendly_import_errors.py`).
-- A pull request that adds a backend adds its enum member, its registry row and a row in
-  [docs/backends.md](docs/backends.md), in the order of the enum.
+- [docs/backends.md](docs/backends.md) holds one row per `Phonemizer`
+  member, in enum order. Its check command names each row that differs from
+  the registry.
 - No extra installs a copyleft or non-commercial distribution, except the two
   that `scripts/check_extra_licences.py` lists. Such a wrapper goes to
   scriptconv-copyleft or scriptconv-nonfree. `tests/test_wheel_licences.py`
@@ -59,4 +60,8 @@ pytest tests/
 python scripts/check_extra_licences.py
 ```
 
-Pull requests target `dev`, where the build and licence workflows run.
+Run the check command of [docs/backends.md](docs/backends.md#check-the-table)
+after a change to the registry.
+
+The build workflow runs on pull requests to `dev` and `master`. The two licence
+workflows run on pull requests to `dev`.
