@@ -3,8 +3,8 @@
 <!-- agent-hint
 covers: every phonemizer backend, its class, its extra and its package, and the models that download
 source: the Phonemizer enum in scriptconv/phonemizers/enums.py, PHONEMIZER_REGISTRY and LANG_DEFAULTS in scriptconv/phonemizers/registry.py
-generated: no
-verify: python -c "import re; from scriptconv.phonemizers import Phonemizer, PHONEMIZER_REGISTRY as R; rows = re.findall(r'^\| \x60([^\x60]+)\x60 \| \x60([^\x60]+)\x60 \| \x60([^\x60]+)\x60 \|', open('docs/backends.md', encoding='utf-8').read(), re.M); want = [(p.value, R[p][1], R[p][2] or 'phonemizers') for p in Phonemizer]; assert rows == want, sorted(set(rows) ^ set(want)); print(len(rows), 'rows match')"
+generated: yes, by scripts/backend_table.py. Edit the registry and run `python scripts/backend_table.py --write`, not the table
+verify: python scripts/backend_table.py --check, which tests/test_backend_table.py runs
 see: docs/phonemizers.md, docs/stack.md
 -->
 
@@ -22,14 +22,11 @@ python -c "from scriptconv.phonemizers import Phonemizer; print(' '.join(p.value
 
 ## Check the table
 
-The table has one row per `Phonemizer` member, in the order of the enum. A
-backend that the registry gains needs its row here. Run this command from the
-repository root. It exits with an error that names each row that differs from
-the registry:
-
-```bash
-python -c "import re; from scriptconv.phonemizers import Phonemizer, PHONEMIZER_REGISTRY as R; rows = re.findall(r'^\| \x60([^\x60]+)\x60 \| \x60([^\x60]+)\x60 \| \x60([^\x60]+)\x60 \|', open('docs/backends.md', encoding='utf-8').read(), re.M); want = [(p.value, R[p][1], R[p][2] or 'phonemizers') for p in Phonemizer]; assert rows == want, sorted(set(rows) ^ set(want)); print(len(rows), 'rows match')"
-```
+The table has one row per `Phonemizer` member, in the order of the enum.
+`scripts/backend_table.py` writes it from the registry. From the repository
+root, `python scripts/backend_table.py` prints the table, `--write` rewrites it
+in this page, and `--check` exits 1 when the page differs from the registry.
+`tests/test_backend_table.py` runs `--check`.
 
 ## The table
 
