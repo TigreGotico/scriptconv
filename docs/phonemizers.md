@@ -562,17 +562,17 @@ better. `micro` is the default:
 `get_phonemizer(Phonemizer.LEOKANI, variant="mini")`.
 
 The model files come from the Hugging Face Hub, at a fixed revision, into the
-shared Hugging Face cache. That repository is a byte-identical copy of the
-upstream repository `milliwattlabs/leokani-g2p` at revision `a819acc8`. Each
-file must have its pinned sha256. A cached file with another sha256 is
+shared Hugging Face cache, from the upstream repository
+`milliwattlabs/leokani-g2p` at revision `a819acc8`. Each file must have its
+pinned sha256. A cached file with another sha256 is
 downloaded again once, unless the Hub is offline (`HF_HUB_OFFLINE`). With no
 copy that passes the check, the backend raises `ModelUnavailableError`.
 
 | File | Source | Revision | Size | Licence |
 |---|---|---|---|---|
 | `leokani_g2p.py`, in the wheel | Hugging Face model `milliwattlabs/leokani-g2p`; the same file is `src/leokani_g2p/runtime.py` of github.com/Milliwatt-Labs/leokani-g2p at `df8bc119` (1.3.0) | `a819acc86471a04a01ba3d3f30f3765e4675c7ca` | 189 KB | MIT |
-| `micro` model: the lexicon and three ONNX models | Hugging Face model `TigreGotico/leokani-g2p` | `60f16f36e79bc37525b0ce6a7b22bd50c54c331f` | 10.2 MB | CC BY 4.0 |
-| `mini` model, in `mini/` | Hugging Face model `TigreGotico/leokani-g2p` | `60f16f36e79bc37525b0ce6a7b22bd50c54c331f` | 10.8 MB | CC BY 4.0 |
+| `micro` model: the lexicon and three ONNX models | Hugging Face model `milliwattlabs/leokani-g2p` | `a819acc86471a04a01ba3d3f30f3765e4675c7ca` | 10.2 MB | CC BY 4.0 |
+| `mini` model, in `mini/` | Hugging Face model `milliwattlabs/leokani-g2p` | `a819acc86471a04a01ba3d3f30f3765e4675c7ca` | 10.8 MB | CC BY 4.0 |
 
 Credit the engine as: Leokani G2P by Milliwatt Labs (milliwattlabs.com).
 

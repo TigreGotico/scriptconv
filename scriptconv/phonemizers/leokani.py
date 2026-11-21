@@ -10,10 +10,8 @@ times and units as words. Its reference readings are American English.
 Its code (MIT) is vendored under
 :mod:`scriptconv.phonemizers._thirdparty.leokani`. Its model files (CC BY 4.0)
 come from the Hugging Face Hub, from :data:`MODEL_REPO` at
-:data:`MODEL_REVISION`, into the shared Hugging Face cache. That repository is
-a byte-identical copy of milliwattlabs/leokani-g2p at revision
-a819acc86471a04a01ba3d3f30f3765e4675c7ca. Each file must have its pinned
-sha256. Offline, with no cached copy that passes the check, the backend raises
+:data:`MODEL_REVISION`, into the shared Hugging Face cache. Each file must
+have its pinned sha256. Offline, with no cached copy that passes the check, the backend raises
 :class:`~scriptconv.phonemizers.base.ModelUnavailableError`.
 """
 import dataclasses
@@ -41,8 +39,8 @@ from scriptconv.phonemizers.g2pw import _hub_file
 
 __all__ = ["LeokaniPhonemizer", "MODEL_REPO", "MODEL_REVISION", "MODEL_FILES"]
 
-MODEL_REPO = "TigreGotico/leokani-g2p"
-MODEL_REVISION = "60f16f36e79bc37525b0ce6a7b22bd50c54c331f"
+MODEL_REPO = "milliwattlabs/leokani-g2p"
+MODEL_REVISION = "a819acc86471a04a01ba3d3f30f3765e4675c7ca"
 #: variant -> {path in :data:`MODEL_REPO`: sha256}. ``micro`` is upstream's default.
 MODEL_FILES = {
     "micro": {

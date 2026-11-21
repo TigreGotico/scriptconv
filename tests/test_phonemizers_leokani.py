@@ -130,5 +130,5 @@ def test_offline_with_no_cache_raises_model_unavailable(tmp_path):
     env = {"PATH": "", "HOME": str(tmp_path), "HF_HOME": str(tmp_path / "hf"), "HF_HUB_OFFLINE": "1"}
     result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True)
     assert result.stdout.startswith("ModelUnavailableError"), result.stderr
-    assert "TigreGotico/leokani-g2p" in result.stdout
+    assert "milliwattlabs/leokani-g2p" in result.stdout
     assert issubclass(ModelUnavailableError, ValueError)
