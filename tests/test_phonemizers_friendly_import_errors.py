@@ -49,6 +49,7 @@ CASES = {
     Phonemizer.EPITRAN: ("epitran", _trigger_construct),
     Phonemizer.PHONETISAURUS: ("phonetisaurus", _trigger_construct),
     Phonemizer.DEEPPHONEMIZER: ("dp", _trigger_construct),
+    Phonemizer.KOLOKWA: ("phonemize", _trigger_construct),
     Phonemizer.OPENPHONEMIZER: ("openphonemizer", _trigger_construct),
     Phonemizer.G2PEN: ("nltk", _trigger_construct),
     Phonemizer.TUGAPHONE: ("tugaphone", _trigger_construct),
@@ -61,7 +62,7 @@ class TestLazyBackendImportsAreFriendly(unittest.TestCase):
     def test_all_documented_backends_covered(self):
         # keeps this test list honest if a new Phonemizer member is added
         # backed by one of the wrapper modules touched by this convention
-        self.assertEqual(len(CASES), 10)
+        self.assertEqual(len(CASES), 11)
 
     def _assert_friendly(self, member):
         module_name, trigger = CASES[member]
@@ -86,6 +87,9 @@ class TestLazyBackendImportsAreFriendly(unittest.TestCase):
 
     def test_deepphonemizer(self):
         self._assert_friendly(Phonemizer.DEEPPHONEMIZER)
+
+    def test_kolokwa(self):
+        self._assert_friendly(Phonemizer.KOLOKWA)
 
     def test_openphonemizer(self):
         self._assert_friendly(Phonemizer.OPENPHONEMIZER)
