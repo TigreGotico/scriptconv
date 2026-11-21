@@ -1,0 +1,57 @@
+Leokani G2P by Milliwatt Labs (milliwattlabs.com).
+
+Code: MIT (LICENSE). Model weights, lexicon and goldens: CC BY 4.0 (LICENSE-CC-BY-4.0.txt).
+When you use or share Leokani G2P, credit it as: Leokani G2P by Milliwatt Labs (milliwattlabs.com).
+
+Provenance
+----------
+Produces espeak compatible phoneme codes, made from the ground up: the same Kokoro/misaki-style codes
+Leokani-tts and Kokoro use. It contains no espeak-ng code or data files.
+
+Third-party credits
+-------------------
+- GeoNames (geonames.org), CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/): place names in the
+  lexicon's word list.
+- Kokoro-82M by hexgrad (https://huggingface.co/hexgrad/Kokoro-82M), Apache-2.0: the phoneme set the output is
+  written in.
+- misaki by hexgrad (https://github.com/hexgrad/misaki), Apache-2.0: the phoneme codes (misaki's set, which
+  Kokoro uses), and words from its us_gold and us_silver lexicons in the lexicon's word list (their
+  pronunciations are not used).
+- The CMU Pronouncing Dictionary (https://github.com/cmusphinx/cmudict), BSD-2-Clause: words in the lexicon's
+  word list (its pronunciations are not used). Its notice follows.
+
+-----------------------------------------------------------------------
+The CMU Pronouncing Dictionary
+Copyright (C) 1993-2015 Carnegie Mellon University. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+   The contents of this file are deemed to be source code.
+
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in
+   the documentation and/or other materials provided with the
+   distribution.
+
+This work was supported in part by funding from the Defense Advanced
+Research Projects Agency, the Office of Naval Research and the National
+Science Foundation of the United States of America, and by member
+companies of the Carnegie Mellon Sphinx Speech Consortium. We acknowledge
+the contributions of many volunteers to the expansion and improvement of
+this dictionary.
+
+THIS SOFTWARE IS PROVIDED BY CARNEGIE MELLON UNIVERSITY ``AS IS'' AND
+ANY EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL CARNEGIE MELLON UNIVERSITY
+NOR ITS EMPLOYEES BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.

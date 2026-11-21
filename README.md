@@ -427,7 +427,10 @@ licence (`LICENSE.cmudict`). That licence is BSD-2-Clause with one added
 sentence and an acknowledgement, so it has no SPDX identifier and the wheel
 names it `LicenseRef-CMUdict`. The homograph weights come from the Wikipedia
 Homograph Data, Apache-2.0 (`LICENSE.homograph-data`), and most of their
-pronunciations come from CMUdict.
+pronunciations come from CMUdict. The Leokani G2P
+English phonemizer of Milliwatt Labs is MIT, with its licence and notice in
+`scriptconv/phonemizers/_thirdparty/leokani/`. Its model files are CC BY 4.0.
+They are not in the wheel: the backend downloads them.
 
 The phonemizer wrappers whose code, engine or dependencies are under a
 copyleft or a non-commercial licence are in two sister packages:

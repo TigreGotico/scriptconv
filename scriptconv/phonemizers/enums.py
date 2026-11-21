@@ -59,6 +59,7 @@ class Phonemizer(str, Enum):
     OPENPHONEMIZER = "openphonemizer" # en
     G2PEN = "g2pen" # en
     DIZIONE = "dizione"  # en-US (CMUdict lexicon, homograph rules, text rules)
+    LEOKANI = "leokani"  # en-US (Kokoro/misaki codes; lexicon, ONNX letter-to-sound and context models)
 
     TUGAPHONE = "tugaphone"  # pt
     G2PFA = "g2pfa"
