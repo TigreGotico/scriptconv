@@ -7,11 +7,11 @@ probe and no call into the backend.
 
 An entry is found by a hash of its key: the interpreter path and version,
 the ``sys.path`` entries, :data:`unicodedata.unidata_version`, the backend
-class, its constructor arguments and instance settings, and the frontend
-settings that the revision hashes, the resolved language among them. The
-entry then holds the state of each file and directory that can change the
-identity, taken before the identity is computed. A hit needs each of them to
-be the same:
+class, its constructor arguments and instance settings, the engine and its
+version, and the frontend settings that the revision hashes, the resolved
+language among them. The entry then holds the state of each file and
+directory that can change the identity, taken before the identity is
+computed. A hit needs each of them to be the same:
 
 - the names in each ``sys.path`` directory, which change when a distribution
   is installed in it or removed from it;
@@ -30,9 +30,9 @@ be the same:
 A directory counts by its names and not by its modification time, so the
 ``__pycache__`` that the computation writes does not change the entry.
 
-Only an identity with a ``revision`` is kept. An identity with none can carry
-a version that comes from outside Python, such as the espeak-ng binary, which
-no key file follows.
+Only an identity with a ``revision`` is kept. The engine version is in the
+key because it can come from outside Python, such as the espeak-ng binary,
+which no key file follows.
 
 An entry is written to a temporary file in the cache directory and renamed
 into place, so two processes that write one entry leave one whole entry. An
@@ -61,7 +61,7 @@ from scriptconv.phonemizers.base import PhonemizerIdentity
 
 LOG = logging.getLogger(__name__)
 
-FORMAT = 2
+FORMAT = 3
 """The version of the entry format. It changes when the key or the entry change."""
 
 Stat = Tuple[str, int, int]
@@ -91,7 +91,7 @@ def key(backend, settings: Mapping) -> dict:
             "unicode": unicodedata.unidata_version,
             "backend": f"{type(backend).__module__}:{type(backend).__qualname__}",
             "arguments": backend._revision_arguments(), "instance": backend._identity_settings(),
-            "frontend": dict(settings)}
+            "engine": list(backend._engine_release()), "frontend": dict(settings)}
 
 
 def _entry_path(entry_key: dict) -> Path:

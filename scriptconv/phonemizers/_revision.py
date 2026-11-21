@@ -8,7 +8,7 @@ open. The hash then covers:
 - the code tokens of each scriptconv module that the probe loads, except
   ``scriptconv/version.py``;
 - the bytes of each scriptconv data file that the probe opens;
-- for each other distribution that holds a loaded module, the code tokens of
+- for each other top-level module that the probe loads, the code tokens of
   each of its Python modules and the bytes of each of its other files, except a
   ``version.py`` or ``_version.py`` at the top of a package. A compiled module
   counts by its name and the version of its distribution, since its bytes
@@ -18,6 +18,16 @@ open. The hash then covers:
 - the class of the backend, the arguments that build it, the settings that
   change the output besides the code, whether the backend keeps clause
   punctuation, the language and :data:`unicodedata.unidata_version`.
+
+A top-level module that the probe does not load stays out, even when a
+distribution that holds a loaded module ships it, as the ``tests`` package of
+gruut-ipa. Such a module is not on the read path, and its files can belong to
+another distribution or to the working directory.
+
+The modules of the interpreter stay out: those that
+:data:`sys.stdlib_module_names` names, and each module in the standard library
+directory, as the build configuration ``_sysconfigdata_*``, which differs
+between two builds of one Python version.
 
 The ``normalizer`` hook of a backend stays out: it is the ``normalize``
 stage, which :meth:`~scriptconv.frontend.TextFrontend.identity` covers.
@@ -57,6 +67,7 @@ import os
 import re
 import subprocess
 import sys
+import sysconfig
 import tokenize
 import unicodedata
 import uuid
@@ -129,10 +140,11 @@ with warnings.catch_warnings():
                     call(text)
                 except Exception:
                     pass
-# a module loaded before the probe, as by a sitecustomize.py, counts when the calls import its package
+# a module loaded before the probe, as by a sitecustomize.py, counts when the calls import its package.
+# A module counts by its own name, as dateparser puts the standard _strptime in sys.modules as strptime_patched.
 used = imported - {"scriptconv"}
-modules = {name: getattr(loaded, "__file__", None) for name, loaded in list(sys.modules.items())
-           if name not in before or name.partition(".")[0] in used}
+modules = {getattr(loaded, "__name__", name): getattr(loaded, "__file__", None)
+           for name, loaded in list(sys.modules.items()) if name not in before or name.partition(".")[0] in used}
 print(marker + json.dumps({"modules": modules, "opened": sorted(opened)}), flush=True)
 """
 """Prints, after a marker, the modules that a backend, or a frontend that reads
@@ -142,6 +154,9 @@ _NOT_CODE = frozenset({tokenize.COMMENT, tokenize.NL, tokenize.ENCODING, tokeniz
 _LINE = frozenset({"NEWLINE", "INDENT", "DEDENT"})
 _VERSION_FILES = frozenset({"version.py", "_version.py"})
 _NATIVE = frozenset({".so", ".pyd", ".dll", ".dylib"})
+_SITES = frozenset({"site-packages", "dist-packages"})
+#: The packages whose classes the probe builds by name. A backend class from elsewhere is probed as its first base in them.
+_IN_TREE = frozenset({"scriptconv", "scriptconv_copyleft", "scriptconv_nonfree"})
 
 
 class RevisionSourceUnavailable(OSError):
@@ -177,7 +192,10 @@ def code_revision(backend, lang: str, settings: Mapping, frontend: bool = False)
     count too. The files of the distributions that
     ``backend._covered_distributions(lang)`` names leave the hash.
     """
-    probed = next(cls for cls in type(backend).__mro__ if cls.__module__.startswith("scriptconv."))
+    probed = next(cls for cls in type(backend).__mro__ if cls.__module__.partition(".")[0] in _IN_TREE)
+    if inspect.isabstract(probed):
+        # a backend class from elsewhere on BasePhonemizer itself, which the probe cannot build
+        return None
     arguments = backend._revision_arguments()
     mode = "frontend" if frontend else "backend"
     digest = hashlib.sha256(json.dumps(
@@ -256,11 +274,16 @@ def _run_probe(module: str, qualname: str, lang: str, mode: str, arguments: str,
         raise RevisionProbeFailed(f"{what} found scriptconv loaded before it started, "
                                   "so it cannot tell which modules the backend loads")
     root = Path(modules["scriptconv"]).parent
+    stdlib = {Path(sysconfig.get_path(name)).resolve() for name in ("stdlib", "platstdlib")}
     entries: List[Tuple[str, str]] = []
     others = set()
     for name, where in modules.items():
         top = name.split(".")[0]
         if top in sys.stdlib_module_names or where is None:
+            continue
+        path = Path(where).resolve()
+        if any(path.is_relative_to(directory) and path.relative_to(directory).parts[0] not in _SITES
+               for directory in stdlib):
             continue
         if top != "scriptconv":
             others.add(top)
@@ -280,16 +303,13 @@ def _run_probe(module: str, qualname: str, lang: str, mode: str, arguments: str,
 
 
 def _distribution_tops(loaded: set, covered: Collection[str]) -> set:
-    """*loaded*, and each other top-level module of a distribution that holds one of them,
-    except those that only distributions in *covered* hold.
+    """*loaded*, except the top-level modules that only distributions in *covered* hold.
 
     A top-level module that no installed distribution holds, as a checkout on
     the import path, stands for a distribution of its own name.
     """
     owners = packages_distributions()
-    distributions = {owner for name in loaded for owner in owners.get(name, ())}
-    held = {name for name, owned in owners.items() if distributions & set(owned)}
-    return {name for name in (loaded | held) - {"scriptconv"}
+    return {name for name in loaded - {"scriptconv"}
             if not {_canonical(owner) for owner in owners.get(name) or [name]} <= set(covered)}
 
 

@@ -76,9 +76,10 @@ class TugaphonePhonemizer(BasePhonemizer):
         :func:`~scriptconv.phonemizers._revision.code_revision` adds the
         scriptconv code on the path of this backend, and the distributions
         that tugaphone does not cover. So a tugaphone release that keeps its
-        revision keeps this revision. ``revision`` is ``None`` when
-        :attr:`contact` is not ``"none"``, and, with one warning, when
-        tugaphone gives no revision.
+        revision keeps this revision. When :attr:`contact` is not ``"none"``,
+        and, with one warning, when tugaphone gives no revision, ``revision``
+        is that of :meth:`BasePhonemizer.identity`, which holds the tugaphone
+        version.
         """
         from scriptconv.phonemizers._revision import code_revision
         identity = super().identity(lang)
@@ -118,7 +119,7 @@ def _tugaphone_revision(lect: str) -> Optional[Tuple[str, FrozenSet[str]]]:
             return tugaphone.revision(lect), frozenset(distributions(tugaphone.resolve_lect(lect)))
         except (tugaphone.RevisionError, EngineSourceUnavailable) as exc:
             failure = exc
-    LOG.warning("tugaphone gives no revision for %r, so the identity has none: %s: %s",
+    LOG.warning("tugaphone gives no revision for %r, so the identity holds the tugaphone version: %s: %s",
                 lect, type(failure).__name__, failure)
     return None
 

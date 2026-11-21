@@ -15,7 +15,6 @@ engine as written. It reads whole text (``reads_whole_text``):
 cuts its own output at its own sentence and clause marks, so an abbreviation
 such as ``Mrs.`` ends no sentence.
 """
-import dataclasses
 import hashlib
 import json
 import re
@@ -51,7 +50,6 @@ from scriptconv.phonemizers.base import (
     CLAUSE_PUNCTUATION,
     BasePhonemizer,
     MissingLanguageError,
-    PhonemizerIdentity,
     Segment,
     UnsupportedLanguageError,
     _check_alphabet,
@@ -244,15 +242,6 @@ class DizionePhonemizer(BasePhonemizer):
             digest = hashlib.sha256(overrides.encode()).hexdigest()
             build = hashlib.sha256(f"{build}\n{digest}".encode()).hexdigest()
         return {"dizione": build}
-
-    def identity(self, lang: str) -> PhonemizerIdentity:
-        """The base identity, with ``revision`` the code revision of this
-        backend that holds the settings of :meth:`_identity_settings`, as
-        :func:`~scriptconv.phonemizers._revision.code_revision` gives it."""
-        from scriptconv.phonemizers._revision import code_revision
-        identity = super().identity(lang)
-        return dataclasses.replace(
-            identity, revision=code_revision(self, identity.lang, self._identity_settings()))
 
     def _clauses(self, text: str, tokens: bool = False) -> Iterator[Segment]:
         """Each clause of *text*, as :func:`_clause_spans` cuts dizione's tokens.

@@ -1,8 +1,8 @@
-"""The tugaphone identity has no revision, with one warning, where tugaphone gives none.
+"""The tugaphone identity is the base identity, with one warning, where tugaphone gives no revision.
 
 A tugaphone with no ``content_revision`` module, as 1.7.1, and an orthography2ipa whose engine source cannot be read
-both phonemize, so their identity must not raise. The expected identity is the base identity of the backend, which
-has no revision."""
+both phonemize, so their identity must not raise. The expected identity is the base identity of the backend, whose
+revision holds the tugaphone version."""
 import logging
 import sys
 import types
@@ -28,7 +28,7 @@ def _check(phonemizer, caplog):
         identity = phonemizer.identity("pt-PT")
         phonemizer.identity("pt-PT")
     assert identity == BasePhonemizer.identity(phonemizer, "pt-PT")
-    assert identity.revision is None
+    assert identity.revision.startswith("sc1:")
     assert len([r for r in caplog.records if "no revision" in r.getMessage()]) == 1
 
 
