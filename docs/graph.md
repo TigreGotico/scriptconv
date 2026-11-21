@@ -1,5 +1,16 @@
 # The conversion graph, `scriptconv.graph`
 
+<!-- agent-hint
+covers: nodes, edges, routing, and the opt-in phonemizer and diacritics edges
+source: scriptconv/graph.py, `register` in scriptconv/phonemizers/registry.py and scriptconv/diacritics.py
+generated: no
+verify: pytest tests/test_graph.py tests/test_graph_lossless.py tests/test_diacritics_graph.py
+see: docs/phonemizers.md, docs/stack.md
+-->
+
+This page shows how the conversion graph finds a path between two
+representations, and how to add edges to a graph.
+
 Once you have more than a handful of representations, pairwise converters
 stop scaling: with nine notations and a dozen orthographies, the interesting
 conversions are the ones nobody wrote a direct table for. The graph solves
@@ -65,7 +76,7 @@ from scriptconv import DEFAULT_GRAPH
 from scriptconv import phonemizers
 
 g = DEFAULT_GRAPH.extend(phonemizers.register)   # DEFAULT_GRAPH is untouched
-g.convert("bom dia", "text", "ipa", lang="pt")   # 'ˈbõ ˈdʒiɐ'
+g.convert("bom dia", "text", "ipa", lang="pt")   # 'ˈbõ ˈdiɐ'
 g.can_convert("text", "arpa")                    # True, phonemize, then transcode
 ```
 
@@ -118,4 +129,4 @@ python -m scriptconv route halabi x-sampa              # show the chosen path
 ```
 
 ---
-[← conventions](conventions.md) · [Home](../README.md) · [phonemizers →](phonemizers.md)
+[Index](index.md) · [← conventions](conventions.md) · [phonemizers →](phonemizers.md)

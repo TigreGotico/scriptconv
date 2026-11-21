@@ -1,5 +1,16 @@
 # Dictionary-backed respelling, `scriptconv.readings`
 
+<!-- agent-hint
+covers: kanji to kana, the token stream, and hanzi to pinyin or bopomofo
+source: scriptconv/readings.py, and the Japanese functions in scriptconv-copyleft
+generated: no
+verify: pytest tests/test_readings_zh.py tests/test_sister_packages.py
+see: docs/conventions.md for the wakachigaki and pinyin-tone conventions
+-->
+
+This page shows the respellings that need a dictionary: kanji to kana, and
+hanzi to pinyin or bopomofo.
+
 Some respellings are mechanical: katakana is hiragana shifted by a fixed
 codepoint offset, and a Hangul syllable decomposes into jamo by arithmetic.
 Those live in [translit](translit.md). This module handles the respellings
@@ -53,8 +64,8 @@ from scriptconv import tokens
 ## Chinese, hanzi → pinyin / bopomofo (`pip install scriptconv[zh]`)
 
 Pinyin and bopomofo (zhuyin) are both kana-like respellings of Chinese:
-standard ways of writing the language phonetically. Heteronyms, characters
-with several readings, are decided by the phrase dictionary:
+standard ways of writing the language phonetically. The phrase dictionary
+decides heteronyms, the characters with several readings:
 
 ```python
 from scriptconv import to_pinyin, to_bopomofo
@@ -75,9 +86,8 @@ the `zh` extra via `restyle` (see [conventions](conventions.md)).
 
 The line this module holds: a dictionary **lookup** is orthography and
 belongs here, contextual **prediction** does not. Restoring Arabic vowel
-marks or guessing an unknown word's reading are modelling problems, they
-live in dedicated tools, and scriptconv's role is only to represent and
-transcode their outputs.
+marks is a modelling problem. `scriptconv.diacritics.diacritize` calls a
+model for it behind the `tashkeel` extra, and this module does not.
 
 ---
-[← translit](translit.md) · [Home](../README.md) · [conventions →](conventions.md)
+[Index](index.md) · [← translit](translit.md) · [conventions →](conventions.md)
