@@ -80,13 +80,13 @@ class TestTheHookReadsTheWholeText:
         monkeypatch.setattr(frontend_module, "diacritize", diacritize)
         frontend = TextFrontend(FrontendConfig("xx", normalizer=normalize,
                                                stages=Stages(diacritize=True)), Echo(events))
-        chunks = frontend.phonemize_lazy("ab. cd. ef.")
+        chunks = frontend.phonemize_lazy("ab. gato. ef.")
         assert events == []
         assert next(chunks) == list("ab")
         # sentence 2 is neither diacritized nor read before sentence 1 is yielded
-        assert events == [("normalize", "ab. cd. ef."), ("diacritize", "ab."), ("backend", "ab")]
-        assert list(chunks) == [list("cd"), list("ef")]
-        assert events[3:] == [("diacritize", "cd."), ("backend", "cd"),
+        assert events == [("normalize", "ab. gato. ef."), ("diacritize", "ab."), ("backend", "ab")]
+        assert list(chunks) == [list("gato"), list("ef")]
+        assert events[3:] == [("diacritize", "gato."), ("backend", "gato"),
                               ("diacritize", "ef."), ("backend", "ef")]
 
 

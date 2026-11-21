@@ -52,6 +52,7 @@ OWNED = {
     Phonemizer.TUGAPHONE: {"normalize", "diacritize"},
     Phonemizer.ARBTOK: {"diacritize"},
     Phonemizer.DIZIONE: {"normalize"},
+    Phonemizer.EUSKAPHONE: {"normalize"},
 }
 
 # Code written or vendored in scriptconv, scriptconv-copyleft or
