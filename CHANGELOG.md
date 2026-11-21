@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a135](https://github.com/TigreGotico/scriptconv/tree/0.0.4a135) (2026-11-21)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a134...0.0.4a135)
+
+**Merged pull requests:**
+
+- fix\(identity\): a dependency of a preloaded package counts in the revision [\#372](https://github.com/TigreGotico/scriptconv/pull/372) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a134](https://github.com/TigreGotico/scriptconv/tree/0.0.4a134) (2026-11-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a133...0.0.4a134)
