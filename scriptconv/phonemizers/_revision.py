@@ -13,15 +13,16 @@ open. The hash then covers:
   ``version.py`` or ``_version.py`` at the top of a package. A compiled module
   counts by its name and the version of its distribution, since its bytes
   differ by platform and by Python build;
-- for each other top-level module of a distribution that holds a loaded
-  module, the same, for the files that the ``RECORD`` of that distribution
-  lists. So the working directory, the order of ``sys.path`` and another
-  distribution that installs a module of the same name, as ``tests``, stay out;
 - the source file of each class in the MRO of the backend that is not in
   scriptconv, so a subclass that changes a method changes the revision;
 - the class of the backend, the arguments that build it, the settings that
   change the output besides the code, whether the backend keeps clause
   punctuation, the language and :data:`unicodedata.unidata_version`.
+
+A top-level module that the probe does not load stays out, even when a
+distribution that holds a loaded module ships it, as the ``tests`` package of
+gruut-ipa. Such a module is not on the read path, and its files can belong to
+another distribution or to the working directory.
 
 The modules of the interpreter stay out: those that
 :data:`sys.stdlib_module_names` names, and each module in the standard library
@@ -70,10 +71,10 @@ import sysconfig
 import tokenize
 import unicodedata
 import uuid
-from importlib.metadata import distribution, packages_distributions, version
+from importlib.metadata import packages_distributions, version
 from importlib.util import find_spec
-from pathlib import Path, PurePosixPath
-from typing import Collection, Dict, Iterable, List, Mapping, NamedTuple, Optional, Tuple, Union
+from pathlib import Path
+from typing import Collection, Dict, Iterator, List, Mapping, NamedTuple, Optional, Tuple, Union
 
 LOG = logging.getLogger(__name__)
 
@@ -293,32 +294,23 @@ def _run_probe(module: str, qualname: str, lang: str, mode: str, arguments: str,
         if (opened.is_relative_to(root) and opened.suffix not in (".py", ".pyc")
                 and "__pycache__" not in opened.parts and opened.is_file()):
             entries.append((f"scriptconv/{opened.relative_to(root).as_posix()}", file_digest(opened)))
-    for top, holders in _distribution_tops(others, frozenset(json.loads(covered))).items():
-        entries.append((top, _top_level_digest(top, holders)))
+    for top in _distribution_tops(others, frozenset(json.loads(covered))):
+        entries.append((top, _top_level_digest(top)))
     digest = hashlib.sha256()
     for name, value in sorted(set(entries)):
         digest.update(f"\0{name}\0{value}".encode())
     return digest.hexdigest()
 
 
-def _distribution_tops(loaded: set, covered: Collection[str]) -> Dict[str, Tuple[str, ...]]:
-    """The top-level modules to hash, each with the distributions whose ``RECORD`` gives its files.
+def _distribution_tops(loaded: set, covered: Collection[str]) -> set:
+    """*loaded*, except the top-level modules that only distributions in *covered* hold.
 
-    Each module in *loaded* maps to ``()``, as the import system finds it. Each
-    other top-level module of a distribution that holds a loaded one maps to the
-    distributions that hold a loaded module and it. A module that only
-    distributions in *covered* hold stays out. A loaded module that no installed
-    distribution holds, as a checkout on the import path, stands for a
-    distribution of its own name.
+    A top-level module that no installed distribution holds, as a checkout on
+    the import path, stands for a distribution of its own name.
     """
     owners = packages_distributions()
-    holding = {owner for name in loaded for owner in owners.get(name, ()) if _canonical(owner) not in covered}
-    tops = {name: () for name in loaded - {"scriptconv"}
+    return {name for name in loaded - {"scriptconv"}
             if not {_canonical(owner) for owner in owners.get(name) or [name]} <= set(covered)}
-    for name, owned in owners.items():
-        if name not in loaded and name != "scriptconv" and holding & set(owned):
-            tops[name] = tuple(sorted(holding & set(owned)))
-    return tops
 
 
 def _canonical(distribution: str) -> str:
@@ -326,25 +318,8 @@ def _canonical(distribution: str) -> str:
     return re.sub(r"[-_.]+", "-", distribution).lower()
 
 
-def _top_level_digest(name: str, holders: Tuple[str, ...] = ()) -> str:
-    """The hash of the files of one top-level module: those that the ``RECORD``
-    of each distribution in *holders* lists under it, or, with no *holders*,
-    those where the import system finds it."""
-    if holders:
-        files = []
-        for holder in holders:
-            installed = distribution(holder)
-            for file in installed.files or ():
-                if len(file.parts) > 1 and file.parts[0] == name:
-                    relative = PurePosixPath(*file.parts[1:])
-                elif len(file.parts) == 1 and file.name.split(".")[0] == name:
-                    relative = PurePosixPath(file.name)
-                else:
-                    continue
-                path = Path(installed.locate_file(file))
-                if path.is_file():
-                    files.append((relative, path))
-        return _files_digest(name, holders, files)
+def _top_level_digest(name: str) -> str:
+    """The hash of the files of one top-level module, where the import system finds it."""
     spec = find_spec(name)
     if spec is None:
         raise RevisionSourceUnavailable(f"the module {name} is not on the import path")
@@ -353,39 +328,34 @@ def _top_level_digest(name: str, holders: Tuple[str, ...] = ()) -> str:
             if not Path(location).is_dir():
                 raise RevisionSourceUnavailable(
                     f"the package {name} does not load from a directory: {location}")
-        return _files_digest(name, holders, ((path.relative_to(root), path)
-                                             for root in map(Path, spec.submodule_search_locations)
-                                             for path in root.rglob("*") if path.is_file()))
+        digest = hashlib.sha256()
+        for relative, path in sorted(_package_files(spec.submodule_search_locations)):
+            if path.suffix in _NATIVE:
+                # the file name carries the platform tag, which the hash leaves out
+                relative = Path(relative).with_name(path.name.split(".")[0]).as_posix()
+                value = _native(name)
+            else:
+                value = file_digest(path)
+            digest.update(f"\0{relative}\0{value}".encode())
+        return digest.hexdigest()
     origin = _source_file(spec.origin, f"the module {name}")
     return _native(name) if origin.suffix in _NATIVE else file_digest(origin)
 
 
-def _files_digest(name: str, holders: Tuple[str, ...], files: Iterable[Tuple[PurePosixPath, Path]]) -> str:
-    """The hash of *files* of the top-level module *name*, each a path under it and the file.
-
-    Bytecode and a ``version.py`` or ``_version.py`` at the top stay out.
-    """
-    kept = {(relative.as_posix(), path) for relative, path in files
-            if "__pycache__" not in relative.parts and path.suffix != ".pyc"
-            and not (len(relative.parts) == 1 and relative.name in _VERSION_FILES)}
-    digest = hashlib.sha256()
-    for relative, path in sorted(kept):
-        if path.suffix in _NATIVE:
-            # the file name carries the platform tag, which the hash leaves out
-            relative = PurePosixPath(relative).with_name(path.name.split(".")[0]).as_posix()
-            value = _native(name, holders)
-        else:
-            value = file_digest(path)
-        digest.update(f"\0{relative}\0{value}".encode())
-    return digest.hexdigest()
-
-
 @functools.lru_cache(maxsize=None)
-def _native(name: str, holders: Tuple[str, ...] = ()) -> str:
-    """A compiled module of the top-level module *name*: the versions of *holders*,
-    or, with no *holders*, of the distributions that hold it."""
-    owners = holders or sorted(set(packages_distributions().get(name, ())))
+def _native(name: str) -> str:
+    """A compiled module of the top-level module *name*: the versions of the distributions that hold it."""
+    owners = sorted(set(packages_distributions().get(name, ())))
     return "native " + " ".join(f"{owner}=={version(owner)}" for owner in owners)
+
+
+def _package_files(roots) -> Iterator[Tuple[str, Path]]:
+    for root in map(Path, roots):
+        for path in root.rglob("*"):
+            relative = path.relative_to(root)
+            if (path.is_file() and "__pycache__" not in relative.parts and path.suffix != ".pyc"
+                    and not (len(relative.parts) == 1 and relative.name in _VERSION_FILES)):
+                yield relative.as_posix(), path
 
 
 def file_digest(path: Path) -> str:

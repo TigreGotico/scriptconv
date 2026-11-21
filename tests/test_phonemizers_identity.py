@@ -252,9 +252,9 @@ def hashed_tops(monkeypatch):
     tops = []
     digest = _revision._top_level_digest
 
-    def recorded(name, *holders):
+    def recorded(name):
         tops.append(name)
-        return digest(name, *holders)
+        return digest(name)
     monkeypatch.setattr(_revision, "_top_level_digest", recorded)
     return tops
 
@@ -1040,11 +1040,28 @@ class TestStableRevision:
         assert revision is not None
         assert revision_from(tmp_path / "plain", site) == revision
 
-    def test_a_file_of_a_distribution_that_holds_a_loaded_module_changes_the_revision(self, tmp_path):
+    def test_a_shared_tests_package_overwritten_or_removed_keeps_the_revision(self, tmp_path):
         site = sloppy_site(tmp_path)
         (tmp_path / "plain").mkdir()
         revision = revision_from(tmp_path / "plain", site)
-        (site / "tests" / "__init__.py").write_text("SLOPPY = 2\n")
+        # each distribution with a top-level tests package writes this file, and its uninstall removes it
+        shared = site / "tests" / "__init__.py"
+        shared.write_text("from .helpers import *\n")
+        overwritten = revision_from(tmp_path / "plain", site)
+        shared.unlink()
+        assert revision is not None
+        assert overwritten == revision
+        assert revision_from(tmp_path / "plain", site) == revision
+
+    def test_an_edit_to_a_module_the_probe_imports_changes_the_revision(self, tmp_path):
+        site = sloppy_site(tmp_path)
+        shutil.copytree(Path(quebra_frases.__file__).parent, site / "quebra_frases",
+                        ignore=shutil.ignore_patterns("__pycache__"))
+        (tmp_path / "plain").mkdir()
+        revision = revision_from(tmp_path / "plain", site)
+        with open(site / "quebra_frases" / "tokenization.py", "a", encoding="utf-8") as module:
+            module.write("\n_split = sentence_tokenize\n\n\n"
+                         "def sentence_tokenize(input_string):\n    return _split(input_string)[::-1]\n")
         assert revision is not None
         assert revision_from(tmp_path / "plain", site) != revision
 
