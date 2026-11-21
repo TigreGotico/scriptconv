@@ -4,7 +4,7 @@
 covers: the reading order of every page in docs/, and the subcommands of the command line
 source: the pages in docs/, and scriptconv/__main__.py for the command line
 generated: no
-verify: python -c '(I:=__import__,re:=I("re"),os:=I("os"),glob:=I("glob"),subprocess:=I("subprocess"),sys:=I("sys"),P:=sorted(os.path.basename(p) for p in glob.glob("docs/*.md") if not p.endswith("index.md")),t:=re.sub(r"<!--.*?--\x3e","",open("docs/index.md",encoding="utf-8").read(),flags=re.S),o:=re.findall(r"^\d+\. \*\*\[([\w-]+\.md)\]",t,re.M),R:=lambda p:re.sub(r"<!--.*?--\x3e|\x60{3}.*?\x60{3}","",open(p,encoding="utf-8").read(),flags=re.S),L:=[(f,u) for f in ["README.md","AGENTS.md"]+["docs/"+p for p in P+["index.md"]] for u in re.findall(r"\]\(([^)#\s]+)",R(f)) if "://" not in u and not os.path.exists(os.path.join(os.path.dirname(f),u))],N:=[(x,y) for x,y in zip(o,o[1:]) if "→\x5d("+y+")" not in R("docs/"+x) or not re.search(r"\[← [^]]*\]\("+re.escape(x)+r"\)",R("docs/"+y))],c:=re.search(r"\{([\w,]+)\}",subprocess.run([sys.executable,"-m","scriptconv","--help"],capture_output=True,text=True).stdout).group(1).split(","),d:=re.findall(r"\x60(\w+)\x60",re.search(r"subcommands: (.*?)\.\n",t,re.S).group(1)),w:=([("pages",P,sorted(o))] if sorted(o)!=P else [])+L+N+([("cli",c,d)] if c!=d else []),print("OK",len(o),"pages",len(c),"subcommands") if not w else sys.exit("BROKEN "+repr(w)))'
+verify: python scripts/check_doc_page.py docs/index.md
 see: README.md, AGENTS.md
 -->
 
