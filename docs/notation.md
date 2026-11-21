@@ -1,6 +1,16 @@
 # scriptconv.notation
 
-Phoneme-notation transcoding. All tables are pure Python data, zero runtime dependencies.
+<!-- agent-hint
+covers: the notation converters, the errors= policy and the NOTATION_INFO fidelity flags
+source: scriptconv/notation.py
+generated: no
+verify: pytest tests/test_notation.py tests/test_notation_strict.py tests/test_errors_policy.py
+see: docs/graph.md for routing between notations
+-->
+
+This page shows how to convert a phoneme string between IPA and the other
+notations, and what each converter does with a symbol outside its table. All
+tables are pure Python data with no runtime dependencies.
 
 ```python
 from scriptconv.notation import (
@@ -39,7 +49,7 @@ convert("S", Notation.XSAMPA, Notation.IPA)  # enum members, equivalent
 ## convert, facade
 
 ```python
-def convert(text: str, src: str | Notation, dst: str | Notation) -> str
+def convert(text: str, src: str | Notation, dst: str | Notation, errors: str = "pass") -> str
 ```
 
 Routes a conversion through the appropriate pair function, or chains through IPA when
@@ -115,7 +125,7 @@ refers to for IPA. `tests/test_notation_sources.py` quotes both.
 ### arpa_to_ipa
 
 ```python
-def arpa_to_ipa(arpa_sequence: str) -> str
+def arpa_to_ipa(arpa_sequence: str, errors: str = "pass", stress: bool = False) -> str
 ```
 
 Converts a space-separated ARPABET token sequence to an IPA string. Stress digits
@@ -196,7 +206,7 @@ quotes it row by row and lists each spelling left out, with the reason.
 ### xsampa_to_ipa
 
 ```python
-def xsampa_to_ipa(xsampa: str) -> str
+def xsampa_to_ipa(xsampa: str, errors: str = "pass") -> str
 ```
 
 Converts an X-SAMPA string to IPA. Multi-character symbols are matched **longest-first**
@@ -227,7 +237,7 @@ xsampa_to_ipa('"tS@n')  # "ˈtʃən"
 ### ipa_to_xsampa
 
 ```python
-def ipa_to_xsampa(ipa: str) -> str
+def ipa_to_xsampa(ipa: str, errors: str = "pass") -> str
 ```
 
 Converts an IPA string to X-SAMPA. Longest-first matching on IPA keys. Unknown IPA
@@ -294,7 +304,7 @@ Table follows Tim Buckwalter's published Arabic transliteration scheme, a
 ### buckwalter_to_arabic
 
 ```python
-def buckwalter_to_arabic(bw: str) -> str
+def buckwalter_to_arabic(bw: str, errors: str = "pass") -> str
 ```
 
 Converts a Buckwalter-encoded string to Arabic Unicode. Unknown characters are passed
@@ -309,7 +319,7 @@ buckwalter_to_arabic("p")       # "ة"   (ta marbuta)
 ### arabic_to_buckwalter
 
 ```python
-def arabic_to_buckwalter(arabic: str) -> str
+def arabic_to_buckwalter(arabic: str, errors: str = "pass") -> str
 ```
 
 Converts Arabic Unicode to Buckwalter transliteration. Unknown characters are passed
@@ -389,7 +399,7 @@ Lexique phoneme string represents exactly one phoneme.
 ### lexique_to_ipa
 
 ```python
-def lexique_to_ipa(lexique: str) -> str
+def lexique_to_ipa(lexique: str, errors: str = "pass") -> str
 ```
 
 Converts a Lexique phoneme-code string to IPA. Each character is looked up
@@ -407,7 +417,7 @@ lexique_to_ipa("abd°Ra")  # "abdəʁa" (° = schwa élidable)
 ### ipa_to_lexique
 
 ```python
-def ipa_to_lexique(ipa: str) -> str
+def ipa_to_lexique(ipa: str, errors: str = "pass") -> str
 ```
 
 Converts an IPA string to Lexique codes. Longest-first matching on IPA keys. Symbols
@@ -676,15 +686,15 @@ consonants (the pipeline never emits it after a vowel), `_sil_` becomes a
 pause, `_eos_`/`_pad_` are dropped, and a pre-tokenized sequence (as returned
 by the mantoq package's `g2p`) is accepted directly, since joining tokens
 into a string is ambiguous. The token → IPA table maps the inventory's
-phonetic values; the phonetiser *engine* itself lives in
-[phonemizers](phonemizers.md) under its own license.
+phonetic values. The phonetiser *engine* is the `halabi` backend, which
+scriptconv-nonfree holds under its own licence (see [backends](backends.md)).
 
 `halabi_to_ipa` also accepts the RAW (pre-`simplify_phonemes`) phonetiser
-output — the emphatic-context uppercase vowels (`A`/`AA`/`I`/`II`/`U`/`UU`)
+output: the emphatic-context uppercase vowels (`A`/`AA`/`I`/`II`/`U`/`UU`)
 that `Phonemizer.HALABI` returns natively, since mantoq's own g2p folds them
 to the plain forms above before a caller ever sees them.
 
-### `iqra_halabi_to_ipa` — the IqraEval `phoneme_ref` flavor
+### `iqra_halabi_to_ipa`, the IqraEval `phoneme_ref` flavor
 
 `Phonemizer.IQRA`'s output uses a related but distinct table: gemination is a
 literal doubled consonant letter (`bb`, `nn`, …) rather than a `_dbl_`
@@ -700,4 +710,4 @@ iqra_halabi_to_ipa("f ii h i x A y r aa t")   # 'fiːhixɑjraːt'
 ```
 
 ---
-[← scripts](scripts.md) · [Home](../README.md) · [translit →](translit.md)
+[Index](index.md) · [← scripts](scripts.md) · [translit →](translit.md)

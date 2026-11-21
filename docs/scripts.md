@@ -1,6 +1,15 @@
 # scriptconv.scripts
 
-Writing-system identification and metadata.
+<!-- agent-hint
+covers: script detection, mixed-script runs, text direction and the language-to-script map
+source: scriptconv/scripts.py
+generated: no
+verify: pytest tests/test_scripts.py
+see: docs/notation.md, docs/conventions.md
+-->
+
+This page shows how to find the writing system of a text, split mixed-script
+text into runs, and map a language code to its script.
 
 ```python
 from scriptconv.scripts import (
@@ -363,4 +372,4 @@ authoritative script subtag (`sr-Latn`), and the widespread informal
 `_cyr`/`_lat` variant suffixes (`uzb_cyr`).
 
 ---
-[Home](../README.md) · [notation →](notation.md)
+[Index](index.md) · [← stack](stack.md) · [notation →](notation.md)

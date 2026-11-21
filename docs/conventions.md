@@ -1,5 +1,16 @@
 # Orthographic conventions, `scriptconv.conventions`
 
+<!-- agent-hint
+covers: the convention registry and the strip, apply, restyle and detect calls
+source: scriptconv/conventions.py
+generated: no
+verify: pytest tests/test_conventions.py
+see: docs/graph.md, and scriptconv/diacritics.py for restoring marks
+-->
+
+This page shows how to strip, add and restyle the optional marks of a
+script, such as Arabic vowel marks or pinyin tones.
+
 Two pieces of Arabic text can be the same words with and without vowel marks.
 Japanese can be written solid or with spaces between words. Pinyin writes
 tone as diacritics or as digits. None of these differences change what script
@@ -100,4 +111,4 @@ fits the concept but is already modelled correctly by `str.lower` /
 `str.casefold`, so it is deliberately not duplicated.
 
 ---
-[← readings](readings.md) · [Home](../README.md) · [graph →](graph.md)
+[Index](index.md) · [← readings](readings.md) · [graph →](graph.md)
