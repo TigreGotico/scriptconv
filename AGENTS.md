@@ -40,7 +40,9 @@ installed (`.github/workflows/build-tests.yml`).
   `ImportError` that names the extra
   (`tests/test_phonemizers_friendly_import_errors.py`).
 - A pull request that adds a backend adds its enum member, its registry row and a row in
-  [docs/backends.md](docs/backends.md), in the order of the enum.
+  [docs/backends.md](docs/backends.md). Run
+  `python scripts/backend_table.py --write` for the row.
+  `tests/test_backend_table.py` fails on a stale table.
 - No extra installs a copyleft or non-commercial distribution, except the two
   that `scripts/check_extra_licences.py` lists. Such a wrapper goes to
   scriptconv-copyleft or scriptconv-nonfree. `tests/test_wheel_licences.py`
@@ -57,6 +59,7 @@ installed (`.github/workflows/build-tests.yml`).
 ```bash
 pytest tests/
 python scripts/check_extra_licences.py
+python scripts/backend_table.py --check
 ```
 
 Pull requests target `dev`, where the build and licence workflows run.
