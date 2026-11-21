@@ -3,8 +3,8 @@
 <!-- agent-hint
 covers: every phonemizer backend, its class, its extra and its package, and the models that download
 source: the Phonemizer enum in scriptconv/phonemizers/enums.py, PHONEMIZER_REGISTRY and LANG_DEFAULTS in scriptconv/phonemizers/registry.py
-generated: yes, the table between the backends markers, by scripts/backend_table.py --write. Edit the registry, not the table
-verify: python scripts/backend_table.py --check
+generated: no. The table rows follow the order of the Phonemizer enum, one row per member
+verify: the second command under "List the backends" prints the value, class and extra of each row, in table order
 see: docs/phonemizers.md, docs/stack.md
 -->
 
@@ -20,7 +20,12 @@ The registry holds the list. This command prints the value of each backend:
 python -c "from scriptconv.phonemizers import Phonemizer; print(' '.join(p.value for p in Phonemizer))"
 ```
 
-From a checkout, `python scripts/backend_table.py` prints the table below.
+This command prints the value, class and extra of each backend, in the order
+of the table below. Compare its output with the table to check the table:
+
+```bash
+python -c "from scriptconv.phonemizers import Phonemizer, PHONEMIZER_REGISTRY as R; [print(p.value, R[p][1], R[p][2] or 'phonemizers') for p in Phonemizer]"
+```
 
 ## The table
 
