@@ -14,7 +14,7 @@
 covers: what scriptconv does, the quickstart, the extras and the licences
 source: `__all__` in scriptconv/__init__.py, scriptconv/phonemizers/registry.py, scriptconv/phonemizers/_moved.py, pyproject.toml
 generated: no
-verify: pytest tests/test_examples.py tests/test_wheel_licences.py
+verify: pytest tests/test_cli.py tests/test_graph.py tests/test_conventions.py tests/test_sister_packages.py tests/test_wheel_licences.py
 see: docs/index.md, docs/stack.md, AGENTS.md
 -->
 

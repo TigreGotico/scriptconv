@@ -20,8 +20,13 @@ The registry holds the list. This command prints the value of each backend:
 python -c "from scriptconv.phonemizers import Phonemizer; print(' '.join(p.value for p in Phonemizer))"
 ```
 
-From a checkout, `python scripts/backend_table.py` prints the table below,
-and `--write` rewrites it in this page.
+## Check the table
+
+The table has one row per `Phonemizer` member, in the order of the enum.
+`scripts/backend_table.py` writes it from the registry. From the repository
+root, `python scripts/backend_table.py` prints the table, `--write` rewrites it
+in this page, and `--check` exits 1 when the page differs from the registry.
+`tests/test_backend_table.py` runs `--check`.
 
 ## The table
 
