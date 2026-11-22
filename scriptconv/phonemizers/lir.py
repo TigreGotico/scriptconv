@@ -71,18 +71,7 @@ class KolokwaPhonemizer(BasePhonemizer):
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
-        """
-        Validates the language code and returns the language key of the model.
-
-        Args:
-            target_lang (str): The language code to validate.
-
-        Returns:
-            str: ``"en_lr"``, the key of Liberian English in the model.
-
-        Raises:
-            ValueError: If the language code is unsupported.
-        """
+        """``"en_lr"``, the model key of Liberian English; raises ValueError when *target_lang* is not close to ``lir``."""
         cls.match_lang(target_lang, ["lir"])
         return "en_lr"
 

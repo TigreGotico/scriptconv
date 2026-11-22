@@ -22,8 +22,9 @@ states "This code is Apache 2.0 licensed".
 The backend does not read digits. Numbers, dates and units are the
 normalisation stage, which the caller runs before the backend. A digit or
 another number, such as ``Ⅻ``, or a letter that has no reading, such as a
-Latin letter of either case or ``İ``, gives no symbol: the backend logs a warning that names each run of such characters,
-or raises :class:`~scriptconv.phonemizers.base.UnreadTextError` when
+Latin letter of either case or ``İ``, gives no symbol: the backend logs a
+warning that names each run of such characters, or raises
+:class:`~scriptconv.phonemizers.base.UnreadTextError` when
 :attr:`~scriptconv.phonemizers.base.BasePhonemizer.strict` is set.
 
 The model files come from the Hugging Face Hub at a fixed revision, into the
@@ -241,8 +242,9 @@ class G2PWPhonemizer(BasePhonemizer):
     def _sentence_symbols(self, sentence: str) -> List[str]:
         """The symbols of one sentence.
 
-        A number, or a letter with no reading, gives no symbol. The backend logs a warning that names each run of these
-        characters, or raises :class:`UnreadTextError` in strict mode.
+        A number, or a letter with no reading, gives no symbol. The backend logs
+        a warning that names each run of these characters, or raises
+        :class:`UnreadTextError` in strict mode.
         """
         symbols: List[str] = []
         unread: List[str] = []
