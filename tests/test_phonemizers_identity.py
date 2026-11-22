@@ -360,8 +360,9 @@ SCRIPTCONV = Path(sys.modules["scriptconv"].__file__).parent
 QUEBRA_FRASES = Path(quebra_frases.__file__).parent
 
 # Edits of the scriptconv source, (file, old text, new text), on the path of the
-# named backend or frontend. Each edit but F4 changes its output for some input.
-# F4 edits a module that the frontend loads and calls only when it diacritizes.
+# named backend or frontend. Each edit but F4 and I1 changes its output for some input.
+# F4 edits a module that the frontend loads and calls only when it diacritizes. I1
+# adds code to a parent package, which runs on each import of the backend.
 CODE_MUTANTS = {
     "G1 the letter test before a hyphen skips no combining mark": (
         "graphemes", "phonemizers/base.py",
@@ -400,6 +401,10 @@ CODE_MUTANTS = {
         "matoub_kab", "diacritics.py",
         '**dict.fromkeys(("lv", "sl", "az-Latn", "uz-Latn"), "Latn"),',
         '**dict.fromkeys(("lv", "sl", "az-Latn", "uz-Latn", "kab"), "Latn"),'),
+    "I1 code in a parent package of the backend": (
+        "graphemes", "phonemizers/__init__.py",
+        "from scriptconv.phonemizers.enums import Alphabet, Phonemizer\n",
+        "from scriptconv.phonemizers.enums import Alphabet, Phonemizer\nANSWER = 42\n"),
 }
 # Edits that change no output: a docstring and a comment, the version, and
 # the code of another backend.
@@ -638,6 +643,17 @@ class TestCodeRevision:
         monkeypatch.delitem(sys.modules, "zipped_backend", raising=False)
         return importlib.import_module("zipped_backend")
 
+    def test_a_package_in_a_zip_raises_a_named_error(self, tmp_path, monkeypatch):
+        from scriptconv.phonemizers._revision import RevisionSourceUnavailable, _module_file
+        self.zipped_package(tmp_path, monkeypatch)
+        with pytest.raises(RevisionSourceUnavailable, match="zipped_backend"):
+            _module_file("zipped_backend.engine")
+
+    def test_each_language_has_its_own_revision(self):
+        revisions = {lang: GraphemePhonemizer().identity(lang).revision for lang in ("pt", "ru")}
+        assert None not in revisions.values()
+        assert revisions["pt"] != revisions["ru"]
+
     def test_a_class_from_a_zip_gives_no_revision_and_a_warning(self, tmp_path, monkeypatch, caplog):
         zipped = self.zipped_package(tmp_path, monkeypatch)
         with caplog.at_level(logging.WARNING, logger="scriptconv.phonemizers._revision"):
@@ -851,7 +867,7 @@ print(json.dumps(GraphemePhonemizer().identity("en").revision))
 def fresh_revisions():
     """File digests and warnings kept by no earlier test, and none kept after this one."""
     from scriptconv.phonemizers import _revision
-    caches = (_revision._files, _revision.file_digest, _revision._warn_once)
+    caches = (_revision._path, _revision._top_level_distributions, _revision.file_digest, _revision._warn_once)
     for cache in caches:
         cache.cache_clear()
     yield
@@ -872,6 +888,18 @@ def released(monkeypatch, name, version):
         except metadata.PackageNotFoundError:
             requires = None
         return SimpleNamespace(version=version, requires=requires)
+    monkeypatch.setattr(metadata, "distribution", distribution)
+
+
+def uninstalled(monkeypatch, name):
+    """The installed metadata as after an uninstall of *name*."""
+    from scriptconv.phonemizers import _revision
+    installed = metadata.distribution
+
+    def distribution(asked):
+        if _revision._canonical(asked) == name:
+            raise metadata.PackageNotFoundError(asked)
+        return installed(asked)
     monkeypatch.setattr(metadata, "distribution", distribution)
 
 
@@ -950,6 +978,30 @@ class TestReleases:
         assert current is not None
         assert EpitranPhonemizer().identity("rus-Cyrl").revision == current
 
+    def test_an_install_of_a_module_that_the_path_imports_changes_the_revision(self, monkeypatch):
+        # the Shami normaliser reads numbers through num2words when it is installed, and no extra requires it
+        assert metadata.distribution("num2words")
+        installed = get_phonemizer(Phonemizer.SHAMI).identity("apc").revision
+        uninstalled(monkeypatch, "num2words")
+        assert installed is not None
+        assert get_phonemizer(Phonemizer.SHAMI).identity("apc").revision not in (None, installed)
+
+    def test_a_release_of_a_module_that_the_path_imports_changes_the_revision(self, monkeypatch):
+        current = get_phonemizer(Phonemizer.SHAMI).identity("apc").revision
+        released(monkeypatch, "num2words", "99.0.0")
+        assert current is not None
+        assert get_phonemizer(Phonemizer.SHAMI).identity("apc").revision not in (None, current)
+
+    def test_a_release_of_a_language_pack_of_the_engine_changes_that_language_only(self, monkeypatch):
+        # gruut requires gruut_lang_fr under its extra "fr"
+        gruut = get_phonemizer(Phonemizer.GRUUT)
+        current = {lang: gruut.identity(lang).revision for lang in ("fr", "ru", "en-us")}
+        released(monkeypatch, "gruut-lang-fr", "99.0.0")
+        assert None not in current.values()
+        after = {lang: gruut.identity(lang).revision for lang in current}
+        assert after["fr"] not in (None, current["fr"])
+        assert (after["ru"], after["en-us"]) == (current["ru"], current["en-us"])
+
     def test_an_unrelated_release_keeps_the_revision(self, monkeypatch):
         current = GraphemePhonemizer().identity("en").revision
         released(monkeypatch, "panphon", "99.0.0")
@@ -964,6 +1016,9 @@ class TestReleases:
         ('os_name in "nt posix"', True),
         ('(python_version < "3.0" or os_name != "nt") and extra == "Test_It"', os.name != "nt"),
         ('extra == "other"', False),
+        ('"win" not in sys_platform', "win" not in sys.platform),
+        ('"linux" in sys_platform', "linux" in sys.platform),
+        ('python_version >= "3.9"', sys.version_info >= (3, 9)),
     ])
     def test_a_marker_holds_as_pep_508_reads_it(self, marker, expected):
         from scriptconv.phonemizers._revision import _marker_holds
@@ -1053,7 +1108,7 @@ class TestStableRevision:
 
     def test_the_hash_holds_files_of_the_scriptconv_packages_on_the_path_only(self):
         from scriptconv.phonemizers import _revision
-        files = {path for path, _ in _revision._files(frozenset({"scriptconv.phonemizers.base"}))}
+        files = {path for path, _ in _revision._path(frozenset({"scriptconv.phonemizers.base"}))[0]}
         assert {"scriptconv/phonemizers/base.py", "scriptconv/diacritics.py"} <= files
         assert not {"scriptconv/version.py", "scriptconv/phonemizers/zh.py"} & files
         # neither the interpreter's own modules, which differ between two builds of one Python, nor a dependency

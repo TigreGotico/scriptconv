@@ -86,9 +86,15 @@ The hash covers these inputs:
 - the name and version of each installed distribution that the `phonemizers`
   extra and the extra of the backend require, at any depth, and those of the
   engine. A requirement under an extra counts only when that extra is asked
-  for. A requirement for another platform or Python version does not count.
-  The engine, and each distribution that an engine revision covers, count
-  only once, in the settings.
+  for. The engine counts with its extra named by the language, when it has
+  one, so `gruut` for `fr` counts `gruut-lang-fr`. A requirement for another
+  platform or Python version does not count. The engine, and each
+  distribution that an engine revision covers, count only once, in the
+  settings.
+- the name and version of each installed distribution that provides a module
+  that the scriptconv modules above import, such as `num2words`, which the
+  Shami normaliser uses when it is installed. The requirements of such a
+  distribution do not count.
 - the source file of each class of the backend outside scriptconv, so a
   subclass counts
 - the arguments of the backend, a character rule set on the instance, the
@@ -98,8 +104,12 @@ The code of a module counts as its tokens. Comments, blank lines, docstrings
 and `version.py` do not count. A release of scriptconv that changes code or
 data on the path of the backend changes the `revision`. A release that changes
 only other backends, docs or `version.py` keeps it, and `differs_from` then
-reports nothing. A release of a dependency changes the `revision`, also when
-the phonemes stay the same, and a voice then warns once.
+reports nothing. A release of a distribution in the list above changes the
+`revision`, also when the phonemes stay the same, and a voice then warns once.
+A release of any other distribution keeps the `revision`. This includes a
+distribution that the engine loads at run time by a name that is not in the
+scriptconv source, such as a model package, unless an extra of the backend
+or of the engine requires it.
 
 The hash reads no state of the running process: not the modules that it
 loaded, not its working directory and not a package that loads at startup from

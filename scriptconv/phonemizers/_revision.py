@@ -12,10 +12,15 @@ The hash covers:
   A package that loads only as the parent of such a module adds no files;
 - the name and version of each installed distribution that the ``phonemizers``
   extra and the extra of the backend require, with the engine distribution, at
-  any depth. A requirement counts when its PEP 508 marker holds here, so a
-  requirement under an extra that nobody asks for, or for another platform,
-  does not. scriptconv and its sister packages count by their files instead,
-  and the distributions of
+  any depth. The engine counts with its extra named by the language, when it
+  has one, as ``gruut[fr]`` for ``fr``. A requirement counts when its PEP 508
+  marker holds here, so a requirement under an extra that nobody asks for, or
+  for another platform, does not;
+- the name and version of each installed distribution that provides a module
+  that the modules above import, as num2words for the Shami normaliser. Its
+  own requirements do not count;
+- scriptconv and its sister packages count by their files instead of their
+  version, and the distributions of
   :meth:`~scriptconv.phonemizers.base.BasePhonemizer._covered_distributions`
   count by the engine revision or version in the settings;
 - the source file of each class in the MRO of the backend outside these packages;
@@ -28,8 +33,10 @@ With *frontend*, the modules that :mod:`scriptconv.frontend` imports count too.
 A code token is any token but a comment, a blank line or a string that stands
 as a statement, as a docstring does. So a release that changes code or data on
 the path of the backend changes the revision, and a release that changes only
-docs, ``version.py`` or the modules and data of other backends keeps it. A release of a
-dependency changes it.
+docs, ``version.py`` or the modules and data of other backends keeps it. A
+release of a distribution above changes it. A release of any other
+distribution keeps it, also when the backend loads that distribution at run
+time through a name that is not in its source.
 
 Nothing of the running process counts: neither the modules it loaded, nor its
 working directory, nor a package that loads at startup. Two machines with the
@@ -111,16 +118,21 @@ def code_revision(backend, lang: str, settings: Mapping, frontend: bool = False)
         classes = [(cls.__module__, file_digest(_source_file(inspect.getsourcefile(cls), f"the class {cls.__qualname__}")))
                    for cls in type(backend).__mro__
                    if cls.__module__ not in ("builtins", "abc") and cls not in in_tree]
+        files, outside = _path(frozenset(roots))
         extras = {"phonemizers", _extra(type(backend))} - {None}
         roots_of_releases = [("scriptconv", frozenset(extras))]
+        imported = {name for top in outside for name in _top_level_distributions().get(top, ())}
         if backend.engine_distribution is not None:
-            roots_of_releases.append((backend.engine_distribution, frozenset()))
+            # an engine extra named by the language, as gruut[fr], holds the data of that language
+            language = _canonical(lang)
+            roots_of_releases.append((backend.engine_distribution,
+                                      frozenset({language, language.partition("-")[0]})))
         covered = {_canonical(name) for name in backend._covered_distributions(lang)}
         hashed = [FORMAT, "frontend" if frontend else "backend",
                   f"{type(backend).__module__}:{type(backend).__qualname__}", lang,
                   backend._revision_arguments(), settings, backend._keeps_punctuation(),
-                  unicodedata.unidata_version, _files(frozenset(roots)), classes,
-                  _releases(roots_of_releases, covered)]
+                  unicodedata.unidata_version, files, classes,
+                  _releases(roots_of_releases, covered, imported)]
     except (OSError, SyntaxError, ValueError, KeyError, TypeError, metadata.PackageNotFoundError) as exc:
         _warn_once(type(backend).__name__, lang, f"{type(exc).__name__}: {exc}")
         return None
@@ -147,14 +159,26 @@ def _canonical(name: str) -> str:
 
 
 @functools.lru_cache(maxsize=None)
-def _files(roots: FrozenSet[str]) -> List[Tuple[str, str]]:
-    """The path and digest of each file of the packages in :data:`_IN_TREE` on the import path of *roots*."""
+def _top_level_distributions() -> Mapping[str, List[str]]:
+    """The installed distributions that provide each top-level module."""
+    return metadata.packages_distributions()
+
+
+@functools.lru_cache(maxsize=None)
+def _path(roots: FrozenSet[str]) -> Tuple[List[Tuple[str, str]], FrozenSet[str]]:
+    """The path and digest of each file of the packages in :data:`_IN_TREE` on the import path of *roots*,
+    and the top-level name of each other module that these files import."""
     modules: Dict[str, Path] = {}
     imported = set(roots)
+    outside: Set[str] = set()
     pending = list(roots)
     while pending:
         name = pending.pop()
-        if name in modules or name.partition(".")[0] not in _IN_TREE:
+        top = name.partition(".")[0]
+        if top not in _IN_TREE:
+            outside.add(top)
+            continue
+        if name in modules:
             continue
         path = _module_file(name)
         if path is None:
@@ -182,7 +206,7 @@ def _files(roots: FrozenSet[str]) -> List[Tuple[str, str]]:
         relative = path.relative_to(sites[top]).as_posix()
         if relative != f"{top}/version.py":
             entries.append((relative, file_digest(path)))
-    return sorted(entries)
+    return sorted(entries), frozenset(outside)
 
 
 def _module_file(name: str) -> Optional[Path]:
@@ -231,14 +255,21 @@ def _data_files(directory: Path) -> Iterator[Path]:
                         if child.is_file() and "__pycache__" not in child.parts and child.suffix != ".pyc")
 
 
-def _releases(roots: List[Tuple[str, FrozenSet[str]]], covered: Collection[str]) -> List[str]:
-    """``name==version`` of each installed distribution that *roots*, as (distribution, extras), require at any depth.
+def _releases(roots: List[Tuple[str, FrozenSet[str]]], covered: Collection[str],
+              imported: Collection[str] = ()) -> List[str]:
+    """``name==version`` of each installed distribution that *roots*, as (distribution, extras), require at any depth,
+    and of each distribution in *imported*, without its requirements.
 
     A distribution that is not installed, as an optional engine or a binary,
     adds nothing. The distributions of :data:`_IN_TREE_DISTRIBUTIONS` and
     *covered* stay out, and their requirements count.
     """
     found: Dict[str, str] = {}
+    for name in imported:
+        try:
+            found[_canonical(name)] = metadata.distribution(name).version
+        except metadata.PackageNotFoundError:
+            continue
     seen: Set[Tuple[str, str]] = set()
     pending = [(name, extra) for name, extras in roots for extra in ("", *extras)]
     while pending:
