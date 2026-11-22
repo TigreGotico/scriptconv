@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a138](https://github.com/TigreGotico/scriptconv/tree/0.0.4a138) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a137...0.0.4a138)
+
+**Merged pull requests:**
+
+- docs: README, docs index, navigation and agent hints [\#374](https://github.com/TigreGotico/scriptconv/pull/374) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a137](https://github.com/TigreGotico/scriptconv/tree/0.0.4a137) (2026-11-22)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a136...0.0.4a137)
@@ -340,10 +348,6 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a93...0.0.4a94)
 
-**Merged pull requests:**
-
-- fix: read the g2pM erhua suffix r5 as a rhotic coda [\#247](https://github.com/TigreGotico/scriptconv/pull/247) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a93](https://github.com/TigreGotico/scriptconv/tree/0.0.4a93) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a92...0.0.4a93)
@@ -379,10 +383,6 @@
 ## [0.0.4a89](https://github.com/TigreGotico/scriptconv/tree/0.0.4a89) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a88...0.0.4a89)
-
-**Merged pull requests:**
-
-- fix\(frontend\): skip the stages when no mark can follow a block [\#246](https://github.com/TigreGotico/scriptconv/pull/246) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a88](https://github.com/TigreGotico/scriptconv/tree/0.0.4a88) (2026-11-15)
 
