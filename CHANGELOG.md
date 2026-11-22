@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a145](https://github.com/TigreGotico/scriptconv/tree/0.0.4a145) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a144...0.0.4a145)
+
+**Merged pull requests:**
+
+- fix\(frontend\): no casing for a backend that owns normalize [\#390](https://github.com/TigreGotico/scriptconv/pull/390) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a144](https://github.com/TigreGotico/scriptconv/tree/0.0.4a144) (2026-11-22)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a143...0.0.4a144)
@@ -373,10 +381,6 @@
 ## [0.0.4a97](https://github.com/TigreGotico/scriptconv/tree/0.0.4a97) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a96...0.0.4a97)
-
-**Merged pull requests:**
-
-- fix\(frontend\): read blocks as their plain text at marks and line breaks [\#263](https://github.com/TigreGotico/scriptconv/pull/263) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a96](https://github.com/TigreGotico/scriptconv/tree/0.0.4a96) (2026-11-15)
 
