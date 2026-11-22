@@ -32,8 +32,12 @@ frontend cannot cut it for that backend:
   appends the clause symbols and groups the segments. Above
   :attr:`FrontendConfig.whole_text_limit` characters, the frontend first cuts
   the text at its paragraph breaks.
-- Any other owner of ``normalize`` gets the text cut into sentences before
-  casing, as written.
+- Any other owner of ``normalize`` gets the text cut into sentences as
+  written.
+
+A backend that owns ``normalize`` gets no casing. Casing would change the
+text before the backend normalises it, and ``15H30`` in capitals is no longer
+a time to tugaphone.
 
 With ``strict=False`` a failed stage logs a warning and the text continues
 without that stage. With ``strict=True`` it raises :class:`StageError`.
@@ -173,7 +177,8 @@ class Stages:
     lang: Optional[str] = None
     """The language of the text. A cloning reference has its own language."""
     casing: Optional[Callable[[str], str]] = None
-    """Runs after normalisation. Only training sets one."""
+    """Runs after normalisation. Only training sets one. A backend that owns
+    ``normalize`` gets no casing."""
     chunk: Optional[Chunk] = None
     """The chunk size, a :class:`Chunk` or its value such as ``"clause"``.
     ``None`` takes the frontend's value, and when that is ``None`` too, a
@@ -537,6 +542,7 @@ class TextFrontend:
         self.config = config
         self.backend = backend
         self._space = backend.word_break()
+        self._casing_skipped = False
         stages = self._resolve(None)
         # The Grapheme and Unicode backends take any language and have no get_lang.
         if hasattr(backend, "get_lang"):
@@ -765,7 +771,8 @@ class TextFrontend:
 
         An explicit value of the call wins, then the frontend's own. The
         resolved ``normalize`` and ``diacritize`` are ``False`` when the
-        backend owns the stage.
+        backend owns the stage, and ``casing`` is ``None`` when it owns
+        ``normalize``.
         """
         own = self.config.stages
         if stages is None:
@@ -776,12 +783,19 @@ class TextFrontend:
         if enabled is None:
             from linguatag import lang_distance
             enabled = lang_distance(lang, "ar") <= _ARABIC_DISTANCE
+        casing = stages.casing or own.casing
+        if casing is not None and "normalize" in self.backend.owned_stages:
+            if not self._casing_skipped:
+                LOG.warning("%s normalises its own text, so the frontend applies no casing",
+                            type(self.backend).__name__)
+                self._casing_skipped = True
+            casing = None
         return Stages(
             normalize=normalize is not False and "normalize" not in self.backend.owned_stages,
             diacritize=enabled and "diacritize" not in self.backend.owned_stages,
             diacritizer_model=stages.diacritizer_model or own.diacritizer_model,
             lang=lang,
-            casing=stages.casing or own.casing,
+            casing=casing,
             chunk=stages.chunk or own.chunk or Chunk.SENTENCE,
         )
 
@@ -962,10 +976,8 @@ class TextFrontend:
             yield from self._whole_text_read(text, stages, clauses)
             return
         # A backend that owns normalize reads the text with its own rules, so
-        # it gets the sentences as written, cut before casing.
-        owned = "normalize" in self.backend.owned_stages
-        if not owned:
-            text = self._read(text, stages)
+        # it gets the sentences as written.
+        text = self._read(text, stages)
         # A backend that overrides its output appends no clause symbol, so
         # its marks join as any other symbol.
         tokens = self.backend._keeps_punctuation()
@@ -976,8 +988,7 @@ class TextFrontend:
             for number, sentence in enumerate(sentences, 1):
                 start = text.find(sentence, cursor)
                 cursor = start + len(sentence)
-                for piece in self._sentence_pieces(self._read(sentence, stages) if owned else sentence,
-                                                   stages, clauses, tokens,
+                for piece in self._sentence_pieces(sentence, stages, clauses, tokens,
                                                    ends_paragraph=number == len(sentences)):
                     # Only the first piece of a sentence follows the gap
                     # before it. The gap is read only for a sentence that
