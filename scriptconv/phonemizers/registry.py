@@ -54,6 +54,7 @@ PHONEMIZER_REGISTRY: Dict[Phonemizer, Tuple[str, str, Optional[str]]] = {
     _P.OPENPHONEMIZER: (f"{_BASE}.en", "OpenPhonemizer", "en-phonemizers"),
     _P.G2PEN: (f"{_BASE}.en", "G2PEnPhonemizer", "en-phonemizers"),
     _P.DIZIONE: (f"{_BASE}.dizione", "DizionePhonemizer", "en-phonemizers"),
+    _P.LEOKANI: (f"{_BASE}.leokani", "LeokaniPhonemizer", "en-phonemizers"),
     _P.KOLOKWA: (f"{_BASE}.lir", "KolokwaPhonemizer", "lir"),
     _P.TUGAPHONE: (f"{_BASE}.pt", "TugaphonePhonemizer", "pt-phonemizers"),
     _P.BARRANQUENHO: (f"{_BASE}.pt", "BarranquenhoPhonemizer", "o2i"),

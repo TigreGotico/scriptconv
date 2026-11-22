@@ -1,0 +1,36 @@
+Leokani G2P
+Copyright (c) 2026 Milliwatt Labs (milliwattlabs.com)
+
+Leokani G2P is under two licences:
+
+- The code (leokani_g2p.py, and the leokani_g2p Python package, its command-line tool, tests and examples) is
+  under the MIT License, whose text follows.
+- The model weights (oov-encoder.onnx, oov-decoder.onnx, context.onnx), the lexicon (leokani-g2p.json.gz) and
+  the goldens (goldens.json) are under the Creative Commons Attribution 4.0 International license (CC BY 4.0),
+  in LICENSE-CC-BY-4.0.txt. Attribution: "Leokani G2P by Milliwatt Labs (milliwattlabs.com)".
+
+Third-party credits are in NOTICE.
+
+-----------------------------------------------------------------------
+
+MIT License
+
+Copyright (c) 2026 Milliwatt Labs
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
