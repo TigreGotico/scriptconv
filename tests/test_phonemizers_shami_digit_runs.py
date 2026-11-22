@@ -5,9 +5,15 @@ than 4,300 digits into an int, and num2words refuses numbers from about
 10**306, so 4,000, 4,400 and 20,000 digits each failed before. The expected
 words come from the digit names below, written by hand.
 """
+import time
+
 import pytest
 
-from scriptconv.phonemizers._thirdparty.shami.normalize import verbalize
+from scriptconv.phonemizers._thirdparty.shami.normalize import (
+    _CURRENCY_RE,
+    _PERCENT_RE,
+    verbalize,
+)
 from scriptconv.phonemizers.shami import ShamiPhonemizer
 
 SEVEN_AR = "سَبعة"
@@ -49,3 +55,22 @@ def test_one_dollar_is_singular_and_cents_keep_their_reading():
 def test_the_backend_reads_a_long_run_as_its_separate_digits(n):
     phonemizer = ShamiPhonemizer()
     assert phonemizer.phonemize("7" * n, "ar") == phonemizer.phonemize(" ".join("7" * n), "ar")
+
+
+@pytest.mark.parametrize("amount, expected", [
+    ("١$", "one dollar"),        # Arabic-Indic digit
+    ("１$", "one dollar"),        # full-width digit
+    ("$5.０", "five dollars"),    # a zero decimal part adds no cents
+    ("$5.٠٥", "five dollars and five cents"),
+])
+def test_an_amount_in_other_digits_reads_as_in_ascii_digits(amount, expected):
+    assert verbalize(amount, "en") == expected
+
+
+@pytest.mark.parametrize("pattern", [_CURRENCY_RE, _PERCENT_RE])
+def test_a_long_digit_run_is_scanned_once(pattern):
+    # Without the (?<!\d) guard each pattern retried the run from every digit:
+    # 20,000 digits took 49 s (currency) and 32 s (percent).
+    start = time.perf_counter()
+    assert pattern.search("7" * 20000) is None
+    assert time.perf_counter() - start < 5
