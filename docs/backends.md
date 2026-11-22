@@ -2,7 +2,7 @@
 
 <!-- agent-hint
 covers: every phonemizer backend, its class, its extra, its package and its language default, and the models that download
-source: the Phonemizer enum in scriptconv/phonemizers/enums.py, PHONEMIZER_REGISTRY and LANG_DEFAULTS in scriptconv/phonemizers/registry.py, COPYLEFT and NONFREE in scriptconv/phonemizers/_moved.py, the download sites in scriptconv/diacritics.py, scriptconv/phonemizers/g2pw.py, scriptconv/phonemizers/en.py and scriptconv/phonemizers/mul.py
+source: the Phonemizer enum in scriptconv/phonemizers/enums.py, PHONEMIZER_REGISTRY and LANG_DEFAULTS in scriptconv/phonemizers/registry.py, COPYLEFT and NONFREE in scriptconv/phonemizers/_moved.py, the download sites in scriptconv/diacritics.py, scriptconv/phonemizers/g2pw.py, scriptconv/phonemizers/en.py, scriptconv/phonemizers/leokani.py, scriptconv/phonemizers/lir.py and scriptconv/phonemizers/mul.py
 generated: no
 verify: python -c '(I:=__import__,ast:=I("ast"),re:=I("re"),sys:=I("sys"),inspect:=I("inspect"),enum:=I("enum"),dataclasses:=I("dataclasses"),unittest:=I("unittest"),f:=sys.argv[1],g:={},T:=unittest.TestCase(),B:=re.findall(r"\x60{3}python\n(.*?)\x60{3}",open(f,encoding="utf-8").read(),re.S),K:=lambda o:[(p.name,p.kind,p.default) for p in inspect.signature(o).parameters.values()] if not isinstance(o,type) else [(m.name,m.value) for m in o] if issubclass(o,enum.Enum) else [x.name for x in dataclasses.fields(o)],D:=lambda b:((s:=re.sub(r"\)( -> .+)?$",r")\1: ...",b.strip()) if b.startswith("def") else b),(h:=dict(g)),exec("from __future__ import annotations\nfrom enum import Enum\nfrom dataclasses import dataclass\n"+s,h),[K(h[d.name])==K(g[d.name]) or (d.name,K(h[d.name]),K(g[d.name])) for d in ast.parse(s).body])[-1],C:=lambda s,L:None if not isinstance(s,ast.Expr) else (m.group(1) if (m:=re.search(r"\s#\s?(.*)$",L[s.end_lineno-1])) else L[s.end_lineno][2:] if s.end_lineno<len(L) and L[s.end_lineno].startswith("# ") else None),X:=lambda s:compile(ast.Expression(s.value),f,"eval"),Q:=lambda s,e:(T.assertRaisesRegex(eval(e.split(":")[0],g),re.escape(e.partition(":")[2].strip()),eval,X(s),g) or True) if re.match(r"\w+Error\b",e) else (True if (v:=eval(X(s),g))==ast.literal_eval(e) else (ast.unparse(s),e,v)),R:=lambda s,L:exec(compile(ast.Module([s],[]),f,"exec"),g) if (c:=C(s,L)) is None else Q(s,c.split("  ")[0].strip()),r:=[y for b in B for y in (D(b) if re.match(r"def |class |@",b) else [R(s,b.splitlines()) for s in ast.parse(b).body]) if y is not None],w:=[y for y in r if y is not True],print("OK",len(r)) if not w else sys.exit("MISMATCH "+repr(w)))' docs/backends.md
 see: docs/phonemizers.md, docs/stack.md
@@ -78,6 +78,8 @@ last column names each language whose explicit default chain holds the backend.
 | `openphonemizer` | `OpenPhonemizer` | `en-phonemizers` | scriptconv |  |
 | `g2pen` | `G2PEnPhonemizer` | `en-phonemizers` | scriptconv |  |
 | `dizione` | `DizionePhonemizer` | `en-phonemizers` | scriptconv |  |
+| `leokani` | `LeokaniPhonemizer` | `en-phonemizers` | scriptconv |  |
+| `kolokwa` | `KolokwaPhonemizer` | `lir` | scriptconv | `lir` |
 | `tugaphone` | `TugaphonePhonemizer` | `pt-phonemizers` | scriptconv | `pt` |
 | `g2pfa` | `PersianPhonemizer` | `fa` | scriptconv-copyleft |  |
 | `openjtalk` | `OpenJTaklPhonemizer` | `ja-phonemizers` | scriptconv |  |
@@ -140,6 +142,8 @@ These models and data download on first use:
 | the fp32 weights of a text2tashkeel model, such as `rawi` | `diacritize(text, "ar", diacritizer_model="rawi")` | text2tashkeel | the Hugging Face cache |
 | the stressonnx model of the language, from `TigreGotico/stressonnx-models` at a pinned revision | `diacritize(text, lang)` for a language in `STRESS_LANGS` | stressonnx | the Hugging Face cache |
 | g2pW polyphone model, pinned to a sha256 | the `g2pw` backend | `g2pw.py` | the Hugging Face cache |
+| the Leokani G2P lexicon and ONNX models of the `micro` or `mini` model, from `milliwattlabs/leokani-g2p` at a pinned revision, each pinned to a sha256 | the `leokani` backend | `LeokaniPhonemizer.__init__` in `leokani.py` | the Hugging Face cache |
+| the kolokwa-g2p ONNX model and its tables, from `TigreGotico/kolokwa-g2p-onnx` at a pinned revision, each pinned to a sha256 | the `kolokwa` backend | `KolokwaPhonemizer.__init__` in `lir.py` | the Hugging Face cache |
 | a DeepPhonemizer checkpoint named in `DeepPhonemizer.MODELS` | the `deepphonemizer` backend | `DeepPhonemizer.__init__` in `en.py` | `~/.local/share/deepphonemizer` |
 | the NLTK data `averaged_perceptron_tagger_eng` and `cmudict` | the `g2pen` backend | `nltk.download` in `G2PEnPhonemizer.__init__` in `en.py` | the NLTK data directory |
 
@@ -155,10 +159,11 @@ To skip a download, give a local file where the code accepts one:
 - Nakdimon: put the file with the pinned sha256 in its cache location.
 
 The g2pW backend takes no model path. Its constructor has only an `alphabet`
-parameter, and `get_phonemizer` drops a `model=` value for it. The g2pW
-model, the stressonnx models and the fp32 text2tashkeel weights come from the
-Hugging Face cache. To run these offline, fill the cache first and then set
-`HF_HUB_OFFLINE=1`:
+parameter, and `get_phonemizer` drops a `model=` value for it. The Leokani
+G2P and kolokwa-g2p backends take no model path either. The g2pW, Leokani G2P
+and kolokwa-g2p models, the stressonnx models and the fp32 text2tashkeel
+weights come from the Hugging Face cache. To run these offline, fill the cache
+first and then set `HF_HUB_OFFLINE=1`:
 
 ```python
 import inspect
