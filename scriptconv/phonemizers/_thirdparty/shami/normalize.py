@@ -166,12 +166,13 @@ def _verbalise_currency(symbol: str, amount: str, lang: str) -> str:
         whole = "0"
     if lang == "ar":
         words = _digits_to_words(whole, True) + " " + ar
-        if frac.strip("0"):
+        if any(int(digit) for digit in frac):
             words += " وْ" + _digits_to_words(frac, True) + " قِرش"
         return words
-    unit = sg if whole.lstrip("0") == "1" else pl
+    # int() reads Arabic-Indic and full-width digits too
+    unit = sg if len(whole) <= MAX_QUANTITY_DIGITS and int(whole) == 1 else pl
     words = f"{_digits_to_words(whole, False)} {unit}"
-    if frac.strip("0"):
+    if any(int(digit) for digit in frac):
         words += f" and {_digits_to_words(frac, False)} cents"
     return words
 
