@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a144](https://github.com/TigreGotico/scriptconv/tree/0.0.4a144) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a143...0.0.4a144)
+
+**Merged pull requests:**
+
+- fix\(identity\): an engine backend's revision covers the scriptconv read path [\#369](https://github.com/TigreGotico/scriptconv/pull/369) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a143](https://github.com/TigreGotico/scriptconv/tree/0.0.4a143) (2026-11-22)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a142...0.0.4a143)
