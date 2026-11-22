@@ -92,9 +92,12 @@ The hash covers these inputs:
   distribution that an engine revision covers, count only once, in the
   settings.
 - the name and version of each installed distribution that provides a module
-  that the scriptconv modules above import, such as `num2words`, which the
-  Shami normaliser uses when it is installed. The requirements of such a
-  distribution do not count.
+  that the scriptconv modules above import at module level, in a `try` block
+  or not, such as `num2words`, which the Shami normaliser uses when it is
+  installed. An import inside a function does not count. Such an import
+  serves another language, such as the diacritics models in
+  `scriptconv.diacritics`, or comes from a dependency that an extra declares.
+  The requirements of such a distribution do not count.
 - the source file of each class of the backend outside scriptconv, so a
   subclass counts
 - the arguments of the backend, a character rule set on the instance, the
@@ -107,6 +110,7 @@ only other backends, docs or `version.py` keeps it, and `differs_from` then
 reports nothing. A release of a distribution in the list above changes the
 `revision`, also when the phonemes stay the same, and a voice then warns once.
 A release of any other distribution keeps the `revision`. This includes a
+distribution that scriptconv imports only inside a function, and a
 distribution that the engine loads at run time by a name that is not in the
 scriptconv source, such as a model package, unless an extra of the backend
 or of the engine requires it.

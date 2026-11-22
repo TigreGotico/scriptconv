@@ -992,6 +992,14 @@ class TestReleases:
         assert current is not None
         assert get_phonemizer(Phonemizer.SHAMI).identity("apc").revision not in (None, current)
 
+    def test_a_release_of_a_module_imported_only_inside_a_function_keeps_the_revision(self, monkeypatch):
+        # scriptconv.diacritics imports bifonia inside a function, and the phonemizers extra does not require it
+        assert metadata.distribution("bifonia")
+        current = GraphemePhonemizer().identity("en").revision
+        released(monkeypatch, "bifonia", "99.0.0")
+        assert current is not None
+        assert GraphemePhonemizer().identity("en").revision == current
+
     def test_a_release_of_a_language_pack_of_the_engine_changes_that_language_only(self, monkeypatch):
         # gruut requires gruut_lang_fr under its extra "fr"
         gruut = get_phonemizer(Phonemizer.GRUUT)

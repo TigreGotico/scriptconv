@@ -17,8 +17,10 @@ The hash covers:
   marker holds here, so a requirement under an extra that nobody asks for, or
   for another platform, does not;
 - the name and version of each installed distribution that provides a module
-  that the modules above import, as num2words for the Shami normaliser. Its
-  own requirements do not count;
+  that the modules above import at module level, in a ``try`` block or not, as
+  num2words for the Shami normaliser. An import inside a function does not
+  count: it serves another language, or a dependency that an extra declares.
+  The requirements of such a distribution do not count;
 - scriptconv and its sister packages count by their files instead of their
   version, and the distributions of
   :meth:`~scriptconv.phonemizers.base.BasePhonemizer._covered_distributions`
@@ -35,8 +37,8 @@ as a statement, as a docstring does. So a release that changes code or data on
 the path of the backend changes the revision, and a release that changes only
 docs, ``version.py`` or the modules and data of other backends keeps it. A
 release of a distribution above changes it. A release of any other
-distribution keeps it, also when the backend loads that distribution at run
-time through a name that is not in its source.
+distribution keeps it, also when the backend imports that distribution inside
+a function, or loads it at run time through a name that is not in its source.
 
 Nothing of the running process counts: neither the modules it loaded, nor its
 working directory, nor a package that loads at startup. Two machines with the
@@ -167,17 +169,13 @@ def _top_level_distributions() -> Mapping[str, List[str]]:
 @functools.lru_cache(maxsize=None)
 def _path(roots: FrozenSet[str]) -> Tuple[List[Tuple[str, str]], FrozenSet[str]]:
     """The path and digest of each file of the packages in :data:`_IN_TREE` on the import path of *roots*,
-    and the top-level name of each other module that these files import."""
+    and the top-level name of each other module that these files import at module level."""
     modules: Dict[str, Path] = {}
     imported = set(roots)
     outside: Set[str] = set()
     pending = list(roots)
     while pending:
         name = pending.pop()
-        top = name.partition(".")[0]
-        if top not in _IN_TREE:
-            outside.add(top)
-            continue
         if name in modules:
             continue
         path = _module_file(name)
@@ -187,13 +185,19 @@ def _path(roots: FrozenSet[str]) -> Tuple[List[Tuple[str, str]], FrozenSet[str]]
         modules[name] = path
         package = name if path.name == "__init__.py" else name.rpartition(".")[0]
         pending.extend(package.rsplit(".", depth)[0] for depth in range(package.count(".") + 1))
-        for module, names in _imported(path, package):
+        for module, names, module_level in _imported(path, package):
+            top = module.partition(".")[0]
+            if top not in _IN_TREE:
+                # an import inside a function serves another language, or a dependency that an extra declares
+                if module_level:
+                    outside.add(top)
+                continue
             submodules = [f"{module}.{name}" for name in names]
             pending.append(module)
             pending.extend(submodules)
             imported.update(submodules)
             # "from package import module" loads the package only as a parent
-            if module.partition(".")[0] not in _IN_TREE or not names or not all(map(_module_file, submodules)):
+            if not names or not all(map(_module_file, submodules)):
                 imported.add(module)
     sites = {name.partition(".")[0]: path.parents[name.count(".") + (path.name == "__init__.py")]
              for name, path in modules.items()}
@@ -226,22 +230,24 @@ def _module_file(name: str) -> Optional[Path]:
     return None
 
 
-def _imported(path: Path, package: str) -> Iterator[Tuple[str, Tuple[str, ...]]]:
-    """Each module that the source at *path*, a module of *package*, may import, with the names it imports from it."""
-    pending: List[ast.AST] = [ast.parse(path.read_bytes())]
+def _imported(path: Path, package: str) -> Iterator[Tuple[str, Tuple[str, ...], bool]]:
+    """Each module that the source at *path*, a module of *package*, may import, with the names it imports from it,
+    and whether the import runs at module level, that is outside any function."""
+    pending: List[Tuple[ast.AST, bool]] = [(ast.parse(path.read_bytes()), True)]
     while pending:
-        node = pending.pop()
+        node, module_level = pending.pop()
         if isinstance(node, ast.Import):
-            yield from ((alias.name, ()) for alias in node.names)
+            yield from ((alias.name, (), module_level) for alias in node.names)
         elif isinstance(node, ast.ImportFrom):
             module = node.module or ""
             if node.level:
                 parent = package.rsplit(".", node.level - 1)[0]
                 module = f"{parent}.{module}" if module else parent
-            yield module, tuple(alias.name for alias in node.names)
+            yield module, tuple(alias.name for alias in node.names), module_level
         else:
+            inner = module_level and not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
             # an import is a statement, so the walk skips expressions
-            pending.extend(child for child in ast.iter_child_nodes(node)
+            pending.extend((child, inner) for child in ast.iter_child_nodes(node)
                            if isinstance(child, (ast.stmt, ast.excepthandler, ast.match_case)))
 
 
