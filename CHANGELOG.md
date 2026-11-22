@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.0.4a141](https://github.com/TigreGotico/scriptconv/tree/0.0.4a141) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a140...0.0.4a141)
+
+**Merged pull requests:**
+
+- fix: Shami reads the emphatics that espeak-ng writes with a bridge below [\#384](https://github.com/TigreGotico/scriptconv/pull/384) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- fix: join sentences with the space that the text writes [\#382](https://github.com/TigreGotico/scriptconv/pull/382) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a140](https://github.com/TigreGotico/scriptconv/tree/0.0.4a140) (2026-11-22)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a139...0.0.4a140)
@@ -369,17 +378,9 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a92...0.0.4a93)
 
-**Merged pull requests:**
-
-- fix\(deps\): the test extra pulls the normalize extra [\#255](https://github.com/TigreGotico/scriptconv/pull/255) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a92](https://github.com/TigreGotico/scriptconv/tree/0.0.4a92) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a91...0.0.4a92)
-
-**Merged pull requests:**
-
-- fix\(deps\): the normalize extra pulls the es extra of text2spoken [\#253](https://github.com/TigreGotico/scriptconv/pull/253) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a91](https://github.com/TigreGotico/scriptconv/tree/0.0.4a91) (2026-11-15)
 
