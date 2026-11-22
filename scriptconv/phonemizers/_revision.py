@@ -145,8 +145,7 @@ with warnings.catch_warnings():
                 except Exception:
                     pass
 # a module loaded before the probe, as by a sitecustomize.py, counts when the calls import its package,
-# or when a used module holds a package as a global, as in "import regex" or "from regex import compile".
-# A module counts by its own name, as dateparser puts the standard _strptime in sys.modules as strptime_patched.
+# or when a used module holds a package as a global, as in "import regex" or "from regex import compile"
 used = imported - {"scriptconv"}
 pending = [top for top in used if top not in sys.stdlib_module_names]
 while pending:
@@ -160,8 +159,8 @@ while pending:
                     if owner not in used | {"scriptconv"} and owner not in sys.stdlib_module_names:
                         used.add(owner)
                         pending.append(owner)
-modules = {getattr(loaded, "__name__", name): getattr(loaded, "__file__", None)
-           for name, loaded in list(sys.modules.items()) if name not in before or name.partition(".")[0] in used}
+modules = {name: getattr(loaded, "__file__", None) for name, loaded in list(sys.modules.items())
+           if name not in before or name.partition(".")[0] in used}
 print(marker + json.dumps({"modules": modules, "opened": sorted(opened)}), flush=True)
 """
 """Prints, after a marker, the modules that a backend, or a frontend that reads
