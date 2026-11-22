@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a143](https://github.com/TigreGotico/scriptconv/tree/0.0.4a143) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a142...0.0.4a143)
+
+**Merged pull requests:**
+
+- feat: FrontendConfig.phonemizer\_lang, a backend language apart from the text language [\#389](https://github.com/TigreGotico/scriptconv/pull/389) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a142](https://github.com/TigreGotico/scriptconv/tree/0.0.4a142) (2026-11-22)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a141...0.0.4a142)
@@ -366,17 +374,9 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a95...0.0.4a96)
 
-**Merged pull requests:**
-
-- fix\(frontend\): a block after a sentence token joins with no space [\#259](https://github.com/TigreGotico/scriptconv/pull/259) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a95](https://github.com/TigreGotico/scriptconv/tree/0.0.4a95) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a94...0.0.4a95)
-
-**Merged pull requests:**
-
-- fix\(deps\): the normalize extra pulls the ar extra of text2spoken [\#258](https://github.com/TigreGotico/scriptconv/pull/258) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a94](https://github.com/TigreGotico/scriptconv/tree/0.0.4a94) (2026-11-15)
 
