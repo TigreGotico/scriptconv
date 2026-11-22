@@ -194,7 +194,7 @@ class FrontendConfig:
 
     lang: str
     phonemizer: Optional[Phonemizer] = None
-    """``None`` takes the default backend for :attr:`lang`."""
+    """``None`` takes the default backend for :attr:`phonemizer_lang`, else for :attr:`lang`."""
     alphabet: Alphabet = Alphabet.IPA
     model: Optional[str] = None
     stages: Stages = Stages()
@@ -550,8 +550,10 @@ class TextFrontend:
                     f"with `pip install scriptconv[{extra}]`")
 
     def _backend_lang(self, lang: str) -> str:
-        """The language the backend reads for text in *lang*."""
-        return self.config.phonemizer_lang if self.config.phonemizer_lang and lang == self.config.lang else lang
+        """The language the backend reads for text in *lang*. Tag case has no
+        meaning (RFC 5646 section 2.1.1), and ``_`` reads as ``-``."""
+        same = lang.replace("_", "-").lower() == self.config.lang.replace("_", "-").lower()
+        return self.config.phonemizer_lang if self.config.phonemizer_lang and same else lang
 
     def with_backend(self, backend: BasePhonemizer) -> "TextFrontend":
         """A frontend with this configuration and another backend instance."""

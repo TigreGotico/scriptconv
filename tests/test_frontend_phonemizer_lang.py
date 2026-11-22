@@ -44,6 +44,42 @@ def test_a_call_in_another_language_phonemizes_in_that_language():
     assert set(backend.langs) == {"pt-PT"}
 
 
+@pytest.mark.parametrize("call_lang", ["en-us", "en_US", "EN-US"])
+def test_the_text_language_matches_in_any_case_and_with_an_underscore(call_lang):
+    # RFC 5646 section 2.1.1: the case of a tag has no meaning
+    frontend, backend, _ = recording_frontend(lang="en-US", phonemizer_lang="en")
+    frontend.phonemize("Hello there.", Stages(lang=call_lang))
+    assert set(backend.langs) == {"en"}
+
+
+def test_the_default_backend_is_the_one_of_the_backend_language():
+    from scriptconv.phonemizers import phonemizer_for_lang
+
+    frontend = TextFrontend(FrontendConfig("tdt-TL", phonemizer_lang="pt"))
+    assert type(frontend.backend) is type(phonemizer_for_lang("pt"))
+
+
+def test_a_backend_without_the_text_language_builds_with_the_backend_language():
+    from scriptconv.phonemizers import Phonemizer, get_phonemizer
+    from scriptconv.phonemizers.base import UnsupportedLanguageError
+
+    with pytest.raises(UnsupportedLanguageError):
+        get_phonemizer(Phonemizer.ESPEAK).get_lang("tw")
+    frontend = TextFrontend(FrontendConfig("tw", phonemizer_lang="lfn", phonemizer=Phonemizer.ESPEAK))
+    assert frontend.identity().lang == "lfn"
+
+
+def test_the_revision_reads_the_data_of_the_backend_language():
+    # orthography2ipa has no Klingon: a revision that read the text language fails
+    from scriptconv.phonemizers import Phonemizer
+
+    frontend = TextFrontend(FrontendConfig("tlh", phonemizer_lang="pt-PT",
+                                           phonemizer=Phonemizer.ORTHOGRAPHY2IPA))
+    identity = frontend.identity()
+    assert identity.lang == "pt-PT"
+    assert identity.revision is not None
+
+
 def test_without_phonemizer_lang_the_backend_reads_the_text_language():
     frontend, backend, normalised = recording_frontend(lang="tw")
     frontend.phonemize("Ɛyɛ me dɛ.")
