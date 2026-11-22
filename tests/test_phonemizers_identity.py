@@ -68,7 +68,8 @@ IN_TREE = {
 }
 # An engine that no extra can name: a binary, and a distribution the zh extra
 # does not list.
-OUTSIDE_THE_EXTRAS = {Phonemizer.ESPEAK: "espeak-ng", Phonemizer.G2PC: "g2pc"}
+OUTSIDE_THE_EXTRAS = {Phonemizer.ESPEAK: "espeak-ng", Phonemizer.ESPEAK_LT_ACCENT: "espeak-ng",
+                      Phonemizer.G2PC: "g2pc"}
 
 
 class TestErrors:

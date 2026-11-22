@@ -416,7 +416,7 @@ copyleft or a non-commercial licence are in two sister packages:
 
 | Package | Holds | Installed by the extras |
 |---|---|---|
-| [scriptconv-copyleft](https://github.com/TigreGotico/scriptconv-copyleft) | the espeak, Cotovía, AhoTTS, transphone, misaki, g2pfa, g2pk and KoG2P wrappers, the pykakasi wrapper, the Hebrew `hebrew_ipa`, Japanese `openjtalk_prosody` and Thai `tltk` backends, and the Japanese functions of `readings` | `espeak`, `transphone`, `misaki`, `gl`, `eu`, `fa`, `he`, `ko`, `ja`, `ja-phonemizers`, `th` |
+| [scriptconv-copyleft](https://github.com/TigreGotico/scriptconv-copyleft) | the espeak, Cotovía, AhoTTS, transphone, misaki, g2pfa, g2pk and KoG2P wrappers, the pykakasi wrapper, the Lithuanian pitch-accent backend `espeak_lt_accent`, the Hebrew `hebrew_ipa`, Japanese `openjtalk_prosody` and Thai `tltk` backends, and the Japanese functions of `readings` | `espeak`, `transphone`, `misaki`, `gl`, `eu`, `fa`, `he`, `ko`, `ja`, `ja-phonemizers`, `th` |
 | [scriptconv-nonfree](https://github.com/TigreGotico/scriptconv-nonfree) | the Mantoq, Halabi and Iqra wrappers with the vendored mantoq and iqra_phonetiser, the viphoneme wrapper, and the africa-g2p and ghana-g2p wrappers | `ar-phonemizers`, `vi`, `africa`, `ghana` |
 
 Each sister package states its own licence. scriptconv-nonfree holds code

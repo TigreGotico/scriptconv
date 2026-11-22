@@ -51,7 +51,7 @@ zh = ["pypinyin>=0.50,<1"]
 # --- phonemizer wrappers (scriptconv.phonemizers) ---
 phonemizers = ["quebra-frases>=0.3.8a4", "linguatag[langcodes]>=0.2.3a1"]
 normalize = ["text2spoken[pt]>=0.0.2a69"]
-espeak = ["scriptconv[phonemizers]", "scriptconv-copyleft[espeak]>=0.1.2a1"]
+espeak = ["scriptconv[phonemizers]", "scriptconv-copyleft[espeak]>=0.2.0a1"]
 gruut = ["scriptconv[phonemizers]", "gruut"]
 goruut = ["scriptconv[phonemizers]", "pygoruut"]
 epitran = ["scriptconv[phonemizers]", "epitran>=1.26.1"]
