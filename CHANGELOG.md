@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.0.4a140](https://github.com/TigreGotico/scriptconv/tree/0.0.4a140) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a139...0.0.4a140)
+
+**Merged pull requests:**
+
+- fix: cap tokenizers below 1.0 in the he extra [\#385](https://github.com/TigreGotico/scriptconv/pull/385) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- feat: espeak\_lt\_accent, Lithuanian with the three pitch accents [\#370](https://github.com/TigreGotico/scriptconv/pull/370) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a139](https://github.com/TigreGotico/scriptconv/tree/0.0.4a139) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a138...0.0.4a139)
+
+**Merged pull requests:**
+
+- docs: generate the backend table from the registry, and test it [\#375](https://github.com/TigreGotico/scriptconv/pull/375) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a138](https://github.com/TigreGotico/scriptconv/tree/0.0.4a138) (2026-11-22)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a137...0.0.4a138)
@@ -368,17 +385,9 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a90...0.0.4a91)
 
-**Merged pull requests:**
-
-- test\(frontend\): pin the mark after a block for digits, end blocks and closing brackets [\#250](https://github.com/TigreGotico/scriptconv/pull/250) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a90](https://github.com/TigreGotico/scriptconv/tree/0.0.4a90) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a89...0.0.4a90)
-
-**Merged pull requests:**
-
-- fix\(deps\): the normalize extra pulls the eu extra of text2spoken [\#251](https://github.com/TigreGotico/scriptconv/pull/251) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a89](https://github.com/TigreGotico/scriptconv/tree/0.0.4a89) (2026-11-15)
 
