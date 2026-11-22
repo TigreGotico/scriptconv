@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.0.4a138](https://github.com/TigreGotico/scriptconv/tree/0.0.4a138) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a137...0.0.4a138)
+
+**Merged pull requests:**
+
+- docs: README, docs index, navigation and agent hints [\#374](https://github.com/TigreGotico/scriptconv/pull/374) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a137](https://github.com/TigreGotico/scriptconv/tree/0.0.4a137) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a136...0.0.4a137)
+
+**Merged pull requests:**
+
+- feat: Kolokwa \(Liberian English, lir\) phonemizer on kolokwa-g2p [\#376](https://github.com/TigreGotico/scriptconv/pull/376) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a136](https://github.com/TigreGotico/scriptconv/tree/0.0.4a136) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a135...0.0.4a136)
+
+**Merged pull requests:**
+
+- feat: add the Leokani G2P backend for American English [\#373](https://github.com/TigreGotico/scriptconv/pull/373) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a135](https://github.com/TigreGotico/scriptconv/tree/0.0.4a135) (2026-11-21)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a134...0.0.4a135)
+
+**Merged pull requests:**
+
+- fix\(identity\): a dependency of a preloaded package counts in the revision [\#372](https://github.com/TigreGotico/scriptconv/pull/372) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a134](https://github.com/TigreGotico/scriptconv/tree/0.0.4a134) (2026-11-21)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a133...0.0.4a134)
+
+**Merged pull requests:**
+
+- feat: euskaphone owns normalize [\#360](https://github.com/TigreGotico/scriptconv/pull/360) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a133](https://github.com/TigreGotico/scriptconv/tree/0.0.4a133) (2026-11-19)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a132...0.0.4a133)
@@ -308,10 +348,6 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a93...0.0.4a94)
 
-**Merged pull requests:**
-
-- fix: read the g2pM erhua suffix r5 as a rhotic coda [\#247](https://github.com/TigreGotico/scriptconv/pull/247) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a93](https://github.com/TigreGotico/scriptconv/tree/0.0.4a93) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a92...0.0.4a93)
@@ -348,25 +384,13 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a88...0.0.4a89)
 
-**Merged pull requests:**
-
-- fix\(frontend\): skip the stages when no mark can follow a block [\#246](https://github.com/TigreGotico/scriptconv/pull/246) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a88](https://github.com/TigreGotico/scriptconv/tree/0.0.4a88) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a87...0.0.4a88)
 
-**Merged pull requests:**
-
-- fix: match Charsiu dialect labels to their BCP-47 tags [\#245](https://github.com/TigreGotico/scriptconv/pull/245) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a87](https://github.com/TigreGotico/scriptconv/tree/0.0.4a87) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a86...0.0.4a87)
-
-**Merged pull requests:**
-
-- fix: prefix Charsiu input with the Charsiu language label [\#238](https://github.com/TigreGotico/scriptconv/pull/238) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a86](https://github.com/TigreGotico/scriptconv/tree/0.0.4a86) (2026-11-14)
 
@@ -379,10 +403,6 @@
 ## [0.0.4a84](https://github.com/TigreGotico/scriptconv/tree/0.0.4a84) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a83...0.0.4a84)
-
-**Merged pull requests:**
-
-- fix: match Charsiu labels by the script of their data [\#237](https://github.com/TigreGotico/scriptconv/pull/237) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a83](https://github.com/TigreGotico/scriptconv/tree/0.0.4a83) (2026-11-14)
 

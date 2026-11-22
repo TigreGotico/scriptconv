@@ -52,6 +52,7 @@ OWNED = {
     Phonemizer.TUGAPHONE: {"normalize", "diacritize"},
     Phonemizer.ARBTOK: {"diacritize"},
     Phonemizer.DIZIONE: {"normalize"},
+    Phonemizer.EUSKAPHONE: {"normalize"},
 }
 
 # Code written or vendored in scriptconv, scriptconv-copyleft or
@@ -61,7 +62,8 @@ IN_TREE = {
     Phonemizer.UNICODE, Phonemizer.GRAPHEMES, Phonemizer.MATOUB_KAB,
     Phonemizer.MANTOQ, Phonemizer.HALABI, Phonemizer.IQRA, Phonemizer.KOG2PK,
     Phonemizer.SHAMI, Phonemizer.VOSK, Phonemizer.BYT5, Phonemizer.CHARSIU,
-    Phonemizer.DIZIONE, Phonemizer.G2PW, Phonemizer.F5TTS_CHAR,
+    Phonemizer.DIZIONE, Phonemizer.G2PW, Phonemizer.F5TTS_CHAR, Phonemizer.LEOKANI,
+    Phonemizer.KOLOKWA,
 }
 # An engine that no extra can name: a binary, and a distribution the zh extra
 # does not list.
@@ -872,6 +874,88 @@ class TestProbeFailures:
         after = revision()
         assert None not in (before, after)
         assert after != before
+
+    def test_a_dependency_imported_by_a_preloaded_distribution_counts(self, tmp_path):
+        import quebra_frases
+        shutil.copytree(Path(quebra_frases.__file__).parent, tmp_path / "quebra_frases",
+                        ignore=shutil.ignore_patterns("__pycache__"))
+        init = tmp_path / "quebra_frases" / "__init__.py"
+        init.write_text("import stubdep\nfrom stubdep2 import helper\n" + init.read_text(encoding="utf-8"),
+                        encoding="utf-8")
+        for name, body in (("stubdep", "VALUE = 1\n"), ("stubdep2", "def helper():\n    return 1\n")):
+            (tmp_path / name).mkdir()
+            (tmp_path / name / "__init__.py").write_text(body)
+        (tmp_path / "sitecustomize.py").write_text("import quebra_frases\n")
+
+        def revision():
+            done = subprocess.run([sys.executable, "-c", GRAPHEMES_EN_REVISION], cwd=ROOT, check=True,
+                                  capture_output=True, text=True,
+                                  env={**os.environ, "PYTHONPATH": os.pathsep.join([str(tmp_path), str(ROOT)]),
+                                       "PYTHONDONTWRITEBYTECODE": "1"})
+            return json.loads(done.stdout.splitlines()[-1])
+        base = revision()
+        results = {}
+        for name, file in (("stubdep", "__init__.py"), ("stubdep2", "__init__.py")):
+            with open(tmp_path / name / file, "a", encoding="utf-8") as module:
+                module.write("\nCHANGED = 1\n")
+            results[name] = revision()
+        assert base is not None
+        assert results["stubdep"] != base
+        assert results["stubdep2"] != results["stubdep"]
+
+    @staticmethod
+    def preloaded_revision(directory, sitecustomize=None):
+        """The GRAPHEMES en revision in a process whose path starts at *directory*."""
+        if sitecustomize is not None:
+            (directory / "sitecustomize.py").write_text(sitecustomize)
+        done = subprocess.run([sys.executable, "-c", GRAPHEMES_EN_REVISION], cwd=ROOT, check=True,
+                              capture_output=True, text=True,
+                              env={**os.environ, "PYTHONPATH": os.pathsep.join([str(directory), str(ROOT)]),
+                                   "PYTHONDONTWRITEBYTECODE": "1"})
+        return json.loads(done.stdout.splitlines()[-1])
+
+    def test_a_hook_from_an_unrelated_package_keeps_the_revision(self, tmp_path):
+        (tmp_path / "hookpkg").mkdir()
+        (tmp_path / "hookpkg" / "__init__.py").write_text("def hook(*args):\n    return None\n")
+        (tmp_path / "empty").mkdir()
+        expected = self.preloaded_revision(tmp_path / "empty")
+        hooked = self.preloaded_revision(
+            tmp_path, "import sys, hookpkg\nsys.excepthook = hookpkg.hook\n")
+        assert expected is not None
+        assert hooked == expected
+
+    def test_a_dependency_of_a_dependency_of_a_preloaded_distribution_counts(self, tmp_path):
+        import quebra_frases
+        shutil.copytree(Path(quebra_frases.__file__).parent, tmp_path / "quebra_frases",
+                        ignore=shutil.ignore_patterns("__pycache__"))
+        init = tmp_path / "quebra_frases" / "__init__.py"
+        init.write_text("import hop_a\n" + init.read_text(encoding="utf-8"), encoding="utf-8")
+        for name, body in (("hop_a", "import hop_b\n"), ("hop_b", "import hop_c\n"), ("hop_c", "VALUE = 1\n")):
+            (tmp_path / name).mkdir()
+            (tmp_path / name / "__init__.py").write_text(body)
+        before = self.preloaded_revision(tmp_path, "import quebra_frases\n")
+        with open(tmp_path / "hop_c" / "__init__.py", "a", encoding="utf-8") as module:
+            module.write("\nCHANGED = 1\n")
+        assert self.preloaded_revision(tmp_path) not in (None, before)
+
+    def test_a_hook_on_a_standard_library_module_a_used_package_holds_keeps_the_revision(self, tmp_path):
+        (tmp_path / "hookpkg").mkdir()
+        (tmp_path / "hookpkg" / "__init__.py").write_text("def hook(*args):\n    return None\n")
+        (tmp_path / "empty").mkdir()
+        expected = self.preloaded_revision(tmp_path / "empty")
+        hooked = self.preloaded_revision(
+            tmp_path, "import quebra_frases, hookpkg, xml.dom\n"
+                      "quebra_frases.held = xml.dom\nxml.dom.hook = hookpkg.hook\n")
+        assert expected is not None
+        assert hooked == expected
+
+    def test_a_blocked_import_in_sys_modules_keeps_the_revision(self, tmp_path):
+        (tmp_path / "empty").mkdir()
+        expected = self.preloaded_revision(tmp_path / "empty", None)
+        blocked = self.preloaded_revision(
+            tmp_path, "import sys, quebra_frases\nsys.modules['quebra_frases.blocked'] = None\n")
+        assert expected is not None
+        assert blocked == expected
 
     def test_another_distribution_loaded_before_the_probe_keeps_the_revision(self, fresh_probes, tmp_path,
                                                                              monkeypatch):
