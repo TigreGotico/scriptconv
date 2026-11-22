@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a149](https://github.com/TigreGotico/scriptconv/tree/0.0.4a149) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a148...0.0.4a149)
+
+**Merged pull requests:**
+
+- perf\(phonemizers\): compute the backend revision without a probe process [\#396](https://github.com/TigreGotico/scriptconv/pull/396) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a148](https://github.com/TigreGotico/scriptconv/tree/0.0.4a148) (2026-11-22)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a147...0.0.4a148)
