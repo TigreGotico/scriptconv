@@ -76,6 +76,9 @@ _TRAILING_PUNCTUATION = re.compile(r"(?<![^\w\s])[^\w\s]++\s*+$")
 # One or more blank lines: a paragraph break.
 _PARAGRAPH_BREAK = re.compile(r"(\n(?:[^\S\n]*\n)+)")
 _LANG_FLAGS = re.compile(r"\([^)]+\)")
+_WHITESPACE = re.compile(r"\s")
+# The text before the first letter or digit: whitespace and marks.
+_WORDLESS_START = re.compile(r"[\W_]*")
 # The stress mark that the diacritize stage (stressonnx) writes after a stressed vowel.
 STRESS_MARK = "\u0301"
 # The methods through which text reaches a backend.
@@ -94,6 +97,13 @@ def join_sentences(sentences: Iterable[List[str]], keep_punctuation: bool = True
     sentence starts with a space, because a voice never saw a space at the
     start of an utterance, so the space exists only here.
 
+    The sentences come without their text, so this function cannot see the
+    whitespace between them, and a sentence that ends with no token always
+    takes the space. Text that writes no space between two sentences, as
+    Chinese and Japanese do after ``。！？``, gets one here.
+    :meth:`BasePhonemizer.phonemize_to_list` reads the text, and adds the
+    space only where the text writes whitespace between the two sentences.
+
     Without *keep_punctuation* no sentence ends in a token, so one space
     separates every two sentences. With it, a sentence that ends in a clause
     symbol (``. ? ! , : ;``) counts as ending in a token. A phoneme written
@@ -102,17 +112,22 @@ def join_sentences(sentences: Iterable[List[str]], keep_punctuation: bool = True
     it appended, so it joins its own sentences without that ambiguity.
     """
     return _join((sentence, keep_punctuation and bool(sentence)
-                  and sentence[-1] in _CLAUSE_TOKENS) for sentence in sentences)
+                  and sentence[-1] in _CLAUSE_TOKENS, True) for sentence in sentences)
 
 
-def _join(sentences: Iterable[Tuple[List[str], bool]]) -> List[str]:
-    """``(phonemes, ends_in_token)`` sentences joined by the rule of :func:`join_sentences`."""
+def _join(sentences: Iterable[Tuple[List[str], bool, bool]]) -> List[str]:
+    """``(phonemes, ends_in_token, spaced)`` sentences joined by the rule of :func:`join_sentences`.
+
+    *spaced* tells whether the text writes whitespace before the first word
+    of the sentence. Where it writes none, no space comes between the two
+    sentences.
+    """
     phonemes: List[str] = []
     joins = True
-    for sentence, ends_in_token in sentences:
+    for sentence, ends_in_token, spaced in sentences:
         if not sentence:
             continue
-        if not joins:
+        if spaced and not joins:
             phonemes.append(" ")
         phonemes.extend(sentence)
         joins = ends_in_token or sentence[-1] == " "
@@ -449,20 +464,22 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
 
         The list is the sentences of :meth:`phonemize` joined by the rule of
         :func:`join_sentences`, so a voice trains on the sequences that
-        synthesis gives it. Without :attr:`keep_punctuation` no punctuation
-        reaches the list, and one space separates two sentences. With it, each
-        clause's symbol comes before its space, and a sentence that ends in an
-        appended symbol joins the next one with no space. Clause breaks that a
-        backend prints as ``"\\n"`` are not phonemes: each becomes one space,
-        because the next clause starts a new word. A backend that overrides
-        :meth:`phonemize_lazy` keeps its own synthesis, so its list is the
-        whole text read by :meth:`phonemize_string`.
+        synthesis gives it. A space comes between two sentences only where
+        the text writes whitespace between them, so Chinese and Japanese
+        sentences join with none. Without :attr:`keep_punctuation` no
+        punctuation reaches the list, so no sentence ends in a symbol. With
+        it, each clause's symbol comes before its space, and a sentence that
+        ends in an appended symbol joins the next one with no space. Clause
+        breaks that a backend prints as ``"\\n"`` are not phonemes: each
+        becomes one space, because the next clause starts a new word. A
+        backend that overrides :meth:`phonemize_lazy` keeps its own synthesis,
+        so its list is the whole text read by :meth:`phonemize_string`.
         """
         if self._keeps_punctuation():
             return _join(self._punctuated_sentences(text, lang))
         if type(self).phonemize_lazy is not BasePhonemizer.phonemize_lazy:
             return list(_clause_breaks_as_spaces(self.phonemize_string(text, lang)))
-        return join_sentences(self._bare_sentences(text, lang), keep_punctuation=False)
+        return _join(self._bare_sentences(text, lang))
 
     def phonemize(self, text: str, lang: str) -> PhonemizedChunks:
         # PhonemizedChunks is list[list[str]]; empty text yields no
@@ -489,9 +506,9 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         if self.normalizer is not None:
             text = self.normalizer(text, lang)
         if self._keeps_punctuation():
-            yield from (phonemes for phonemes, _ in self._punctuated_sentences(text, lang))
+            yield from (phonemes for phonemes, _, _ in self._punctuated_sentences(text, lang))
         else:
-            yield from self._bare_sentences(text, lang)
+            yield from (phonemes for phonemes, _, _ in self._bare_sentences(text, lang))
 
     def phonemize_segments(self, text: str, lang: str) -> Iterator[Segment]:
         """The segments of *text* in reading order, read in one pass.
@@ -541,7 +558,7 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         """
         return None
 
-    def _bare_sentences(self, text: str, lang: str) -> Iterator[List[str]]:
+    def _bare_sentences(self, text: str, lang: str) -> Iterator[Tuple[List[str], bool, bool]]:
         """Per-sentence phonemes, with the punctuation removed before the backend.
 
         The backend reads each chunk of :meth:`chunk_text` alone. A ``:``,
@@ -552,10 +569,21 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         A backend that owns ``normalize`` reads the text with its own rules, so
         its chunk reaches it as written, stripped of outer whitespace, with the
         punctuation that its normaliser reads.
+
+        Each sentence comes with the two flags of
+        :meth:`_punctuated_sentences`, and it never ends in a token.
         """
         question_semicolon = _primary_subtag(lang) == "el"
         sentence: List[List[str]] = []
+        # where the first word of the sentence starts in the text, and where
+        # the last chunk of the last sentence with phonemes ends
+        word = end = cursor = 0
         for chunk, punct, eos in self.chunk_text(text):
+            if chunk:
+                found = text.find(chunk, cursor)
+                cursor = found + len(chunk)
+                if not any(sentence):
+                    word = found + _WORDLESS_START.match(chunk).end()
             read = (chunk.strip() if "normalize" in self.owned_stages
                     else self.remove_punctuation(chunk))
             phoneme_str = _clause_breaks_as_spaces(self.phonemize_string(read, lang))
@@ -564,7 +592,10 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
             phoneme_str = re.sub(r"\([^)]+\)", "", phoneme_str)
             sentence.append(list(phoneme_str))
             if eos or (question_semicolon and punct == ";"):
-                yield join_sentences(sentence, keep_punctuation=False)
+                phonemes = join_sentences(sentence, keep_punctuation=False)
+                yield phonemes, False, bool(_WHITESPACE.search(text, end, word))
+                if phonemes:
+                    end = cursor
                 sentence = []
 
     def _keeps_punctuation(self) -> bool:
@@ -573,7 +604,7 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
                 and cls.phonemize_to_list is BasePhonemizer.phonemize_to_list
                 and cls.phonemize_lazy is BasePhonemizer.phonemize_lazy)
 
-    def _punctuated_sentences(self, text: str, lang: str) -> Iterator[Tuple[List[str], bool]]:
+    def _punctuated_sentences(self, text: str, lang: str) -> Iterator[Tuple[List[str], bool, bool]]:
         """Per-sentence phonemes with each clause's punctuation appended.
 
         Each clause is phonemized on its own with its punctuation removed, so
@@ -582,7 +613,9 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         space for ``, : ;``. A space also separates a clause from the next one
         in the same sentence, after any symbol or none. No sentence starts with
         a space: :func:`join_sentences` adds the space between two sentences.
-        Each sentence comes with whether it ends in an appended symbol.
+        Each sentence comes with whether it ends in an appended symbol, and
+        whether the text writes whitespace between its first word and the
+        last sentence before it that gives phonemes.
 
         A backend that owns ``normalize`` reads the text with its own rules, so
         each clause reaches it as written, stripped of outer whitespace, with
@@ -595,7 +628,10 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
             raise ImportError(
                 "sentence chunking needs quebra-frases — install with "
                 "`pip install scriptconv[phonemizers]`") from None
+        end = cursor = 0
         for sentence in sentence_tokenize(text):
+            start = text.find(sentence, cursor)
+            cursor = start + len(sentence)
             phonemes: List[str] = []
             ends_in_token = False
             for clause, mark in split_clauses(sentence):
@@ -617,7 +653,9 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
                     if mark in _PAUSE_PUNCTUATION:
                         phonemes.append(" ")
             if phonemes:
-                yield phonemes, ends_in_token
+                word = start + _WORDLESS_START.match(sentence).end()
+                yield phonemes, ends_in_token, bool(_WHITESPACE.search(text, end, word))
+                end = cursor
 
     @staticmethod
     def _process_phones(raw_phones: RawPhonemizedChunks) -> PhonemizedChunks:

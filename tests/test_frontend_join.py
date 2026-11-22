@@ -167,7 +167,8 @@ class TestClausesJoinAsTheSentence:
     def test_a_space_follows_an_exclamation_mark_inside_a_sentence(self):
         frontend = TextFrontend(FrontendConfig("xx", keep_punctuation=True,
                                                stages=Stages(diacritize=False)), GraphemePhonemizer())
-        assert ["".join(c) for c in frontend.phonemize("She reads books! The road is long.",
+        # a lower-case word after the "!" keeps one sentence
+        assert ["".join(c) for c in frontend.phonemize("She reads books! the road is long.",
                                                        Stages(chunk=Chunk.CLAUSE))] == [
             "she reads books! ", "the road is long."]
 
@@ -208,6 +209,46 @@ class TestClausesJoinAsTheSentence:
         frontend = TextFrontend(FrontendConfig("en-US", keep_punctuation=keep), dizione)
         text = "Really? Yes, I think so! Mrs. Jones came; she left. Bye"
         assert joined(frontend, text, Chunk.CLAUSE, keep) == joined(frontend, text, Chunk.SENTENCE, keep)
+
+
+class TestSentencesJoinAsTheTextWrites:
+    """A sentence that ends with no clause symbol takes a space before the
+    next sentence only where the text writes whitespace between them.
+
+    The sentence split here ends a sentence after ``。！？`` with no space
+    after it, as Chinese and Japanese write it, so the rows do not depend on
+    the installed quebra-frases."""
+
+    @pytest.fixture(autouse=True)
+    def cjk_sentence_split(self, monkeypatch):
+        import quebra_frases
+        monkeypatch.setattr(quebra_frases, "sentence_tokenize",
+                            lambda text: re.split(r"(?<=[。！？])(?=\S)|(?<=[.?!。！？])\s+", text))
+
+    @pytest.mark.parametrize("backend", [GraphemePhonemizer, UnicodeCodepointPhonemizer])
+    @pytest.mark.parametrize("keep", [True, False])
+    @pytest.mark.parametrize("text, expected", [
+        ("你好！我们走。", "你好我们走"),
+        ("我有三本书。你有几本？太好了！", "我有三本书你有几本太好了"),
+        # whitespace in the text keeps the space
+        ("你好！ 我们走。", "你好 我们走"),
+        ("你好！\n我们走。", "你好 我们走"),
+        # the whitespace before the first word counts, also after a mark
+        ("你好！' 我们走。", "你好 我们走"),
+        ("你好！「我们走」", "你好我们走"),
+    ])
+    def test_flat_streams(self, backend, keep, text, expected):
+        frontend = TextFrontend(FrontendConfig("zh", keep_punctuation=keep,
+                                               stages=Stages(diacritize=False)), backend())
+        assert "".join(frontend.backend.phonemize_to_list(text, "zh")) == expected
+        assert "".join(frontend.phonemize_flat(text)) == expected
+        assert ["".join(c) for c in frontend.phonemize(text, Stages(chunk=Chunk.NONE))] == [expected]
+
+    @pytest.mark.parametrize("text", ["你好！我们走。", "你好！ 我们走。"])
+    def test_the_chunk_text_keeps_the_gap(self, text):
+        frontend = TextFrontend(FrontendConfig("zh", keep_punctuation=True,
+                                               stages=Stages(diacritize=False)), GraphemePhonemizer())
+        assert [s.text for s in frontend.segments(text, Stages(chunk=Chunk.NONE))] == [text]
 
 
 class TestTrainingReadsTheSentencePath:
