@@ -102,7 +102,7 @@ WHOLE_TEXT_LIMIT = 1_750
 """The default of :attr:`FrontendConfig.whole_text_limit`."""
 
 # The word that stands for a block when the frontend reads the mark after it.
-_BLOCK_WORD = "a"
+_BLOCK_WORD = "casa"
 # Text that ends in whitespace and then only marks. The marks join the block
 # after them as they join a plain word, and the whitespace stays.
 _SPACE_BEFORE_BLOCK = re.compile(r"\s\W*$")
