@@ -37,6 +37,7 @@ PHONEMIZER_REGISTRY: Dict[Phonemizer, Tuple[str, str, Optional[str]]] = {
     _P.UNICODE: (f"{_BASE}.base", "UnicodeCodepointPhonemizer", None),
     _P.GRAPHEMES: (f"{_BASE}.base", "GraphemePhonemizer", None),
     _P.ESPEAK: (f"{COPYLEFT}.mul", "EspeakPhonemizer", "espeak"),
+    _P.ESPEAK_LT_ACCENT: (f"{COPYLEFT}.lt", "EspeakLithuanianAccentPhonemizer", "espeak"),
     _P.GRUUT: (f"{_BASE}.mul", "GruutPhonemizer", "gruut"),
     _P.GORUUT: (f"{_BASE}.mul", "GoruutPhonemizer", "goruut"),
     _P.EPITRAN: (f"{_BASE}.mul", "EpitranPhonemizer", "epitran"),

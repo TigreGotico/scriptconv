@@ -46,6 +46,7 @@ class Phonemizer(str, Enum):
     MISAKI_KO = "misaki_ko"
     MISAKI_VI = "misaki_vi"
     ESPEAK = "espeak"
+    ESPEAK_LT_ACCENT = "espeak_lt_accent"  # lithuanian espeak-ng IPA with the three pitch accents
     GRUUT = "gruut"
     GORUUT = "goruut"
     EPITRAN = "epitran"

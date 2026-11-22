@@ -636,8 +636,9 @@ Two sister packages hold those wrappers, and their vendored code, under the
 licences of that code:
 
 - **scriptconv-copyleft** holds KoG2P and the espeak, Cotovía, AhoTTS,
-  transphone, misaki, g2pfa, g2pk and pykakasi wrappers, and the Japanese
-  functions of `scriptconv.readings`.
+  transphone, misaki, g2pfa, g2pk and pykakasi wrappers, the Lithuanian
+  pitch-accent backend `espeak_lt_accent`, and the Japanese functions of
+  `scriptconv.readings`.
 - **scriptconv-nonfree** holds mantoq, iqra_phonetiser and their wrappers
   (Mantoq, Halabi, Iqra), and the viphoneme, africa-g2p and ghana-g2p
   wrappers.
@@ -911,7 +912,9 @@ xpinyin, pypinyin, g2pW), F5-TTS voices (`f5tts_char`, `f5tts_pinyin`), Arabic (
 Vietnamese (viphoneme, Python below 3.12 only), Portuguese (tugaphone), Galician
 (Cotovía), Russian (vosk, the vosk-tts inventory, `Alphabet.VOSK`, with the
 voice's pronunciation dictionary passed as `phonemizer_model`), Basque
-(AhoTTS, euskaphone), African languages (africa-g2p, ghana-g2p), Mirandese and Barranquenho (the orthography2ipa specs
+(AhoTTS, euskaphone), Lithuanian (`espeak_lt_accent`: espeak-ng IPA with the
+three pitch accents `ˈ`, `ˌ`, `ˋ` from the stress dictionary of Reginutė, in
+the `espeak` extra), African languages (africa-g2p, ghana-g2p), Mirandese and Barranquenho (the orthography2ipa specs
 `mwl`, `mwl-x-sendim`, `mwl-x-ifanes` and `ext-PT-x-barranco`), Levantine
 Arabic/English code-switching (shami, whose `phonemize_with_language_ids` also returns the
 parallel per-phoneme language-ID stream), and orthography2ipa for its

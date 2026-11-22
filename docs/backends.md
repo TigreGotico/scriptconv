@@ -47,6 +47,7 @@ last column names each language whose explicit default chain holds the backend.
 | `misaki_ko` | `MisakiKoPhonemizer` | `misaki` | scriptconv-copyleft |  |
 | `misaki_vi` | `MisakiViPhonemizer` | `misaki` | scriptconv-copyleft |  |
 | `espeak` | `EspeakPhonemizer` | `espeak` | scriptconv-copyleft | `gl`, `ru` |
+| `espeak_lt_accent` | `EspeakLithuanianAccentPhonemizer` | `espeak` | scriptconv-copyleft |  |
 | `gruut` | `GruutPhonemizer` | `gruut` | scriptconv |  |
 | `goruut` | `GoruutPhonemizer` | `goruut` | scriptconv |  |
 | `epitran` | `EpitranPhonemizer` | `epitran` | scriptconv |  |
