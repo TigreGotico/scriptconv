@@ -637,7 +637,8 @@ licences of that code:
 
 - **scriptconv-copyleft** holds KoG2P and the espeak, Cotovía, AhoTTS,
   transphone, misaki, g2pfa, g2pk and pykakasi wrappers, the Lithuanian
-  pitch-accent backend `espeak_lt_accent`, and the Japanese functions of
+  pitch-accent backend `espeak_lt_accent`, the Hebrew `hebrew_ipa`, Japanese
+  `openjtalk_prosody` and Thai `tltk` backends, and the Japanese functions of
   `scriptconv.readings`.
 - **scriptconv-nonfree** holds mantoq, iqra_phonetiser and their wrappers
   (Mantoq, Halabi, Iqra), and the viphoneme, africa-g2p and ghana-g2p
@@ -907,8 +908,11 @@ Multilingual: espeak (subprocess with espyak fallback), gruut, goruut,
 epitran, transphone, ByT5/Charsiu (ONNX), the misaki family (en/ja/zh/ko/vi).
 Per-language: English (DeepPhonemizer, OpenPhonemizer, g2p_en, dizione, Leokani G2P), Liberian
 English (kolokwa, `lir`), Japanese
-(OpenJTalk, cutlet, pykakasi), Korean (g2pk, KoG2P), Chinese (jieba, g2pM,
-xpinyin, pypinyin, g2pW), F5-TTS voices (`f5tts_char`, `f5tts_pinyin`), Arabic (arbtok, mantoq), Hebrew (phonikud), Persian,
+(OpenJTalk, cutlet, pykakasi, and `openjtalk_prosody`: OpenJTalk IPA with the
+accent marks `↑ ↓ #`), Korean (g2pk, KoG2P), Chinese (jieba, g2pM,
+xpinyin, pypinyin, g2pW), F5-TTS voices (`f5tts_char`, `f5tts_pinyin`), Arabic (arbtok, mantoq), Hebrew (phonikud, and `hebrew_ipa`: IPA with stress from text that
+carries niqqud), Thai (`tltk`: IPA with a tone
+digit per syllable, in the `th` extra), Persian,
 Vietnamese (viphoneme, Python below 3.12 only), Portuguese (tugaphone), Galician
 (Cotovía), Russian (vosk, the vosk-tts inventory, `Alphabet.VOSK`, with the
 voice's pronunciation dictionary passed as `phonemizer_model`), Basque
@@ -922,6 +926,12 @@ data-driven language specs. Trivial built-ins that need no extra:
 `GraphemePhonemizer` (normalized characters, where a hyphen between two
 letters stays as part of the word) and `UnicodeCodepointPhonemizer`
 (codepoints as phonemes).
+
+`hebrew_ipa` reads the niqqud that the text carries and adds none, so text
+without niqqud gives no phonemes. Hebrew does not diacritize by default. A
+caller with text without niqqud turns the diacritize stage on, for example
+`frontend.phonemize(text, Stages(lang="he", diacritize=True))`, and the
+phonikud model of the `he` extra then adds the niqqud.
 
 `GraphemePhonemizer` takes its character rules as keyword arguments, so a voice
 can match the text it trained on. `lowercase`, `in_word_chars`, `replace_chars`

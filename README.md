@@ -370,7 +370,7 @@ of each phonemizer backend.
 | `phonemizers` | The phonemizer base layer: sentence chunking (quebra-frases) and language matching (linguatag). Every other phonemizer extra includes it |
 | `normalize` | `text2spoken`, the normaliser that `spoken_normalizer()` returns for the `TextFrontend` hook |
 | `espeak`, `gruut`, `goruut`, `epitran`, `transphone`, `misaki`, `byt5`, `phonetisaurus` | Multilingual phonemizer backends |
-| `en-phonemizers`, `lir`, `ja-phonemizers`, `zh-phonemizers`, `ko`, `ar-phonemizers`, `eu`, `pt-phonemizers`, `gl`, `he`, `fa`, `vi`, `shami`, `africa`, `ghana` | Per-language phonemizer backends |
+| `en-phonemizers`, `lir`, `ja-phonemizers`, `zh-phonemizers`, `ko`, `ar-phonemizers`, `eu`, `pt-phonemizers`, `gl`, `he`, `fa`, `th`, `vi`, `shami`, `africa`, `ghana` | Per-language phonemizer backends |
 | `o2i`, `mwl` | orthography2ipa with o2i-lexicons, and the Mirandese and Barranquenho backends that use its specs. `mwl` installs the same packages as `o2i` |
 | `tashkeel` | Arabic diacritization (text2tashkeel) |
 | `stress` | Word-stress restoration (stressonnx) for the languages in `scriptconv.diacritics.STRESS_LANGS` |
@@ -416,7 +416,7 @@ copyleft or a non-commercial licence are in two sister packages:
 
 | Package | Holds | Installed by the extras |
 |---|---|---|
-| [scriptconv-copyleft](https://github.com/TigreGotico/scriptconv-copyleft) | the espeak, Cotovía, AhoTTS, transphone, misaki, g2pfa, g2pk and KoG2P wrappers, the pykakasi wrapper, the Lithuanian pitch-accent backend `espeak_lt_accent` and the Japanese functions of `readings` | `espeak`, `transphone`, `misaki`, `gl`, `eu`, `fa`, `ko`, `ja`, `ja-phonemizers` |
+| [scriptconv-copyleft](https://github.com/TigreGotico/scriptconv-copyleft) | the espeak, Cotovía, AhoTTS, transphone, misaki, g2pfa, g2pk and KoG2P wrappers, the pykakasi wrapper, the Lithuanian pitch-accent backend `espeak_lt_accent`, the Hebrew `hebrew_ipa`, Japanese `openjtalk_prosody` and Thai `tltk` backends, and the Japanese functions of `readings` | `espeak`, `transphone`, `misaki`, `gl`, `eu`, `fa`, `he`, `ko`, `ja`, `ja-phonemizers`, `th` |
 | [scriptconv-nonfree](https://github.com/TigreGotico/scriptconv-nonfree) | the Mantoq, Halabi and Iqra wrappers with the vendored mantoq and iqra_phonetiser, the viphoneme wrapper, and the africa-g2p and ghana-g2p wrappers | `ar-phonemizers`, `vi`, `africa`, `ghana` |
 
 Each sister package states its own licence. scriptconv-nonfree holds code

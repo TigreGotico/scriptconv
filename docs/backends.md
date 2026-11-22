@@ -65,11 +65,14 @@ last column names each language whose explicit default chain holds the backend.
 | `tugaphone` | `TugaphonePhonemizer` | `pt-phonemizers` | scriptconv | `pt` |
 | `g2pfa` | `PersianPhonemizer` | `fa` | scriptconv-copyleft |  |
 | `openjtalk` | `OpenJTaklPhonemizer` | `ja-phonemizers` | scriptconv |  |
+| `openjtalk_prosody` | `OpenJTalkProsodyPhonemizer` | `ja-phonemizers` | scriptconv-copyleft |  |
 | `cutlet` | `CutletPhonemizer` | `ja-phonemizers` | scriptconv |  |
 | `pykakasi` | `PyKakasiPhonemizer` | `ja-phonemizers` | scriptconv-copyleft |  |
 | `cotovia` | `CotoviaPhonemizer` | `gl` | scriptconv-copyleft | `gl` |
 | `ahotts` | `AhoTTSPhonemizer` | `eu` | scriptconv-copyleft |  |
 | `phonikud` | `PhonikudPhonemizer` | `he` | scriptconv | `he` |
+| `hebrew_ipa` | `HebrewIPAPhonemizer` | `he` | scriptconv-copyleft |  |
+| `tltk` | `TLTKPhonemizer` | `th` | scriptconv-copyleft |  |
 | `mantoq` | `MantoqPhonemizer` | `ar-phonemizers` | scriptconv-nonfree |  |
 | `halabi` | `HalabiPhonemizer` | `ar-phonemizers` | scriptconv-nonfree |  |
 | `iqra` | `IqraPhonemizer` | `ar-phonemizers` | scriptconv-nonfree |  |
