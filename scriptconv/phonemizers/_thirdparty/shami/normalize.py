@@ -128,6 +128,21 @@ def _english_fallback(n: int) -> str:
     return _EN_ONES[n]
 
 
+# The longest digit run that is still read as one quantity, as in mantoq. A
+# longer run, such as a serial number, is read digit by digit: Python refuses
+# to turn more than 4,300 digits into an int, and num2words refuses numbers
+# from about 10**306.
+MAX_QUANTITY_DIGITS = 15
+
+
+def _digits_to_words(digits: str, is_ar: bool) -> str:
+    """Read a run of ASCII digits as one quantity, or digit by digit when it is long."""
+    to_words = arabic_int_to_words if is_ar else english_int_to_words
+    if len(digits) > MAX_QUANTITY_DIGITS:
+        return " ".join(to_words(int(digit)) for digit in digits)
+    return to_words(int(digits) if digits else 0)
+
+
 _CURRENCY = {
     "$": ("dollar", "dollars", "دولار"),
     "£": ("pound", "pounds", "جْنيه"),
@@ -147,16 +162,17 @@ def _verbalise_currency(symbol: str, amount: str, lang: str) -> str:
         whole, frac = amount.split(".", 1)
     else:
         whole, frac = amount, ""
-    whole_i = int(whole) if whole.isdigit() else 0
+    if not whole.isdigit():
+        whole = "0"
     if lang == "ar":
-        words = arabic_int_to_words(whole_i) + " " + ar
-        if frac and int(frac):
-            words += " وْ" + arabic_int_to_words(int(frac)) + " قِرش"
+        words = _digits_to_words(whole, True) + " " + ar
+        if frac.strip("0"):
+            words += " وْ" + _digits_to_words(frac, True) + " قِرش"
         return words
-    unit = sg if whole_i == 1 else pl
-    words = f"{english_int_to_words(whole_i)} {unit}"
-    if frac and int(frac):
-        words += f" and {english_int_to_words(int(frac))} cents"
+    unit = sg if whole.lstrip("0") == "1" else pl
+    words = f"{_digits_to_words(whole, False)} {unit}"
+    if frac.strip("0"):
+        words += f" and {_digits_to_words(frac, False)} cents"
     return words
 
 
@@ -176,10 +192,12 @@ def strip_diacritics(text: str) -> str:
 
 
 _TIME_RE = re.compile(r"\b([01]?\d|2[0-3]):([0-5]\d)\b")
-_PERCENT_RE = re.compile(r"(\d+(?:\.\d+)?)\s*%")
+# (?<!\d): a match never starts inside a digit run, and without the guard a
+# long run is scanned again from each of its digits.
+_PERCENT_RE = re.compile(r"(?<!\d)(\d+(?:\.\d+)?)\s*%")
 _CURRENCY_RE = re.compile(
     r"([$£€₪]|د\.إ|ر\.س|ل\.ل|ل\.س|ج\.م)\s*(\d+(?:[.,]\d+)?)"
-    r"|(\d+(?:[.,]\d+)?)\s*([$£€₪])"
+    r"|(?<!\d)(\d+(?:[.,]\d+)?)\s*([$£€₪])"
 )
 _NUMBER_RE = re.compile(r"-?\d+(?:[.,]\d+)?")
 
@@ -232,8 +250,7 @@ def _float_words(token: str, is_ar: bool) -> str:
         whole, frac = token.split(".", 1)
     else:
         whole, frac = token, ""
-    whole_i = int(whole) if whole else 0
-    words = arabic_int_to_words(whole_i) if is_ar else english_int_to_words(whole_i)
+    words = _digits_to_words(whole, is_ar)
     if frac:
         point = "فاصِل" if is_ar else "point"
         digit_words = " ".join(
