@@ -526,6 +526,76 @@ Limits:
 - `keep_punctuation` has no effect: the IPA string has no punctuation, and
   `tokens()` has all of it.
 
+## Leokani G2P, American English
+
+`Phonemizer.LEOKANI` reads American English text into the phoneme codes of
+Kokoro and misaki. The engine is
+[Leokani G2P](https://github.com/Milliwatt-Labs/leokani-g2p) by Milliwatt
+Labs. Its code is MIT, and its model files are CC BY 4.0. The code is
+vendored byte for byte under `scriptconv/phonemizers/_thirdparty/leokani/`,
+with its `LICENSE`, its `NOTICE` and its source revision. Leokani G2P looks
+each word up in its lexicon and guesses the other words with a
+letter-to-sound model. A context model then picks how each word is said in
+its clause. Install the backend with `pip install scriptconv[en-phonemizers]`,
+which holds numpy, onnxruntime and huggingface_hub.
+
+```python
+from scriptconv.phonemizers import Phonemizer, get_phonemizer
+
+leokani = get_phonemizer(Phonemizer.LEOKANI)
+leokani.phonemize_string("The wind was cold, so we read inside.", "en-US")
+# 'ðə wˈɪnd wʌz kˈOld, sˌO wi ɹˈid ɪnsˈId.'
+leokani.phonemize("The wind was cold, so we read inside.", "en-US")
+# [['ð', 'ə', ' ', 'w', 'ˈ', 'ɪ', 'n', 'd', ...]]
+```
+
+The output alphabet is `Alphabet.IPA`, with the codes that the `misaki_en`
+backend writes: `A`, `I`, `O`, `W` and `Y` stand for the diphthongs eɪ, aɪ,
+oʊ, aʊ and ɔɪ, and `ᵊ` and `ᵻ` for reduced vowels. A Kokoro voice reads these
+codes as they are. `phonemize_string` returns the output of the engine
+unchanged, with the punctuation that the text holds. `phonemize` and the
+frontend remove the punctuation before the engine reads the text, as for
+the other backends.
+
+`model="mini"` loads the larger model, which reads names and rare words
+better. `micro` is the default:
+`get_phonemizer(Phonemizer.LEOKANI, model="mini")`.
+
+The model files come from the Hugging Face Hub, at a fixed revision, into the
+shared Hugging Face cache, from the upstream repository
+`milliwattlabs/leokani-g2p` at revision `a819acc8`. Each file must have its
+pinned sha256. A cached file with another sha256 is
+downloaded again once, unless the Hub is offline (`HF_HUB_OFFLINE`). With no
+copy that passes the check, the backend raises `ModelUnavailableError`.
+
+| File | Source | Revision | Size | Licence |
+|---|---|---|---|---|
+| `leokani_g2p.py`, in the wheel | Hugging Face model `milliwattlabs/leokani-g2p`; the same file is `src/leokani_g2p/runtime.py` of github.com/Milliwatt-Labs/leokani-g2p at `df8bc119` (1.3.0) | `a819acc86471a04a01ba3d3f30f3765e4675c7ca` | 189 KB | MIT |
+| `micro` model: the lexicon and three ONNX models | Hugging Face model `milliwattlabs/leokani-g2p` | `a819acc86471a04a01ba3d3f30f3765e4675c7ca` | 10.2 MB | CC BY 4.0 |
+| `mini` model, in `mini/` | Hugging Face model `milliwattlabs/leokani-g2p` | `a819acc86471a04a01ba3d3f30f3765e4675c7ca` | 10.8 MB | CC BY 4.0 |
+
+Credit the engine as: Leokani G2P by Milliwatt Labs (milliwattlabs.com).
+
+The backend owns no stage, so the frontend runs its normalise stage first.
+Leokani G2P then runs its own text rules on the result, which read numbers,
+money, dates, times, units and web addresses. `identity(lang)` gives a
+`revision` that hashes the code on the path of the backend, the vendored
+engine with it. That code holds the model revision and the sha256 of each
+model file, so a new model gives a new `revision`.
+
+Limits:
+
+- Leokani G2P reads American English only. A tag must resolve to `en-US`, or
+  to a lect of it such as `en-US-x-nyc`. A bare `en` is British English by
+  the default-region rule, so it is refused with `UnsupportedLanguageError`.
+- The engine reads a number word with a hyphen, such as `ninety-nine`, as one
+  word with one stress: `nˈIntinˈIn`. Its own text rules write `99` as two
+  words, `nˈInti nˈIn`. A normaliser that writes hyphens, as text2spoken
+  does, gives the first form.
+- When the engine reads the digits itself, `at 14:30` reads as "fourteen
+  thirty", and `fell to -5 degrees` reads the sign as "dash". Normalise such
+  text first.
+
 ## Backends in scriptconv-copyleft and scriptconv-nonfree
 
 A wrapper moves out of scriptconv when its own code or a dependency of its
@@ -803,7 +873,7 @@ f5.phonemize_to_list("我们用iPhone打电话。", "zh")
 
 Multilingual: espeak (subprocess with espyak fallback), gruut, goruut,
 epitran, transphone, ByT5/Charsiu (ONNX), the misaki family (en/ja/zh/ko/vi).
-Per-language: English (DeepPhonemizer, OpenPhonemizer, g2p_en, dizione), Japanese
+Per-language: English (DeepPhonemizer, OpenPhonemizer, g2p_en, dizione, Leokani G2P), Japanese
 (OpenJTalk, cutlet, pykakasi), Korean (g2pk, KoG2P), Chinese (jieba, g2pM,
 xpinyin, pypinyin, g2pW), F5-TTS voices (`f5tts_char`, `f5tts_pinyin`), Arabic (arbtok, mantoq), Hebrew (phonikud), Persian,
 Vietnamese (viphoneme, Python below 3.12 only), Portuguese (tugaphone), Galician
