@@ -224,6 +224,12 @@ class TestKey:
         assert hit_then(monkeypatch, lambda: monkeypatch.setattr(
             sys, "executable", str(tmp_path / "other" / "python"))) == 2
 
+    def test_another_engine_version_is_a_miss(self, monkeypatch):
+        # a version from outside Python, as the espeak-ng binary, changes no key file
+        assert frontend().identity().version != "0.0.4a999"
+        monkeypatch.setattr(GraphemePhonemizer, "_engine_release", lambda self: ("scriptconv", "0.0.4a999"))
+        assert frontend().identity().version == "0.0.4a999"
+
     def test_another_frontend_setting_is_a_miss(self, monkeypatch):
         calls = counted_backend_calls(monkeypatch)
         frontend().identity()

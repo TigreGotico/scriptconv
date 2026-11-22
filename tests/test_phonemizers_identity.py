@@ -6,9 +6,11 @@ import json
 import logging
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
+import sysconfig
 import time
 import tomllib
 import unicodedata
@@ -19,6 +21,7 @@ from types import MappingProxyType
 
 import orthography2ipa
 import pytest
+import quebra_frases
 import tugaphone.version
 from orthography2ipa.exceptions import EngineSourceUnavailable
 
@@ -215,13 +218,15 @@ class TestOrthography2IPARevision:
         assert first == second
         assert second.revision.startswith("sc1:")
 
-    def test_a_missing_engine_source_gives_no_revision_and_a_warning(self, monkeypatch, caplog):
+    def test_a_missing_engine_source_gives_the_base_revision_and_a_warning(self, monkeypatch, caplog):
         def unavailable(code):
             raise EngineSourceUnavailable("engine source of g2p.py is missing")
+        spec = Orthography2IPAPhonemizer().identity("gl")
         monkeypatch.setattr(orthography2ipa, "spec_revision", unavailable)
         with caplog.at_level(logging.WARNING, logger="scriptconv.phonemizers.o2ipa"):
             identity = Orthography2IPAPhonemizer().identity("gl")
-        assert identity.revision is None
+        assert identity == BasePhonemizer.identity(Orthography2IPAPhonemizer(), "gl")
+        assert identity.revision.startswith("sc1:") and identity.revision != spec.revision
         warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
         assert len(warnings) == 1
         assert "engine source" in warnings[0] and "g2p.py is missing" in warnings[0]
@@ -298,22 +303,24 @@ class TestTugaphoneRevision:
         assert not covered & {_revision._canonical(name) for name in tops}
         assert not {"tugaphone", "orthography2ipa", "o2i_lexicons"} & set(tops)
 
-    def test_a_tugaphone_revision_error_gives_no_revision_and_one_warning(self, monkeypatch, caplog):
+    def test_a_tugaphone_revision_error_gives_the_base_revision_and_one_warning(self, monkeypatch, caplog):
         def fails(lang):
             raise tugaphone.RevisionError("the revision probe for 'pt-PT' did not finish in 120 s")
         monkeypatch.setattr(tugaphone, "revision", fails)
         with caplog.at_level(logging.WARNING, logger="scriptconv.phonemizers.pt"):
             identities = [TugaphonePhonemizer().identity("pt-PT") for _ in range(3)]
-        assert [identity.revision for identity in identities] == [None] * 3
+        assert identities == [BasePhonemizer.identity(TugaphonePhonemizer(), "pt-PT")] * 3
+        assert identities[0].revision.startswith("sc1:")
         warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
         assert len(warnings) == 1
         assert "RevisionError" in warnings[0] and "did not finish in 120 s" in warnings[0]
 
-    def test_a_contact_other_than_none_gives_no_revision(self):
+    def test_a_contact_other_than_none_gives_the_base_revision(self):
         mixed = TugaphonePhonemizer()
         mixed.contact = "en"
-        assert TugaphonePhonemizer().identity("pt-PT").revision is not None
-        assert mixed.identity("pt-PT").revision is None
+        default = TugaphonePhonemizer().identity("pt-PT").revision
+        assert mixed.identity("pt-PT") == BasePhonemizer.identity(mixed, "pt-PT")
+        assert mixed.identity("pt-PT").revision.startswith("sc1:") and mixed.identity("pt-PT").revision != default
         # the policy reaches tugaphone and changes the output
         assert mixed.phonemize_string("o weekend", "pt-PT") == \
             tugaphone.TugaPhonemizer().phonemize_sentence("o weekend", "pt-PT", contact="en")
@@ -371,6 +378,7 @@ REVISIONS = revisions_script(CODE_BACKENDS, CODE_FRONTENDS)
 WRAPPER_REVISIONS = revisions_script(WRAPPER_BACKENDS, WRAPPER_FRONTENDS,
                                      "from scriptconv.phonemizers.dizione import DizionePhonemizer")
 SCRIPTCONV = Path(sys.modules["scriptconv"].__file__).parent
+QUEBRA_FRASES = Path(quebra_frases.__file__).parent
 
 # Edits of the scriptconv source, (file, old text, new text), on the path of the
 # named backend or frontend. Each edit but F4 changes its output for some input.
@@ -430,9 +438,11 @@ NEUTRAL_EDITS = {
 
 def revisions_in_a_copy(directory, edit=None, script=REVISIONS):
     """The revisions that *script* prints, in a fresh process, from a copy of
-    the scriptconv package with *edit* ``(file, old, new)`` applied."""
+    the scriptconv and quebra-frases packages with *edit* ``(file, old, new)``
+    applied. *file* is relative to the scriptconv package."""
     tree = directory / "tree"
-    shutil.copytree(SCRIPTCONV, tree / "scriptconv", ignore=shutil.ignore_patterns("__pycache__"))
+    for package in (SCRIPTCONV, QUEBRA_FRASES):
+        shutil.copytree(package, tree / package.name, ignore=shutil.ignore_patterns("__pycache__"))
     if edit is not None:
         target, old, new = edit
         path = tree / "scriptconv" / target
@@ -708,6 +718,78 @@ class TestWrapperRevision:
         assert revisions_in_a_copy(tmp_path, NEUTRAL_EDITS[edit], WRAPPER_REVISIONS) == wrapped_pristine
 
 
+# An engine backend, whose revision holds the engine version in place of the
+# engine's files, and a frontend that reads through it.
+ENGINE_BACKENDS = {"epitran": ("EpitranPhonemizer()", "rus-Cyrl")}
+ENGINE_FRONTENDS = {"frontend-epitran": ("EpitranPhonemizer()", "rus-Cyrl")}
+ENGINE_REVISIONS = revisions_script(ENGINE_BACKENDS, ENGINE_FRONTENDS,
+                                    "from scriptconv.phonemizers.mul import EpitranPhonemizer")
+# Edits on the path of the engine backend that change its output for some input.
+ENGINE_MUTANTS = {
+    "E1 a stress mark stays in the text that epitran reads": (
+        "epitran", "diacritics.py",
+        "    if STRESS_MARK not in text:\n        return text\n    vowels = _stress_vowels(lang)",
+        "    if True:\n        return text\n    vowels = _stress_vowels(lang)"),
+    "E2 the sentence splitter keeps the whole text as one sentence": (
+        "epitran", "../quebra_frases/tokenization.py",
+        "def sentence_tokenize(input_string):\n", "def sentence_tokenize(input_string):\n    return [input_string]\n"),
+    "E3 the epitran frontend keeps a block of whitespace": (
+        "frontend-epitran", "frontend.py", "if block[2:-2].strip():", "if block[2:-2]:"),
+}
+
+
+@pytest.fixture(scope="module")
+def engine_pristine(tmp_path_factory):
+    return revisions_in_a_copy(tmp_path_factory.mktemp("engine"), script=ENGINE_REVISIONS)
+
+
+# Each copy runs the epitran probes in a fresh process.
+@pytest.mark.timeout(900)
+class TestEngineRevision:
+    @pytest.mark.parametrize("member, lang", [
+        (Phonemizer.EPITRAN, "rus-Cyrl"), (Phonemizer.GRUUT, "ru"), (Phonemizer.ESPEAK, "pt"),
+        (Phonemizer.KOG2PK, "ko"), (Phonemizer.MANTOQ, "ar"),
+    ])
+    def test_an_engine_backend_has_a_revision(self, member, lang):
+        assert get_phonemizer(member).identity(lang).revision.startswith("sc1:")
+
+    @pytest.mark.parametrize("member, lang", [(Phonemizer.EPITRAN, "rus-Cyrl"), (Phonemizer.ESPEAK, "pt")])
+    def test_an_engine_release_changes_the_revision(self, member, lang, monkeypatch):
+        backend = get_phonemizer(member)
+        current = backend.identity(lang)
+        distribution, version = backend._engine_release()
+        monkeypatch.setattr(type(backend), "_engine_release", lambda self: (distribution, f"{version}.post1"))
+        released = backend.identity(lang)
+        assert None not in (current.revision, released.revision)
+        assert released.differs_from(current) == ("revision", "version")
+
+    @pytest.mark.parametrize("mutant", ENGINE_MUTANTS)
+    def test_a_code_change_on_the_path_changes_the_revision(self, mutant, engine_pristine, tmp_path):
+        backend, *edit = ENGINE_MUTANTS[mutant]
+        assert engine_pristine[backend] is not None
+        assert revisions_in_a_copy(tmp_path, edit, ENGINE_REVISIONS)[backend] != engine_pristine[backend]
+
+    @pytest.mark.parametrize("edit", NEUTRAL_EDITS)
+    def test_an_edit_that_changes_no_output_keeps_every_engine_revision(self, edit, engine_pristine, tmp_path):
+        assert None not in engine_pristine.values()
+        assert revisions_in_a_copy(tmp_path, NEUTRAL_EDITS[edit], ENGINE_REVISIONS) == engine_pristine
+
+    def test_the_engine_files_leave_the_hash(self, monkeypatch):
+        from scriptconv.phonemizers import _revision
+        _revision._probe_outcome.cache_clear()
+        tops = hashed_tops(monkeypatch)
+        assert get_phonemizer(Phonemizer.EPITRAN).identity("rus-Cyrl").revision is not None
+        assert "panphon" in tops and "epitran" not in tops
+
+    def test_a_backend_on_the_base_class_itself_gives_no_revision_and_no_warning(self, caplog):
+        class Custom(BasePhonemizer):
+            def phonemize_string(self, text, lang):
+                return text
+        with caplog.at_level(logging.WARNING):
+            assert Custom().identity("pt").revision is None
+        assert not caplog.records
+
+
 def frontend(backend=None, **config):
     return TextFrontend(FrontendConfig("pt-PT", **config), backend or GraphemePhonemizer())
 
@@ -977,6 +1059,113 @@ class TestProbeFailures:
         monkeypatch.syspath_prepend(str(tmp_path))
         assert expected is not None
         assert GraphemePhonemizer().identity("en").revision == expected
+
+
+def sloppy_site(tmp_path):
+    """A site directory with ``sloppy``, a distribution that holds ``quebra_frases``,
+    which the grapheme probe loads, and ships a top-level ``tests`` package, as gruut-ipa does."""
+    site = tmp_path / "site"
+    (site / "tests").mkdir(parents=True)
+    (site / "tests" / "__init__.py").write_text("SLOPPY = 1\n")
+    info = site / "sloppy-1.0.dist-info"
+    info.mkdir()
+    (info / "METADATA").write_text("Metadata-Version: 2.1\nName: sloppy\nVersion: 1.0\n")
+    (info / "top_level.txt").write_text("quebra_frases\ntests\n")
+    (info / "RECORD").write_text("tests/__init__.py,,\nsloppy-1.0.dist-info/METADATA,,\n")
+    return site
+
+
+def revision_from(cwd, site):
+    """The grapheme revision for ``en`` in a ``python -c`` process in *cwd*, which puts *cwd* first on its path."""
+    done = subprocess.run([sys.executable, "-c", GRAPHEMES_EN_REVISION], cwd=cwd, check=True,
+                          capture_output=True, text=True,
+                          env={**os.environ, "PYTHONPATH": os.pathsep.join([str(site), str(ROOT)]),
+                               "PYTHONDONTWRITEBYTECODE": "1"})
+    return json.loads(done.stdout.splitlines()[-1])
+
+
+class TestStableRevision:
+    """Two machines with the same packages, or two working directories, give one revision."""
+
+    def test_the_build_configuration_of_the_interpreter_stays_out(self, fresh_probes, tmp_path, monkeypatch):
+        from scriptconv.phonemizers import _revision
+        import scriptconv
+        # the probe of epitran and gruut loads it; another build of the same Python differs in it
+        name = sysconfig._get_sysconfigdata_name()
+        build = Path(importlib.util.find_spec(name).origin)
+        probe = {"modules": {"scriptconv": scriptconv.__file__, name: str(build)}, "opened": []}
+        monkeypatch.setattr(sys, "executable",
+                            fake_python(tmp_path, f"printf '%s%s\\n' \"$4\" {shlex.quote(json.dumps(probe))}"))
+        here = GraphemePhonemizer().identity("en").revision
+        _revision._probe_outcome.cache_clear()
+        digest = _revision.file_digest
+        monkeypatch.setattr(_revision, "file_digest",
+                            lambda path: "another build" if Path(path) == build else digest(path))
+        assert here is not None
+        assert GraphemePhonemizer().identity("en").revision == here
+
+    def test_a_tests_package_in_the_working_directory_keeps_the_revision(self, tmp_path):
+        site = sloppy_site(tmp_path)
+        plain, checkout = tmp_path / "plain", tmp_path / "checkout"
+        plain.mkdir()
+        (checkout / "tests").mkdir(parents=True)
+        (checkout / "tests" / "__init__.py").write_text("CHECKOUT = 1\n")
+        revision = revision_from(plain, site)
+        assert revision is not None
+        assert revision_from(checkout, site) == revision
+
+    def test_another_distribution_with_a_tests_package_keeps_the_revision(self, tmp_path):
+        site = sloppy_site(tmp_path)
+        (tmp_path / "plain").mkdir()
+        revision = revision_from(tmp_path / "plain", site)
+        info = site / "unrelated-1.0.dist-info"
+        info.mkdir()
+        (info / "METADATA").write_text("Metadata-Version: 2.1\nName: unrelated\nVersion: 1.0\n")
+        (info / "RECORD").write_text("tests/test_unrelated.py,,\nunrelated-1.0.dist-info/METADATA,,\n")
+        (site / "tests" / "test_unrelated.py").write_text("UNRELATED = 1\n")
+        assert revision is not None
+        assert revision_from(tmp_path / "plain", site) == revision
+
+    def test_a_shared_tests_package_overwritten_or_removed_keeps_the_revision(self, tmp_path):
+        site = sloppy_site(tmp_path)
+        (tmp_path / "plain").mkdir()
+        revision = revision_from(tmp_path / "plain", site)
+        # each distribution with a top-level tests package writes this file, and its uninstall removes it
+        shared = site / "tests" / "__init__.py"
+        shared.write_text("from .helpers import *\n")
+        overwritten = revision_from(tmp_path / "plain", site)
+        shared.unlink()
+        assert revision is not None
+        assert overwritten == revision
+        assert revision_from(tmp_path / "plain", site) == revision
+
+    def test_an_edit_to_a_module_the_probe_imports_changes_the_revision(self, tmp_path):
+        site = sloppy_site(tmp_path)
+        shutil.copytree(Path(quebra_frases.__file__).parent, site / "quebra_frases",
+                        ignore=shutil.ignore_patterns("__pycache__"))
+        (tmp_path / "plain").mkdir()
+        revision = revision_from(tmp_path / "plain", site)
+        with open(site / "quebra_frases" / "tokenization.py", "a", encoding="utf-8") as module:
+            module.write("\n_split = sentence_tokenize\n\n\n"
+                         "def sentence_tokenize(input_string):\n    return _split(input_string)[::-1]\n")
+        assert revision is not None
+        assert revision_from(tmp_path / "plain", site) != revision
+
+    def test_a_module_under_a_bare_alias_counts_by_its_own_name(self, tmp_path, monkeypatch):
+        # as pandas puts pandas._libs._cyutility in sys.modules as _cyutility when epitran loads it
+        site = tmp_path / "site"
+        shutil.copytree(Path(quebra_frases.__file__).parent, site / "quebra_frases",
+                        ignore=shutil.ignore_patterns("__pycache__"))
+        (site / "quebra_frases" / "_shared.py").write_text("VALUE = 1\n")
+        init = site / "quebra_frases" / "__init__.py"
+        init.write_text("import os, sys\nfrom quebra_frases import _shared\n"
+                        "if os.environ.get('QUEBRA_FRASES_ALIAS'):\n    sys.modules['_qf_shared'] = _shared\n"
+                        + init.read_text(encoding="utf-8"), encoding="utf-8")
+        (tmp_path / "plain").mkdir()
+        revision = revision_from(tmp_path / "plain", site)
+        monkeypatch.setenv("QUEBRA_FRASES_ALIAS", "1")
+        assert revision is not None
+        assert revision_from(tmp_path / "plain", site) == revision
 
 
 class TestDeclarations:

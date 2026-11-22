@@ -60,8 +60,10 @@ def both_installed(tmp_path, monkeypatch):
         monkeypatch.setattr(pyopenjtalk, "__file__", str(module_file))
         monkeypatch.setattr(pyopenjtalk, "OPEN_JTALK_DICT_DIR", str(module_file.parent / "dictionary").encode())
         monkeypatch.setattr(metadata, "packages_distributions", lambda: {"pyopenjtalk": order})
-        monkeypatch.setattr(metadata, "distribution", dists.__getitem__)
-        monkeypatch.setattr(metadata, "version", VERSIONS.__getitem__)
+        # Other names reach the real metadata: the identity probe reads the versions of every module it loads.
+        real_distribution, real_version = metadata.distribution, metadata.version
+        monkeypatch.setattr(metadata, "distribution", lambda name: dists[name] if name in dists else real_distribution(name))
+        monkeypatch.setattr(metadata, "version", lambda name: VERSIONS[name] if name in VERSIONS else real_version(name))
 
     return install
 
