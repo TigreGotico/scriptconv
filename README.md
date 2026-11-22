@@ -241,8 +241,9 @@ Details: [docs/graph.md](docs/graph.md).
 ### From spelling to sound: the `phonemizers` module
 
 The `phonemizers` subpackage wraps grapheme-to-phoneme engines behind one
-interface. Some engines ship inside scriptconv (dizione, Leokani G2P, the
-Shami frontend, the Kabyle Matoub rules). The others come from the package an extra installs.
+interface. Some engines ship inside scriptconv: dizione, Leokani G2P, g2pW,
+the kolokwa reader, the Vosk Russian rules, the Shami frontend and the Kabyle
+Matoub rules. Most others come from the package that an extra installs.
 Each language has a default backend, and `override=` picks another one:
 
 ```python
@@ -379,7 +380,8 @@ of each phonemizer backend.
 ## Licensing
 
 The scriptconv wheel is `Apache-2.0 AND MIT AND LicenseRef-CMUdict`. The code
-of scriptconv is Apache-2.0. The wheel carries a notice for each vendored part:
+of scriptconv is Apache-2.0. The wheel carries a notice file for each vendored
+part in this table:
 
 | Vendored part | Licence | Notice |
 |---|---|---|
@@ -397,6 +399,12 @@ of scriptconv is Apache-2.0. The wheel carries a notice for each vendored part:
 The CMUdict licence is BSD-2-Clause with one added sentence and an
 acknowledgement. It has no SPDX identifier, so the wheel names it
 `LicenseRef-CMUdict`.
+
+The Vosk Russian rules (`scriptconv/phonemizers/_thirdparty/vosk_g2p.py`, from
+alphacep/vosk-tts) and the Shami frontend
+(`scriptconv/phonemizers/_thirdparty/shami/`, from hams_tts) are Apache-2.0.
+Each names its source and licence in its module docstring, and has no separate
+notice file.
 
 The Leokani G2P model files are CC BY 4.0, and the wheel holds the text of
 that licence in `scriptconv/phonemizers/_thirdparty/leokani/`. The model of
