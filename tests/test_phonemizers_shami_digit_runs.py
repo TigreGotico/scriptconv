@@ -5,10 +5,12 @@ than 4,300 digits into an int, and num2words refuses numbers from about
 10**306, so 4,000, 4,400 and 20,000 digits each failed before. The expected
 words come from the digit names below, written by hand.
 """
+import subprocess
 import time
 
 import pytest
 
+from scriptconv.phonemizers._thirdparty.shami import espeak
 from scriptconv.phonemizers._thirdparty.shami.normalize import (
     _CURRENCY_RE,
     _PERCENT_RE,
@@ -74,3 +76,44 @@ def test_a_long_digit_run_is_scanned_once(pattern):
     start = time.perf_counter()
     assert pattern.search("7" * 20000) is None
     assert time.perf_counter() - start < 5
+
+
+
+def _words(phonemes):
+    return "".join(phonemes[1:-1]).split(" ")
+
+
+def _unstressed(words):
+    return [word.replace("ˈ", "").replace("ˌ", "") for word in words]
+
+
+@pytest.mark.parametrize("voice, text", [
+    ("en-us", "xs, expected"),
+    ("en-us", "zhong guo ren"),
+    ("ar", "عندي سبعة كتب"),
+])
+def test_espeak_reads_as_with_the_text_on_the_command_line(voice, text):
+    # Without a final newline on stdin, espeak-ng drops the end of the last word
+    argv = subprocess.run([espeak.binary(), "-v", voice, "--ipa=1", "-q", "--", text],
+                          capture_output=True, text=True, check=True).stdout
+    assert espeak.phonemize(text, voice=voice).split() == argv.replace("_", "").split()
+
+
+def test_espeak_reads_a_text_longer_than_one_command_line_argument():
+    # Linux refuses one argument longer than 128 KiB (MAX_ARG_STRLEN) with E2BIG.
+    # espeak-ng places the stress of a run by its length, so stress is not compared.
+    text = " ".join([SEVEN_AR] * 20000)
+    assert len(text.encode()) > 128 * 1024
+    seven = _unstressed(espeak.phonemize(SEVEN_AR, voice="ar").split())
+    assert _unstressed(espeak.phonemize(text, voice="ar").split()) == seven * 20000
+
+
+def test_a_long_run_in_arabic_reads_each_digit_through_espeak():
+    # Arabic text goes to espeak-ng in one piece, and 20,000 digit words passed
+    # the argument limit. The digit word comes from a 16-digit run.
+    phonemizer = ShamiPhonemizer()
+    short = _words(phonemizer.phonemize("عندي " + "7" * 16, "ar")[0])
+    assert len(short) == 17 and len(set(short[1:-1])) == 1
+    long = _words(phonemizer.phonemize("عندي " + "7" * 20000, "ar")[0])
+    assert long[0] == short[0]
+    assert _unstressed(long[1:]) == _unstressed(short[1:2]) * 20000
