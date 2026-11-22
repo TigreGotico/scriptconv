@@ -1,66 +1,46 @@
-"""The ``revision`` of a backend whose phonemes come only from code and data on its own path.
+"""The ``revision`` of a backend: a hash of the code and data on its path and of the releases under it.
 
-A probe in a fresh process builds the backend, calls ``phonemize`` and
-``phonemize_to_list`` with ``keep_punctuation`` off and on, and records each
-module that the calls load and each package data file of scriptconv that they
-open. The hash then covers:
+The hash covers:
 
-- the code tokens of each scriptconv module that the probe loads, except
-  ``scriptconv/version.py``;
-- the bytes of each scriptconv data file that the probe opens;
-- for each other top-level module that the probe loads, the code tokens of
-  each of its Python modules and the bytes of each of its other files, except a
-  ``version.py`` or ``_version.py`` at the top of a package. A compiled module
-  counts by its name and the version of its distribution, since its bytes
-  differ by platform and by Python build;
-- the source file of each class in the MRO of the backend that is not in
-  scriptconv, so a subclass that changes a method changes the revision;
+- the code tokens of each module of scriptconv, scriptconv-copyleft or
+  scriptconv-nonfree that the backend class imports, directly or through
+  another such module, and of their parent packages, except a ``version.py``
+  at the top of a package. The imports are read from the source, those inside
+  functions too, so a module counts whether or not a call reaches it;
+- the bytes of each other file in the directory of such a module, and in each
+  directory under it that is not a package, as the tables of a vendored engine.
+  A package that loads only as the parent of such a module adds no files;
+- the name and version of each installed distribution that the ``phonemizers``
+  extra and the extra of the backend require, with the engine distribution, at
+  any depth. A requirement counts when its PEP 508 marker holds here, so a
+  requirement under an extra that nobody asks for, or for another platform,
+  does not. scriptconv and its sister packages count by their files instead,
+  and the distributions of
+  :meth:`~scriptconv.phonemizers.base.BasePhonemizer._covered_distributions`
+  count by the engine revision or version in the settings;
+- the source file of each class in the MRO of the backend outside these packages;
 - the class of the backend, the arguments that build it, the settings that
   change the output besides the code, whether the backend keeps clause
   punctuation, the language and :data:`unicodedata.unidata_version`.
 
-A top-level module that the probe does not load stays out, even when a
-distribution that holds a loaded module ships it, as the ``tests`` package of
-gruut-ipa. Such a module is not on the read path, and its files can belong to
-another distribution or to the working directory.
-
-The modules of the interpreter stay out: those that
-:data:`sys.stdlib_module_names` names, and each module in the standard library
-directory, as the build configuration ``_sysconfigdata_*``, which differs
-between two builds of one Python version.
-
-The ``normalizer`` hook of a backend stays out: it is the ``normalize``
-stage, which :meth:`~scriptconv.frontend.TextFrontend.identity` covers.
-
-A backend that wraps an engine with a revision of its own, as tugaphone or
-orthography2ipa, names the distributions that the engine revision covers in
-:meth:`~scriptconv.phonemizers.base.BasePhonemizer._covered_distributions`.
-Their files leave the hash, and the backend puts the engine revision in the
-settings. So a release of the engine that keeps its revision keeps the revision
-of the backend, and a change of the wrapper code changes it.
-
-For :meth:`~scriptconv.frontend.TextFrontend.identity`, a second probe reads
-through a frontend, so the modules of the frontend stages count too.
+With *frontend*, the modules that :mod:`scriptconv.frontend` imports count too.
 
 A code token is any token but a comment, a blank line or a string that stands
 as a statement, as a docstring does. So a release that changes code or data on
 the path of the backend changes the revision, and a release that changes only
-docs, docstrings, ``version.py`` or the modules of other backends keeps it.
+docs, ``version.py`` or the modules and data of other backends keeps it. A release of a
+dependency changes it.
 
-A module on the path that does not load from a file in a directory, as from a
-zip archive, raises :class:`RevisionSourceUnavailable`, so it never counts as
-an empty digest. A module of another distribution that loads before the
-probe, as from a ``sitecustomize.py`` or a ``.pth`` file, counts when the
-calls import its package, or when a module that counts holds its package as
-a module-level global, as ``regex`` in ``import regex`` or ``from regex import
-compile``. The walk never enters a standard-library module, because any package
-installed at startup can put a hook there, and it skips a blocked import
-(``None`` in ``sys.modules``). A probe that exits with an error, runs longer than
-:data:`PROBE_TIMEOUT`, prints no readable result, or finds scriptconv loaded
-before it starts, as from a ``sitecustomize.py``, raises
-:class:`RevisionProbeFailed`. In each case :func:`code_revision` gives no
-revision and logs one warning per backend, language and error in a process.
+Nothing of the running process counts: neither the modules it loaded, nor its
+working directory, nor a package that loads at startup. Two machines with the
+same packages give the same revision. An edit of a dependency's files that
+keeps its version, as in an editable install, keeps the revision.
+
+A module of these packages that does not load from a file in a directory, as
+from a zip archive, or a scriptconv with no installed metadata, gives no
+revision and one warning per backend, language and error in a process.
 """
+import ast
 import functools
 import hashlib
 import inspect
@@ -68,127 +48,44 @@ import io
 import json
 import logging
 import os
+import platform
 import re
-import subprocess
 import sys
-import sysconfig
 import tokenize
 import unicodedata
-import uuid
-from importlib.metadata import packages_distributions, version
+from importlib import metadata
 from importlib.util import find_spec
 from pathlib import Path
-from typing import Collection, Dict, Iterator, List, Mapping, NamedTuple, Optional, Tuple, Union
+from typing import Collection, Dict, FrozenSet, Iterator, List, Mapping, Optional, Set, Tuple
 
 LOG = logging.getLogger(__name__)
 
-FORMAT = "sc1"
+FORMAT = "sc2"
 """The prefix of a revision. It changes when the inputs or the encoding of the hash change."""
-
-#: Texts for the probe: every clause mark, a stress mark, digits, brackets,
-#: paragraphs and inline blocks.
-PROBE_TEXTS = (
-    "azul, a. b? c! d: e; f... g… h| i، j؛ k؟ l",
-    "ázul tanemmirt",
-    "16:30 «x» (y) [z] \"w\" a-b",
-    "T\u00edtulo\n\nTexto [[\u02c8a]] fim. a [[ ]] b",
-)
-
-PROBE_TIMEOUT = 120
-"""The seconds a probe may run before it counts as failed. A probe runs the
-engine of the backend, and an engine such as tugaphone takes tens of seconds
-to start on a loaded machine."""
-
-_PROBE = """
-import builtins, importlib, sys
-before = set(sys.modules)
-opened = set()
-imported = set()
-def audit(event, args):
-    if event == "open" and isinstance(args[0], (str, bytes)):
-        opened.add(args[0] if isinstance(args[0], str) else args[0].decode(errors="replace"))
-sys.addaudithook(audit)
-load, load_module = builtins.__import__, importlib.import_module
-def recorded_import(name, globals=None, locals=None, fromlist=(), level=0):
-    if not level:
-        imported.add(name.partition(".")[0])
-    return load(name, globals, locals, fromlist, level)
-def recorded_import_module(name, package=None):
-    imported.add(name.partition(".")[0])
-    return load_module(name, package)
-builtins.__import__, importlib.import_module = recorded_import, recorded_import_module
-import json, warnings
-marker, module, qualname, lang, mode = sys.argv[1:6]
-arguments, texts = (json.loads(a) for a in sys.argv[6:8])
-backend_class = importlib.import_module(module)
-for part in qualname.split("."):
-    backend_class = getattr(backend_class, part)
-def calls(keep):
-    backend = backend_class(**arguments)
-    if mode == "backend":
-        backend.keep_punctuation = keep
-        return [lambda text: backend.phonemize(text, lang),
-                lambda text: backend.phonemize_to_list(text, lang)]
-    from scriptconv.frontend import Chunk, FrontendConfig, Stages, TextFrontend
-    frontend = TextFrontend(FrontendConfig(lang, keep_punctuation=keep,
-                                           stages=Stages(normalize=False, diacritize=False)), backend)
-    return [frontend.phonemize_flat] + [
-        lambda text, chunk=chunk: list(frontend.phonemize_lazy(text, Stages(chunk=chunk)))
-        for chunk in Chunk]
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore")
-    for keep in (False, True):
-        for call in calls(keep):
-            for text in texts:
-                try:
-                    call(text)
-                except Exception:
-                    pass
-# a module loaded before the probe, as by a sitecustomize.py, counts when the calls import its package,
-# or when a used module holds a package as a global, as in "import regex" or "from regex import compile".
-# A module counts by its own name: pandas puts pandas._libs._cyutility in sys.modules as _cyutility.
-used = imported - {"scriptconv"}
-pending = [top for top in used if top not in sys.stdlib_module_names]
-while pending:
-    top = pending.pop()
-    for name, loaded in list(sys.modules.items()):
-        if loaded is not None and name.partition(".")[0] == top:
-            for value in list(vars(loaded).values()):
-                owner = value.__name__ if isinstance(value, type(sys)) else getattr(value, "__module__", None)
-                if isinstance(owner, str):
-                    owner = owner.partition(".")[0]
-                    if owner not in used | {"scriptconv"} and owner not in sys.stdlib_module_names:
-                        used.add(owner)
-                        pending.append(owner)
-modules = {getattr(loaded, "__name__", name): getattr(loaded, "__file__", None)
-           for name, loaded in list(sys.modules.items()) if name not in before or name.partition(".")[0] in used}
-print(marker + json.dumps({"modules": modules, "opened": sorted(opened)}), flush=True)
-"""
-"""Prints, after a marker, the modules that a backend, or a frontend that reads
-through it, loads or imports, and the files that it opens."""
 
 _NOT_CODE = frozenset({tokenize.COMMENT, tokenize.NL, tokenize.ENCODING, tokenize.ENDMARKER})
 _LINE = frozenset({"NEWLINE", "INDENT", "DEDENT"})
-_VERSION_FILES = frozenset({"version.py", "_version.py"})
-_NATIVE = frozenset({".so", ".pyd", ".dll", ".dylib"})
-_SITES = frozenset({"site-packages", "dist-packages"})
-#: The packages whose classes the probe builds by name. A backend class from elsewhere is probed as its first base in them.
+#: The packages whose files the hash holds.
 _IN_TREE = frozenset({"scriptconv", "scriptconv_copyleft", "scriptconv_nonfree"})
+_IN_TREE_DISTRIBUTIONS = frozenset({"scriptconv", "scriptconv-copyleft", "scriptconv-nonfree"})
+_REQUIREMENT = re.compile(r"\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*(?:\[([^\]]*)\])?[^;]*(?:;(.*))?")
+_COMPARISON = re.compile(r"""(\w+|"[^"]*"|'[^']*')\s*(===|==|!=|~=|<=|>=|<|>|not\s+in\b|in\b)\s*(\w+|"[^"]*"|'[^']*')""")
+_VERSION = re.compile(r"\d+(?:\.\d+)*")
+#: The values of the PEP 508 marker variables in this interpreter.
+_ENVIRONMENT = {
+    "implementation_name": sys.implementation.name,
+    "implementation_version": platform.python_version() if sys.implementation.name == "cpython"
+    else ".".join(map(str, sys.implementation.version[:3])),
+    "os_name": os.name, "platform_machine": platform.machine(), "platform_release": platform.release(),
+    "platform_system": platform.system(), "platform_version": platform.version(),
+    "platform_python_implementation": platform.python_implementation(),
+    "python_full_version": platform.python_version(), "python_version": "%s.%s" % sys.version_info[:2],
+    "sys_platform": sys.platform,
+}
 
 
 class RevisionSourceUnavailable(OSError):
     """A module or package on the path of a backend has no source file in a directory to hash."""
-
-
-class RevisionProbeFailed(RuntimeError):
-    """The probe process failed, timed out, or gave no readable result."""
-
-
-class _Failed(NamedTuple):
-    """A probe that failed, kept as the name and message of its error, so a
-    later call neither raises it again nor grows its traceback."""
-
-    error: str
 
 
 def _source_file(where, what: str) -> Path:
@@ -202,40 +99,32 @@ def _source_file(where, what: str) -> Path:
 def code_revision(backend, lang: str, settings: Mapping, frontend: bool = False) -> Optional[str]:
     """The revision of *backend* for *lang*, or ``None`` when its code cannot be read.
 
-    The probe rebuilds the backend from ``backend._revision_arguments()``.
     *settings* are values besides the code that change the output; they join
-    the hash. With *frontend*, the probe reads through a
-    :class:`~scriptconv.frontend.TextFrontend`, so the modules of the frontend
-    count too. The files of the distributions that
-    ``backend._covered_distributions(lang)`` names leave the hash.
+    the hash. With *frontend*, the modules of :mod:`scriptconv.frontend` count too.
     """
-    probed = next(cls for cls in type(backend).__mro__ if cls.__module__.partition(".")[0] in _IN_TREE)
-    if inspect.isabstract(probed):
-        # a backend class from elsewhere on BasePhonemizer itself, which the probe cannot build
+    in_tree = [cls for cls in type(backend).__mro__ if cls.__module__.partition(".")[0] in _IN_TREE]
+    if inspect.isabstract(in_tree[0]):
+        # a backend class from elsewhere on BasePhonemizer itself, which says nothing of its path
         return None
-    arguments = backend._revision_arguments()
-    mode = "frontend" if frontend else "backend"
-    digest = hashlib.sha256(json.dumps(
-        [FORMAT, mode, f"{probed.__module__}:{probed.__qualname__}",
-         f"{type(backend).__module__}:{type(backend).__qualname__}", lang, arguments, settings,
-         backend._keeps_punctuation(), unicodedata.unidata_version],
-        sort_keys=True, ensure_ascii=False).encode())
+    roots = {cls.__module__ for cls in in_tree} | ({"scriptconv.frontend"} if frontend else set())
     try:
-        covered = sorted({_canonical(name) for name in backend._covered_distributions(lang)})
-        outcome = _probe_outcome(probed.__module__, probed.__qualname__, lang, mode,
-                                 json.dumps(arguments, sort_keys=True), json.dumps(covered))
-        if isinstance(outcome, _Failed):
-            _warn_once(type(backend).__name__, lang, outcome.error)
-            return None
-        digest.update(outcome.encode())
-        for cls in type(backend).__mro__:
-            if cls.__module__ in ("builtins", "abc") or cls.__module__.split(".")[0] == "scriptconv":
-                continue
-            path = _source_file(inspect.getsourcefile(cls), f"the class {cls.__qualname__}")
-            digest.update(f"\0class\0{cls.__module__}\0{file_digest(path)}".encode())
-    except (OSError, TypeError, RuntimeError) as exc:
+        classes = [(cls.__module__, file_digest(_source_file(inspect.getsourcefile(cls), f"the class {cls.__qualname__}")))
+                   for cls in type(backend).__mro__
+                   if cls.__module__ not in ("builtins", "abc") and cls not in in_tree]
+        extras = {"phonemizers", _extra(type(backend))} - {None}
+        roots_of_releases = [("scriptconv", frozenset(extras))]
+        if backend.engine_distribution is not None:
+            roots_of_releases.append((backend.engine_distribution, frozenset()))
+        covered = {_canonical(name) for name in backend._covered_distributions(lang)}
+        hashed = [FORMAT, "frontend" if frontend else "backend",
+                  f"{type(backend).__module__}:{type(backend).__qualname__}", lang,
+                  backend._revision_arguments(), settings, backend._keeps_punctuation(),
+                  unicodedata.unidata_version, _files(frozenset(roots)), classes,
+                  _releases(roots_of_releases, covered)]
+    except (OSError, SyntaxError, ValueError, KeyError, TypeError, metadata.PackageNotFoundError) as exc:
         _warn_once(type(backend).__name__, lang, f"{type(exc).__name__}: {exc}")
         return None
+    digest = hashlib.sha256(json.dumps(hashed, sort_keys=True, ensure_ascii=False).encode())
     return f"{FORMAT}:{digest.hexdigest()}"
 
 
@@ -245,136 +134,161 @@ def _warn_once(backend: str, lang: str, error: str) -> None:
     LOG.warning("the identity of %s for %r has no revision: %s", backend, lang, error)
 
 
+def _extra(backend_class) -> Optional[str]:
+    """The scriptconv extra that installs the first registered class in the MRO of *backend_class*."""
+    from scriptconv.phonemizers.registry import PHONEMIZER_REGISTRY
+    extras = {cls_name: extra for _, cls_name, extra in PHONEMIZER_REGISTRY.values()}
+    return next((extras[cls.__name__] for cls in backend_class.__mro__ if cls.__name__ in extras), None)
+
+
+def _canonical(name: str) -> str:
+    """The normalised name of a distribution or an extra, as PEP 503 and PEP 685 give it."""
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
 @functools.lru_cache(maxsize=None)
-def _probe_outcome(*key: str) -> Union[str, _Failed]:
-    """The probe digest for *key*, or its error, kept so that a failed probe
-    does not run again in this process."""
-    try:
-        return _run_probe(*key)
-    except (RevisionProbeFailed, OSError) as exc:
-        return _Failed(f"{type(exc).__name__}: {exc}")
-
-
-def _run_probe(module: str, qualname: str, lang: str, mode: str, arguments: str,
-               covered: str) -> str:
-    """The hash of the code and data that a probe of the backend, or of a
-    frontend that reads through it, loads for one language.
-
-    *covered* is a JSON list of the distributions whose files leave the hash.
-
-    Raises:
-        RevisionProbeFailed: If the probe exits with an error, runs longer than
-            :data:`PROBE_TIMEOUT`, prints no readable result after its marker,
-            or finds scriptconv loaded before it starts.
-    """
-    pythonpath = os.pathsep.join(entry or os.getcwd() for entry in sys.path)
-    marker = f"scriptconv-revision-probe-{uuid.uuid4().hex}:"
-    what = f"the revision probe of {qualname} for {lang!r}"
-    try:
-        done = subprocess.run([sys.executable, "-P", "-c", _PROBE, marker, module, qualname, lang, mode,
-                               arguments, json.dumps(PROBE_TEXTS)],
-                              capture_output=True, text=True, timeout=PROBE_TIMEOUT,
-                              env={**os.environ, "PYTHONPATH": pythonpath})
-    except subprocess.TimeoutExpired:
-        raise RevisionProbeFailed(f"{what} ran longer than {PROBE_TIMEOUT} s") from None
-    if done.returncode:
-        raise RevisionProbeFailed(f"{what} exited with {done.returncode}:\n{done.stderr}")
-    results = [line[len(marker):] for line in done.stdout.splitlines() if line.startswith(marker)]
-    if len(results) != 1:
-        raise RevisionProbeFailed(f"{what} printed {len(results)} results")
-    try:
-        probe = json.loads(results[0])
-    except ValueError as exc:
-        raise RevisionProbeFailed(f"{what} printed a result that is not JSON: {exc}") from None
-    modules: Dict[str, Optional[str]] = probe["modules"]
-    if "scriptconv" not in modules:
-        raise RevisionProbeFailed(f"{what} found scriptconv loaded before it started, "
-                                  "so it cannot tell which modules the backend loads")
-    root = Path(modules["scriptconv"]).parent
-    stdlib = {Path(sysconfig.get_path(name)).resolve() for name in ("stdlib", "platstdlib")}
-    entries: List[Tuple[str, str]] = []
-    others = set()
-    for name, where in modules.items():
-        top = name.split(".")[0]
-        if top in sys.stdlib_module_names or where is None:
+def _files(roots: FrozenSet[str]) -> List[Tuple[str, str]]:
+    """The path and digest of each file of the packages in :data:`_IN_TREE` on the import path of *roots*."""
+    modules: Dict[str, Path] = {}
+    imported = set(roots)
+    pending = list(roots)
+    while pending:
+        name = pending.pop()
+        if name in modules or name.partition(".")[0] not in _IN_TREE:
             continue
-        path = Path(where).resolve()
-        if any(path.is_relative_to(directory) and path.relative_to(directory).parts[0] not in _SITES
-               for directory in stdlib):
+        path = _module_file(name)
+        if path is None:
+            # a name imported from a module, as GraphemePhonemizer in "from scriptconv.phonemizers import ..."
             continue
-        if top != "scriptconv":
-            others.add(top)
-        elif Path(where).relative_to(root).as_posix() != "version.py":
-            entries.append((f"scriptconv/{Path(where).relative_to(root).as_posix()}",
-                            file_digest(_source_file(where, name))))
-    for opened in (Path(os.path.abspath(name)) for name in probe["opened"]):
-        if (opened.is_relative_to(root) and opened.suffix not in (".py", ".pyc")
-                and "__pycache__" not in opened.parts and opened.is_file()):
-            entries.append((f"scriptconv/{opened.relative_to(root).as_posix()}", file_digest(opened)))
-    for top in _distribution_tops(others, frozenset(json.loads(covered))):
-        entries.append((top, _top_level_digest(top)))
-    digest = hashlib.sha256()
-    for name, value in sorted(set(entries)):
-        digest.update(f"\0{name}\0{value}".encode())
-    return digest.hexdigest()
+        modules[name] = path
+        package = name if path.name == "__init__.py" else name.rpartition(".")[0]
+        pending.extend(package.rsplit(".", depth)[0] for depth in range(package.count(".") + 1))
+        for module, names in _imported(path, package):
+            submodules = [f"{module}.{name}" for name in names]
+            pending.append(module)
+            pending.extend(submodules)
+            imported.update(submodules)
+            # "from package import module" loads the package only as a parent
+            if module.partition(".")[0] not in _IN_TREE or not names or not all(map(_module_file, submodules)):
+                imported.add(module)
+    sites = {name.partition(".")[0]: path.parents[name.count(".") + (path.name == "__init__.py")]
+             for name, path in modules.items()}
+    files = {(name.partition(".")[0], path) for name, path in modules.items()}
+    # a package that loads only as the parent of an imported module, as _thirdparty, adds no data files
+    files |= {(name.partition(".")[0], data) for name, path in modules.items() if name in imported
+              for data in _data_files(path.parent)}
+    entries = []
+    for top, path in files:
+        relative = path.relative_to(sites[top]).as_posix()
+        if relative != f"{top}/version.py":
+            entries.append((relative, file_digest(path)))
+    return sorted(entries)
 
 
-def _distribution_tops(loaded: set, covered: Collection[str]) -> set:
-    """*loaded*, except the top-level modules that only distributions in *covered* hold.
-
-    A top-level module that no installed distribution holds, as a checkout on
-    the import path, stands for a distribution of its own name.
-    """
-    owners = packages_distributions()
-    return {name for name in loaded - {"scriptconv"}
-            if not {_canonical(owner) for owner in owners.get(name) or [name]} <= set(covered)}
-
-
-def _canonical(distribution: str) -> str:
-    """The normalised name of *distribution*, as PEP 503 gives it."""
-    return re.sub(r"[-_.]+", "-", distribution).lower()
-
-
-def _top_level_digest(name: str) -> str:
-    """The hash of the files of one top-level module, where the import system finds it."""
-    spec = find_spec(name)
+def _module_file(name: str) -> Optional[Path]:
+    """The source file of the module *name*, or ``None`` when *name* is no installed module."""
+    top, _, rest = name.partition(".")
+    spec = find_spec(top)
     if spec is None:
-        raise RevisionSourceUnavailable(f"the module {name} is not on the import path")
-    if spec.submodule_search_locations:
-        for location in spec.submodule_search_locations:
-            if not Path(location).is_dir():
-                raise RevisionSourceUnavailable(
-                    f"the package {name} does not load from a directory: {location}")
-        digest = hashlib.sha256()
-        for relative, path in sorted(_package_files(spec.submodule_search_locations)):
-            if path.suffix in _NATIVE:
-                # the file name carries the platform tag, which the hash leaves out
-                relative = Path(relative).with_name(path.name.split(".")[0]).as_posix()
-                value = _native(name)
-            else:
-                value = file_digest(path)
-            digest.update(f"\0{relative}\0{value}".encode())
-        return digest.hexdigest()
-    origin = _source_file(spec.origin, f"the module {name}")
-    return _native(name) if origin.suffix in _NATIVE else file_digest(origin)
+        return None
+    locations = spec.submodule_search_locations or []
+    if not locations or not all(Path(location).is_dir() for location in locations):
+        raise RevisionSourceUnavailable(f"the package {top} does not load from a directory: {spec.origin}")
+    for location in locations:
+        base = Path(location).joinpath(*rest.split(".")) if rest else Path(location)
+        for path in (base / "__init__.py", base.with_name(base.name + ".py")):
+            if path.is_file():
+                return path
+    return None
+
+
+def _imported(path: Path, package: str) -> Iterator[Tuple[str, Tuple[str, ...]]]:
+    """Each module that the source at *path*, a module of *package*, may import, with the names it imports from it."""
+    pending: List[ast.AST] = [ast.parse(path.read_bytes())]
+    while pending:
+        node = pending.pop()
+        if isinstance(node, ast.Import):
+            yield from ((alias.name, ()) for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module or ""
+            if node.level:
+                parent = package.rsplit(".", node.level - 1)[0]
+                module = f"{parent}.{module}" if module else parent
+            yield module, tuple(alias.name for alias in node.names)
+        else:
+            # an import is a statement, so the walk skips expressions
+            pending.extend(child for child in ast.iter_child_nodes(node)
+                           if isinstance(child, (ast.stmt, ast.excepthandler, ast.match_case)))
+
+
+def _data_files(directory: Path) -> Iterator[Path]:
+    """The files of *directory* that are not Python, and each file under it outside a package."""
+    for path in directory.iterdir():
+        if path.is_file() and path.suffix not in (".py", ".pyc"):
+            yield path
+        elif path.is_dir() and path.name != "__pycache__" and not (path / "__init__.py").exists():
+            yield from (child for child in path.rglob("*")
+                        if child.is_file() and "__pycache__" not in child.parts and child.suffix != ".pyc")
+
+
+def _releases(roots: List[Tuple[str, FrozenSet[str]]], covered: Collection[str]) -> List[str]:
+    """``name==version`` of each installed distribution that *roots*, as (distribution, extras), require at any depth.
+
+    A distribution that is not installed, as an optional engine or a binary,
+    adds nothing. The distributions of :data:`_IN_TREE_DISTRIBUTIONS` and
+    *covered* stay out, and their requirements count.
+    """
+    found: Dict[str, str] = {}
+    seen: Set[Tuple[str, str]] = set()
+    pending = [(name, extra) for name, extras in roots for extra in ("", *extras)]
+    while pending:
+        name, extra = pending.pop()
+        key = (_canonical(name), _canonical(extra))
+        if key in seen:
+            continue
+        seen.add(key)
+        try:
+            distribution = metadata.distribution(name)
+        except metadata.PackageNotFoundError:
+            if key[0] == "scriptconv":
+                raise
+            continue
+        found[key[0]] = distribution.version
+        for requirement in distribution.requires or ():
+            required, extras, marker = _REQUIREMENT.match(requirement).groups()
+            if marker is None or _marker_holds(marker, key[1]):
+                pending.extend((required, extra) for extra in ("", *(extras or "").replace(" ", "").split(",")))
+    return sorted(f"{name}=={version}" for name, version in found.items()
+                  if name not in _IN_TREE_DISTRIBUTIONS and name not in covered)
+
+
+def _marker_holds(marker: str, extra: str) -> bool:
+    """Whether the PEP 508 environment *marker* holds in this interpreter, with *extra* asked for."""
+    environment = {**_ENVIRONMENT, "extra": extra}
+
+    def compare(match: re.Match) -> str:
+        left, right = (side[1:-1] if side[0] in "\"'" else environment[side] for side in (match[1], match[3]))
+        operator = " ".join(match[2].split())
+        if "extra" in (match[1], match[3]):
+            left, right = _canonical(left), _canonical(right)
+        if operator in ("in", "not in"):
+            return str((left in right) == (operator == "in"))
+        if operator != "===" and _VERSION.fullmatch(left) and _VERSION.fullmatch(right):
+            given = [int(part) for part in right.split(".")]
+            width = max(left.count("."), right.count(".")) + 1
+            left, right = ([*map(int, value.split(".")), *[0] * width][:width] for value in (left, right))
+            if operator == "~=":
+                return str(left >= right and left[:len(given) - 1] == given[:-1])
+        return str({"===": left == right, "==": left == right, "!=": left != right, "<": left < right,
+                    "<=": left <= right, ">": left > right, ">=": left >= right, "~=": left >= right}[operator])
+
+    expression = _COMPARISON.sub(compare, marker)
+    if not re.fullmatch(r"(?:\s|\(|\)|True|False|and|or)*", expression):
+        raise ValueError(f"a requirement marker that PEP 508 does not allow: {marker}")
+    return eval(expression, {"__builtins__": {}})
 
 
 @functools.lru_cache(maxsize=None)
-def _native(name: str) -> str:
-    """A compiled module of the top-level module *name*: the versions of the distributions that hold it."""
-    owners = sorted(set(packages_distributions().get(name, ())))
-    return "native " + " ".join(f"{owner}=={version(owner)}" for owner in owners)
-
-
-def _package_files(roots) -> Iterator[Tuple[str, Path]]:
-    for root in map(Path, roots):
-        for path in root.rglob("*"):
-            relative = path.relative_to(root)
-            if (path.is_file() and "__pycache__" not in relative.parts and path.suffix != ".pyc"
-                    and not (len(relative.parts) == 1 and relative.name in _VERSION_FILES)):
-                yield relative.as_posix(), path
-
-
 def file_digest(path: Path) -> str:
     """The sha256 of the code tokens of a Python module, or of the bytes of any other file."""
     data = path.read_bytes()

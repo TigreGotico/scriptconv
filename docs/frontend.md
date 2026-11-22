@@ -399,12 +399,12 @@ Build a `TextFrontend` to get the phonemes that a voice reads.
 stage order. A change to the steps raises it, so a dataset phonemized under
 older steps is detectable. A backend called directly has `frontend=None`.
 
-The `revision` of a frontend is not the `revision` of its backend. It is `sc1:`
+The `revision` of a frontend is not the `revision` of its backend. It is `sc2:`
 and a hash of these inputs:
 
 - the `revision` of the backend
-- each scriptconv module that a frontend loads when it reads a probe text
-  through the backend, such as `frontend` and `diacritics`
+- each scriptconv module that `scriptconv.frontend` imports, such as
+  `diacritics`
 - the settings that change the output: `keep_punctuation`, `strict`,
   `whole_text_limit`, the alphabet, the resolved language, the chunk size and
   whether the normaliser runs
@@ -419,11 +419,11 @@ The `revision` is `None` when scriptconv cannot vouch for a stage, so a
 - the frontend diacritizes
 - a casing runs
 
-**The identity is kept on disk.** The first `identity()` of a frontend runs
-the revision probes, which take seconds. An identity with a `revision` is then
+**The identity is kept on disk.** The first `identity()` of a frontend hashes
+the code on its path and asks the engine for its revision. An identity with a `revision` is then
 written to `~/.cache/scriptconv/identity/` (`$XDG_CACHE_HOME` when it is set,
 `~/Library/Caches` on macOS, `%LOCALAPPDATA%` on Windows). A later process
-reads it back with no probe and no call into the backend. In an install with
+reads it back with no hash and no call into the backend. In an install with
 no editable installs, a hit takes about a millisecond. Each checkout on the
 path and each editable install adds the time to read the state of its files,
 so in a development venv with hundreds of editable installs a hit takes about

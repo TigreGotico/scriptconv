@@ -687,7 +687,7 @@ class TextFrontend:
     def identity(self) -> PhonemizerIdentity:
         """What phonemizes this frontend's language, with :data:`FRONTEND_VERSION`.
 
-        ``revision`` is ``sc1:`` and a hash of the backend's revision, of the
+        ``revision`` is ``sc2:`` and a hash of the backend's revision, of the
         code of the scriptconv modules that the frontend loads, of the stage
         settings and of ``text2spoken.revision`` when the normaliser is
         :func:`spoken_normalizer`. It is ``None``, so a ``version`` difference
@@ -697,7 +697,7 @@ class TextFrontend:
 
         An identity with a ``revision`` is kept on disk, as
         :mod:`scriptconv.phonemizers._identity_cache` describes, so a later
-        process reads it back with no probe and no call into the backend.
+        process reads it back with no hash and no call into the backend.
         """
         from scriptconv.phonemizers import _identity_cache
         stages = self._resolve(None)
