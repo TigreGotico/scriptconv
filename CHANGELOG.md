@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a136](https://github.com/TigreGotico/scriptconv/tree/0.0.4a136) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a135...0.0.4a136)
+
+**Merged pull requests:**
+
+- feat: add the Leokani G2P backend for American English [\#373](https://github.com/TigreGotico/scriptconv/pull/373) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a135](https://github.com/TigreGotico/scriptconv/tree/0.0.4a135) (2026-11-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a134...0.0.4a135)
