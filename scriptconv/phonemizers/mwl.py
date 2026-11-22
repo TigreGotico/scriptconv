@@ -6,9 +6,7 @@ from scriptconv.phonemizers.enums import Alphabet
 from scriptconv.phonemizers.o2ipa import Orthography2IPAPhonemizer
 
 
-# lang -> orthography2ipa spec. Mirandese is dialect-aware: the central
-# variety is the default, with Sendinese and the Raiano (Ifanês) border
-# variety selectable per call.
+# lang -> orthography2ipa spec.
 DIALECTS = {
     "mwl": "mwl",                      # central Mirandese (the standard)
     "mwl-x-sendim": "mwl-x-sendim",    # Sendinese
@@ -17,14 +15,12 @@ DIALECTS = {
 
 
 class MirandesePhonemizer(BasePhonemizer):
-    """
-    Mirandese phonemizer on the orthography2ipa specs ``mwl``,
-    ``mwl-x-sendim`` and ``mwl-x-ifanes``.  Output is always IPA.
+    """Mirandese to IPA on the orthography2ipa specs ``mwl``, ``mwl-x-sendim`` and ``mwl-x-ifanes``.
 
-    The variety is taken from the per-call ``lang`` argument (central ``mwl`` by
-    default), so one instance serves all three.  The phonemes come from
-    :class:`~scriptconv.phonemizers.o2ipa.Orthography2IPAPhonemizer` on the
-    matching spec, so this backend needs the ``o2i`` extra.
+    The per-call ``lang`` picks the variety, central ``mwl`` by default. The
+    phonemes come from
+    :class:`~scriptconv.phonemizers.o2ipa.Orthography2IPAPhonemizer`, so this
+    backend needs the ``o2i`` extra.
     """
 
     engine_distribution = Orthography2IPAPhonemizer.engine_distribution
@@ -37,8 +33,7 @@ class MirandesePhonemizer(BasePhonemizer):
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
-        """
-        Validates and returns the closest supported Mirandese variety code.
+        """The closest supported Mirandese variety code.
 
         Raises:
             ValueError: If the language code is unsupported.

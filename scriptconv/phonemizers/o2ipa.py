@@ -1,24 +1,13 @@
-"""orthography2ipa-backed phonemizer.
+"""The orthography2ipa phonemizer: one backend for every orthography2ipa spec, always IPA.
 
-Wraps ``orthography2ipa.G2P`` to expose the shared grapheme->IPA lattice as a
-``BasePhonemizer``.  A single instance covers the whole orthography2ipa family
-(hundreds of language specs: the Arabic lects, Basque, Galician, Mirandese,
-Portuguese, the East-Slavic set, ...): one backend, many languages, always IPA.
+For undiacritized Arabic use ``ArbtokPhonemizer``, and for the Basque dialects
+``EuskaphonePhonemizer``; both build on the same engine.
 
-Per-language quality varies -- the lattice is strongest for regular
-orthographies.  For undiacritized Arabic use ``ArbtokPhonemizer`` (which adds a
-diacritizer on top of this same lattice); for dialect-aware Basque use
-``EuskaphonePhonemizer``.
-
-``orthography2ipa`` is imported lazily so importing ``scriptconv`` never requires
-it; install with ``pip install orthography2ipa`` (or ``pip install scriptconv[o2i]``).
-
-With ``packaged_lexicons=True`` (the default) the engine of each language
-holds the installed packaged lexicon (``o2i-lexicons``) for that language, when
-a package serves it: the exceptions, and the patches when the package ships
-them. The lexicon belongs to that engine, so no other orthography2ipa engine in
-the process sees it. With ``packaged_lexicons=False`` the engine holds an empty
-lexicon and runs on the rules alone.
+With ``packaged_lexicons=True`` (the default) the engine of each language holds
+the packaged lexicon (``o2i-lexicons``) for that language, when a package
+serves it: the exceptions, and the patches when the package ships them. No
+other orthography2ipa engine in the process sees that lexicon. With
+``packaged_lexicons=False`` the engine runs on the rules alone.
 """
 import dataclasses
 import hashlib
@@ -34,15 +23,15 @@ from scriptconv.phonemizers.enums import Alphabet
 
 LOG = logging.getLogger(__name__)
 
+# Spec codes whose G2P engine builds. ``orthography2ipa.resolve`` echoes an
+# unknown tag, so get_lang builds the engine once per code to prove the spec.
+_KNOWN_SPECS: set[str] = set()
+
 
 class Orthography2IPAPhonemizer(BasePhonemizer):
-    """
-    Data-driven multilingual IPA phonemizer backed by orthography2ipa.
+    """Any language that ``orthography2ipa.resolve`` maps to a spec, to IPA.
 
-    Accepts any language code that ``orthography2ipa.resolve`` can map to a
-    supported spec (BCP-47 closest-match logic lives in orthography2ipa itself,
-    so it is not reinvented here).  The per-language G2P engine is created
-    lazily on first use and cached for the lifetime of the instance.
+    The engine of each language is built on first use and kept.
     """
 
     engine_distribution = "orthography2ipa"
@@ -62,7 +51,7 @@ class Orthography2IPAPhonemizer(BasePhonemizer):
         return resolved_lang in orthography2ipa.packaged_lexicon_sources(patches=True)
 
     def _engine(self, resolved_lang: str):
-        """Return, lazily creating and caching, the G2P engine for *resolved_lang*."""
+        """The G2P engine of *resolved_lang*, built on first use."""
         if resolved_lang not in self._cache:
             import orthography2ipa
             patches = self._lexicon_patches(resolved_lang)
@@ -126,16 +115,13 @@ class Orthography2IPAPhonemizer(BasePhonemizer):
 
     @classmethod
     def supported_langs(cls) -> List[str]:
-        """Return every language code orthography2ipa ships a spec for."""
+        """Every language code orthography2ipa ships a spec for."""
         import orthography2ipa
         return orthography2ipa.available_codes()
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
-        """
-        Resolve *target_lang* to the canonical orthography2ipa spec code.
-
-        Delegates BCP-47 resolution to ``orthography2ipa.resolve``.
+        """*target_lang* as the orthography2ipa spec code that ``orthography2ipa.resolve`` gives.
 
         Raises:
             ValueError: If orthography2ipa has no spec for *target_lang*.
@@ -148,15 +134,15 @@ class Orthography2IPAPhonemizer(BasePhonemizer):
                 "Install it with 'pip install orthography2ipa' "
                 "(or 'pip install scriptconv[o2i]')."
             ) from e
-        # ``resolve`` echoes an unknown tag back rather than raising, so probe
-        # the resolved code by constructing its G2P engine (raises if no spec).
         resolved = orthography2ipa.resolve(target_lang)
-        try:
-            orthography2ipa.G2P(resolved)
-        except Exception as exc:
-            raise UnsupportedLanguageError(
-                f"orthography2ipa: unsupported language {target_lang!r}"
-            ) from exc
+        if resolved not in _KNOWN_SPECS:
+            try:
+                orthography2ipa.G2P(resolved)
+            except Exception as exc:
+                raise UnsupportedLanguageError(
+                    f"orthography2ipa: unsupported language {target_lang!r}"
+                ) from exc
+            _KNOWN_SPECS.add(resolved)
         return resolved
 
     def phonemize_string(self, text: str, lang: str) -> str:
