@@ -249,6 +249,17 @@ class TestSentencesJoinAsTheTextWrites:
         assert "".join(frontend.phonemize_flat(text)) == expected
         assert ["".join(c) for c in frontend.phonemize(text, Stages(chunk=Chunk.NONE))] == [expected]
 
+    @pytest.mark.parametrize("text", ["...vamos", ": olá"])
+    def test_a_backend_that_reads_an_empty_chunk(self, text):
+        class EmptyReadsASymbol(GraphemePhonemizer):
+            def phonemize_string(self, text, lang):
+                return super().phonemize_string(text, lang) or "_"
+
+        backend = EmptyReadsASymbol()
+        word = text.lstrip(".: ")
+        assert ["".join(s) for s in backend.phonemize(text, "pt")] == [f"_ {word}"]
+        assert "".join(backend.phonemize_to_list(text, "pt")) == f"_ {word}"
+
     # Sentences with no phonemes leave the gap open, and the gap after them
     # grows. A search that reads the open gap again at each such sentence
     # reads a number of characters that grows with the square of their count.

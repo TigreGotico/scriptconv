@@ -580,6 +580,7 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         word: Optional[int] = None
         end = cursor = 0
         for chunk, punct, eos in self.chunk_text(text):
+            found = cursor
             if chunk:
                 found = text.find(chunk, cursor)
                 cursor = found + len(chunk)
