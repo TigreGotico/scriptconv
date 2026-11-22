@@ -33,9 +33,6 @@ conventions:
     Orthographic conventions — script-scoped decorations orthogonal to
     identity (tashkeel, niqqud, wakachigaki, pinyin tone spelling…).
     Scripts are nodes; conventions are parameters, never nodes.
-
-Zero required runtime dependencies (stdlib only); the readings module
-needs the optional ``ja``/``zh`` extras.
 """
 
 from scriptconv.scripts import (

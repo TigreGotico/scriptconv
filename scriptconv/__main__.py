@@ -83,19 +83,19 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     dispatch = {
-        "convert": lambda: _do_convert(args),
-        "detect": lambda: _do_detect(args),
-        "distribution": lambda: _do_distribution(args),
-        "direction": lambda: _do_direction(args),
-        "decompose": lambda: _do_decompose(args),
-        "lang": lambda: _do_lang(args),
-        "strip": lambda: _do_strip(args),
-        "restyle": lambda: _do_restyle(args),
-        "conventions": lambda: _do_conventions(args),
-        "route": lambda: _do_route(args),
-        "phonemize": lambda: _do_phonemize(args),
+        "convert": _do_convert,
+        "detect": _do_detect,
+        "distribution": _do_distribution,
+        "direction": _do_direction,
+        "decompose": _do_decompose,
+        "lang": _do_lang,
+        "strip": _do_strip,
+        "restyle": _do_restyle,
+        "conventions": _do_conventions,
+        "route": _do_route,
+        "phonemize": _do_phonemize,
     }
-    dispatch[args.command]()
+    dispatch[args.command](args)
     return 0
 
 
