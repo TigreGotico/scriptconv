@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a148](https://github.com/TigreGotico/scriptconv/tree/0.0.4a148) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a147...0.0.4a148)
+
+**Merged pull requests:**
+
+- fix\(shami\): send the espeak-ng text on stdin [\#403](https://github.com/TigreGotico/scriptconv/pull/403) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a147](https://github.com/TigreGotico/scriptconv/tree/0.0.4a147) (2026-11-22)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a146...0.0.4a147)
@@ -374,17 +382,9 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a99...0.0.4a100)
 
-**Merged pull requests:**
-
-- feat: add the 90-symbol Shami inventory [\#268](https://github.com/TigreGotico/scriptconv/pull/268) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a99](https://github.com/TigreGotico/scriptconv/tree/0.0.4a99) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a98...0.0.4a99)
-
-**Merged pull requests:**
-
-- feat: add the dizione English phonemizer [\#269](https://github.com/TigreGotico/scriptconv/pull/269) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a98](https://github.com/TigreGotico/scriptconv/tree/0.0.4a98) (2026-11-15)
 
