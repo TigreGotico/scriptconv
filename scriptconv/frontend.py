@@ -200,6 +200,11 @@ class FrontendConfig:
     stages: Stages = Stages()
     normalizer: Optional[Callable[[str, str], str]] = None
     """A ``(text, lang) -> str`` hook. ``None`` means no normalisation."""
+    phonemizer_lang: Optional[str] = None
+    """The language the backend reads when it differs from :attr:`lang`, the
+    text language: a voice trained with the espeak voice ``lfn`` for Twi text.
+    Normalisation, diacritization and casing keep :attr:`lang`. A call with
+    another :attr:`Stages.lang` phonemizes in that language."""
     keep_punctuation: bool = False
     strict: bool = False
     whole_text_limit: Optional[int] = WHOLE_TEXT_LIMIT
@@ -521,7 +526,8 @@ class TextFrontend:
     def __init__(self, config: FrontendConfig, backend: Optional[BasePhonemizer] = None):
         if backend is None:
             if config.phonemizer is None:
-                backend = phonemizer_for_lang(config.lang, config.alphabet, model=config.model)
+                backend = phonemizer_for_lang(config.phonemizer_lang or config.lang, config.alphabet,
+                                              model=config.model)
             else:
                 backend = get_phonemizer(config.phonemizer, config.alphabet, config.model)
         if (backend.keep_punctuation, backend.strict) != (config.keep_punctuation, config.strict):
@@ -534,7 +540,7 @@ class TextFrontend:
         stages = self._resolve(None)
         # The Grapheme and Unicode backends take any language and have no get_lang.
         if hasattr(backend, "get_lang"):
-            backend.get_lang(stages.lang)
+            backend.get_lang(self._backend_lang(stages.lang))
         if config.strict and stages.diacritize:
             package, extra = _DIACRITIZER_PACKAGES.get(
                 _diacritizer_family(stages.lang), (None, None))
@@ -542,6 +548,10 @@ class TextFrontend:
                 raise ImportError(
                     f"diacritization for {stages.lang!r} needs {package} — install "
                     f"with `pip install scriptconv[{extra}]`")
+
+    def _backend_lang(self, lang: str) -> str:
+        """The language the backend reads for text in *lang*."""
+        return self.config.phonemizer_lang if self.config.phonemizer_lang and lang == self.config.lang else lang
 
     def with_backend(self, backend: BasePhonemizer) -> "TextFrontend":
         """A frontend with this configuration and another backend instance."""
@@ -688,7 +698,8 @@ class TextFrontend:
         if kept is not None:
             return kept
         state = _identity_cache.snapshot(self.backend)
-        identity = dataclasses.replace(self.backend.identity(stages.lang), frontend=FRONTEND_VERSION)
+        identity = dataclasses.replace(self.backend.identity(self._backend_lang(stages.lang)),
+                                       frontend=FRONTEND_VERSION)
         identity = dataclasses.replace(identity, revision=self._revision(identity.revision, stages))
         _identity_cache.store(entry_key, identity, state)
         return identity
@@ -698,7 +709,8 @@ class TextFrontend:
         return {"keep_punctuation": self.config.keep_punctuation, "strict": self.config.strict,
                 "whole_text_limit": self.config.whole_text_limit,
                 "alphabet": Alphabet(self.config.alphabet).value, "normalize": stages.normalize,
-                "lang": stages.lang, "chunk": stages.chunk.value}
+                "lang": stages.lang, "phonemizer_lang": self._backend_lang(stages.lang),
+                "chunk": stages.chunk.value}
 
     def _identity_settings(self, stages: Stages) -> Dict[str, object]:
         """The frontend settings that change :meth:`identity`: those of the
@@ -730,7 +742,8 @@ class TextFrontend:
                             stages.lang, exc)
                 return None
         from scriptconv.phonemizers._revision import FORMAT, code_revision
-        code = code_revision(self.backend, stages.lang, self._revision_settings(stages), frontend=True)
+        code = code_revision(self.backend, self._backend_lang(stages.lang), self._revision_settings(stages),
+                             frontend=True)
         if code is None:
             return None
         digest = hashlib.sha256(json.dumps([FORMAT, backend_revision, code, normalizer]).encode())
@@ -986,8 +999,8 @@ class TextFrontend:
             # A chunk never starts with a space, also for a backend that
             # keeps the spaces it reads.
             part = self._diacritize(part, stages).lstrip()
-            read = [piece for piece in map(_Piece.of, self.backend.phonemize_segments(part, stages.lang))
-                    if piece.phonemes]
+            segments = self.backend.phonemize_segments(part, self._backend_lang(stages.lang))
+            read = [piece for piece in map(_Piece.of, segments) if piece.phonemes]
             self._check_read(part, [p for piece in read for p in piece.phonemes], stages)
             words_follow = clauses and any(c.isalnum() for c in "".join(texts[index + 1:]))
             for count, piece in enumerate(read, 1):
@@ -1019,7 +1032,7 @@ class TextFrontend:
             cut = self._diacritize(cut, stages)
             pieces: List[_Piece] = []
             sentence: List[_Piece] = []
-            for segment in self.backend.phonemize_segments(cut, stages.lang):
+            for segment in self.backend.phonemize_segments(cut, self._backend_lang(stages.lang)):
                 if segment.phonemes:
                     if sentence:
                         self._continue_sentence(sentence[-1])
