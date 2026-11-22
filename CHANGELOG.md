@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a142](https://github.com/TigreGotico/scriptconv/tree/0.0.4a142) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a141...0.0.4a142)
+
+**Merged pull requests:**
+
+- feat: hebrew\_ipa, openjtalk\_prosody and tltk registry rows [\#371](https://github.com/TigreGotico/scriptconv/pull/371) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a141](https://github.com/TigreGotico/scriptconv/tree/0.0.4a141) (2026-11-22)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a140...0.0.4a141)
