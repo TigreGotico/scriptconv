@@ -246,11 +246,12 @@ A backend can still cut inside a chunk that is too long for its own limit.
 | Field | Default | Meaning |
 | --- | --- | --- |
 | `lang` | Required | The language of the voice |
-| `phonemizer` | `None` | The backend. `None` takes the default backend for `lang` |
+| `phonemizer` | `None` | The backend. `None` takes the default backend for `phonemizer_lang`, else for `lang` |
 | `alphabet` | `Alphabet.IPA` | The output alphabet of the backend |
 | `model` | `None` | The model of a model-backed backend |
 | `stages` | `Stages()` | The stage settings of the frontend |
 | `normalizer` | `None` | A `(text, lang) -> str` hook. `None` means no normalisation |
+| `phonemizer_lang` | `None` | The language the backend reads, when it is not `lang`. The normaliser, the diacritizer and casing read `lang` |
 | `keep_punctuation` | `False` | Keep clause punctuation, as the voice was trained |
 | `strict` | `False` | Raise on a failure, instead of a warning |
 | `whole_text_limit` | `WHOLE_TEXT_LIMIT` | Above this many characters, a whole-text backend reads each paragraph alone. `None` turns the cut off |
@@ -260,6 +261,14 @@ configuration. Give `backend=` an instance to use that instance. The backend
 reads with the `keep_punctuation` of the configuration. When the instance has
 another value, the frontend uses a shallow copy with the configured value, and
 the instance that you gave does not change.
+
+A voice trained with an espeak voice that is not its text language sets
+`phonemizer_lang`. A Twi voice trained with the espeak voice `lfn` uses
+`FrontendConfig("tw", phonemizer_lang="lfn", phonemizer=Phonemizer.ESPEAK)`:
+Twi text is normalised as Twi and phonemized as `lfn`. A call whose
+`Stages.lang` is not `lang`, such as a cloning reference, phonemizes in its
+own language. The comparison ignores case and reads `_` as `-`, so `en-us`
+and `en_US` are the language `en-US`.
 
 When the backend has a `get_lang` method, the frontend calls it once, so an
 unsupported language fails when the frontend is built. The Grapheme and
