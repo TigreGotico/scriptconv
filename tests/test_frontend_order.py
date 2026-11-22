@@ -91,7 +91,7 @@ class TestTheHookReadsTheWholeText:
 
 
 class TestAnOwnerThatCannotReportItsMarks:
-    def test_it_gets_the_raw_text_split_and_any_other_backend_the_read_text_split(self):
+    def test_it_gets_no_casing_and_any_other_backend_the_cased_text(self):
         def run(backend):
             cased = []
 
@@ -104,7 +104,7 @@ class TestAnOwnerThatCannotReportItsMarks:
             frontend.phonemize("ab. cd.")
             return cased
 
-        assert run(NormalizeOwner()) == ["ab.", "cd."]
+        assert run(NormalizeOwner()) == []
         assert run(Echo()) == ["ab. cd."]
         assert NormalizeOwner.reads_whole_text is False
 
@@ -112,6 +112,42 @@ class TestAnOwnerThatCannotReportItsMarks:
 @pytest.fixture(scope="module")
 def dizione():
     return DizionePhonemizer()
+
+
+class TestAnOwnerOfNormalizeGetsNoCasing:
+    # Casing before the backend's own normalisation changed its reading: in
+    # capitals "15h30" was no time and "Dr." no title, and in lower case
+    # "XIX" was no numeral.
+    @pytest.mark.parametrize("casing", [str.upper, str.lower])
+    def test_tugaphone_reads_as_with_no_casing(self, casing):
+        from scriptconv.phonemizers.pt import TugaphonePhonemizer
+
+        backend = TugaphonePhonemizer()
+
+        def read(casing):
+            frontend = TextFrontend(FrontendConfig("pt-PT", stages=Stages(diacritize=False, casing=casing)),
+                                    backend)
+            return [frontend.phonemize_flat(text) for text in ("às 15h30", "o Dr. Silva", "século XIX")]
+
+        assert read(casing) == read(None)
+
+    @pytest.mark.parametrize("casing", [str.upper, str.lower])
+    def test_a_whole_text_owner_reads_as_with_no_casing(self, dizione, casing):
+        # dizione reads "dr." in lower case as "drive", and "LIVES" with the vowel of "give"
+        def read(casing):
+            frontend = TextFrontend(FrontendConfig("en-US", stages=Stages(diacritize=False, casing=casing)),
+                                    dizione)
+            return frontend.phonemize_flat("Dr. Smith lives on Main St.")
+
+        assert read(casing) == read(None)
+
+    def test_one_warning_names_the_backend(self, caplog):
+        frontend = TextFrontend(FrontendConfig("xx", stages=Stages(diacritize=False, casing=str.upper)),
+                                NormalizeOwner())
+        frontend.phonemize("ab.")
+        frontend.phonemize("cd.", Stages(casing=str.lower))
+        warnings = [r.getMessage() for r in caplog.records if "casing" in r.getMessage()]
+        assert warnings == ["NormalizeOwner normalises its own text, so the frontend applies no casing"]
 
 
 class TestDizioneReadsTheWholeText:

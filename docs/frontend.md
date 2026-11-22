@@ -25,7 +25,8 @@ order:
    block, and its symbols go into the output as written.
 2. Run the normalisation hook on the whole text, if the configuration sets
    one.
-3. Apply casing, if the call sets a casing function.
+3. Apply casing, if the call sets a casing function and the backend does
+   not own `normalize`.
 4. Cut the normalised text at its blank lines, then into sentences, or into
    clauses at `CLAUSE` size.
 5. For each sentence or clause, lazily: diacritize, then run the backend. The
@@ -102,7 +103,12 @@ garbage collection of the process can fall inside one call and add to it.
 
 An owner of `normalize` that cannot report its marks keeps
 `reads_whole_text = False`. The frontend then cuts the text into sentences as
-written, before casing, and the backend reads each sentence alone.
+written, and the backend reads each sentence alone.
+
+An owner of `normalize` gets no casing, and the frontend logs one warning
+when a call sets one. Casing would change the text before the backend
+normalises it: in capitals, tugaphone no longer reads `15H30` as a time, and
+in lower case it no longer reads `xix` as a numeral.
 
 ## Chunk size
 
@@ -276,7 +282,7 @@ frontend, and each call can give its own:
 | `diacritize` | `None` | `True` or `False` adds or skips the diacritizer |
 | `diacritizer_model` | `None` | The model of the diacritizer |
 | `lang` | `None` | The language of the text, for example a cloning reference |
-| `casing` | `None` | A `str -> str` function. Training sets one |
+| `casing` | `None` | A `str -> str` function. Training sets one. A backend that owns `normalize` gets none |
 | `chunk` | `None` | The chunk size, a `Chunk` or its value. `None` takes `Chunk.SENTENCE` |
 
 A value that the call sets wins. A value of `None` takes the value of the
