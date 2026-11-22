@@ -130,7 +130,7 @@ default, resolving in-house engines first:
 
 1. the explicit per-language chain (Arabic to arbtok, Basque to euskaphone,
    Mirandese to its orthography2ipa specs, Portuguese to tugaphone, Hebrew to
-   phonikud, Galician to Cotovía, and Russian to vosk for their own notations, only
+   phonikud, Liberian English (`lir`) to kolokwa, Galician to Cotovía, and Russian to vosk for their own notations, only
    when their own notation is requested: a candidate must be able to *emit*
    the requested alphabet)
 2. orthography2ipa, wherever it has a spec for the language
@@ -406,6 +406,37 @@ as `《》`, gives no symbol and no warning.
 | `g2pw.tar.gz`: the ONNX model, `config.py` and the character lists | Hugging Face dataset `rhasspy/piper-checkpoints`, `zh/zh_CN/_resources/` | `581dcfb1856912507627724d4ab2817a20e889ca` | 113 MB | MIT (dataset card); the g2pW weights are Apache-2.0 |
 | `tokenizer.json` | Hugging Face model `google-bert/bert-base-chinese` | `8f23c25b06e129b6c986331a13d8d025a92cf0ea` | 269 KB | Apache-2.0 |
 | Three reading tables, in the wheel | github.com/GitYCC/g2pW, `g2pw/` | `b9328ce8129c4717a70f16a2688542a0197541dd` | 1.9 MB | Apache-2.0 |
+
+## Kolokwa, Liberian English
+
+`Phonemizer.KOLOKWA` reads Liberian English (Kolokwa, ISO 639-3 `lir`) with
+the kolokwa-g2p model of michsethowusu, a Forward Transformer of the
+`phonemize` package, with a pronouncing dictionary of 12,006 words. It runs an
+ONNX export of the model on onnxruntime, with no torch. It is the default for
+`lir`. It does not read `en` or `en-LR`, so the default for those tags does
+not change. Install it with `pip install scriptconv[lir]`.
+
+```python
+from scriptconv.phonemizers import phonemizer_for_lang
+
+phonemizer_for_lang("lir").phonemize_string("da man dey go drink cold water", "lir")
+# 'ðæ mæ̃n de ko tɹɪ̃ŋk ko wɔtə˞'
+```
+
+The text reads as `phonemize` 0.2.4 reads it, and the output is the same.
+Each character that is not a letter, a digit, a space, a hyphen or one of
+`().,:?!/–` goes, so an apostrophe goes. A digit stays in the text, but the
+model has no symbol for it, so it gives no phonemes. The text splits at
+spaces and at those marks, which stay in the output. A word that is not in the
+dictionary splits at hyphens and before each inner capital, so `DIY` gives
+`d-a-j`.
+
+The model files must have their pinned sha256. With no network and no cached
+copy that passes the check, the constructor raises `ModelUnavailableError`.
+
+| File | Source | Revision | Size | Licence |
+|---|---|---|---|---|
+| `model.onnx`, `kolokwa.json` | Hugging Face model `TigreGotico/kolokwa-g2p-onnx`, the ONNX export of `michsethowusu/kolokwa-g2p` at `92ed3b721a4f80f98d5b741fdd16352ca320f121` | `3729a707e532ba2929c884288bacf5d5d76f7316` | 59 MB | MIT |
 
 ## dizione, American English
 
@@ -873,7 +904,8 @@ f5.phonemize_to_list("我们用iPhone打电话。", "zh")
 
 Multilingual: espeak (subprocess with espyak fallback), gruut, goruut,
 epitran, transphone, ByT5/Charsiu (ONNX), the misaki family (en/ja/zh/ko/vi).
-Per-language: English (DeepPhonemizer, OpenPhonemizer, g2p_en, dizione, Leokani G2P), Japanese
+Per-language: English (DeepPhonemizer, OpenPhonemizer, g2p_en, dizione, Leokani G2P), Liberian
+English (kolokwa, `lir`), Japanese
 (OpenJTalk, cutlet, pykakasi), Korean (g2pk, KoG2P), Chinese (jieba, g2pM,
 xpinyin, pypinyin, g2pW), F5-TTS voices (`f5tts_char`, `f5tts_pinyin`), Arabic (arbtok, mantoq), Hebrew (phonikud), Persian,
 Vietnamese (viphoneme, Python below 3.12 only), Portuguese (tugaphone), Galician

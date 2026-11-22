@@ -374,7 +374,7 @@ install scriptconv-copyleft or scriptconv-nonfree: see [Licensing](#licensing).
 | `ja` / `zh` | Dictionary readings: kanji to kana (pykakasi, through scriptconv-copyleft), hanzi to pinyin/bopomofo (pypinyin) |
 | `phonemizers` | The phonemizer base layer (sentence chunking, language matching) |
 | `espeak`, `gruut`, `goruut`, `epitran`, `transphone`, `misaki`, `byt5` | Multilingual phonemizer backends |
-| `en-phonemizers`, `ja-phonemizers`, `zh-phonemizers`, `ko`, `ar-phonemizers`, `eu`, `pt-phonemizers`, `gl`, `he`, `fa`, `vi`, `shami`, `o2i`, `africa`, `ghana` | Per-language phonemizer backends. `o2i` also gives Mirandese and Barranquenho |
+| `en-phonemizers`, `lir`, `ja-phonemizers`, `zh-phonemizers`, `ko`, `ar-phonemizers`, `eu`, `pt-phonemizers`, `gl`, `he`, `fa`, `vi`, `shami`, `o2i`, `africa`, `ghana` | Per-language phonemizer backends. `o2i` also gives Mirandese and Barranquenho |
 | `mwl` | The same packages as `o2i` |
 | `tashkeel` | Arabic diacritization for the phonemizer pipeline (text2tashkeel) |
 | `stress` | Word-stress restoration for 26 stressonnx language tags: East Slavic; Bulgarian, Macedonian, and Slovene; Latvian; Armenian; Georgian; and Turkic/Caucasian, for the phonemizer pipeline (stressonnx; not yet on PyPI) |

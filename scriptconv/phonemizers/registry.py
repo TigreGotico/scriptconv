@@ -55,6 +55,7 @@ PHONEMIZER_REGISTRY: Dict[Phonemizer, Tuple[str, str, Optional[str]]] = {
     _P.G2PEN: (f"{_BASE}.en", "G2PEnPhonemizer", "en-phonemizers"),
     _P.DIZIONE: (f"{_BASE}.dizione", "DizionePhonemizer", "en-phonemizers"),
     _P.LEOKANI: (f"{_BASE}.leokani", "LeokaniPhonemizer", "en-phonemizers"),
+    _P.KOLOKWA: (f"{_BASE}.lir", "KolokwaPhonemizer", "lir"),
     _P.TUGAPHONE: (f"{_BASE}.pt", "TugaphonePhonemizer", "pt-phonemizers"),
     _P.BARRANQUENHO: (f"{_BASE}.pt", "BarranquenhoPhonemizer", "o2i"),
     _P.MIRANDESE: (f"{_BASE}.mwl", "MirandesePhonemizer", "o2i"),
@@ -169,6 +170,7 @@ LANG_DEFAULTS: Dict[str, Tuple[Phonemizer, ...]] = {
     "mwl": (_P.MIRANDESE,),
     "pt": (_P.TUGAPHONE,),
     "he": (_P.PHONIKUD,),
+    "lir": (_P.KOLOKWA,),
     "gl": (_P.COTOVIA, _P.ORTHOGRAPHY2IPA, _P.ESPEAK),
     # vosk emits its own inventory, so it is the Russian default only
     # when that notation is requested (same shape as Cotovía above)

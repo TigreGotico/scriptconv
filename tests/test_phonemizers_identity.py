@@ -63,6 +63,7 @@ IN_TREE = {
     Phonemizer.MANTOQ, Phonemizer.HALABI, Phonemizer.IQRA, Phonemizer.KOG2PK,
     Phonemizer.SHAMI, Phonemizer.VOSK, Phonemizer.BYT5, Phonemizer.CHARSIU,
     Phonemizer.DIZIONE, Phonemizer.G2PW, Phonemizer.F5TTS_CHAR, Phonemizer.LEOKANI,
+    Phonemizer.KOLOKWA,
 }
 # An engine that no extra can name: a binary, and a distribution the zh extra
 # does not list.

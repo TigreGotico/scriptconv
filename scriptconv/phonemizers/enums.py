@@ -60,6 +60,7 @@ class Phonemizer(str, Enum):
     G2PEN = "g2pen" # en
     DIZIONE = "dizione"  # en-US (CMUdict lexicon, homograph rules, text rules)
     LEOKANI = "leokani"  # en-US (Kokoro/misaki codes; lexicon, ONNX letter-to-sound and context models)
+    KOLOKWA = "kolokwa"  # lir, Liberian English (kolokwa-g2p model)
 
     TUGAPHONE = "tugaphone"  # pt
     G2PFA = "g2pfa"
