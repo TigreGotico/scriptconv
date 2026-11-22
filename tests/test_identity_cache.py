@@ -272,7 +272,7 @@ class TestEntries:
             import sys
             from scriptconv.phonemizers import GraphemePhonemizer, PhonemizerIdentity, _identity_cache
             key = {"writer": "test"}
-            identity = PhonemizerIdentity("graphemes", "scriptconv", "1", "pt-PT", "sc1:" + sys.argv[1] * 64, 2)
+            identity = PhonemizerIdentity("graphemes", "scriptconv", "1", "pt-PT", "sc2:" + sys.argv[1] * 64, 2)
             state = _identity_cache.snapshot(GraphemePhonemizer())
             for _ in range(40):
                 _identity_cache.store(key, identity, state)
@@ -293,7 +293,7 @@ class TestEntries:
         entries = list(_identity_cache.cache_dir().iterdir())
         assert len(entries) == 1 and entries[0].suffix == ".json"
         entry = json.loads(entries[0].read_text())
-        assert entry["identity"]["revision"] in ("sc1:" + "1" * 64, "sc1:" + "2" * 64)
+        assert entry["identity"]["revision"] in ("sc2:" + "1" * 64, "sc2:" + "2" * 64)
         assert _identity_cache.load({"writer": "test"}) == PhonemizerIdentity(**entry["identity"])
 
 
@@ -306,8 +306,8 @@ if sys.argv[1] == "hit":
     import text2spoken
     from scriptconv.phonemizers import _revision
     def refuse(*args, **kwargs):
-        raise AssertionError("a hit runs no probe and does not call the backend")
-    _revision._run_probe = text2spoken.revision = TugaphonePhonemizer.identity = refuse
+        raise AssertionError("a hit computes no revision and does not call the backend")
+    _revision.code_revision = text2spoken.revision = TugaphonePhonemizer.identity = refuse
 started = time.perf_counter()
 identity = frontend.identity()
 print(json.dumps({"revision": identity.revision, "seconds": time.perf_counter() - started}))
@@ -325,6 +325,6 @@ def test_a_hit_for_a_tugaphone_frontend_with_the_text2spoken_hook_costs_under_50
     miss = run("miss")
     hits = [run("hit") for _ in range(3)]
     print("miss", miss["seconds"], "hits", [hit["seconds"] for hit in hits])
-    assert miss["revision"] is not None and miss["revision"].startswith("sc1:")
+    assert miss["revision"] is not None and miss["revision"].startswith("sc2:")
     assert all(hit["revision"] == miss["revision"] for hit in hits)
     assert min(hit["seconds"] for hit in hits) < 0.05

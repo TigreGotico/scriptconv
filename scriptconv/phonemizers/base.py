@@ -236,7 +236,7 @@ class PhonemizerIdentity:
 
     Its meaning depends on :attr:`frontend`. With ``frontend`` ``None``, a
     backend called directly, it is the backend's own revision. With
-    ``frontend`` set, it is the frontend revision with the ``sc1:`` prefix.
+    ``frontend`` set, it is the frontend revision with the ``sc2:`` prefix.
     That revision covers the backend revision plus the frontend stage modules
     and output settings, and text2spoken's revision when the normaliser is
     :func:`~scriptconv.frontend.spoken_normalizer`. It is ``None`` when the
@@ -728,8 +728,7 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         return "scriptconv", VERSION_STR
 
     def _revision_arguments(self) -> Dict[str, object]:
-        """The constructor arguments, as JSON values, that rebuild this backend
-        in the probe of :func:`~scriptconv.phonemizers._revision.code_revision`."""
+        """The constructor arguments, as JSON values, that change the output. They join the revision."""
         return {}
 
     def _identity_settings(self) -> Dict[str, object]:
@@ -740,9 +739,9 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
 
     def _covered_distributions(self, lang: str) -> FrozenSet[str]:
         """The distributions whose own revision, or version, the identity of
-        this backend holds for *lang*. The probe of
+        this backend holds for *lang*.
         :func:`~scriptconv.phonemizers._revision.code_revision` leaves their
-        files out of the hash. For an engine outside scriptconv it is the
+        versions out of the hash. For an engine outside scriptconv it is the
         engine's distribution, whose version :meth:`identity` puts in the settings."""
         if self.engine_distribution is None:
             return frozenset()
@@ -755,10 +754,10 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         backend, as :func:`~scriptconv.phonemizers._revision.code_revision`
         gives it, with :meth:`_identity_settings` in the settings. For an
         engine outside scriptconv, the settings also hold the engine's
-        distribution and version, and the files of that distribution leave
-        the hash. So a change of the scriptconv code on the path, as
-        ``base.py``, ``diacritics.py`` or the sentence splitter, changes the
-        revision, and so does an engine release.
+        distribution and version. So a change of the scriptconv code on the
+        path, as ``base.py`` or ``diacritics.py``, changes the revision, and
+        so does a release of the engine or of a distribution under it, as the
+        sentence splitter.
 
         Raises:
             ImportError: If the engine is not installed.

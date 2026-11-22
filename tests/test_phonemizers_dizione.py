@@ -264,7 +264,7 @@ class TestIdentity:
         assert (identity.backend, identity.lang) == ("dizione", "en-US")
         assert dizione.identity(data_dir)["fingerprint"] == \
             "f41b6f9dac16c0b3ac492e255fcbebf6b73f737b20a62dfba7576ceb208f9190"
-        assert identity.revision.startswith("sc1:")
+        assert identity.revision.startswith("sc2:")
         other = DizionePhonemizer(data_dir=data_dir)
         other.__dict__["fingerprint"] = "another build"
         assert other.identity("en-US").revision != identity.revision

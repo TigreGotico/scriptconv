@@ -1,9 +1,9 @@
 """A disk cache for :meth:`~scriptconv.frontend.TextFrontend.identity`.
 
-The first ``identity()`` of a frontend runs the revision probes, which take
-seconds. The cache keeps the result in a JSON file under the user cache
-directory, so a later process reads it back in a few milliseconds, with no
-probe and no call into the backend.
+The first ``identity()`` of a frontend hashes the source of each scriptconv
+module on its path and reads the revision of its engine. The cache keeps the
+result in a JSON file under the user cache directory, so a later process reads
+it back with no hash and no call into the backend.
 
 An entry is found by a hash of its key: the interpreter path and version,
 the ``sys.path`` entries, :data:`unicodedata.unidata_version`, the backend
@@ -23,8 +23,7 @@ computed. A hit needs each of them to be the same:
   such as a checkout on ``PYTHONPATH`` or the target of a ``.pth`` file, and
   the project of each editable install. A file counts by its size and
   modification time, a directory by its names. Each of them is watched,
-  whether or not this process loads it, because a revision probe can load
-  what the process that writes the entry does not;
+  whether or not this process loads it;
 - the source file of each class of the backend outside scriptconv.
 
 A directory counts by its names and not by its modification time, so the

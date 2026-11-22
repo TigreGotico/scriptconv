@@ -74,7 +74,7 @@ def test_identity_names_the_orthography2ipa_engine(phonemizer, lang, spec, backe
     assert (identity.distribution, identity.version) == (engine.distribution, engine.version)
     assert (identity.backend, identity.lang) == (backend, lang)
     # the wrapper hashes its own code too, so its revision is its own
-    assert identity.revision.startswith("sc1:") and engine.revision.startswith("sc1:")
+    assert identity.revision.startswith("sc2:") and engine.revision.startswith("sc2:")
     assert identity.revision != engine.revision
 
 

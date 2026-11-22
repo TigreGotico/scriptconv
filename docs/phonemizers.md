@@ -53,11 +53,11 @@ spec that gives the phonemes did not change. The class attribute
 means the code is in this repository.
 
 **Each backend holds a `revision`.** For `graphemes`, `unicode` and
-`matoub_kab`, the `revision` is `sc1:` and a hash of the code and data on the
+`matoub_kab`, the `revision` is `sc2:` and a hash of the code and data on the
 path of the backend. `dizione` takes it from its engine.
 
 For `tugaphone`, `orthography2ipa`, `mwl_phonemizer` and `barranquenho`, the
-`revision` is `sc1:` and a hash of the revision that the engine gives and of
+`revision` is `sc2:` and a hash of the revision that the engine gives and of
 the code on the path of the backend. The engine revision is
 `tugaphone.revision(lect)` or the orthography2ipa spec revision of the lect,
 with its packaged lexicon. The files of the distributions that the engine
@@ -68,45 +68,71 @@ when the tugaphone `contact` is not `none`, the `revision` holds the engine
 version in place of the engine revision, as for the other engines below.
 
 For a backend that calls any other engine, such as `epitran`, `espeak` or
-`gruut`, the `revision` is `sc1:` and a hash of the engine name and version and
-of the code on the path of the backend. The files of the engine distribution
-leave the hash, and the version stands for them. For `espeak` it is the version
+`gruut`, the `revision` is `sc2:` and a hash of the engine name and version and
+of the code on the path of the backend. For `espeak` the version is the version
 of the espeak-ng binary. So an engine release changes the `revision`, and so
-does a change of the scriptconv code on the path or of quebra-frases. The
-wrappers in scriptconv-copyleft and scriptconv-nonfree are code on the path.
+does a change of the scriptconv code on the path or a release of quebra-frases.
+The wrappers in scriptconv-copyleft and scriptconv-nonfree are code on the path.
 
-A probe in a fresh process builds the backend. It reads a text with every
-clause mark through `phonemize` and `phonemize_to_list`, with
-`keep_punctuation` off and on. The hash then covers these inputs:
+The hash covers these inputs:
 
-- each scriptconv module that the probe loads, and each scriptconv data file
-  that it opens
-- each top-level module of another distribution that the probe loads, such
-  as `quebra_frases`, whole. A top-level module that the probe does not load,
-  such as the `tests` package of gruut-ipa, does not count. The engine
-  distribution, whose version the `revision` holds, is left out.
+- each module of scriptconv, scriptconv-copyleft and scriptconv-nonfree that
+  the backend class imports, directly or through another such module. The
+  imports are read from the source, so a module counts whether or not a call
+  reaches it.
+- each other file in the directory of such a module, and in each directory
+  under it that is not a package, such as the tables of a vendored engine. A
+  package that loads only as the parent of such a module adds no files.
+- the name and version of each installed distribution that the `phonemizers`
+  extra and the extra of the backend require, at any depth, and those of the
+  engine. A requirement under an extra counts only when that extra is asked
+  for. The engine counts with its extra named by the language, when it has
+  one, so `gruut` for `fr` counts `gruut-lang-fr`. A requirement for another
+  platform or Python version does not count. The engine, and each
+  distribution that an engine revision covers, count only once, in the
+  settings.
+- the name and version of each installed distribution that provides a module
+  that the scriptconv modules above import at module level, in a `try` block
+  or not, such as `num2words`, which the Shami normaliser uses when it is
+  installed. The requirements of such a distribution do not count. A
+  distribution that these modules import only inside a function does not
+  count, unless an extra above requires it. So an optional tool that a backend
+  loads inside a function is not in the `revision`. An example is the
+  camel-tools diacritizer of the Shami backend: its install can change the
+  phonemes of undiacritized Arabic and keep the `revision`.
 - the source file of each class of the backend outside scriptconv, so a
   subclass counts
 - the arguments of the backend, a character rule set on the instance, the
   language and the Unicode version of Python
 
-The modules of the Python installation do not count. One of them, the build
-configuration `_sysconfigdata_*`, differs between two builds of one Python
-version, so two machines with the same packages give the same `revision`.
-
 The code of a module counts as its tokens. Comments, blank lines, docstrings
-and `version.py` do not count. A release that changes code or data on the path
-of the backend changes the `revision`. A release that changes only other
-backends, docs or `version.py` keeps it, and `differs_from` then reports
-nothing.
+and `version.py` do not count. A release of scriptconv that changes code or
+data on the path of the backend changes the `revision`. A release that changes
+only other backends, docs or `version.py` keeps it, and `differs_from` then
+reports nothing. A release of a distribution in the list above changes the
+`revision`, also when the phonemes stay the same, and a voice then warns once.
+A release of any other distribution keeps the `revision`. This includes a
+distribution that scriptconv imports only inside a function, and a
+distribution that the engine loads at run time by a name that is not in the
+scriptconv source, such as a model package, unless an extra of the backend
+or of the engine requires it.
 
-The first `identity` call for a backend and a language runs the probe. Later
-calls in the process use the stored value. A probe that fails, runs longer
-than 120 seconds or prints no result gives no `revision`, with one warning per
-backend and language in a process. So does a probe that finds scriptconv
-imported before it starts, for example by a `sitecustomize.py`. A backend
-class that subclasses `BasePhonemizer` directly, outside scriptconv and its
-sister packages, has no `revision`, because the probe cannot build it.
+The hash reads no state of the running process: not the modules that it
+loaded, not its working directory and not a package that loads at startup from
+a `sitecustomize.py` or a `.pth` file. So two machines with the same packages
+give the same `revision`. An edit of the files of a dependency that keeps its
+version, as in an editable install, does not change the `revision`.
+
+The code hash runs no process. It reads the source files on the path and the
+installed metadata, and later calls in the process reuse the file digests.
+`identity()` also reads the release of the engine, and the espeak backend
+reads it from `espeak-ng --version` when it uses the binary. A
+module of these packages that does not load from a file in a directory, such
+as from a zip archive, gives no `revision`. So does a scriptconv with no
+installed metadata. Each gives one warning per backend and language in a
+process. A backend class that subclasses `BasePhonemizer` directly, outside
+scriptconv and its sister packages, has no `revision`, because nothing names
+the code on its path.
 
 A `TextFrontend` has its own `revision`, which covers the frontend stages too.
 See [frontend](frontend.md).

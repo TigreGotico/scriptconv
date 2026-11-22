@@ -28,7 +28,7 @@ def _check(phonemizer, caplog):
         identity = phonemizer.identity("pt-PT")
         phonemizer.identity("pt-PT")
     assert identity == BasePhonemizer.identity(phonemizer, "pt-PT")
-    assert identity.revision.startswith("sc1:")
+    assert identity.revision.startswith("sc2:")
     assert len([r for r in caplog.records if "no revision" in r.getMessage()]) == 1
 
 

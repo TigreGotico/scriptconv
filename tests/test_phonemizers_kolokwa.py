@@ -68,8 +68,8 @@ def test_lir_defaults_to_kolokwa(kolokwa):
 def test_identity_has_a_revision(kolokwa):
     identity = kolokwa.identity("lir")
     assert (identity.backend, identity.distribution, identity.lang) == ("kolokwa", "scriptconv", "en_lr")
-    assert identity.revision.startswith("sc1:")
-    assert TextFrontend(FrontendConfig("lir", Phonemizer.KOLOKWA)).identity().revision.startswith("sc1:")
+    assert identity.revision.startswith("sc2:")
+    assert TextFrontend(FrontendConfig("lir", Phonemizer.KOLOKWA)).identity().revision.startswith("sc2:")
 
 
 def test_offline_with_no_cache_raises_model_unavailable(tmp_path):

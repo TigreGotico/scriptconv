@@ -108,8 +108,8 @@ def test_the_identity_has_a_revision_per_variant(leokani):
     micro = leokani.identity("en-US")
     mini = LeokaniPhonemizer(model="mini").identity("en-US")
     assert (micro.backend, micro.distribution, micro.lang) == ("leokani", "scriptconv", "en-US")
-    assert micro.revision.startswith("sc1:")
-    assert mini.revision.startswith("sc1:")
+    assert micro.revision.startswith("sc2:")
+    assert mini.revision.startswith("sc2:")
     assert micro.revision != mini.revision
 
 
