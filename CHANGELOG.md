@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a146](https://github.com/TigreGotico/scriptconv/tree/0.0.4a146) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a145...0.0.4a146)
+
+**Merged pull requests:**
+
+- fix: Shami reads a digit run over 15 digits digit by digit [\#395](https://github.com/TigreGotico/scriptconv/pull/395) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a145](https://github.com/TigreGotico/scriptconv/tree/0.0.4a145) (2026-11-22)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a144...0.0.4a145)
@@ -373,10 +381,6 @@
 ## [0.0.4a98](https://github.com/TigreGotico/scriptconv/tree/0.0.4a98) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a97...0.0.4a98)
-
-**Merged pull requests:**
-
-- refactor: take restricted backends from scriptconv-copyleft and scriptconv-nonfree [\#264](https://github.com/TigreGotico/scriptconv/pull/264) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a97](https://github.com/TigreGotico/scriptconv/tree/0.0.4a97) (2026-11-15)
 
