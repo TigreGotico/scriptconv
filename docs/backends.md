@@ -2,9 +2,9 @@
 
 <!-- agent-hint
 covers: every phonemizer backend, its class, its extra, its package and its language default, and the models that download
-source: the Phonemizer enum in scriptconv/phonemizers/enums.py, PHONEMIZER_REGISTRY and LANG_DEFAULTS in scriptconv/phonemizers/registry.py, COPYLEFT and NONFREE in scriptconv/phonemizers/_moved.py, the download sites in scriptconv/diacritics.py, scriptconv/phonemizers/g2pw.py, scriptconv/phonemizers/en.py, scriptconv/phonemizers/leokani.py, scriptconv/phonemizers/lir.py and scriptconv/phonemizers/mul.py
-generated: no
-verify: python -c '(I:=__import__,ast:=I("ast"),re:=I("re"),sys:=I("sys"),inspect:=I("inspect"),enum:=I("enum"),dataclasses:=I("dataclasses"),unittest:=I("unittest"),f:=sys.argv[1],g:={},T:=unittest.TestCase(),B:=re.findall(r"\x60{3}python\n(.*?)\x60{3}",open(f,encoding="utf-8").read(),re.S),K:=lambda o:[(p.name,p.kind,p.default) for p in inspect.signature(o).parameters.values()] if not isinstance(o,type) else [(m.name,m.value) for m in o] if issubclass(o,enum.Enum) else [x.name for x in dataclasses.fields(o)],D:=lambda b:((s:=re.sub(r"\)( -> .+)?$",r")\1: ...",b.strip()) if b.startswith("def") else b),(h:=dict(g)),exec("from __future__ import annotations\nfrom enum import Enum\nfrom dataclasses import dataclass\n"+s,h),[K(h[d.name])==K(g[d.name]) or (d.name,K(h[d.name]),K(g[d.name])) for d in ast.parse(s).body])[-1],C:=lambda s,L:None if not isinstance(s,ast.Expr) else (m.group(1) if (m:=re.search(r"\s#\s?(.*)$",L[s.end_lineno-1])) else L[s.end_lineno][2:] if s.end_lineno<len(L) and L[s.end_lineno].startswith("# ") else None),X:=lambda s:compile(ast.Expression(s.value),f,"eval"),Q:=lambda s,e:(T.assertRaisesRegex(eval(e.split(":")[0],g),re.escape(e.partition(":")[2].strip()),eval,X(s),g) or True) if re.match(r"\w+Error\b",e) else (True if (v:=eval(X(s),g))==ast.literal_eval(e) else (ast.unparse(s),e,v)),R:=lambda s,L:exec(compile(ast.Module([s],[]),f,"exec"),g) if (c:=C(s,L)) is None else Q(s,c.split("  ")[0].strip()),r:=[y for b in B for y in (D(b) if re.match(r"def |class |@",b) else [R(s,b.splitlines()) for s in ast.parse(b).body]) if y is not None],w:=[y for y in r if y is not True],print("OK",len(r)) if not w else sys.exit("MISMATCH "+repr(w)))' docs/backends.md
+source: scriptconv/phonemizers/enums.py, registry.py and _moved.py for the table, through scripts/backend_table.py. The download code in scriptconv/diacritics.py and scriptconv/phonemizers/g2pw.py, en.py, leokani.py, lir.py and mul.py
+generated: yes for the table between the backends markers, by scripts/backend_table.py. Edit the registry and run `python scripts/backend_table.py --write`, not the table
+verify: python scripts/backend_table.py --check && python scripts/check_doc_page.py docs/backends.md
 see: docs/phonemizers.md, docs/stack.md
 -->
 
@@ -22,30 +22,11 @@ python -c "from scriptconv.phonemizers import Phonemizer; print(' '.join(p.value
 
 ## Check the table
 
-The table has one row per `Phonemizer` member, in the order of the enum. A
-backend that the registry gains needs its row here. This code, run from the
-repository root, compares all five columns of each row with the registry:
-
-```python
-import re
-from scriptconv.phonemizers import LANG_DEFAULTS, PHONEMIZER_REGISTRY, Phonemizer
-from scriptconv.phonemizers._moved import COPYLEFT, NONFREE
-
-page = open("docs/backends.md", encoding="utf-8").read()
-rows = re.findall(r"^\| `(\w+)` \| `(\w+)` \| `([\w-]+)` \| ([\w-]+) \| (.*?) \|$", page, re.M)
-want = [(member.value, cls, extra or "phonemizers",
-         "scriptconv-copyleft" if module.startswith(COPYLEFT)
-         else "scriptconv-nonfree" if module.startswith(NONFREE) else "scriptconv",
-         ", ".join(f"`{lang}`" for lang, chain in LANG_DEFAULTS.items() if member in chain))
-        for member in Phonemizer for module, cls, extra in [PHONEMIZER_REGISTRY[member]]]
-[row for row in rows if row not in want]   # []
-[row for row in want if row not in rows]   # []
-rows == want                               # True
-```
-
-The first list holds each row of the page that the registry does not give. The
-second list holds each row of the registry that the page does not hold. The
-last line checks the order.
+The table has one row per `Phonemizer` member, in the order of the enum.
+`scripts/backend_table.py` writes it from the registry. From the repository
+root, `python scripts/backend_table.py` prints the table, `--write` rewrites it
+in this page, and `--check` exits 1 when the page differs from the registry.
+`tests/test_backend_table.py` runs `--check`.
 
 ## The table
 

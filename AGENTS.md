@@ -15,7 +15,7 @@ core has no dependencies, and each phonemizer engine sits behind an extra.
 | `scriptconv/phonemizers/registry.py` | `PHONEMIZER_REGISTRY`, `LANG_DEFAULTS`, `get_phonemizer` |
 | `scriptconv/phonemizers/_moved.py` | The wrappers that live in scriptconv-copyleft and scriptconv-nonfree |
 | `scriptconv/phonemizers/_thirdparty/`, `_vendored/` | Vendored engines, each with its licence notice |
-| `scripts/` | The licence check and measurement scripts |
+| `scripts/` | The licence check, the backend table generator, the docs page check and measurement scripts |
 | `examples/` | Runnable examples, run by `tests/test_examples.py` |
 | `docs/` | The documentation. [docs/index.md](docs/index.md) gives the reading order |
 
@@ -40,9 +40,10 @@ installed (`.github/workflows/build-tests.yml`).
   `ImportError` that names the extra
   (`tests/test_phonemizers_friendly_import_errors.py`).
 - [docs/backends.md](docs/backends.md) holds one row per `Phonemizer`
-  member, in enum order. The code in its
-  [Check the table](docs/backends.md#check-the-table) section compares each
-  row with the registry.
+  member, in enum order. `python scripts/backend_table.py --write` writes the
+  rows, and `tests/test_backend_table.py` fails on a stale table.
+- The python examples of each page with an agent hint give the results that
+  the page shows. `tests/test_doc_pages.py` fails otherwise.
 - No extra installs a copyleft or non-commercial distribution, except the two
   that `scripts/check_extra_licences.py` lists. Such a wrapper goes to
   scriptconv-copyleft or scriptconv-nonfree. `tests/test_wheel_licences.py`
@@ -59,12 +60,15 @@ installed (`.github/workflows/build-tests.yml`).
 ```bash
 pytest tests/
 python scripts/check_extra_licences.py
+python scripts/backend_table.py --check
+python scripts/check_doc_page.py docs/stack.md   # once for each changed page
 ```
 
 After a change to the code or to a page, run the `verify` command in the
 agent hint of each page that the change touches. The hint is the HTML comment
-under the title of the page. [docs/backends.md](docs/backends.md) needs this
-after each change to the registry.
+under the title of the page. `scripts/check_doc_page.py` runs the examples of a
+page, and its docstring lists what it checks. `tests/test_doc_pages.py` runs
+it on each page that has a hint.
 
 The build workflow runs on pull requests to `dev` and `master`. The two licence
 workflows run on pull requests to `dev`.
