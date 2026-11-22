@@ -9,6 +9,7 @@ import re
 
 import pytest
 
+from scriptconv import frontend as frontend_module
 from scriptconv.frontend import (
     WHOLE_TEXT_LIMIT,
     Chunk,
@@ -24,6 +25,7 @@ from scriptconv.phonemizers import (
     Segment,
     UnicodeCodepointPhonemizer,
 )
+from scriptconv.phonemizers import base
 from scriptconv.phonemizers._thirdparty.dizione.symbols import SYMBOL_TO_ID
 from scriptconv.phonemizers.base import join_sentences
 from scriptconv.phonemizers.dizione import DizionePhonemizer
@@ -236,6 +238,9 @@ class TestSentencesJoinAsTheTextWrites:
         # the whitespace before the first word counts, also after a mark
         ("你好！' 我们走。", "你好 我们走"),
         ("你好！「我们走」", "你好我们走"),
+        # the gap starts after the last sentence that gives phonemes
+        ("你好！ ！？我们走。", "你好 我们走"),
+        ("你好。 、！我们走。", "你好 我们走"),
     ])
     def test_flat_streams(self, backend, keep, text, expected):
         frontend = TextFrontend(FrontendConfig("zh", keep_punctuation=keep,
@@ -243,6 +248,30 @@ class TestSentencesJoinAsTheTextWrites:
         assert "".join(frontend.backend.phonemize_to_list(text, "zh")) == expected
         assert "".join(frontend.phonemize_flat(text)) == expected
         assert ["".join(c) for c in frontend.phonemize(text, Stages(chunk=Chunk.NONE))] == [expected]
+
+    # Sentences with no phonemes leave the gap open, and the gap after them
+    # grows. A search that reads the open gap again at each such sentence
+    # reads a number of characters that grows with the square of their count.
+
+    @pytest.mark.parametrize("keep", [True, False])
+    def test_the_gap_is_read_in_linear_work(self, keep, monkeypatch):
+        read = 0
+        whitespace = base._WHITESPACE
+
+        class Counted:
+            def search(self, text, start, end):
+                nonlocal read
+                read += max(0, end - start)
+                return whitespace.search(text, start, end)
+
+        monkeypatch.setattr(base, "_WHITESPACE", Counted())
+        monkeypatch.setattr(frontend_module, "_WHITESPACE", Counted())
+        text = "你好！" + "、！" * 5000 + "我们走。"
+        frontend = TextFrontend(FrontendConfig("zh", keep_punctuation=keep,
+                                               stages=Stages(diacritize=False)), GraphemePhonemizer())
+        assert "".join(frontend.backend.phonemize_to_list(text, "zh")) == "你好我们走"
+        assert "".join(frontend.phonemize_flat(text)) == "你好我们走"
+        assert read <= 2 * len(text), read
 
     @pytest.mark.parametrize("text", ["你好！我们走。", "你好！ 我们走。"])
     def test_the_chunk_text_keeps_the_gap(self, text):

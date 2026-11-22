@@ -575,28 +575,32 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         """
         question_semicolon = _primary_subtag(lang) == "el"
         sentence: List[List[str]] = []
-        # where the first word of the sentence starts in the text, and where
-        # the last chunk of the last sentence with phonemes ends
-        word = end = cursor = 0
+        # where the first word with phonemes of the sentence starts in the
+        # text, and where the last chunk of the last sentence with phonemes ends
+        word: Optional[int] = None
+        end = cursor = 0
         for chunk, punct, eos in self.chunk_text(text):
             if chunk:
                 found = text.find(chunk, cursor)
                 cursor = found + len(chunk)
-                if not any(sentence):
-                    word = found + _WORDLESS_START.match(chunk).end()
             read = (chunk.strip() if "normalize" in self.owned_stages
                     else self.remove_punctuation(chunk))
             phoneme_str = _clause_breaks_as_spaces(self.phonemize_string(read, lang))
             # Filter out (lang) switch (flags) that surround words from languages
             # other than the current voice — mirrors _process_phones().
             phoneme_str = re.sub(r"\([^)]+\)", "", phoneme_str)
+            if phoneme_str and word is None:
+                word = found + _WORDLESS_START.match(chunk).end()
             sentence.append(list(phoneme_str))
             if eos or (question_semicolon and punct == ";"):
                 phonemes = join_sentences(sentence, keep_punctuation=False)
-                yield phonemes, False, bool(_WHITESPACE.search(text, end, word))
+                # the gap is read only for a sentence with phonemes, so each
+                # character is read once
+                yield phonemes, False, bool(phonemes and _WHITESPACE.search(text, end, word))
                 if phonemes:
                     end = cursor
                 sentence = []
+                word = None
 
     def _keeps_punctuation(self) -> bool:
         cls = type(self)

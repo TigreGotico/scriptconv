@@ -27,6 +27,7 @@ from scriptconv.phonemizers import (
     StageError,
     UnreadTextError,
     UnsupportedLanguageError,
+    Segment,
     get_phonemizer,
     phonemize,
 )
@@ -245,6 +246,20 @@ class TestSegmentText:
     def test_a_block_keeps_the_staged_words_before_it(self, chunk, text, expected):
         frontend = build(Echo(), stages=Stages(diacritize=False))
         assert [s.text for s in frontend.segments(text, Stages(chunk=chunk))] == expected
+
+    # The text of a chunk joins the texts of its pieces. A join that adds each
+    # text to the text joined so far copies all of it again at each piece, so
+    # the copies grow with the square of the number of pieces. A join that
+    # collects the texts and joins them once copies no characters through +.
+
+    def test_the_texts_of_a_chunk_join_in_linear_time(self, monkeypatch):
+        monkeypatch.setattr(Joined, "copied", 0)
+        # every second piece follows whitespace in the text
+        pieces = [frontend_module._Piece(["a"], text=Joined("ab"), spaced=bool(number % 2))
+                  for number in range(10000)]
+        joined = frontend_module._join(pieces, Segment((" ",)))
+        assert joined.text == "ab" + " abab" * 4999 + " ab"
+        assert Joined.copied <= 2 * len(joined.text), Joined.copied
 
     def test_the_words_before_a_block_are_the_staged_text(self):
         frontend = build(Echo(), normalizer=lambda text, lang: text.upper(),

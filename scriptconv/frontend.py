@@ -449,10 +449,13 @@ def _join(pieces: Iterable[_Piece], space: Segment) -> _Piece:
         joined.ends_paragraph = piece.ends_paragraph
         texts.append((piece.spaced, piece.text))
     if texts and all(text is not None for _, text in texts):
-        joined.text = ""
+        parts = []
         for spaced, text in texts:
             if text:
-                joined.text += (" " if joined.text and spaced else "") + text
+                if parts and spaced:
+                    parts.append(" ")
+                parts.append(text)
+        joined.text = "".join(parts)
     return joined
 
 
@@ -958,14 +961,16 @@ class TextFrontend:
             for number, sentence in enumerate(sentences, 1):
                 start = text.find(sentence, cursor)
                 cursor = start + len(sentence)
-                word = start + _WORDLESS_START.match(sentence).end()
-                spaced = end is None or bool(_WHITESPACE.search(text, end, word))
                 for piece in self._sentence_pieces(self._read(sentence, stages) if owned else sentence,
                                                    stages, clauses, tokens,
                                                    ends_paragraph=number == len(sentences)):
-                    # only the first piece of a sentence follows the gap before it
-                    piece.spaced, spaced = spaced, True
-                    end = cursor
+                    # Only the first piece of a sentence follows the gap
+                    # before it. The gap is read only for a sentence that
+                    # gives pieces, so each character is read once.
+                    if end != cursor:
+                        word = start + _WORDLESS_START.match(sentence).end()
+                        piece.spaced = end is None or bool(_WHITESPACE.search(text, end, word))
+                        end = cursor
                     yield piece
 
     def _sentence_pieces(self, sentence: str, stages: Stages, clauses: bool, tokens: bool,
