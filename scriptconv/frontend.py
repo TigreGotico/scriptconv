@@ -99,11 +99,8 @@ FRONTEND_VERSION = 2
 to the stages raises it. Version 1 cut the raw text into sentences before
 normalisation."""
 
-# scripts/time_owner_backends.py, output in scripts/time_owner_backends.txt: one dizione call on English text
-# dense in dates and prices, also with a blank line and quotes after each sentence, stays under 100 ms up to
-# 1,750 characters, both with a new backend per call (at most 61.9 ms in two runs) and with one backend read
-# again and again (at most 79.3 ms in 11 runs). At 2,000 characters one run of the second kind took 100.5 ms.
-# Prose reads faster. The limit bounds the read; a full garbage collection of the process can add to one call.
+# One dizione call on English text dense in dates and prices stays under 100 ms up to this size
+# (scripts/time_owner_backends.txt); at 2,000 characters one run took 100.5 ms.
 WHOLE_TEXT_LIMIT = 1_750
 """The default of :attr:`FrontendConfig.whole_text_limit`."""
 
@@ -568,33 +565,20 @@ class TextFrontend:
     def phonemize_lazy(self, text: str, stages: Optional[Stages] = None) -> Iterator[List[str]]:
         """Phonemes of *text*, one list per chunk, as each chunk is read.
 
-        :attr:`Stages.chunk` sets the size of a chunk. At every size the
-        stages read the text in the same order, the frontend cuts the read
-        text into sentences, and a chunk is a sentence, a clause, the
-        sentences of a paragraph, or every sentence. The sentences of a chunk
-        join by the rule of :meth:`phonemize_flat`. A clause that ends in a
-        clause symbol, with another clause after it in its sentence, takes a
-        space after the symbol, as inside the sentence. The frontend cuts the
-        read text at its paragraph breaks before it cuts sentences, so a
-        paragraph break also ends a sentence, as after a title with no full
-        stop or after a ``!``. A ``reads_whole_text`` backend reports its own
-        paragraph ends.
+        :attr:`Stages.chunk` sets the chunk: a sentence, a clause, the
+        sentences of a paragraph, or every sentence. The stages run in the same
+        order at every size, and the sentences of a chunk join by the rule of
+        :meth:`phonemize_flat`. A clause symbol with another clause after it in
+        its sentence takes a space after it. A paragraph break also ends a
+        sentence.
 
         A block's symbols join the chunk before the block, and the text after
-        a block starts a new sentence, but a new paragraph only after a
-        paragraph break. A closing mark after a block, right after it or
-        after whitespace, closes the block's sentence, so it goes with the
-        block's chunk, and no chunk starts with such a mark. A symbol that the
-        backend reads as a word, such as ``%``, is no such mark, and a quote
-        after whitespace that opens the next word stays with that word (see
-        :func:`_marks_after`). A backend with a mark table gets the marks from
-        it, also where no word follows them (see :meth:`_take_marks`). A
-        block that starts a sentence after a sentence that ends in a clause
-        symbol follows that symbol with no space. A block before the first
-        text is a chunk of its own at ``sentence`` and ``clause`` size, with the marks right after it, and
-        it starts the chunk after it at ``paragraph`` and ``none`` size. A
-        chunk of bounded segments has one start and one end symbol, with the
-        block's symbols between them. A chunk that gives no phonemes is not
+        it starts a new sentence. A closing mark after a block goes with the
+        block's chunk, so no chunk starts with one (:func:`_marks_after`,
+        :meth:`_take_marks`). A block before the first text is a chunk of its
+        own at ``sentence`` and ``clause`` size, and starts the next chunk at
+        ``paragraph`` and ``none`` size. A chunk of bounded segments has one
+        start and one end symbol. A chunk that gives no phonemes is not
         yielded.
         """
         for chunk in self._chunk_pieces(text, self._resolve(stages)):
@@ -605,22 +589,15 @@ class TextFrontend:
         return list(self.phonemize_lazy(text, stages))
 
     def segments(self, text: str, stages: Optional[Stages] = None) -> Iterator[Segment]:
-        """The chunks of :meth:`phonemize_lazy`, each with the backend's side streams.
+        """The chunks of :meth:`phonemize_lazy` as :class:`~scriptconv.phonemizers.base.Segment`, with the backend's side streams.
 
-        The streams of the backend, such as dizione's stress or Shami's
-        language ids, stay in step with the symbols at every size. A word
-        break that the frontend adds takes the values of the backend's
+        The streams stay in step with the symbols at every size: a word break
+        that the frontend adds takes the values of the backend's
         :meth:`~scriptconv.phonemizers.base.BasePhonemizer.word_break`, and a
-        clause symbol or a block's symbol takes 0 in every stream. Where two
-        bounded segments of the backend join, the inner end and start symbols
-        go with their stream values. Each chunk is a :class:`~scriptconv.phonemizers.base.Segment`
-        whose symbols hold the clause symbols, so its ``mark`` is ``None``.
-        The segment's ``text`` is the staged source text of its chunk, with one
-        space between two sentences where the text writes whitespace between
-        them and none where it writes none, or ``None`` where the
-        frontend cannot say. The first piece of a part holds the part's text,
-        and each later piece of that part holds ``""``, so it drops out of the
-        join.
+        clause symbol or a block's symbol takes 0. The symbols hold the clause
+        symbols, so ``mark`` is ``None``. ``text`` is the staged source text of
+        the chunk, with one space between two sentences where the text writes
+        whitespace between them, or ``None`` where the frontend cannot say.
         """
         for chunk in self._chunk_pieces(text, self._resolve(stages)):
             yield Segment(tuple(chunk.phonemes), None, chunk.ends_sentence,
@@ -628,16 +605,12 @@ class TextFrontend:
                           chunk.ends_paragraph, chunk.bounds is not None, text=chunk.text)
 
     def phonemize_flat(self, text: str, stages: Optional[Stages] = None) -> List[str]:
-        """Phonemes of *text* as one list, for training.
+        """Phonemes of *text* as one list, for training: the ``none`` chunk.
 
-        The list is the sentence chunks of :meth:`phonemize` joined by the
-        rule of tts-punctuation, for every backend. A sentence that ends in a
-        clause symbol, or in a space, joins the next one with no space, and
-        any other sentence takes one space before the next, as
-        :func:`~scriptconv.phonemizers.base.join_sentences` joins them, where
-        the text writes whitespace between the two sentences. Where
-        two bounded segments join, the inner end and start symbols go. So the
-        ``none`` size gives this list as its one chunk.
+        The sentences join by the rule of
+        :func:`~scriptconv.phonemizers.base.join_sentences`, with a space only
+        where the text writes whitespace between two sentences. Where two
+        bounded segments join, the inner end and start symbols go.
         """
         stages = dataclasses.replace(self._resolve(stages), chunk=Chunk.SENTENCE)
         return _join(self._pieces(text, stages, clauses=False), self._space).closed(self._space).phonemes
@@ -875,36 +848,27 @@ class TextFrontend:
             yield held
 
     def _take_marks(self, held: _Piece, piece: Optional[_Piece], marks: str, following: str) -> None:
-        """Move the symbols at the start of *piece* that write *marks* to the end of *held*.
+        """Move the symbols at the start of *piece* that write *marks* to the end of *held*, in place of its word break.
 
-        *held* ends in a block, and *marks* are the closing marks after the
-        block in the text (see :func:`_marks_after`). Such a mark closes the
-        block's sentence, so it goes with the block, in place of the word
-        break before it, as tts-punctuation puts a closing mark with the
-        sentence that it ends. A backend with a mark table
-        (:meth:`~scriptconv.phonemizers.base.BasePhonemizer.mark_symbols`)
-        writes the symbols of its table for the marks after a word. The table
-        is the backend's read of the marks at the end of a text, and the
-        backend can read them in another way where a word follows. So the
-        frontend writes the mark symbols at the start of the table's read of
-        the marks with *following*, the text after them up to the end of the
-        next word. It removes from *piece* the symbols at its start that the
-        backend writes for one of the marks, also where that read drops them.
-        dizione drops ``);`` at the end of a text as an emoticon, but reads
-        ``x.);5`` with ``. ) ;``. It reads ``;* go`` alone with no mark, but
-        ``x;* go`` with ``;``, and it drops all of ``:'))`` in ``x:')) go``.
-        It reads ``x .5``, ``x != y`` and ``x:( go`` with no mark, as the
-        decimal point, the operator and the emoticon belong to the text after
-        the block. *piece* is ``None`` where no word follows the marks before
-        the next block or the end of the text. A backend with no table writes symbols whose characters are
-        all in *marks*. A backend that drops the marks writes no such symbols,
-        and then *held* keeps its word break.
+        *held* ends in a block, and *marks* are the closing marks after it
+        (:func:`_marks_after`), which close the block's sentence. A backend
+        with a mark table
+        (:meth:`~scriptconv.phonemizers.base.BasePhonemizer.mark_symbols`) can
+        read marks in another way where a word follows, so the symbols are
+        the start of the table's read of *marks* plus *following*, the text up
+        to the end of the next word: dizione drops ``);`` at the end of a text
+        as an emoticon, but reads ``x.);5`` with ``. ) ;``. The symbols at the
+        start of *piece* that the backend writes for a mark leave *piece*,
+        also where that read drops them. A backend with no table gives the
+        symbols of *piece* whose characters are all in *marks*. *piece* is
+        ``None`` where no word follows the marks. Where the backend writes no
+        symbol for the marks, *held* keeps its word break.
         """
         phonemes = piece.phonemes if piece is not None else []
         table = self.backend.mark_symbols(marks)
         if table is None:
-            count = next((i for i, symbol in enumerate(phonemes) if not set(symbol) <= set(marks.lstrip())),
-                         len(phonemes))
+            allowed = set(marks.lstrip())
+            count = next((i for i, symbol in enumerate(phonemes) if not set(symbol) <= allowed), len(phonemes))
             # whitespace between two runs of marks stays, and whitespace after them goes
             while count and not phonemes[count - 1].strip():
                 count -= 1
@@ -1031,11 +995,7 @@ class TextFrontend:
 
         Above :attr:`FrontendConfig.whole_text_limit` characters, the text is
         first cut at its paragraph breaks, and each cut ends a sentence and a
-        paragraph. Each piece is diacritized and read whole, and the backend
-        reports its segments. A segment's clause symbol follows it, with a
-        space after ``, : ;``. A segment that ends in a clause symbol, with
-        another segment after it in its sentence, takes a space after the
-        symbol, and the pieces of a sentence join by :func:`_join`.
+        paragraph. The backend reads each cut whole and reports its segments.
         """
         text = self._read(text, stages)
         cuts = self._whole_text_pieces(text)
@@ -1110,26 +1070,18 @@ class TextFrontend:
     def _add_block(self, piece: _Piece, parts: List[str], index: int, stages: Stages) -> None:
         """Append the symbols of the inline block at *index* of a split text to *piece*.
 
-        A space, tab or line break before the block in the text, also with
-        marks between it and the block, a hyphen, ``!`` or ``?`` between a
-        word and the block, or a space after the block, becomes the backend's
-        word break, unless *piece* is empty or already ends in one.
-        :meth:`_before_block` reads what comes before the block, and
-        :meth:`_mark_after` reads the clause symbol after it. A block whose
-        symbols end in a character that is also a clause symbol, with no
-        clause symbol after it, takes a word break before the next word,
-        because that character ends no sentence. The piece then ends in a
-        clause symbol that joins the next sentence with no space only when a
-        mark follows the block.
+        Whitespace before the block (also with marks between), a hyphen,
+        ``!`` or ``?`` between a word and the block, or a space after it,
+        becomes the backend's word break, unless *piece* is empty or already
+        ends in one. A block whose symbols end in a clause-symbol character,
+        with no mark after it, takes a word break before the next word, as
+        that character ends no sentence.
 
-        The block's symbols go inside the start and end symbols of a bounded
-        piece. A block before the first text takes the bounds of the text
-        after it. The backend writes the marks of a bounded piece itself, so
-        the frontend reads no mark around the block: a word break comes
-        before the block where the text has whitespace and the piece does not
-        end in a mark, and after it where the text has whitespace or a mark.
-        :meth:`_take_marks` replaces that word break with the symbols that the
-        backend writes for the mark.
+        In a bounded piece the block goes inside the start and end symbols, and
+        the frontend reads no mark around it, as the backend writes the marks:
+        a word break comes before the block where the text has whitespace and
+        the piece does not end in a mark, and after it where the text has
+        whitespace or a mark, for :meth:`_take_marks` to replace.
         """
         text, after = parts[index - 1], parts[index + 1]
         symbols = parts[index][2:-2].strip()
@@ -1200,22 +1152,14 @@ class TextFrontend:
         return mark
 
     def _before_block(self, phonemes: List[str], text: str, after_block: bool) -> Optional[bool]:
-        """How a block follows *phonemes* and the *text* before it, read as in the plain text.
-
-        *text* reads with a plain word in place of the block, and in front of
-        it when *after_block*, for the block before it.
+        """How a block follows *phonemes* and the *text* before it, read with a plain word in place of each block.
 
         ``True``: the block starts a sentence after one that ends in a clause
-        symbol, so no space comes before it, by the rule of
-        :func:`~scriptconv.phonemizers.base.join_sentences`. ``False``: the
-        clause symbol at the end of *phonemes* ends no clause in the plain
-        text, as after ``Tudo."``, after ``Dr.`` or directly before the block.
-        The block continues the clause, so the symbol goes. ``None``: neither.
+        symbol, so no space comes before it. ``False``: the clause symbol at
+        the end of *phonemes* is the mark of the last clause of *text* but ends
+        no clause in the plain text, as after ``Dr.``, so it goes. ``None``:
+        neither, also when the symbol is a phoneme such as an X-SAMPA ``:``.
         Only a backend that keeps punctuation gives ``True`` or ``False``.
-
-        The symbol goes only when it is the mark of the last clause of
-        *text*, which the backend writes after that clause. Any other symbol
-        is a phoneme, such as an X-SAMPA ``:`` for length, and it stays.
         """
         if not (self._keeps_punctuation() and phonemes
                 and phonemes[-1] in _CLAUSE_TOKENS):
