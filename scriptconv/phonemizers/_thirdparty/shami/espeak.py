@@ -33,8 +33,11 @@ def phonemize(text: str, voice: str = "en-us") -> str:
         raise RuntimeError("espeak-ng not found on PATH")
     if not text.strip():
         return ""
+    # The text goes on stdin, because Linux refuses one argument longer than
+    # 128 KiB. Without the final newline, espeak-ng drops the end of the last word.
     proc = subprocess.run(
-        [_ESPEAK, "-v", voice, "--ipa=1", "-q", "--", text],
+        [_ESPEAK, "-v", voice, "--ipa=1", "-q", "--stdin"],
+        input=text + "\n",
         capture_output=True,
         text=True,
         encoding="utf-8",
