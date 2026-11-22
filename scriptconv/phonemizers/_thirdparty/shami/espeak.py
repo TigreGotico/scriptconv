@@ -49,7 +49,7 @@ def phonemize(text: str, voice: str = "en-us") -> str:
         text=True,
         encoding="utf-8",
         errors="replace",
-        timeout=_TIMEOUT_BASE + _TIMEOUT_PER_BYTE * len(data.encode()),
+        timeout=_TIMEOUT_BASE + _TIMEOUT_PER_BYTE * len(data.encode("utf-8", "replace")),
     )
     raw = proc.stdout or ""
     raw = _PAREN.sub(" ", raw).translate(_ZW)

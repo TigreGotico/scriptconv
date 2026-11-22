@@ -151,3 +151,14 @@ def test_the_espeak_timeout_grows_with_the_text(espeak_timeouts):
     assert 30 <= short < 31
     for timeout, seconds in zip(long, MEASURED_SECONDS.values()):
         assert timeout >= 4 * seconds
+
+
+def test_a_lone_surrogate_reads_as_the_question_mark_espeak_receives():
+    # A surrogateescape read leaves a lone surrogate. subprocess writes it to
+    # espeak-ng as "?", so the timeout must count bytes the same way.
+    text, written = "مرحبا \udce9", "مرحبا ?"
+    expected = espeak.phonemize(written, voice="ar")
+    assert expected
+    assert espeak.phonemize(text, voice="ar") == expected
+    phonemizer = ShamiPhonemizer()
+    assert phonemizer.phonemize(text, "ar") == phonemizer.phonemize(written, "ar")
