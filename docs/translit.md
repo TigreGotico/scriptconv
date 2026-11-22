@@ -1,6 +1,15 @@
 # scriptconv.translit
 
-Script-level decomposition utilities.
+<!-- agent-hint
+covers: Hangul decomposition, kana transliteration and Cangjie codes
+source: scriptconv/translit.py, scriptconv/cangjie.py
+generated: no
+verify: python -c '(I:=__import__,ast:=I("ast"),re:=I("re"),sys:=I("sys"),inspect:=I("inspect"),enum:=I("enum"),dataclasses:=I("dataclasses"),unittest:=I("unittest"),f:=sys.argv[1],g:={},T:=unittest.TestCase(),B:=re.findall(r"\x60{3}python\n(.*?)\x60{3}",open(f,encoding="utf-8").read(),re.S),K:=lambda o:[(p.name,p.kind,p.default) for p in inspect.signature(o).parameters.values()] if not isinstance(o,type) else [(m.name,m.value) for m in o] if issubclass(o,enum.Enum) else [x.name for x in dataclasses.fields(o)],D:=lambda b:((s:=re.sub(r"\)( -> .+)?$",r")\1: ...",b.strip()) if b.startswith("def") else b),(h:=dict(g)),exec("from __future__ import annotations\nfrom enum import Enum\nfrom dataclasses import dataclass\n"+s,h),[K(h[d.name])==K(g[d.name]) or (d.name,K(h[d.name]),K(g[d.name])) for d in ast.parse(s).body])[-1],C:=lambda s,L:None if not isinstance(s,ast.Expr) else (m.group(1) if (m:=re.search(r"\s#\s?(.*)$",L[s.end_lineno-1])) else L[s.end_lineno][2:] if s.end_lineno<len(L) and L[s.end_lineno].startswith("# ") else None),X:=lambda s:compile(ast.Expression(s.value),f,"eval"),Q:=lambda s,e:(T.assertRaisesRegex(eval(e.split(":")[0],g),re.escape(e.partition(":")[2].strip()),eval,X(s),g) or True) if re.match(r"\w+Error\b",e) else (True if (v:=eval(X(s),g))==ast.literal_eval(e) else (ast.unparse(s),e,v)),R:=lambda s,L:exec(compile(ast.Module([s],[]),f,"exec"),g) if (c:=C(s,L)) is None else Q(s,c.split("  ")[0].strip()),r:=[y for b in B for y in (D(b) if re.match(r"def |class |@",b) else [R(s,b.splitlines()) for s in ast.parse(b).body]) if y is not None],w:=[y for y in r if y is not True],print("OK",len(r)) if not w else sys.exit("MISMATCH "+repr(w)))' docs/translit.md
+see: docs/readings.md for the respellings that need a dictionary
+-->
+
+This page shows the table-driven rewrites of a script: Hangul to jamo,
+hiragana to katakana, and hanzi to Cangjie input codes.
 
 ```python
 from scriptconv.translit import decompose_hangul
@@ -11,7 +20,7 @@ from scriptconv.translit import decompose_hangul
 ## decompose_hangul
 
 ```python
-def decompose_hangul(text: str) -> str
+def decompose_hangul(text: str, form: str = "compatibility", drop_silent_initial: bool = False) -> str
 ```
 
 Decomposes Hangul syllable block characters into their constituent jamo letters.
@@ -90,6 +99,8 @@ them, the katakana-only long-vowel mark `ー` (U+30FC) has no hiragana form and
 passes through unchanged.
 
 ```python
+from scriptconv import hira_to_kana, kana_to_hira
+
 hira_to_kana("ひらがな")   # "ヒラガナ"
 kana_to_hira("カタカナ")   # "かたかな"
 ```
@@ -115,4 +126,4 @@ Where the upstream table lists alternative codes for a glyph, the primary
 code is kept, `cangjie_code` returns `None` for unmapped characters.
 
 ---
-[← notation](notation.md) · [Home](../README.md) · [readings →](readings.md)
+[Index](index.md) · [← notation](notation.md) · [readings →](readings.md)

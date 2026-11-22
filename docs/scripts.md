@@ -1,6 +1,15 @@
 # scriptconv.scripts
 
-Writing-system identification and metadata.
+<!-- agent-hint
+covers: script detection, mixed-script runs, text direction and the language-to-script map
+source: scriptconv/scripts.py
+generated: no
+verify: python -c '(I:=__import__,ast:=I("ast"),re:=I("re"),sys:=I("sys"),inspect:=I("inspect"),enum:=I("enum"),dataclasses:=I("dataclasses"),unittest:=I("unittest"),f:=sys.argv[1],g:={},T:=unittest.TestCase(),B:=re.findall(r"\x60{3}python\n(.*?)\x60{3}",open(f,encoding="utf-8").read(),re.S),K:=lambda o:[(p.name,p.kind,p.default) for p in inspect.signature(o).parameters.values()] if not isinstance(o,type) else [(m.name,m.value) for m in o] if issubclass(o,enum.Enum) else [x.name for x in dataclasses.fields(o)],D:=lambda b:((s:=re.sub(r"\)( -> .+)?$",r")\1: ...",b.strip()) if b.startswith("def") else b),(h:=dict(g)),exec("from __future__ import annotations\nfrom enum import Enum\nfrom dataclasses import dataclass\n"+s,h),[K(h[d.name])==K(g[d.name]) or (d.name,K(h[d.name]),K(g[d.name])) for d in ast.parse(s).body])[-1],C:=lambda s,L:None if not isinstance(s,ast.Expr) else (m.group(1) if (m:=re.search(r"\s#\s?(.*)$",L[s.end_lineno-1])) else L[s.end_lineno][2:] if s.end_lineno<len(L) and L[s.end_lineno].startswith("# ") else None),X:=lambda s:compile(ast.Expression(s.value),f,"eval"),Q:=lambda s,e:(T.assertRaisesRegex(eval(e.split(":")[0],g),re.escape(e.partition(":")[2].strip()),eval,X(s),g) or True) if re.match(r"\w+Error\b",e) else (True if (v:=eval(X(s),g))==ast.literal_eval(e) else (ast.unparse(s),e,v)),R:=lambda s,L:exec(compile(ast.Module([s],[]),f,"exec"),g) if (c:=C(s,L)) is None else Q(s,c.split("  ")[0].strip()),r:=[y for b in B for y in (D(b) if re.match(r"def |class |@",b) else [R(s,b.splitlines()) for s in ast.parse(b).body]) if y is not None],w:=[y for y in r if y is not True],print("OK",len(r)) if not w else sys.exit("MISMATCH "+repr(w)))' docs/scripts.md
+see: docs/notation.md, docs/conventions.md
+-->
+
+This page shows how to find the writing system of a text, split mixed-script
+text into runs, and map a language code to its script.
 
 ```python
 from scriptconv.scripts import (
@@ -23,6 +32,7 @@ class Script:
     name: str                              # English name, e.g. "Latin"
     direction: str                         # "ltr" or "rtl"
     char_ranges: Tuple[Tuple[int, int], ...]  # Inclusive Unicode codepoint ranges
+    script_type: str = "other"             # "alphabet", "abjad", "abugida", "syllabary", "logographic", "featural" or "other"
 ```
 
 `Script` instances are **frozen** (immutable). Any attempt to assign an attribute raises
@@ -273,9 +283,9 @@ Returns the languages whose default script is `code`. This is the reverse of
 `lang_to_script`. Returns an empty list for unknown scripts.
 
 ```python
-script_to_langs("Cyrl")   # ['av', 'ba', 'be', 'bg', 'bxr', 'ce', 'cv', ...]
-script_to_langs("Latn")   # ['af', 'ast', 'az', 'br', 'ca', ...]
-script_to_langs("Zzzz")   # []
+script_to_langs("Cyrl")[:7]   # ['av', 'ba', 'be', 'bg', 'bxr', 'ce', 'cv']
+script_to_langs("Latn")[:5]   # ['af', 'ast', 'az', 'br', 'ca']
+script_to_langs("Zzzz")       # []
 ```
 
 ---
@@ -343,6 +353,8 @@ characters (spaces, punctuation, combining marks) attach to the preceding run,
 following the resolution model of Unicode UAX #24.
 
 ```python
+from scriptconv.scripts import script_runs
+
 script_runs("привет hello")
 # [('Cyrl', 'привет '), ('Latn', 'hello')]
 ```
@@ -363,4 +375,4 @@ authoritative script subtag (`sr-Latn`), and the widespread informal
 `_cyr`/`_lat` variant suffixes (`uzb_cyr`).
 
 ---
-[Home](../README.md) · [notation →](notation.md)
+[Index](index.md) · [← stack](stack.md) · [notation →](notation.md)

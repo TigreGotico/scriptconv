@@ -1,5 +1,16 @@
 # The conversion graph, `scriptconv.graph`
 
+<!-- agent-hint
+covers: nodes, edges, routing, and the opt-in phonemizer and diacritics edges
+source: scriptconv/graph.py, `register` in scriptconv/phonemizers/registry.py and scriptconv/diacritics.py
+generated: no
+verify: python -c '(I:=__import__,ast:=I("ast"),re:=I("re"),sys:=I("sys"),inspect:=I("inspect"),enum:=I("enum"),dataclasses:=I("dataclasses"),unittest:=I("unittest"),f:=sys.argv[1],g:={},T:=unittest.TestCase(),B:=re.findall(r"\x60{3}python\n(.*?)\x60{3}",open(f,encoding="utf-8").read(),re.S),K:=lambda o:[(p.name,p.kind,p.default) for p in inspect.signature(o).parameters.values()] if not isinstance(o,type) else [(m.name,m.value) for m in o] if issubclass(o,enum.Enum) else [x.name for x in dataclasses.fields(o)],D:=lambda b:((s:=re.sub(r"\)( -> .+)?$",r")\1: ...",b.strip()) if b.startswith("def") else b),(h:=dict(g)),exec("from __future__ import annotations\nfrom enum import Enum\nfrom dataclasses import dataclass\n"+s,h),[K(h[d.name])==K(g[d.name]) or (d.name,K(h[d.name]),K(g[d.name])) for d in ast.parse(s).body])[-1],C:=lambda s,L:None if not isinstance(s,ast.Expr) else (m.group(1) if (m:=re.search(r"\s#\s?(.*)$",L[s.end_lineno-1])) else L[s.end_lineno][2:] if s.end_lineno<len(L) and L[s.end_lineno].startswith("# ") else None),X:=lambda s:compile(ast.Expression(s.value),f,"eval"),Q:=lambda s,e:(T.assertRaisesRegex(eval(e.split(":")[0],g),re.escape(e.partition(":")[2].strip()),eval,X(s),g) or True) if re.match(r"\w+Error\b",e) else (True if (v:=eval(X(s),g))==ast.literal_eval(e) else (ast.unparse(s),e,v)),R:=lambda s,L:exec(compile(ast.Module([s],[]),f,"exec"),g) if (c:=C(s,L)) is None else Q(s,c.split("  ")[0].strip()),r:=[y for b in B for y in (D(b) if re.match(r"def |class |@",b) else [R(s,b.splitlines()) for s in ast.parse(b).body]) if y is not None],w:=[y for y in r if y is not True],print("OK",len(r)) if not w else sys.exit("MISMATCH "+repr(w)))' docs/graph.md
+see: docs/phonemizers.md, docs/stack.md
+-->
+
+This page shows how the conversion graph finds a path between two
+representations, and how to add edges to a graph.
+
 Once you have more than a handful of representations, pairwise converters
 stop scaling: with nine notations and a dozen orthographies, the interesting
 conversions are the ones nobody wrote a direct table for. The graph solves
@@ -10,7 +21,7 @@ this once. Every representation is a **node**, every converter is an
 from scriptconv import DEFAULT_GRAPH
 
 DEFAULT_GRAPH.convert("こんにちは", "hira", "kana")     # 'コンニチハ'
-DEFAULT_GRAPH.convert("mrHbaa", "halabi", "x-sampa")   # via IPA, two hops
+DEFAULT_GRAPH.convert("mrHbaa", "halabi", "x-sampa")   # 'mrX\\ba:'  (through IPA, two hops)
 
 [f"{e.src}->{e.dst}" for e in DEFAULT_GRAPH.route("arpa", "x-sampa")]
 # ['arpa->ipa', 'ipa->x-sampa']
@@ -49,8 +60,8 @@ expensive by definition. Unroutable pairs raise a `ValueError` naming the
 targets that *are* reachable, so callers can self-diagnose:
 
 ```python
-DEFAULT_GRAPH.can_convert("buckwalter", "ipa")   # False, transliteration, not phonemes
-DEFAULT_GRAPH.route("ipa", "hangul")             # ValueError: reachable from 'ipa': arpa, cotovia, ...
+DEFAULT_GRAPH.can_convert("buckwalter", "ipa")   # False  (transliteration, not phonemes)
+DEFAULT_GRAPH.route("ipa", "hangul")             # ValueError: no conversion path 'ipa' -> 'hangul'  (the message lists the reachable targets)
 ```
 
 ## Extension is explicit
@@ -65,8 +76,8 @@ from scriptconv import DEFAULT_GRAPH
 from scriptconv import phonemizers
 
 g = DEFAULT_GRAPH.extend(phonemizers.register)   # DEFAULT_GRAPH is untouched
-g.convert("bom dia", "text", "ipa", lang="pt")   # 'ˈbõ ˈdʒiɐ'
-g.can_convert("text", "arpa")                    # True, phonemize, then transcode
+g.convert("bom dia", "text", "ipa", lang="pt")   # 'ˈbõ ˈdiɐ'
+g.can_convert("text", "arpa")                    # True  (phonemize, then transcode)
 ```
 
 `phonemizers.register` is the in-house example of the pattern: it adds the
@@ -100,8 +111,8 @@ from scriptconv import diacritics, phonemizers
 g = DEFAULT_GRAPH.extend(diacritics.register).extend(phonemizers.register)
 g.convert("Tenho muita sede hoje.", "text", "text-diacritized", lang="pt")
 # 'Tenho muita sêde hoje.'
-g.convert("за́мок", "text-diacritized", "text", lang="ru")   # 'замок', strip
-g.route("text", "ipa")   # still the single direct edge, no detour
+g.convert("за́мок", "text-diacritized", "text", lang="ru")   # 'замок'  (strip)
+[f"{e.src}->{e.dst}" for e in g.route("text", "ipa")]   # ['text->ipa']  (the single direct edge, no detour)
 ```
 
 The same boundary in one sentence: **scriptconv's own edges are orthography
@@ -118,4 +129,4 @@ python -m scriptconv route halabi x-sampa              # show the chosen path
 ```
 
 ---
-[← conventions](conventions.md) · [Home](../README.md) · [phonemizers →](phonemizers.md)
+[Index](index.md) · [← conventions](conventions.md) · [phonemizers →](phonemizers.md)

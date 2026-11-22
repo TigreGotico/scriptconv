@@ -1,5 +1,16 @@
 # Dictionary-backed respelling, `scriptconv.readings`
 
+<!-- agent-hint
+covers: kanji to kana, the token stream, and hanzi to pinyin or bopomofo
+source: scriptconv/readings.py, and the Japanese functions in scriptconv-copyleft
+generated: no
+verify: python -c '(I:=__import__,ast:=I("ast"),re:=I("re"),sys:=I("sys"),inspect:=I("inspect"),enum:=I("enum"),dataclasses:=I("dataclasses"),unittest:=I("unittest"),f:=sys.argv[1],g:={},T:=unittest.TestCase(),B:=re.findall(r"\x60{3}python\n(.*?)\x60{3}",open(f,encoding="utf-8").read(),re.S),K:=lambda o:[(p.name,p.kind,p.default) for p in inspect.signature(o).parameters.values()] if not isinstance(o,type) else [(m.name,m.value) for m in o] if issubclass(o,enum.Enum) else [x.name for x in dataclasses.fields(o)],D:=lambda b:((s:=re.sub(r"\)( -> .+)?$",r")\1: ...",b.strip()) if b.startswith("def") else b),(h:=dict(g)),exec("from __future__ import annotations\nfrom enum import Enum\nfrom dataclasses import dataclass\n"+s,h),[K(h[d.name])==K(g[d.name]) or (d.name,K(h[d.name]),K(g[d.name])) for d in ast.parse(s).body])[-1],C:=lambda s,L:None if not isinstance(s,ast.Expr) else (m.group(1) if (m:=re.search(r"\s#\s?(.*)$",L[s.end_lineno-1])) else L[s.end_lineno][2:] if s.end_lineno<len(L) and L[s.end_lineno].startswith("# ") else None),X:=lambda s:compile(ast.Expression(s.value),f,"eval"),Q:=lambda s,e:(T.assertRaisesRegex(eval(e.split(":")[0],g),re.escape(e.partition(":")[2].strip()),eval,X(s),g) or True) if re.match(r"\w+Error\b",e) else (True if (v:=eval(X(s),g))==ast.literal_eval(e) else (ast.unparse(s),e,v)),R:=lambda s,L:exec(compile(ast.Module([s],[]),f,"exec"),g) if (c:=C(s,L)) is None else Q(s,c.split("  ")[0].strip()),r:=[y for b in B for y in (D(b) if re.match(r"def |class |@",b) else [R(s,b.splitlines()) for s in ast.parse(b).body]) if y is not None],w:=[y for y in r if y is not True],print("OK",len(r)) if not w else sys.exit("MISMATCH "+repr(w)))' docs/readings.md
+see: docs/conventions.md for the wakachigaki and pinyin-tone conventions
+-->
+
+This page shows the respellings that need a dictionary: kanji to kana, and
+hanzi to pinyin or bopomofo.
+
 Some respellings are mechanical: katakana is hiragana shifted by a fixed
 codepoint offset, and a Hangul syllable decomposes into jamo by arithmetic.
 Those live in [translit](translit.md). This module handles the respellings
@@ -53,8 +64,8 @@ from scriptconv import tokens
 ## Chinese, hanzi → pinyin / bopomofo (`pip install scriptconv[zh]`)
 
 Pinyin and bopomofo (zhuyin) are both kana-like respellings of Chinese:
-standard ways of writing the language phonetically. Heteronyms, characters
-with several readings, are decided by the phrase dictionary:
+standard ways of writing the language phonetically. The phrase dictionary
+decides heteronyms, the characters with several readings:
 
 ```python
 from scriptconv import to_pinyin, to_bopomofo
@@ -75,9 +86,8 @@ the `zh` extra via `restyle` (see [conventions](conventions.md)).
 
 The line this module holds: a dictionary **lookup** is orthography and
 belongs here, contextual **prediction** does not. Restoring Arabic vowel
-marks or guessing an unknown word's reading are modelling problems, they
-live in dedicated tools, and scriptconv's role is only to represent and
-transcode their outputs.
+marks is a modelling problem. `scriptconv.diacritics.diacritize` calls a
+model for it behind the `tashkeel` extra, and this module does not.
 
 ---
-[← translit](translit.md) · [Home](../README.md) · [conventions →](conventions.md)
+[Index](index.md) · [← translit](translit.md) · [conventions →](conventions.md)

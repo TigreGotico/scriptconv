@@ -1,0 +1,203 @@
+# Phonemizer backends
+
+<!-- agent-hint
+covers: every phonemizer backend, its class, its extra, its package and its language default, and the models that download
+source: the Phonemizer enum in scriptconv/phonemizers/enums.py, PHONEMIZER_REGISTRY and LANG_DEFAULTS in scriptconv/phonemizers/registry.py, COPYLEFT and NONFREE in scriptconv/phonemizers/_moved.py, the download sites in scriptconv/diacritics.py, scriptconv/phonemizers/g2pw.py, scriptconv/phonemizers/en.py, scriptconv/phonemizers/leokani.py, scriptconv/phonemizers/lir.py and scriptconv/phonemizers/mul.py
+generated: no
+verify: python -c '(I:=__import__,ast:=I("ast"),re:=I("re"),sys:=I("sys"),inspect:=I("inspect"),enum:=I("enum"),dataclasses:=I("dataclasses"),unittest:=I("unittest"),f:=sys.argv[1],g:={},T:=unittest.TestCase(),B:=re.findall(r"\x60{3}python\n(.*?)\x60{3}",open(f,encoding="utf-8").read(),re.S),K:=lambda o:[(p.name,p.kind,p.default) for p in inspect.signature(o).parameters.values()] if not isinstance(o,type) else [(m.name,m.value) for m in o] if issubclass(o,enum.Enum) else [x.name for x in dataclasses.fields(o)],D:=lambda b:((s:=re.sub(r"\)( -> .+)?$",r")\1: ...",b.strip()) if b.startswith("def") else b),(h:=dict(g)),exec("from __future__ import annotations\nfrom enum import Enum\nfrom dataclasses import dataclass\n"+s,h),[K(h[d.name])==K(g[d.name]) or (d.name,K(h[d.name]),K(g[d.name])) for d in ast.parse(s).body])[-1],C:=lambda s,L:None if not isinstance(s,ast.Expr) else (m.group(1) if (m:=re.search(r"\s#\s?(.*)$",L[s.end_lineno-1])) else L[s.end_lineno][2:] if s.end_lineno<len(L) and L[s.end_lineno].startswith("# ") else None),X:=lambda s:compile(ast.Expression(s.value),f,"eval"),Q:=lambda s,e:(T.assertRaisesRegex(eval(e.split(":")[0],g),re.escape(e.partition(":")[2].strip()),eval,X(s),g) or True) if re.match(r"\w+Error\b",e) else (True if (v:=eval(X(s),g))==ast.literal_eval(e) else (ast.unparse(s),e,v)),R:=lambda s,L:exec(compile(ast.Module([s],[]),f,"exec"),g) if (c:=C(s,L)) is None else Q(s,c.split("  ")[0].strip()),r:=[y for b in B for y in (D(b) if re.match(r"def |class |@",b) else [R(s,b.splitlines()) for s in ast.parse(b).body]) if y is not None],w:=[y for y in r if y is not True],print("OK",len(r)) if not w else sys.exit("MISMATCH "+repr(w)))' docs/backends.md
+see: docs/phonemizers.md, docs/stack.md
+-->
+
+Each backend is a member of the `Phonemizer` enum. Its string value is wire
+format: voice configuration files store it, so it never changes. The registry
+maps each member to a class and to the extra that installs its engine.
+
+## List the backends
+
+The registry holds the list. This command prints the value of each backend:
+
+```bash
+python -c "from scriptconv.phonemizers import Phonemizer; print(' '.join(p.value for p in Phonemizer))"
+```
+
+## Check the table
+
+The table has one row per `Phonemizer` member, in the order of the enum. A
+backend that the registry gains needs its row here. This code, run from the
+repository root, compares all five columns of each row with the registry:
+
+```python
+import re
+from scriptconv.phonemizers import LANG_DEFAULTS, PHONEMIZER_REGISTRY, Phonemizer
+from scriptconv.phonemizers._moved import COPYLEFT, NONFREE
+
+page = open("docs/backends.md", encoding="utf-8").read()
+rows = re.findall(r"^\| `(\w+)` \| `(\w+)` \| `([\w-]+)` \| ([\w-]+) \| (.*?) \|$", page, re.M)
+want = [(member.value, cls, extra or "phonemizers",
+         "scriptconv-copyleft" if module.startswith(COPYLEFT)
+         else "scriptconv-nonfree" if module.startswith(NONFREE) else "scriptconv",
+         ", ".join(f"`{lang}`" for lang, chain in LANG_DEFAULTS.items() if member in chain))
+        for member in Phonemizer for module, cls, extra in [PHONEMIZER_REGISTRY[member]]]
+[row for row in rows if row not in want]   # []
+[row for row in want if row not in rows]   # []
+rows == want                               # True
+```
+
+The first list holds each row of the page that the registry does not give. The
+second list holds each row of the registry that the page does not hold. The
+last line checks the order.
+
+## The table
+
+The Extra column names the extra to install. Each phonemizer extra includes
+`phonemizers`, the base layer, and a backend with no engine package needs only
+that. The Package column names the package that holds the wrapper code. The
+last column names each language whose explicit default chain holds the backend.
+
+<!-- backends:start -->
+| Backend | Class | Extra | Package | Language default |
+|---|---|---|---|---|
+| `unicode` | `UnicodeCodepointPhonemizer` | `phonemizers` | scriptconv |  |
+| `graphemes` | `GraphemePhonemizer` | `phonemizers` | scriptconv |  |
+| `misaki` | `MisakiPhonemizer` | `misaki` | scriptconv-copyleft |  |
+| `misaki_en` | `MisakiEnPhonemizer` | `misaki` | scriptconv-copyleft |  |
+| `misaki_ja` | `MisakiJaPhonemizer` | `misaki` | scriptconv-copyleft |  |
+| `misaki_zh` | `MisakiZhPhonemizer` | `misaki` | scriptconv-copyleft |  |
+| `misaki_ko` | `MisakiKoPhonemizer` | `misaki` | scriptconv-copyleft |  |
+| `misaki_vi` | `MisakiViPhonemizer` | `misaki` | scriptconv-copyleft |  |
+| `espeak` | `EspeakPhonemizer` | `espeak` | scriptconv-copyleft | `gl`, `ru` |
+| `gruut` | `GruutPhonemizer` | `gruut` | scriptconv |  |
+| `goruut` | `GoruutPhonemizer` | `goruut` | scriptconv |  |
+| `epitran` | `EpitranPhonemizer` | `epitran` | scriptconv |  |
+| `byt5` | `ByT5Phonemizer` | `byt5` | scriptconv |  |
+| `charsiu` | `CharsiuPhonemizer` | `byt5` | scriptconv |  |
+| `transphone` | `TransphonePhonemizer` | `transphone` | scriptconv-copyleft |  |
+| `phonetisaurus` | `PhonetisaurusPhonemizer` | `phonetisaurus` | scriptconv |  |
+| `mwl_phonemizer` | `MirandesePhonemizer` | `o2i` | scriptconv | `mwl` |
+| `deepphonemizer` | `DeepPhonemizer` | `en-phonemizers` | scriptconv |  |
+| `openphonemizer` | `OpenPhonemizer` | `en-phonemizers` | scriptconv |  |
+| `g2pen` | `G2PEnPhonemizer` | `en-phonemizers` | scriptconv |  |
+| `dizione` | `DizionePhonemizer` | `en-phonemizers` | scriptconv |  |
+| `leokani` | `LeokaniPhonemizer` | `en-phonemizers` | scriptconv |  |
+| `kolokwa` | `KolokwaPhonemizer` | `lir` | scriptconv | `lir` |
+| `tugaphone` | `TugaphonePhonemizer` | `pt-phonemizers` | scriptconv | `pt` |
+| `g2pfa` | `PersianPhonemizer` | `fa` | scriptconv-copyleft |  |
+| `openjtalk` | `OpenJTaklPhonemizer` | `ja-phonemizers` | scriptconv |  |
+| `cutlet` | `CutletPhonemizer` | `ja-phonemizers` | scriptconv |  |
+| `pykakasi` | `PyKakasiPhonemizer` | `ja-phonemizers` | scriptconv-copyleft |  |
+| `cotovia` | `CotoviaPhonemizer` | `gl` | scriptconv-copyleft | `gl` |
+| `ahotts` | `AhoTTSPhonemizer` | `eu` | scriptconv-copyleft |  |
+| `phonikud` | `PhonikudPhonemizer` | `he` | scriptconv | `he` |
+| `mantoq` | `MantoqPhonemizer` | `ar-phonemizers` | scriptconv-nonfree |  |
+| `halabi` | `HalabiPhonemizer` | `ar-phonemizers` | scriptconv-nonfree |  |
+| `iqra` | `IqraPhonemizer` | `ar-phonemizers` | scriptconv-nonfree |  |
+| `viphoneme` | `VIPhonemePhonemizer` | `vi` | scriptconv-nonfree |  |
+| `g2pk` | `G2PKPhonemizer` | `ko` | scriptconv-copyleft |  |
+| `kog2p` | `KoG2PPhonemizer` | `ko` | scriptconv-copyleft |  |
+| `g2pc` | `G2pCPhonemizer` | `zh-phonemizers` | scriptconv |  |
+| `g2pm` | `G2pMPhonemizer` | `zh-phonemizers` | scriptconv |  |
+| `g2pw` | `G2PWPhonemizer` | `zh-phonemizers` | scriptconv |  |
+| `pypinyin` | `PypinyinPhonemizer` | `zh-phonemizers` | scriptconv |  |
+| `xpinyin` | `XpinyinPhonemizer` | `zh-phonemizers` | scriptconv |  |
+| `jieba` | `JiebaPhonemizer` | `zh-phonemizers` | scriptconv |  |
+| `f5tts_char` | `F5TTSCharPhonemizer` | `phonemizers` | scriptconv |  |
+| `f5tts_pinyin` | `F5TTSPinyinPhonemizer` | `zh-phonemizers` | scriptconv |  |
+| `vosk` | `VoskPhonemizer` | `phonemizers` | scriptconv | `ru` |
+| `shami` | `ShamiPhonemizer` | `shami` | scriptconv |  |
+| `arbtok` | `ArbtokPhonemizer` | `ar-phonemizers` | scriptconv | `ar` |
+| `euskaphone` | `EuskaphonePhonemizer` | `eu` | scriptconv | `eu` |
+| `barranquenho` | `BarranquenhoPhonemizer` | `o2i` | scriptconv |  |
+| `orthography2ipa` | `Orthography2IPAPhonemizer` | `o2i` | scriptconv | `gl`, `ru` |
+| `africa_g2p` | `AfricaG2PPhonemizer` | `africa` | scriptconv-nonfree |  |
+| `ghana_g2p` | `GhanaG2PPhonemizer` | `ghana` | scriptconv-nonfree |  |
+| `matoub_kab` | `MatoubKabylePhonemizer` | `phonemizers` | scriptconv |  |
+<!-- backends:end -->
+
+Two languages list `espeak` and `orthography2ipa` because their chains end
+with them. Every other language without an explicit chain resolves to
+orthography2ipa when it has a spec for the language, and to espeak otherwise.
+`ar` never leaves its chain.
+
+## Model files
+
+ByT5, Charsiu and phonetisaurus never download a model. Each needs a local
+model path through `model=`, and `get_phonemizer(backend, model=...)` passes
+that path to the constructor. ByT5 and Charsiu also need `tokenizer_config=`,
+the path of a local tokenizer JSON file. Without a model path, the
+constructor raises an error:
+
+```python
+from scriptconv.phonemizers import Phonemizer, get_phonemizer
+
+get_phonemizer(Phonemizer.BYT5)      # ValueError: ByT5 phonemization needs a local ONNX model file
+get_phonemizer(Phonemizer.CHARSIU)   # ValueError: ByT5 phonemization needs a local ONNX model file
+```
+
+These models and data download on first use:
+
+| Model or data | Used by | Downloaded by | Cache location |
+|---|---|---|---|
+| phonikud ONNX diacritizer | `diacritize(text, "he")` | `_default_phonikud_model` in `diacritics.py` | `scriptconv/phonikud` under `$SCRIPTCONV_CACHE`, else under `$XDG_CACHE_HOME` (default `~/.cache`) |
+| Nakdimon diacritizer, pinned to a sha256 | `diacritize(text, "he", diacritizer_model="nakdimon")` | `_download_nakdimon` in `diacritics.py` | `scriptconv/nakdimon` under the same base directory |
+| the fp32 weights of a text2tashkeel model, such as `rawi` | `diacritize(text, "ar", diacritizer_model="rawi")` | text2tashkeel | the Hugging Face cache |
+| the stressonnx model of the language, from `TigreGotico/stressonnx-models` at a pinned revision | `diacritize(text, lang)` for a language in `STRESS_LANGS` | stressonnx | the Hugging Face cache |
+| g2pW polyphone model, pinned to a sha256 | the `g2pw` backend | `g2pw.py` | the Hugging Face cache |
+| the Leokani G2P lexicon and ONNX models of the `micro` or `mini` model, from `milliwattlabs/leokani-g2p` at a pinned revision, each pinned to a sha256 | the `leokani` backend | `LeokaniPhonemizer.__init__` in `leokani.py` | the Hugging Face cache |
+| the kolokwa-g2p ONNX model and its tables, from `TigreGotico/kolokwa-g2p-onnx` at a pinned revision, each pinned to a sha256 | the `kolokwa` backend | `KolokwaPhonemizer.__init__` in `lir.py` | the Hugging Face cache |
+| a DeepPhonemizer checkpoint named in `DeepPhonemizer.MODELS` | the `deepphonemizer` backend | `DeepPhonemizer.__init__` in `en.py` | `~/.local/share/deepphonemizer` |
+| the NLTK data `averaged_perceptron_tagger_eng` and `cmudict` | the `g2pen` backend | `nltk.download` in `G2PEnPhonemizer.__init__` in `en.py` | the NLTK data directory |
+
+The default Arabic diacritizer, `rawi-ensemble`, and the INT8 text2tashkeel
+models ship in the text2tashkeel wheel, so `diacritize(text, "ar")` downloads
+nothing.
+
+To skip a download, give a local file where the code accepts one:
+
+- Hebrew: pass the path of a phonikud ONNX model through
+  `diacritizer_model=`.
+- DeepPhonemizer: pass the path of a checkpoint through `model=`.
+- Nakdimon: put the file with the pinned sha256 in its cache location.
+
+The g2pW backend takes no model path. Its constructor has only an `alphabet`
+parameter, and `get_phonemizer` drops a `model=` value for it. The Leokani
+G2P and kolokwa-g2p backends take no model path either. The g2pW, Leokani G2P
+and kolokwa-g2p models, the stressonnx models and the fp32 text2tashkeel
+weights come from the Hugging Face cache. To run these offline, fill the cache
+first and then set `HF_HUB_OFFLINE=1`:
+
+```python
+import inspect
+from scriptconv.phonemizers.g2pw import G2PWPhonemizer
+
+list(inspect.signature(G2PWPhonemizer).parameters)   # ['alphabet']
+```
+
+Some engine packages download data of their own. For example, pygoruut
+fetches its executable, and openphonemizer fetches its checkpoint from the
+Hugging Face Hub. The documentation of each engine names its downloads.
+
+## The phonetisaurus engine and its libraries
+
+The `phonetisaurus` 0.3.0 wheel bundles its executables and most of their
+shared objects under `phonetisaurus/lib/<machine>`: `libfst.so.13`,
+`libmitlm.so.1`, `libgfortran.so.3` and the OpenFST companions. The binaries
+find them only through the `PATH` and `LD_LIBRARY_PATH` that
+`phonetisaurus.guess_environment()` builds. `phonetisaurus.predict` and
+`phonetisaurus.train` pass that environment to every call. A binary started
+with the plain shell environment exits with code 127 from the dynamic loader.
+
+The wrapper only applies a model, and that path needs nothing more. Training
+needs one object that the wheel does not bundle:
+
+| Missing object | Needed by | Where it comes from |
+|---|---|---|
+| `libquadmath.so.0` | `estimate-ngram`, and so `phonetisaurus.train` | the GCC runtime: package `libquadmath0` on Debian and Ubuntu |
+
+`MODEL_SOURCES` on the class names where to get a trained model. To train
+one, run `phonetisaurus.train` on a lexicon such as CMUdict.
+`tests/test_phonemizers_phonetisaurus_engine.py` runs the real engine when
+`SCRIPTCONV_PHONETISAURUS_MODEL` names a trained FST, and skips with the
+loader error or the missing model otherwise.
+
+---
+[Index](index.md) · [← ovos](ovos.md)
