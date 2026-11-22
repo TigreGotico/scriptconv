@@ -83,8 +83,9 @@ it. A phonemizer library that reads raw text, such as tugaphone, runs
 
 A backend names the stages it runs itself in `owned_stages`, and the frontend
 then skips them. tugaphone owns `normalize` and `diacritize`, arbtok owns
-`diacritize`, and dizione owns `normalize`. A backend that owns `normalize`
-gets the text as written, so the caller's hook does not run for it.
+`diacritize`, and dizione and euskaphone own `normalize`. A backend that owns
+`normalize` gets the text as written, so the caller's hook does not run for
+it.
 
 ---
 [Index](index.md) · [scripts →](scripts.md)

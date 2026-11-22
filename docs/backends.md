@@ -2,7 +2,7 @@
 
 <!-- agent-hint
 covers: every phonemizer backend, its class, its extra, its package and its language default, and the models that download
-source: scriptconv/phonemizers/enums.py, registry.py and _moved.py for the table, through scripts/backend_table.py. The download code in scriptconv/diacritics.py and scriptconv/phonemizers/g2pw.py, en.py and mul.py
+source: scriptconv/phonemizers/enums.py, registry.py and _moved.py for the table, through scripts/backend_table.py. The download code in scriptconv/diacritics.py and scriptconv/phonemizers/g2pw.py, en.py, leokani.py, lir.py and mul.py
 generated: yes for the table between the backends markers, by scripts/backend_table.py. Edit the registry and run `python scripts/backend_table.py --write`, not the table
 verify: python scripts/backend_table.py --check && python scripts/check_doc_page.py docs/backends.md
 see: docs/phonemizers.md, docs/stack.md
@@ -59,6 +59,8 @@ last column names each language whose explicit default chain holds the backend.
 | `openphonemizer` | `OpenPhonemizer` | `en-phonemizers` | scriptconv |  |
 | `g2pen` | `G2PEnPhonemizer` | `en-phonemizers` | scriptconv |  |
 | `dizione` | `DizionePhonemizer` | `en-phonemizers` | scriptconv |  |
+| `leokani` | `LeokaniPhonemizer` | `en-phonemizers` | scriptconv |  |
+| `kolokwa` | `KolokwaPhonemizer` | `lir` | scriptconv | `lir` |
 | `tugaphone` | `TugaphonePhonemizer` | `pt-phonemizers` | scriptconv | `pt` |
 | `g2pfa` | `PersianPhonemizer` | `fa` | scriptconv-copyleft |  |
 | `openjtalk` | `OpenJTaklPhonemizer` | `ja-phonemizers` | scriptconv |  |
@@ -121,6 +123,8 @@ These models and data download on first use:
 | the fp32 weights of a text2tashkeel model, such as `rawi` | `diacritize(text, "ar", diacritizer_model="rawi")` | text2tashkeel | the Hugging Face cache |
 | the stressonnx model of the language, from `TigreGotico/stressonnx-models` at a pinned revision | `diacritize(text, lang)` for a language in `STRESS_LANGS` | stressonnx | the Hugging Face cache |
 | g2pW polyphone model, pinned to a sha256 | the `g2pw` backend | `g2pw.py` | the Hugging Face cache |
+| the Leokani G2P lexicon and ONNX models of the `micro` or `mini` model, from `milliwattlabs/leokani-g2p` at a pinned revision, each pinned to a sha256 | the `leokani` backend | `LeokaniPhonemizer.__init__` in `leokani.py` | the Hugging Face cache |
+| the kolokwa-g2p ONNX model and its tables, from `TigreGotico/kolokwa-g2p-onnx` at a pinned revision, each pinned to a sha256 | the `kolokwa` backend | `KolokwaPhonemizer.__init__` in `lir.py` | the Hugging Face cache |
 | a DeepPhonemizer checkpoint named in `DeepPhonemizer.MODELS` | the `deepphonemizer` backend | `DeepPhonemizer.__init__` in `en.py` | `~/.local/share/deepphonemizer` |
 | the NLTK data `averaged_perceptron_tagger_eng` and `cmudict` | the `g2pen` backend | `nltk.download` in `G2PEnPhonemizer.__init__` in `en.py` | the NLTK data directory |
 
@@ -136,10 +140,11 @@ To skip a download, give a local file where the code accepts one:
 - Nakdimon: put the file with the pinned sha256 in its cache location.
 
 The g2pW backend takes no model path. Its constructor has only an `alphabet`
-parameter, and `get_phonemizer` drops a `model=` value for it. The g2pW
-model, the stressonnx models and the fp32 text2tashkeel weights come from the
-Hugging Face cache. To run these offline, fill the cache first and then set
-`HF_HUB_OFFLINE=1`:
+parameter, and `get_phonemizer` drops a `model=` value for it. The Leokani
+G2P and kolokwa-g2p backends take no model path either. The g2pW, Leokani G2P
+and kolokwa-g2p models, the stressonnx models and the fp32 text2tashkeel
+weights come from the Hugging Face cache. To run these offline, fill the cache
+first and then set `HF_HUB_OFFLINE=1`:
 
 ```python
 import inspect

@@ -241,8 +241,8 @@ Details: [docs/graph.md](docs/graph.md).
 ### From spelling to sound: the `phonemizers` module
 
 The `phonemizers` subpackage wraps grapheme-to-phoneme engines behind one
-interface. Some engines ship inside scriptconv (dizione, the Shami frontend,
-the Kabyle Matoub rules). The others come from the package an extra installs.
+interface. Some engines ship inside scriptconv (dizione, Leokani G2P, the
+Shami frontend, the Kabyle Matoub rules). The others come from the package an extra installs.
 Each language has a default backend, and `override=` picks another one:
 
 ```python
@@ -254,7 +254,8 @@ phonemize("hello", "en", override=Phonemizer.GRUUT)  # 'hɛlˈoʊ'
 
 The default for a language comes from an explicit chain first: Arabic to
 arbtok, Basque to euskaphone, Mirandese to its orthography2ipa specs,
-Portuguese to tugaphone and Hebrew to phonikud. Galician goes to Cotovía and
+Portuguese to tugaphone, Hebrew to phonikud and Liberian English (`lir`) to
+kolokwa. Galician goes to Cotovía and
 Russian to vosk only when their own notations are requested. Without an
 explicit entry, orthography2ipa serves every language it has a spec for, and
 espeak is the last resort. Arabic never falls back past arbtok.
@@ -309,8 +310,9 @@ Three rules hold for every backend:
 - **Some models download on first use, and others never do.** ByT5, Charsiu
   and phonetisaurus need a local `model=` path. These download on first use:
   the phonikud and Nakdimon Hebrew diacritizers, the fp32 text2tashkeel
-  weights, the stressonnx models, the g2pW model, a named DeepPhonemizer
-  checkpoint and the NLTK data of the `g2pen` backend.
+  weights, the stressonnx models, the g2pW model, the Leokani G2P and
+  kolokwa-g2p models, a named DeepPhonemizer checkpoint and the NLTK data of
+  the `g2pen` backend.
   [docs/backends.md](docs/backends.md#model-files) names each cache location.
 - **orthography2ipa uses the packaged lexicons.** The `o2i` extra installs
   [o2i-lexicons](https://github.com/TigreGotico/o2i-lexicons), which holds
@@ -367,7 +369,7 @@ of each phonemizer backend.
 | `phonemizers` | The phonemizer base layer: sentence chunking (quebra-frases) and language matching (linguatag). Every other phonemizer extra includes it |
 | `normalize` | `text2spoken`, the normaliser that `spoken_normalizer()` returns for the `TextFrontend` hook |
 | `espeak`, `gruut`, `goruut`, `epitran`, `transphone`, `misaki`, `byt5`, `phonetisaurus` | Multilingual phonemizer backends |
-| `en-phonemizers`, `ja-phonemizers`, `zh-phonemizers`, `ko`, `ar-phonemizers`, `eu`, `pt-phonemizers`, `gl`, `he`, `fa`, `vi`, `shami`, `africa`, `ghana` | Per-language phonemizer backends |
+| `en-phonemizers`, `lir`, `ja-phonemizers`, `zh-phonemizers`, `ko`, `ar-phonemizers`, `eu`, `pt-phonemizers`, `gl`, `he`, `fa`, `vi`, `shami`, `africa`, `ghana` | Per-language phonemizer backends |
 | `o2i`, `mwl` | orthography2ipa with o2i-lexicons, and the Mirandese and Barranquenho backends that use its specs. `mwl` installs the same packages as `o2i` |
 | `tashkeel` | Arabic diacritization (text2tashkeel) |
 | `stress` | Word-stress restoration (stressonnx) for the languages in `scriptconv.diacritics.STRESS_LANGS` |
@@ -390,10 +392,16 @@ of scriptconv is Apache-2.0. The wheel carries a notice for each vendored part:
 | dizione English phonemizer | Apache-2.0 | `scriptconv/phonemizers/_thirdparty/dizione/LICENSE` |
 | dizione dictionary, alignment table and model (CMUdict) | CMUdict | `scriptconv/phonemizers/_thirdparty/dizione/built/LICENSE.cmudict` |
 | dizione homograph weights (Wikipedia Homograph Data) | Apache-2.0 | `scriptconv/phonemizers/_thirdparty/dizione/built/LICENSE.homograph-data` |
+| Leokani G2P English phonemizer of Milliwatt Labs | MIT | `scriptconv/phonemizers/_thirdparty/leokani/LICENSE` and `NOTICE` |
 
 The CMUdict licence is BSD-2-Clause with one added sentence and an
 acknowledgement. It has no SPDX identifier, so the wheel names it
 `LicenseRef-CMUdict`.
+
+The Leokani G2P model files are CC BY 4.0, and the wheel holds the text of
+that licence in `scriptconv/phonemizers/_thirdparty/leokani/`. The model of
+the `kolokwa` backend is MIT. Neither model is in the wheel: each backend
+downloads its model.
 
 The phonemizer wrappers whose code, engine or dependencies are under a
 copyleft or a non-commercial licence are in two sister packages:
