@@ -173,3 +173,27 @@ def test_the_espeak_arabic_path_uses_the_90_inventory(monkeypatch):
     assert utterance.symbols == [
         "<bos>", "k", "ə", "t", "aː", "b", "sil", " ", "k", "ə", "t", "aː", "b", "brk", "<eos>"]
     assert utterance.language_ids == [0] + [AR] * 5 + [NEUTRAL, NEUTRAL] + [AR] * 5 + [NEUTRAL, 0]
+
+
+# espeak-ng 1.52 with the Arabic voice: "الصبح" gives ʔas̪s̪ˈubħ, "طالب" gives t̪ˈaːlab and
+# "ضرب" gives dˤˈarb. The bridge below marks ص and ط; the inventory writes them sˤ and tˤ.
+_ESPEAK_AR = {"الصبح": "ʔas̪s̪ˈubħ", "طالب": "t̪ˈaːlab", "ضرب": "dˤˈarb", "اكل": "ʔaɮal"}
+
+
+@pytest.mark.parametrize("inventory", [88, 90])
+def test_the_espeak_arabic_path_reads_the_emphatics_espeak_writes_with_a_bridge(monkeypatch, inventory):
+    monkeypatch.setattr(espeak, "_ESPEAK", "/stub/espeak-ng")
+    monkeypatch.setattr(espeak, "phonemize", lambda text, voice="ar": " ".join(
+        _ESPEAK_AR[word] for word in text.split()))
+    monkeypatch.setattr(frontend, "get_diacritizer", lambda backend: None)
+    utterance = TextFrontend(inventory=inventory).process("الصبح طالب ضرب")
+    assert utterance.symbols == ["<bos>", "ʔ", "a", "sˤ", "sˤ", "ˈ", "u", "b", "ħ", " ",
+                                 "tˤ", "ˈ", "aː", "l", "a", "b", " ", "dˤ", "ˈ", "a", "r", "b", "<eos>"]
+
+
+def test_a_symbol_outside_the_inventory_is_dropped_not_read_as_letters(monkeypatch):
+    monkeypatch.setattr(espeak, "_ESPEAK", "/stub/espeak-ng")
+    monkeypatch.setattr(espeak, "phonemize", lambda text, voice="ar": _ESPEAK_AR[text])
+    monkeypatch.setattr(frontend, "get_diacritizer", lambda backend: None)
+    utterance = TextFrontend().process("اكل")
+    assert utterance.symbols == ["<bos>", "ʔ", "a", "a", "l", "<eos>"]
