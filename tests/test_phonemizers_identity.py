@@ -1151,6 +1151,22 @@ class TestStableRevision:
         assert revision is not None
         assert revision_from(tmp_path / "plain", site) != revision
 
+    def test_a_module_under_a_bare_alias_counts_by_its_own_name(self, tmp_path, monkeypatch):
+        # as pandas puts pandas._libs._cyutility in sys.modules as _cyutility when epitran loads it
+        site = tmp_path / "site"
+        shutil.copytree(Path(quebra_frases.__file__).parent, site / "quebra_frases",
+                        ignore=shutil.ignore_patterns("__pycache__"))
+        (site / "quebra_frases" / "_shared.py").write_text("VALUE = 1\n")
+        init = site / "quebra_frases" / "__init__.py"
+        init.write_text("import os, sys\nfrom quebra_frases import _shared\n"
+                        "if os.environ.get('QUEBRA_FRASES_ALIAS'):\n    sys.modules['_qf_shared'] = _shared\n"
+                        + init.read_text(encoding="utf-8"), encoding="utf-8")
+        (tmp_path / "plain").mkdir()
+        revision = revision_from(tmp_path / "plain", site)
+        monkeypatch.setenv("QUEBRA_FRASES_ALIAS", "1")
+        assert revision is not None
+        assert revision_from(tmp_path / "plain", site) == revision
+
 
 class TestDeclarations:
     @pytest.mark.parametrize("member", list(Phonemizer))
