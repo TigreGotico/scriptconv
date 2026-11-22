@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a137](https://github.com/TigreGotico/scriptconv/tree/0.0.4a137) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a136...0.0.4a137)
+
+**Merged pull requests:**
+
+- feat: Kolokwa \(Liberian English, lir\) phonemizer on kolokwa-g2p [\#376](https://github.com/TigreGotico/scriptconv/pull/376) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a136](https://github.com/TigreGotico/scriptconv/tree/0.0.4a136) (2026-11-22)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a135...0.0.4a136)
@@ -379,10 +387,6 @@
 ## [0.0.4a88](https://github.com/TigreGotico/scriptconv/tree/0.0.4a88) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a87...0.0.4a88)
-
-**Merged pull requests:**
-
-- fix: match Charsiu dialect labels to their BCP-47 tags [\#245](https://github.com/TigreGotico/scriptconv/pull/245) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a87](https://github.com/TigreGotico/scriptconv/tree/0.0.4a87) (2026-11-15)
 
