@@ -73,6 +73,8 @@ from scriptconv.phonemizers.base import (
     _HYPHENS,
     _PARAGRAPH_BREAK,
     _PAUSE_PUNCTUATION,
+    _WHITESPACE,
+    _WORDLESS_START,
     BasePhonemizer,
     PhonemizerIdentity,
     Segment,
@@ -102,15 +104,13 @@ WHOLE_TEXT_LIMIT = 1_750
 """The default of :attr:`FrontendConfig.whole_text_limit`."""
 
 # The word that stands for a block when the frontend reads the mark after it.
-_BLOCK_WORD = "a"
+_BLOCK_WORD = "casa"
 # Text that ends in whitespace and then only marks. The marks join the block
 # after them as they join a plain word, and the whitespace stays.
 _SPACE_BEFORE_BLOCK = re.compile(r"\s\W*$")
 # The quotes and apostrophes that can open a word besides the categories of
 # opening and closing quotes (Pi, Pf).
 _OPENING_MARKS = frozenset("\"'\u2019\u2018\u201a\u201e\u00ab\u00bb\u2039\u203a\u00a1\u00bf")
-# The text before the first letter or digit: whitespace and marks.
-_WORDLESS_START = re.compile(r"[\W_]*")
 _SPACES = re.compile(r"\s*")
 # The text after the closing marks that follow a block, up to the end of the next word.
 _FOLLOWING = re.compile(r"\S*\s*\S*")
@@ -292,6 +292,9 @@ class _Piece:
     """The staged source text of the piece, or ``None`` where the frontend
     cannot say. The first piece of a part holds the part's text, and each
     later piece of that part holds ``""``."""
+    spaced: bool = True
+    """Whether the text writes whitespace between the piece before and the
+    first word of this one. The first piece of a text part counts as spaced."""
 
     @classmethod
     def of(cls, segment: Segment) -> "_Piece":
@@ -424,7 +427,9 @@ def _join(pieces: Iterable[_Piece], space: Segment) -> _Piece:
     A piece that ends in a clause symbol or in the word break *space* joins
     the next piece with no space, and any other piece takes *space* before
     the next, as :func:`~scriptconv.phonemizers.base.join_sentences` joins
-    sentences. The start and end symbols of bounded pieces stay out of the
+    sentences, where the text writes whitespace between the two pieces
+    (:attr:`_Piece.spaced`). The texts of the pieces join in the same way.
+    The start and end symbols of bounded pieces stay out of the
     join, so where two of them join, the inner end and start symbols go with
     their stream values. Every :class:`Chunk` size and
     :meth:`TextFrontend.phonemize_flat` join by this function.
@@ -434,16 +439,23 @@ def _join(pieces: Iterable[_Piece], space: Segment) -> _Piece:
     for piece in pieces:
         if not piece.phonemes:
             continue
-        if joined.phonemes and not (joined.ends_in_token or joined.phonemes[-1] == space.phonemes[0]):
+        if joined.phonemes and piece.spaced and not (
+                joined.ends_in_token or joined.phonemes[-1] == space.phonemes[0]):
             joined.add(space.phonemes, space.streams)
         joined.add(piece.phonemes, piece.streams)
         joined.bounds = joined.bounds or piece.bounds
         joined.ends_in_token = piece.ends_in_token
         joined.ends_sentence = piece.ends_sentence
         joined.ends_paragraph = piece.ends_paragraph
-        texts.append(piece.text)
-    if texts and all(text is not None for text in texts):
-        joined.text = " ".join(t for t in texts if t)
+        texts.append((piece.spaced, piece.text))
+    if texts and all(text is not None for _, text in texts):
+        parts = []
+        for spaced, text in texts:
+            if text:
+                if parts and spaced:
+                    parts.append(" ")
+                parts.append(text)
+        joined.text = "".join(parts)
     return joined
 
 
@@ -585,8 +597,9 @@ class TextFrontend:
         bounded segments of the backend join, the inner end and start symbols
         go with their stream values. Each chunk is a :class:`~scriptconv.phonemizers.base.Segment`
         whose symbols hold the clause symbols, so its ``mark`` is ``None``.
-        The segment's ``text`` is the staged source text of its chunk, joined
-        with one space for a chunk of several sentences, or ``None`` where the
+        The segment's ``text`` is the staged source text of its chunk, with one
+        space between two sentences where the text writes whitespace between
+        them and none where it writes none, or ``None`` where the
         frontend cannot say. The first piece of a part holds the part's text,
         and each later piece of that part holds ``""``, so it drops out of the
         join.
@@ -603,7 +616,8 @@ class TextFrontend:
         rule of tts-punctuation, for every backend. A sentence that ends in a
         clause symbol, or in a space, joins the next one with no space, and
         any other sentence takes one space before the next, as
-        :func:`~scriptconv.phonemizers.base.join_sentences` joins them. Where
+        :func:`~scriptconv.phonemizers.base.join_sentences` joins them, where
+        the text writes whitespace between the two sentences. Where
         two bounded segments join, the inner end and start symbols go. So the
         ``none`` size gives this list as its one chunk.
         """
@@ -932,20 +946,32 @@ class TextFrontend:
         if self.backend.reads_whole_text:
             yield from self._whole_text_read(text, stages, clauses)
             return
-        if "normalize" in self.backend.owned_stages:
-            # The backend reads the text with its own rules, so it gets the
-            # sentences as written, cut before casing.
-            paragraphs = [[self._read(sentence, stages) for sentence in sentences]
-                          for sentences in _paragraph_sentences(text)]
-        else:
-            paragraphs = _paragraph_sentences(self._read(text, stages))
+        # A backend that owns normalize reads the text with its own rules, so
+        # it gets the sentences as written, cut before casing.
+        owned = "normalize" in self.backend.owned_stages
+        if not owned:
+            text = self._read(text, stages)
         # A backend that overrides its output appends no clause symbol, so
         # its marks join as any other symbol.
         tokens = self.backend._keeps_punctuation()
-        for sentences in paragraphs:
+        # where the last sentence that gave pieces ends in the text
+        end: Optional[int] = None
+        cursor = 0
+        for sentences in _paragraph_sentences(text):
             for number, sentence in enumerate(sentences, 1):
-                yield from self._sentence_pieces(sentence, stages, clauses, tokens,
-                                                 ends_paragraph=number == len(sentences))
+                start = text.find(sentence, cursor)
+                cursor = start + len(sentence)
+                for piece in self._sentence_pieces(self._read(sentence, stages) if owned else sentence,
+                                                   stages, clauses, tokens,
+                                                   ends_paragraph=number == len(sentences)):
+                    # Only the first piece of a sentence follows the gap
+                    # before it. The gap is read only for a sentence that
+                    # gives pieces, so each character is read once.
+                    if end != cursor:
+                        word = start + _WORDLESS_START.match(sentence).end()
+                        piece.spaced = end is None or bool(_WHITESPACE.search(text, end, word))
+                        end = cursor
+                    yield piece
 
     def _sentence_pieces(self, sentence: str, stages: Stages, clauses: bool, tokens: bool,
                          ends_paragraph: bool) -> Iterator[_Piece]:

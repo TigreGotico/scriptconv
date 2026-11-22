@@ -39,7 +39,7 @@ callable as its `normalizer` hook and runs it in a fixed stage order, see
 **A backend can own a stage.** The class attribute `owned_stages` names the
 stages that a backend always runs itself, so a frontend skips them. The names
 are `normalize` and `diacritize`. Tugaphone owns `normalize` and `diacritize`,
-and Arbtok owns `diacritize`. A
+euskaphone owns `normalize`, and Arbtok owns `diacritize`. A
 stage that a backend runs only with an optional dependency is not owned.
 
 **A backend reports what produced its output.** `identity(lang)` returns a
@@ -146,7 +146,7 @@ default, resolving in-house engines first:
 
 1. the explicit per-language chain (Arabic to arbtok, Basque to euskaphone,
    Mirandese to its orthography2ipa specs, Portuguese to tugaphone, Hebrew to
-   phonikud, Galician to Cotovía, and Russian to vosk for their own notations, only
+   phonikud, Liberian English (`lir`) to kolokwa, Galician to Cotovía, and Russian to vosk for their own notations, only
    when their own notation is requested: a candidate must be able to *emit*
    the requested alphabet)
 2. orthography2ipa, wherever it has a spec for the language
@@ -423,6 +423,37 @@ as `《》`, gives no symbol and no warning.
 | `tokenizer.json` | Hugging Face model `google-bert/bert-base-chinese` | `8f23c25b06e129b6c986331a13d8d025a92cf0ea` | 269 KB | Apache-2.0 |
 | Three reading tables, in the wheel | github.com/GitYCC/g2pW, `g2pw/` | `b9328ce8129c4717a70f16a2688542a0197541dd` | 1.9 MB | Apache-2.0 |
 
+## Kolokwa, Liberian English
+
+`Phonemizer.KOLOKWA` reads Liberian English (Kolokwa, ISO 639-3 `lir`) with
+the kolokwa-g2p model of michsethowusu, a Forward Transformer of the
+`phonemize` package, with a pronouncing dictionary of 12,006 words. It runs an
+ONNX export of the model on onnxruntime, with no torch. It is the default for
+`lir`. It does not read `en` or `en-LR`, so the default for those tags does
+not change. Install it with `pip install scriptconv[lir]`.
+
+```python
+from scriptconv.phonemizers import phonemizer_for_lang
+
+phonemizer_for_lang("lir").phonemize_string("da man dey go drink cold water", "lir")
+# 'ðæ mæ̃n de ko tɹɪ̃ŋk ko wɔtə˞'
+```
+
+The text reads as `phonemize` 0.2.4 reads it, and the output is the same.
+Each character that is not a letter, a digit, a space, a hyphen or one of
+`().,:?!/–` goes, so an apostrophe goes. A digit stays in the text, but the
+model has no symbol for it, so it gives no phonemes. The text splits at
+spaces and at those marks, which stay in the output. A word that is not in the
+dictionary splits at hyphens and before each inner capital, so `DIY` gives
+`d-a-j`.
+
+The model files must have their pinned sha256. With no network and no cached
+copy that passes the check, the constructor raises `ModelUnavailableError`.
+
+| File | Source | Revision | Size | Licence |
+|---|---|---|---|---|
+| `model.onnx`, `kolokwa.json` | Hugging Face model `TigreGotico/kolokwa-g2p-onnx`, the ONNX export of `michsethowusu/kolokwa-g2p` at `92ed3b721a4f80f98d5b741fdd16352ca320f121` | `3729a707e532ba2929c884288bacf5d5d76f7316` | 59 MB | MIT |
+
 ## dizione, American English
 
 `Phonemizer.DIZIONE` reads American English text into IPA. The engine is
@@ -542,6 +573,76 @@ Limits:
 - `keep_punctuation` has no effect: the IPA string has no punctuation, and
   `tokens()` has all of it.
 
+## Leokani G2P, American English
+
+`Phonemizer.LEOKANI` reads American English text into the phoneme codes of
+Kokoro and misaki. The engine is
+[Leokani G2P](https://github.com/Milliwatt-Labs/leokani-g2p) by Milliwatt
+Labs. Its code is MIT, and its model files are CC BY 4.0. The code is
+vendored byte for byte under `scriptconv/phonemizers/_thirdparty/leokani/`,
+with its `LICENSE`, its `NOTICE` and its source revision. Leokani G2P looks
+each word up in its lexicon and guesses the other words with a
+letter-to-sound model. A context model then picks how each word is said in
+its clause. Install the backend with `pip install scriptconv[en-phonemizers]`,
+which holds numpy, onnxruntime and huggingface_hub.
+
+```python
+from scriptconv.phonemizers import Phonemizer, get_phonemizer
+
+leokani = get_phonemizer(Phonemizer.LEOKANI)
+leokani.phonemize_string("The wind was cold, so we read inside.", "en-US")
+# 'ðə wˈɪnd wʌz kˈOld, sˌO wi ɹˈid ɪnsˈId.'
+leokani.phonemize("The wind was cold, so we read inside.", "en-US")
+# [['ð', 'ə', ' ', 'w', 'ˈ', 'ɪ', 'n', 'd', ...]]
+```
+
+The output alphabet is `Alphabet.IPA`, with the codes that the `misaki_en`
+backend writes: `A`, `I`, `O`, `W` and `Y` stand for the diphthongs eɪ, aɪ,
+oʊ, aʊ and ɔɪ, and `ᵊ` and `ᵻ` for reduced vowels. A Kokoro voice reads these
+codes as they are. `phonemize_string` returns the output of the engine
+unchanged, with the punctuation that the text holds. `phonemize` and the
+frontend remove the punctuation before the engine reads the text, as for
+the other backends.
+
+`model="mini"` loads the larger model, which reads names and rare words
+better. `micro` is the default:
+`get_phonemizer(Phonemizer.LEOKANI, model="mini")`.
+
+The model files come from the Hugging Face Hub, at a fixed revision, into the
+shared Hugging Face cache, from the upstream repository
+`milliwattlabs/leokani-g2p` at revision `a819acc8`. Each file must have its
+pinned sha256. A cached file with another sha256 is
+downloaded again once, unless the Hub is offline (`HF_HUB_OFFLINE`). With no
+copy that passes the check, the backend raises `ModelUnavailableError`.
+
+| File | Source | Revision | Size | Licence |
+|---|---|---|---|---|
+| `leokani_g2p.py`, in the wheel | Hugging Face model `milliwattlabs/leokani-g2p`; the same file is `src/leokani_g2p/runtime.py` of github.com/Milliwatt-Labs/leokani-g2p at `df8bc119` (1.3.0) | `a819acc86471a04a01ba3d3f30f3765e4675c7ca` | 189 KB | MIT |
+| `micro` model: the lexicon and three ONNX models | Hugging Face model `milliwattlabs/leokani-g2p` | `a819acc86471a04a01ba3d3f30f3765e4675c7ca` | 10.2 MB | CC BY 4.0 |
+| `mini` model, in `mini/` | Hugging Face model `milliwattlabs/leokani-g2p` | `a819acc86471a04a01ba3d3f30f3765e4675c7ca` | 10.8 MB | CC BY 4.0 |
+
+Credit the engine as: Leokani G2P by Milliwatt Labs (milliwattlabs.com).
+
+The backend owns no stage, so the frontend runs its normalise stage first.
+Leokani G2P then runs its own text rules on the result, which read numbers,
+money, dates, times, units and web addresses. `identity(lang)` gives a
+`revision` that hashes the code on the path of the backend, the vendored
+engine with it. That code holds the model revision and the sha256 of each
+model file, so a new model gives a new `revision`.
+
+Limits:
+
+- Leokani G2P reads American English only. A tag must resolve to `en-US`, or
+  to a lect of it such as `en-US-x-nyc`. A bare `en` is British English by
+  the default-region rule, so it is refused with `UnsupportedLanguageError`.
+- The engine reads a number word with a hyphen, such as `ninety-nine`, as one
+  word with one stress: `nˈIntinˈIn`. Its own text rules write `99` as two
+  words, `nˈInti nˈIn`. A normaliser that writes hyphens, as text2spoken
+  does, gives the first form.
+- When the engine reads the digits itself, `at 14:30` reads as "fourteen
+  thirty", and `fell to -5 degrees` reads the sign as "dash". Normalise such
+  text first.
+
 ## Backends in scriptconv-copyleft and scriptconv-nonfree
 
 A wrapper moves out of scriptconv when its own code or a dependency of its
@@ -551,8 +652,10 @@ Two sister packages hold those wrappers, and their vendored code, under the
 licences of that code:
 
 - **scriptconv-copyleft** holds KoG2P and the espeak, Cotovía, AhoTTS,
-  transphone, misaki, g2pfa, g2pk and pykakasi wrappers, and the Japanese
-  functions of `scriptconv.readings`.
+  transphone, misaki, g2pfa, g2pk and pykakasi wrappers, the Lithuanian
+  pitch-accent backend `espeak_lt_accent`, the Hebrew `hebrew_ipa`, Japanese
+  `openjtalk_prosody` and Thai `tltk` backends, and the Japanese functions of
+  `scriptconv.readings`.
 - **scriptconv-nonfree** holds mantoq, iqra_phonetiser and their wrappers
   (Mantoq, Halabi, Iqra), and the viphoneme, africa-g2p and ghana-g2p
   wrappers.
@@ -819,13 +922,19 @@ f5.phonemize_to_list("我们用iPhone打电话。", "zh")
 
 Multilingual: espeak (subprocess with espyak fallback), gruut, goruut,
 epitran, transphone, ByT5/Charsiu (ONNX), the misaki family (en/ja/zh/ko/vi).
-Per-language: English (DeepPhonemizer, OpenPhonemizer, g2p_en, dizione), Japanese
-(OpenJTalk, cutlet, pykakasi), Korean (g2pk, KoG2P), Chinese (jieba, g2pM,
-xpinyin, pypinyin, g2pW), F5-TTS voices (`f5tts_char`, `f5tts_pinyin`), Arabic (arbtok, mantoq), Hebrew (phonikud), Persian,
+Per-language: English (DeepPhonemizer, OpenPhonemizer, g2p_en, dizione, Leokani G2P), Liberian
+English (kolokwa, `lir`), Japanese
+(OpenJTalk, cutlet, pykakasi, and `openjtalk_prosody`: OpenJTalk IPA with the
+accent marks `↑ ↓ #`), Korean (g2pk, KoG2P), Chinese (jieba, g2pM,
+xpinyin, pypinyin, g2pW), F5-TTS voices (`f5tts_char`, `f5tts_pinyin`), Arabic (arbtok, mantoq), Hebrew (phonikud, and `hebrew_ipa`: IPA with stress from text that
+carries niqqud), Thai (`tltk`: IPA with a tone
+digit per syllable, in the `th` extra), Persian,
 Vietnamese (viphoneme, Python below 3.12 only), Portuguese (tugaphone), Galician
 (Cotovía), Russian (vosk, the vosk-tts inventory, `Alphabet.VOSK`, with the
 voice's pronunciation dictionary passed as `phonemizer_model`), Basque
-(AhoTTS, euskaphone), African languages (africa-g2p, ghana-g2p), Mirandese and Barranquenho (the orthography2ipa specs
+(AhoTTS, euskaphone), Lithuanian (`espeak_lt_accent`: espeak-ng IPA with the
+three pitch accents `ˈ`, `ˌ`, `ˋ` from the stress dictionary of Reginutė, in
+the `espeak` extra), African languages (africa-g2p, ghana-g2p), Mirandese and Barranquenho (the orthography2ipa specs
 `mwl`, `mwl-x-sendim`, `mwl-x-ifanes` and `ext-PT-x-barranco`), Levantine
 Arabic/English code-switching (shami, whose `phonemize_with_language_ids` also returns the
 parallel per-phoneme language-ID stream), and orthography2ipa for its
@@ -833,6 +942,12 @@ data-driven language specs. Trivial built-ins that need no extra:
 `GraphemePhonemizer` (normalized characters, where a hyphen between two
 letters stays as part of the word) and `UnicodeCodepointPhonemizer`
 (codepoints as phonemes).
+
+`hebrew_ipa` reads the niqqud that the text carries and adds none, so text
+without niqqud gives no phonemes. Hebrew does not diacritize by default. A
+caller with text without niqqud turns the diacritize stage on, for example
+`frontend.phonemize(text, Stages(lang="he", diacritize=True))`, and the
+phonikud model of the `he` extra then adds the niqqud.
 
 `GraphemePhonemizer` takes its character rules as keyword arguments, so a voice
 can match the text it trained on. `lowercase`, `in_word_chars`, `replace_chars`

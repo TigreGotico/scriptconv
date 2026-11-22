@@ -1,5 +1,16 @@
 # The conversion graph, `scriptconv.graph`
 
+<!-- agent-hint
+covers: nodes, edges, routing, and the opt-in phonemizer and diacritics edges
+source: scriptconv/graph.py, `register` in scriptconv/phonemizers/registry.py and scriptconv/diacritics.py
+generated: no
+verify: python scripts/check_doc_page.py docs/graph.md
+see: docs/phonemizers.md, docs/stack.md
+-->
+
+This page shows how the conversion graph finds a path between two
+representations, and how to add edges to a graph.
+
 Once you have more than a handful of representations, pairwise converters
 stop scaling: with nine notations and a dozen orthographies, the interesting
 conversions are the ones nobody wrote a direct table for. The graph solves
@@ -10,7 +21,7 @@ this once. Every representation is a **node**, every converter is an
 from scriptconv import DEFAULT_GRAPH
 
 DEFAULT_GRAPH.convert("こんにちは", "hira", "kana")     # 'コンニチハ'
-DEFAULT_GRAPH.convert("mrHbaa", "halabi", "x-sampa")   # via IPA, two hops
+DEFAULT_GRAPH.convert("mrHbaa", "halabi", "x-sampa")   # 'mrX\\ba:'  (through IPA, two hops)
 
 [f"{e.src}->{e.dst}" for e in DEFAULT_GRAPH.route("arpa", "x-sampa")]
 # ['arpa->ipa', 'ipa->x-sampa']
@@ -49,8 +60,8 @@ expensive by definition. Unroutable pairs raise a `ValueError` naming the
 targets that *are* reachable, so callers can self-diagnose:
 
 ```python
-DEFAULT_GRAPH.can_convert("buckwalter", "ipa")   # False, transliteration, not phonemes
-DEFAULT_GRAPH.route("ipa", "hangul")             # ValueError: reachable from 'ipa': arpa, cotovia, ...
+DEFAULT_GRAPH.can_convert("buckwalter", "ipa")   # False  (transliteration, not phonemes)
+DEFAULT_GRAPH.route("ipa", "hangul")             # ValueError: no conversion path 'ipa' -> 'hangul'  (the message lists the reachable targets)
 ```
 
 ## Extension is explicit
@@ -65,8 +76,8 @@ from scriptconv import DEFAULT_GRAPH
 from scriptconv import phonemizers
 
 g = DEFAULT_GRAPH.extend(phonemizers.register)   # DEFAULT_GRAPH is untouched
-g.convert("bom dia", "text", "ipa", lang="pt")   # 'ˈbõ ˈdʒiɐ'
-g.can_convert("text", "arpa")                    # True, phonemize, then transcode
+g.convert("bom dia", "text", "ipa", lang="pt")   # 'ˈbõ ˈdiɐ'
+g.can_convert("text", "arpa")                    # True  (phonemize, then transcode)
 ```
 
 `phonemizers.register` is the in-house example of the pattern: it adds the
@@ -100,8 +111,8 @@ from scriptconv import diacritics, phonemizers
 g = DEFAULT_GRAPH.extend(diacritics.register).extend(phonemizers.register)
 g.convert("Tenho muita sede hoje.", "text", "text-diacritized", lang="pt")
 # 'Tenho muita sêde hoje.'
-g.convert("за́мок", "text-diacritized", "text", lang="ru")   # 'замок', strip
-g.route("text", "ipa")   # still the single direct edge, no detour
+g.convert("за́мок", "text-diacritized", "text", lang="ru")   # 'замок'  (strip)
+[f"{e.src}->{e.dst}" for e in g.route("text", "ipa")]   # ['text->ipa']  (the single direct edge, no detour)
 ```
 
 The same boundary in one sentence: **scriptconv's own edges are orthography
@@ -118,4 +129,4 @@ python -m scriptconv route halabi x-sampa              # show the chosen path
 ```
 
 ---
-[← conventions](conventions.md) · [Home](../README.md) · [phonemizers →](phonemizers.md)
+[Index](index.md) · [← conventions](conventions.md) · [phonemizers →](phonemizers.md)

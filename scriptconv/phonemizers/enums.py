@@ -46,6 +46,7 @@ class Phonemizer(str, Enum):
     MISAKI_KO = "misaki_ko"
     MISAKI_VI = "misaki_vi"
     ESPEAK = "espeak"
+    ESPEAK_LT_ACCENT = "espeak_lt_accent"  # lithuanian espeak-ng IPA with the three pitch accents
     GRUUT = "gruut"
     GORUUT = "goruut"
     EPITRAN = "epitran"
@@ -59,15 +60,20 @@ class Phonemizer(str, Enum):
     OPENPHONEMIZER = "openphonemizer" # en
     G2PEN = "g2pen" # en
     DIZIONE = "dizione"  # en-US (CMUdict lexicon, homograph rules, text rules)
+    LEOKANI = "leokani"  # en-US (Kokoro/misaki codes; lexicon, ONNX letter-to-sound and context models)
+    KOLOKWA = "kolokwa"  # lir, Liberian English (kolokwa-g2p model)
 
     TUGAPHONE = "tugaphone"  # pt
     G2PFA = "g2pfa"
     OPENJTALK = "openjtalk" # ja
+    OPENJTALK_PROSODY = "openjtalk_prosody"  # ja — OpenJTalk IPA with accent rise, fall and phrase marks
     CUTLET = "cutlet" # ja
     PYKAKASI = "pykakasi" # ja
     COTOVIA = "cotovia"  # galician  (no ipa!)
     AHOTTS = "ahotts"  # basque
     PHONIKUD = "phonikud"  # hebrew
+    HEBREW_IPA = "hebrew_ipa"  # hebrew — IPA with stress from text that carries niqqud
+    TLTK = "tltk"  # thai — TLTK IPA with a tone digit per syllable
     MANTOQ = "mantoq"  # arabic — the mantoq wrapper around Halabi's Arabic-Phonetiser
     HALABI = "halabi"  # arabic — raw Halabi Arabic-Phonetiser, no diacritizer (vowelized input only)
     IQRA = "iqra"  # arabic — Halabi phonetiser output post-processed to the IqraEval phoneme_ref convention

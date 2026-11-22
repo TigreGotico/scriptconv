@@ -27,6 +27,7 @@ from scriptconv.phonemizers import (
     StageError,
     UnreadTextError,
     UnsupportedLanguageError,
+    Segment,
     get_phonemizer,
     phonemize,
 )
@@ -224,7 +225,7 @@ class TestSegmentText:
         (Chunk.SENTENCE, "اقرأ [[h a l o]] الآن.", ["اقرأ [[h a l o]]", "الآن."]),
         (Chunk.CLAUSE, "اقرأ [[h a l o]] الآن.", ["اقرأ [[h a l o]]", "الآن."]),
         (Chunk.PARAGRAPH, "اقرأ [[h a l o]] الآن.", ["اقرأ [[h a l o]] الآن."]),
-        (Chunk.SENTENCE, "ab [[xy]] cd. ef.", ["ab [[xy]]", "cd.", "ef."]),
+        (Chunk.SENTENCE, "ab [[xy]] gato. ef.", ["ab [[xy]]", "gato.", "ef."]),
         (Chunk.PARAGRAPH, "ab [[xy]] cd. ef.", ["ab [[xy]] cd. ef."]),
         (Chunk.SENTENCE, "a [[x]] b [[y]] c.", ["a [[x]]", "b [[y]]", "c."]),
         (Chunk.CLAUSE, "a [[x]] b [[y]] c.", ["a [[x]]", "b [[y]]", "c."]),
@@ -245,6 +246,20 @@ class TestSegmentText:
     def test_a_block_keeps_the_staged_words_before_it(self, chunk, text, expected):
         frontend = build(Echo(), stages=Stages(diacritize=False))
         assert [s.text for s in frontend.segments(text, Stages(chunk=chunk))] == expected
+
+    # The text of a chunk joins the texts of its pieces. A join that adds each
+    # text to the text joined so far copies all of it again at each piece, so
+    # the copies grow with the square of the number of pieces. A join that
+    # collects the texts and joins them once copies no characters through +.
+
+    def test_the_texts_of_a_chunk_join_in_linear_time(self, monkeypatch):
+        monkeypatch.setattr(Joined, "copied", 0)
+        # every second piece follows whitespace in the text
+        pieces = [frontend_module._Piece(["a"], text=Joined("ab"), spaced=bool(number % 2))
+                  for number in range(10000)]
+        joined = frontend_module._join(pieces, Segment((" ",)))
+        assert joined.text == "ab" + " abab" * 4999 + " ab"
+        assert Joined.copied <= 2 * len(joined.text), Joined.copied
 
     def test_the_words_before_a_block_are_the_staged_text(self):
         frontend = build(Echo(), normalizer=lambda text, lang: text.upper(),
@@ -346,7 +361,7 @@ class TestInlineBlocks:
         ("Tu viens [[x]] ?", "Tu viens x ?"),
         ("Tu viens [[x]] ?", "Tu viens x ?"),
         ("[[x]] , b", "x , b"),
-        ("Um [[x]]. Dois; três.", "Um x. Dois; três."),
+        ("Um [[gato]]. Dois; três.", "Um gato. Dois; três."),
         ("[[x]] ; [[y]] !", "x ; y !"),
         ("[[x]],[[y]]", "x,y"),
         ("[[x]].[[y]]", "x.y"),
@@ -397,7 +412,7 @@ class TestInlineBlocks:
 
     @pytest.mark.parametrize("text, lazy, flat", [
         ("Olá [[x]] sim. [[y]], b.",
-         ["Olá", "sim.", "a, b.", ", b."], ["Olá", "sim.", "a, b.", ", b."]),
+         ["Olá", "sim.", "casa, b.", ", b."], ["Olá", "sim.", "casa, b.", ", b."]),
         # a digit gives the clause a word, as a letter does
         ("Olá [[x]] 2 gatos, b.", ["Olá", "2 gatos, b."], ["Olá", "2 gatos, b."]),
         # no text after the block gives no mark
@@ -545,11 +560,11 @@ class TestInlineBlocks:
 
     @pytest.mark.parametrize("keep", [True, False])
     @pytest.mark.parametrize("text", [
-        "[[x]]. [[?]]... vem.",
-        "[[x]]. [[?]] vem.",
-        "[[x]]. [[!]] vem.",
+        "[[gato]]. [[?]]... vem.",
+        "[[gato]]. [[?]] vem.",
+        "[[gato]]. [[!]] vem.",
         "Sim. [[,]] vem.",
-        "[[x]]? [[?]]. vem.",
+        "[[gato]]? [[?]]. vem.",
         "Olá [[x]] [[?]] sim.",
         "Sim [[x.]]...",
         "Sim [[x.]][[]] vem.",
@@ -559,10 +574,10 @@ class TestInlineBlocks:
                                                keep_punctuation=keep,
                                                stages=Stages(diacritize=False)))
         symbols = re.search(r"\[\[([^\]]*\W)\]\]", text)[1]
-        # "k" stands for that block in the plain text, and its symbols take its place
-        plain = (text.replace(f"[[{symbols}]]", "k").replace("[[]]", "")
+        # "já" stands for that block in the plain text, and its symbols take its place
+        plain = (text.replace(f"[[{symbols}]]", "já").replace("[[]]", "")
                  .replace("[[", "").replace("]]", ""))
-        expected = list("".join(frontend.phonemize_flat(plain)).replace("k", symbols))
+        expected = list("".join(frontend.phonemize_flat(plain)).replace("já", symbols))
         assert frontend.phonemize_flat(text) == expected
         assert join_sentences(frontend.phonemize(text), keep) == expected
 
@@ -942,8 +957,8 @@ class TestFailurePolicy:
 class TestBackends:
     def test_grapheme_and_unicode_backends_build_without_get_lang(self):
         graphemes = TextFrontend(FrontendConfig("xx-Test", Phonemizer.GRAPHEMES))
-        assert graphemes.phonemize("Ab-c. Dé!", Stages(diacritize=False)) == [
-            ["a", "b", "-", "c"], ["d", "é"]]
+        assert graphemes.phonemize("Pô-lo. Dé!", Stages(diacritize=False)) == [
+            ["p", "ô", "-", "l", "o"], ["d", "é"]]
         codepoints = TextFrontend(FrontendConfig("xx-Test", Phonemizer.UNICODE))
         assert codepoints.phonemize("Dé", Stages(diacritize=False)) == [["D", "e", "́"]]
 

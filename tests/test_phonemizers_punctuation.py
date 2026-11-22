@@ -271,6 +271,9 @@ class TestWordsStayApart:
         # every mark that the clause table reads as "?" counts
         ("graphemes", "نعم؟لا", "نعم لا"),
         ("unicode", "نعم؟لا", "نعم لا"),
+        # whitespace after a full-width mark keeps a space
+        ("graphemes", "你好！ 我们走。", "你好 我们走"),
+        ("unicode", "你好！ 我们走。", "你好 我们走"),
     ])
     def test_words_stay_apart(self, backend, text, expected):
         phonemizer = self.kept(backend)

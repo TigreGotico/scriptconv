@@ -9,7 +9,7 @@ import re
 from typing import List, Tuple
 
 from . import espeak
-from .phoneme_inventory import INVENTORY_88, Inventory, tokenize_ipa
+from .phoneme_inventory import INVENTORY_88, UNK, Inventory, tokenize_ipa
 
 FATHA, KASRA, DAMMA = "َ", "ِ", "ُ"
 SUKUN, SHADDA = "ْ", "ّ"
@@ -294,6 +294,9 @@ _MSA_TO_LEV = [
     ("d͡ʒ", "ʒ"), ("dʒ", "ʒ"),
     ("q", "ʔ"),
     ("ðˤ", "zˤ"), ("ð", "d"), ("θ", "t"),
+    # espeak-ng's Arabic voice writes ص and ط with a bridge below, s̪ and t̪, where the
+    # inventory has sˤ and tˤ; ض already comes out as dˤ
+    ("s̪", "sˤ"), ("t̪", "tˤ"),
 ]
 
 
@@ -314,6 +317,7 @@ def arabic_fallback_ipa(
     out_words = []
     for word in raw.split(" "):
         toks = inventory.tokenize(word).symbols
-        out_words.append("".join(inventory.fold(t) for t in toks))
+        # joined as text, "<unk>" would be read back as five symbols
+        out_words.append("".join(folded for folded in map(inventory.fold, toks) if folded != UNK))
     ipa = " ".join(w for w in out_words if w)
     return ipa
