@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a147](https://github.com/TigreGotico/scriptconv/tree/0.0.4a147) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a146...0.0.4a147)
+
+**Merged pull requests:**
+
+- fix: Shami money reads other digit scripts as ASCII digits [\#398](https://github.com/TigreGotico/scriptconv/pull/398) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a146](https://github.com/TigreGotico/scriptconv/tree/0.0.4a146) (2026-11-22)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a145...0.0.4a146)
