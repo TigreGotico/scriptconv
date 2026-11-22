@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a150](https://github.com/TigreGotico/scriptconv/tree/0.0.4a150) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a149...0.0.4a150)
+
+**Merged pull requests:**
+
+- fix\(shami\): scale the espeak-ng timeout with the text length [\#405](https://github.com/TigreGotico/scriptconv/pull/405) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a149](https://github.com/TigreGotico/scriptconv/tree/0.0.4a149) (2026-11-22)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a148...0.0.4a149)
@@ -358,10 +366,6 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a103...0.0.4a104)
 
-**Merged pull requests:**
-
-- feat\(frontend\): read the whole text before cutting it into chunks [\#272](https://github.com/TigreGotico/scriptconv/pull/272) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a103](https://github.com/TigreGotico/scriptconv/tree/0.0.4a103) (2026-11-16)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a102...0.0.4a103)
@@ -381,10 +385,6 @@
 ## [0.0.4a101](https://github.com/TigreGotico/scriptconv/tree/0.0.4a101) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a100...0.0.4a101)
-
-**Merged pull requests:**
-
-- fix: remove a stress mark that the backend does not read [\#273](https://github.com/TigreGotico/scriptconv/pull/273) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a100](https://github.com/TigreGotico/scriptconv/tree/0.0.4a100) (2026-11-15)
 
