@@ -18,9 +18,11 @@ The hash covers:
   for another platform, does not;
 - the name and version of each installed distribution that provides a module
   that the modules above import at module level, in a ``try`` block or not, as
-  num2words for the Shami normaliser. An import inside a function does not
-  count: it serves another language, or a dependency that an extra declares.
-  The requirements of such a distribution do not count;
+  num2words for the Shami normaliser. The requirements of such a distribution
+  do not count. A distribution that these modules import only inside a
+  function does not count, unless an extra above requires it. So an optional
+  tool that a backend loads inside a function, as the camel-tools diacritizer
+  of the Shami backend, is not in the revision;
 - scriptconv and its sister packages count by their files instead of their
   version, and the distributions of
   :meth:`~scriptconv.phonemizers.base.BasePhonemizer._covered_distributions`

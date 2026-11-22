@@ -94,10 +94,12 @@ The hash covers these inputs:
 - the name and version of each installed distribution that provides a module
   that the scriptconv modules above import at module level, in a `try` block
   or not, such as `num2words`, which the Shami normaliser uses when it is
-  installed. An import inside a function does not count. Such an import
-  serves another language, such as the diacritics models in
-  `scriptconv.diacritics`, or comes from a dependency that an extra declares.
-  The requirements of such a distribution do not count.
+  installed. The requirements of such a distribution do not count. A
+  distribution that these modules import only inside a function does not
+  count, unless an extra above requires it. So an optional tool that a backend
+  loads inside a function is not in the `revision`. An example is the
+  camel-tools diacritizer of the Shami backend: its install can change the
+  phonemes of undiacritized Arabic and keep the `revision`.
 - the source file of each class of the backend outside scriptconv, so a
   subclass counts
 - the arguments of the backend, a character rule set on the instance, the
@@ -121,8 +123,10 @@ a `sitecustomize.py` or a `.pth` file. So two machines with the same packages
 give the same `revision`. An edit of the files of a dependency that keeps its
 version, as in an editable install, does not change the `revision`.
 
-The `revision` runs no process. It reads the source files on the path and the
-installed metadata, and later calls in the process reuse the file digests. A
+The code hash runs no process. It reads the source files on the path and the
+installed metadata, and later calls in the process reuse the file digests.
+`identity()` also reads the release of the engine, and the espeak backend
+reads it from `espeak-ng --version` when it uses the binary. A
 module of these packages that does not load from a file in a directory, such
 as from a zip archive, gives no `revision`. So does a scriptconv with no
 installed metadata. Each gives one warning per backend and language in a
