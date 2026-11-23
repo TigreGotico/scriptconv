@@ -61,7 +61,7 @@ class Phonemizer(str, Enum):
     G2PEN = "g2pen" # en
     DIZIONE = "dizione"  # en-US (CMUdict lexicon, homograph rules, text rules)
     LEOKANI = "leokani"  # en-US (Kokoro/misaki codes; lexicon, ONNX letter-to-sound and context models)
-    NEMO_IPA = "nemo_ipa"  # en (NVIDIA NeMo IpaG2p: ipa_cmudict-0.7b_nv23.01 plus heteronyms-052722)
+    NEMO_IPA = "nemo_ipa"  # en-US (NVIDIA NeMo IpaG2p: ipa_cmudict-0.7b_nv23.01 plus heteronyms-052722)
     KOLOKWA = "kolokwa"  # lir, Liberian English (kolokwa-g2p model)
 
     TUGAPHONE = "tugaphone"  # pt

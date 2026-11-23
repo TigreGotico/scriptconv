@@ -17,7 +17,18 @@ NeMo, it needs no NeMo or torch package, and it differs from NeMo in the two
 places that its module docstring lists.
 
 The module downloads two data files from the Hugging Face repository
-Phoonnx/magpietts-multi-357m-unicode: ipa_cmudict-0.7b_nv23.01.txt, which is
-the CMU Pronouncing Dictionary (BSD-2-Clause, see
-scriptconv/phonemizers/_thirdparty/dizione/built/LICENSE.cmudict) with IPA
-pronunciations, and heteronyms-052722. Neither file is in the wheel.
+Phoonnx/magpietts-multi-357m-unicode, at the copy that the Magpie TTS
+checkpoint holds. Neither file is in the wheel.
+
+ipa_cmudict-0.7b_nv23.01.txt is an NVIDIA file of the NeMo tree
+(scripts/tts_dataset_files, Apache-2.0). It holds the pronunciations of the
+CMU Pronouncing Dictionary, whose licence is BSD-2-Clause with one added
+sentence (see scriptconv/phonemizers/_thirdparty/dizione/built/LICENSE.cmudict),
+converted to IPA by NVIDIA. heteronyms-052722 is also an NVIDIA file of that
+tree, under Apache-2.0.
+
+The Magpie copy of the dictionary has sha256 7ea5c4c2. The copy in NeMo at the
+commit above has sha256 dd0927ff. Both have the same size, and they differ
+only in the order of the two readings of A: Magpie has the schwa reading
+first, and NeMo has the diphthong reading first. The module pins the Magpie
+copy.

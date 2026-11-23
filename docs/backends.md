@@ -129,7 +129,7 @@ These models and data download on first use:
 | the stressonnx model of the language, from `TigreGotico/stressonnx-models` at a pinned revision | `diacritize(text, lang)` for a language in `STRESS_LANGS` | stressonnx | the Hugging Face cache |
 | g2pW polyphone model, pinned to a sha256 | the `g2pw` backend | `g2pw.py` | the Hugging Face cache |
 | the Leokani G2P lexicon and ONNX models of the `micro` or `mini` model, from `milliwattlabs/leokani-g2p` at a pinned revision, each pinned to a sha256 | the `leokani` backend | `LeokaniPhonemizer.__init__` in `leokani.py` | the Hugging Face cache |
-| the NeMo IPA dictionary and the NeMo heteronyms file, from `Phoonnx/magpietts-multi-357m-unicode` at a pinned revision, each pinned to a sha256 | the `nemo_ipa` backend | `NemoIpaPhonemizer.__init__` in `nemo_ipa.py` | the Hugging Face cache |
+| the NeMo IPA dictionary and the NeMo heteronyms file, in the copies of the Magpie TTS checkpoint, from `Phoonnx/magpietts-multi-357m-unicode` at a pinned revision, each pinned to a sha256 | the `nemo_ipa` backend | `NemoIpaPhonemizer.__init__` in `nemo_ipa.py` | the Hugging Face cache |
 | the kolokwa-g2p ONNX model and its tables, from `TigreGotico/kolokwa-g2p-onnx` at a pinned revision, each pinned to a sha256 | the `kolokwa` backend | `KolokwaPhonemizer.__init__` in `lir.py` | the Hugging Face cache |
 | a DeepPhonemizer checkpoint named in `DeepPhonemizer.MODELS` | the `deepphonemizer` backend | `DeepPhonemizer.__init__` in `en.py` | `~/.local/share/deepphonemizer` |
 | the NLTK data `averaged_perceptron_tagger_eng` and `cmudict` | the `g2pen` backend | `nltk.download` in `G2PEnPhonemizer.__init__` in `en.py` | the NLTK data directory |

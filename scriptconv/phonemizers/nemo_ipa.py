@@ -2,8 +2,9 @@
 
 Magpie TTS reads English through its ``english_phoneme`` sub-tokenizer, an
 ``IPATokenizer`` over an ``IpaG2p``. This backend gives the symbol string
-that the sub-tokenizer encodes: one character for each of the 96 symbols of
-its vocabulary, so a caller maps each character to its token id. It takes
+that the sub-tokenizer encodes: one character for each of the 94 symbols of
+its vocabulary (the tokenizer has 96 tokens, with ``<pad>`` and ``<oov>``), so
+a caller maps each character to its token id. It takes
 no random draw. NeMo keeps a word as letters with a probability while it
 trains, and this backend always gives the phonemes of the word.
 
@@ -31,13 +32,17 @@ wheel. By default they come from the Hugging Face Hub, from
 must have its pinned sha256. A caller can give the path of either file.
 ``ipa_cmudict-0.7b_nv23.01.txt`` is the CMU Pronouncing Dictionary with IPA
 pronunciations, and ``heteronyms-052722`` lists the words that NeMo leaves as
-letters.
+letters. The pinned dictionary is the copy in the Magpie TTS checkpoint
+(sha256 ``7ea5c4c2``), not the copy in ``scripts/tts_dataset_files`` of NeMo
+(sha256 ``dd0927ff``). The two have the same size and differ only in the order
+of the two readings of ``A``: Magpie has ``ˈʌ`` first and NeMo has ``ˈeɪ``
+first. The pin follows the checkpoint.
 
 The output differs from NeMo in two places. NeMo stops with an ``IndexError``
-on a text of spaces only, and this backend gives an empty string. A span
-between two ``|`` marks, which NeMo keeps unchanged, loses a token that is
-longer than one character, so ``|<pad>|`` gives nothing and not the id of the
-padding token.
+on any text whose kept symbols are only spaces, as ``½ ¼ ¾``, and this backend
+gives an empty string. In a span between two ``|`` marks, which NeMo keeps
+unchanged, the tokens ``<pad>`` and ``<oov>`` give the id of the special token
+in NeMo and nothing here.
 """
 import dataclasses
 import re

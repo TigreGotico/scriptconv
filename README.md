@@ -410,9 +410,10 @@ notice file.
 The Leokani G2P model files are CC BY 4.0, and the wheel holds the text of
 that licence in `scriptconv/phonemizers/_thirdparty/leokani/`. The model of
 the `kolokwa` backend is MIT. Neither model is in the wheel: each backend
-downloads its model. The `nemo_ipa` backend downloads the pronunciation
-dictionary of NVIDIA NeMo, which is the CMU Pronouncing Dictionary with IPA
-pronunciations, and the heteronyms file of NeMo. Neither file is in the wheel.
+downloads its model. The `nemo_ipa` backend downloads two NVIDIA files in the
+copies of the Magpie TTS checkpoint: a pronunciation dictionary, which is the
+CMU Pronouncing Dictionary with IPA pronunciations, and a heteronyms file. Both
+are Apache-2.0 in the NeMo tree. Neither file is in the wheel.
 
 The phonemizer wrappers whose code, engine or dependencies are under a
 copyleft or a non-commercial licence are in two sister packages:

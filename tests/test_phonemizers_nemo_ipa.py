@@ -61,10 +61,20 @@ def test_a_text_of_spaces_gives_nothing_and_inner_spaces_stay(nemo):
     assert nemo.phonemize_string(" cat  dog ", "en-US") == " " + nemo.phonemize_string("cat  dog", "en-US")
 
 
-def test_a_dictionary_word_with_apostrophe_s_or_s_takes_the_ending(nemo):
-    assert nemo.phonemize_string("airport's airports Jones's", "en-US") == (
-        nemo.phonemize_string("airport", "en-US") + "s " + nemo.phonemize_string("airport", "en-US") + "s "
-        + nemo.phonemize_string("Jones", "en-US") + "ɪz")
+# Words that the dictionary lacks and whose stem it holds, so that a suffix rule runs.
+# The expected strings are the output of NeMo 3.0.0 (commit fd6a877).
+@pytest.mark.parametrize("text, expected", [
+    ("dessert's parrot's jacket's", "dɪˈzɝts ˈpɛɹəts ˈdʒækəts"),
+    ("kiss's cactus's bus's", "ˈkɪsɪz ˈkæktəsɪz ˈbʌsɪz"),
+    ("laptop's", "ˈlæpˌtɑpz"),
+    ("podcasts", "ˈpɔdˌkæsts"),
+    ("jousts ocelots", "ˈdʒaʊsts ˈɑsəˌlɑts"),
+    ("antelopes abattoirs", "ˈæntəˌloʊpz ˌæbətˈwɑɹz"),
+])
+def test_a_word_that_the_dictionary_lacks_takes_the_ending_of_its_stem(nemo, text, expected):
+    for word in text.split():
+        assert word.upper() not in nemo.pronunciations
+    assert nemo.phonemize_string(text, "en-US") == expected
 
 
 def test_a_hyphen_splits_a_word_that_the_dictionary_lacks(nemo):

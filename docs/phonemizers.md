@@ -700,7 +700,10 @@ probability only while it trains, and this backend has no such parameter.
 
 The two data files come from the Hugging Face Hub, at a fixed revision, into
 the shared Hugging Face cache, from `Phoonnx/magpietts-multi-357m-unicode` at
-revision `a0e169ad`. Each file must have its pinned sha256. Pass
+revision `a0e169ad`. They are the copies that the Magpie TTS checkpoint holds.
+The dictionary is not byte-identical to the copy in the NeMo tree (sha256
+`7ea5c4c2` against `dd0927ff`): the two differ only in the order of the two
+readings of `A`, and the pin follows the checkpoint. Each file must have its pinned sha256. Pass
 `dictionary=` or `heteronyms=` to read a local file instead.
 
 | File | Source | sha256 | Size |
@@ -716,6 +719,8 @@ Limits:
 - The backend reads American English only. A tag must resolve to `en-US`, or
   to a lect of it. A bare `en` is British English by the default-region rule,
   so it is refused with `UnsupportedLanguageError`.
+- NeMo raises `IndexError` for any text whose kept symbols are only spaces,
+  such as `½ ¼ ¾`. The backend gives an empty string.
 - The backend does not write numbers, dates or symbols as words. Normalise
   such text first.
 - `phonemize_string` returns the symbol string with its punctuation.
