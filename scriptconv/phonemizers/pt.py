@@ -33,30 +33,19 @@ class TugaphonePhonemizer(BasePhonemizer):
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
-        """
-        Validates and returns the closest supported language code.
+        """The lect of *target_lang*: a tugaphone lect as tugaphone spells it, else the closest country lect.
 
-        A full sub-regional lect tag tugaphone itself knows about (e.g.
-        ``pt-PT-x-lisbon``, ``pt-PT-x-porto``) is passed through unchanged,
-        so its output stays distinct from the generic country lect. A loose
-        tag (``pt``, ``pt-PT``) falls back to :meth:`match_lang` against the
-        country-level lects, since ``tugaphone.resolve_lect`` silently
-        defaults an unrecognized tag to ``pt-PT`` rather than raising.
-
-        Args:
-            target_lang (str): The language code to validate.
-
-        Returns:
-            str: The validated language code.
+        A lect that tugaphone lists, as ``pt-PT-x-porto``, passes through, so it
+        keeps its own output. Any other tag goes through :meth:`match_lang`,
+        because ``tugaphone.resolve_lect`` reads an unknown tag as ``pt-PT``.
 
         Raises:
             ValueError: If the language code is unsupported.
         """
         import tugaphone
         dialects = {d.lower(): d for d in tugaphone.list_dialects()}
-        if target_lang and target_lang.replace("_", "-").lower() in dialects:
-            return dialects[target_lang.replace("_", "-").lower()]
-        # this check is here only to throw an exception if invalid language is provided
+        if target_lang and (tag := target_lang.replace("_", "-").lower()) in dialects:
+            return dialects[tag]
         return cls.match_lang(target_lang, ["pt-PT", "pt-BR", "pt-AO", "pt-MZ", "pt-TL"])
 
     def _identity_settings(self) -> Dict[str, object]:
@@ -125,15 +114,12 @@ def _tugaphone_revision(lect: str) -> Optional[Tuple[str, FrozenSet[str]]]:
 
 
 class BarranquenhoPhonemizer(BasePhonemizer):
-    """
-    Barranquenho phonemizer on the orthography2ipa spec ``ext-PT-x-barranco``,
-    for the Portuguese/Spanish contact variety spoken in Barrancos.  Output is
-    always IPA.
+    """Barranquenho, the Portuguese and Spanish contact variety of Barrancos, to IPA.
 
     The phonemes come from
-    :class:`~scriptconv.phonemizers.o2ipa.Orthography2IPAPhonemizer` on that
-    spec, which transcribes the whole text, so cross-word sandhi applies.  This
-    backend needs the ``o2i`` extra.
+    :class:`~scriptconv.phonemizers.o2ipa.Orthography2IPAPhonemizer` on the
+    spec ``ext-PT-x-barranco``, which reads the whole text, so cross-word
+    sandhi applies. This backend needs the ``o2i`` extra.
     """
 
     engine_distribution = Orthography2IPAPhonemizer.engine_distribution
@@ -148,8 +134,7 @@ class BarranquenhoPhonemizer(BasePhonemizer):
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
-        """
-        Validates and returns the Barranquenho language code.
+        """The Barranquenho language code.
 
         Raises:
             ValueError: If the language code is unsupported.

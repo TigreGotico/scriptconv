@@ -85,19 +85,12 @@ _MAX_WORD_LENGTH = 28
 
 
 class _BoundedEngine(DizioneEngine):
-    """dizione's engine, reading a spelling longer than any word in pieces.
+    """dizione's engine, reading a spelling longer than :data:`_MAX_WORD_LENGTH` in pieces.
 
-    :meth:`word` is where dizione forms the pronunciation of one spelling: it
-    looks the spelling up, derives it from a shorter word, builds it from two
-    words, and else hands the whole spelling to the unknown-word model, whose
-    phones the aligner matches to the letters. A spelling longer than
-    :data:`_MAX_WORD_LENGTH` is none of those words, so it is cut into pieces
-    of at most that many characters, and each piece is read as :meth:`word`
-    reads a word now. The phonemes of the pieces are joined as dizione joins
-    the parts of a hyphenated word, which is no space between them
-    (``sentence.groups``). A spelling that a table holds whole, such as one of
-    the user's overrides, is read whole, and so is every spelling of that
-    length or less.
+    Each piece is read as :meth:`word` reads a word, and the phonemes of the
+    pieces join with no space, as dizione joins the parts of a hyphenated word
+    (``sentence.groups``). A spelling that a table holds whole, such as a user
+    override, is read whole.
     """
 
     def word(self, word):
@@ -493,12 +486,14 @@ def _token_clauses(whole: Phonemized, closes: Optional[List[bool]] = None) -> Li
 
 def _join_tokens(parts: List[Phonemized]) -> Phonemized:
     """*parts* as one sequence: each inner ``<eos>`` ``<bos>`` pair goes, with its ids and stress."""
-    def inner(field: str) -> tuple:
-        return tuple(value for index, part in enumerate(parts)
-                     for value in getattr(part, field)[0 if index == 0 else 1:
-                                                       None if index == len(parts) - 1 else -1])
+    last = len(parts) - 1
 
-    return Phonemized(inner("symbols"), inner("ids"), inner("stress"),
+    def inner(sequences: Iterator[tuple]) -> tuple:
+        return tuple(value for index, sequence in enumerate(sequences)
+                     for value in sequence[0 if index == 0 else 1:None if index == last else -1])
+
+    return Phonemized(inner(part.symbols for part in parts), inner(part.ids for part in parts),
+                      inner(part.stress for part in parts),
                       tuple(phone for part in parts for phone in part.unknown))
 
 

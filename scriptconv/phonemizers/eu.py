@@ -4,23 +4,13 @@ from scriptconv.phonemizers.enums import Alphabet
 
 
 class EuskaphonePhonemizer(BasePhonemizer):
-    """
-    Dialect-aware Basque phonemizer backed by ``euskaphone``, a TTS frontend
-    built on the shared orthography2ipa lattice.  Output is always IPA.
+    """Basque to IPA through ``euskaphone``, for eight lects: Batua and the historical dialects.
 
-    This is distinct from ``AhoTTSPhonemizer`` in scriptconv-copyleft: AhoTTS is a port of the
-    AhoTTS front-end, whereas euskaphone drives the orthography2ipa candidate
-    lattice and resolves eight Basque lects (Batua and the historical dialects)
-    from their spec data, adding vigesimal number verbalization and Spanish/
-    French code-switch handling.
-
-    The lect is taken from the per-call ``lang`` argument -- a BCP-47 code
-    (``eu``, ``eu-x-zuberera``, ...) which euskaphone resolves internally, so a
-    single instance serves every dialect.  ``euskaphone`` is imported lazily so
-    importing ``scriptconv`` does not hard-require it.
-
-    euskaphone reads numbers, dates and abbreviations through ``text2spoken``
-    on every call, so this backend owns the ``normalize`` stage.
+    The per-call ``lang``, a BCP-47 code (``eu``, ``eu-x-zuberera``, ...), picks
+    the lect, so one instance serves every dialect. euskaphone reads numbers, dates and
+    abbreviations through ``text2spoken``, so this backend owns the
+    ``normalize`` stage. ``AhoTTSPhonemizer`` in scriptconv-copyleft is a
+    different engine, a port of the AhoTTS front-end.
     """
 
     owned_stages = frozenset({"normalize"})
@@ -34,7 +24,7 @@ class EuskaphonePhonemizer(BasePhonemizer):
 
     @property
     def pho(self):
-        """Lazily import, construct and cache the ``EuskaPhonemizer``."""
+        """The ``EuskaPhonemizer``, built on first use."""
         if self._pho is None:
             try:
                 from euskaphone import EuskaPhonemizer
@@ -49,8 +39,7 @@ class EuskaphonePhonemizer(BasePhonemizer):
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
-        """
-        Resolve *target_lang* to a euskaphone Basque lect code.
+        """*target_lang* as a euskaphone Basque lect code.
 
         Raises:
             ValueError: If euskaphone has no lect for *target_lang*.
@@ -63,8 +52,7 @@ class EuskaphonePhonemizer(BasePhonemizer):
                 "euskaphone is required for the euskaphone Basque phonemizer. "
                 "Install it with 'pip install euskaphone' (or 'pip install scriptconv[eu]')."
             ) from e
-        # resolve_lect silently falls back to Batua for an unknown tag, so gate
-        # on is_supported first.
+        # resolve_lect gives Batua for an unknown tag.
         if not is_supported(target_lang):
             raise UnsupportedLanguageError(f"euskaphone: unsupported language {target_lang!r}")
         return resolve_lect(target_lang)

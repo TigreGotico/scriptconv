@@ -1,8 +1,7 @@
-"""Russian phonemizers.
+"""Russian phonemizer for the alphacep Vosk-TTS voices.
 
-Currently one backend: the Vosk-TTS front-end, wrapping the vendored
-:mod:`scriptconv.phonemizers._thirdparty.vosk_g2p` rules so the alphacep
-Russian voices can be driven from text without the ``vosk-tts`` package.
+It wraps the vendored :mod:`scriptconv.phonemizers._thirdparty.vosk_g2p` rules,
+so the voices read text without the ``vosk-tts`` package.
 """
 import re
 from typing import Dict, Iterator, List, Optional
@@ -17,42 +16,26 @@ __all__ = ["VoskPhonemizer"]
 
 
 class VoskPhonemizer(BasePhonemizer):
-    """
-    Russian phonemizer for the Vosk-TTS voices (alphacep).
+    """Russian text to the Vosk phoneme inventory (``a0``, ``bj``, ``sch`` …), as ``vosk_tts`` reads it.
 
-    It reproduces ``vosk_tts``'s grapheme-to-phoneme exactly: each word is
-    looked up in the voice's pronunciation ``dictionary`` (word -> phonemes),
-    falling back to the rule-based
-    :func:`~scriptconv.phonemizers._thirdparty.vosk_g2p.convert` for
-    out-of-dictionary words.  Spaces and punctuation are kept as their own
-    tokens (Vosk feeds them to the model as short/long pauses); the BOS ``^`` /
-    EOS ``$`` markers and the inter-phoneme blanks belong to the consumer's
-    tokenizer, so they are *not* emitted here.
+    Each word comes from the voice's pronunciation ``dictionary``, else from
+    the rules of :func:`~scriptconv.phonemizers._thirdparty.vosk_g2p.convert`.
+    Spaces and punctuation stay as their own tokens, the pauses Vosk reads. The
+    ``^`` and ``$`` markers and the blanks between phonemes belong to the
+    consumer's tokenizer, so they are not emitted.
 
-    A stress-marked word (``сег+одня``) is where it differs from ``vosk_tts``,
-    which never finds such a word in the dictionary.  Here the word is looked
-    up without its marks, and a dictionary pronunciation is used when it
-    stresses each marked vowel.  For a homograph the mark picks the entry, so
-    ``з+амок`` and ``зам+ок`` read differently.  When no entry stresses the
-    marked vowels, the rules read the marks.
-
-    The output is the Vosk phoneme inventory (``a0``, ``bj``, ``sch`` …), not
-    IPA, so the only supported alphabet is :attr:`Alphabet.VOSK` — like
-    Cotovía, this backend is eligible only when its own notation is requested.
-
-    The dictionary is optional: without it the rules alone still produce usable
-    Russian (only the curated stress and exception entries are lost).
-    scriptconv never downloads anything — the caller resolves the file and
-    passes its path as ``model`` (the registry's ``phonemizer_model`` knob).
+    Unlike ``vosk_tts``, a stress-marked word (``сег+одня``) is looked up
+    without its marks, and a dictionary entry is used when it stresses each
+    marked vowel, so ``з+амок`` and ``зам+ок`` read differently. When no entry
+    agrees, the rules read the marks.
 
     Args:
         alphabet (Alphabet): must be :attr:`Alphabet.VOSK`.
-        model (Optional[str]): path to the voice's ``dictionary`` file.  When
-            absent or missing, only the rule-based fallback is used.
+        model (Optional[str]): path to the voice's ``dictionary`` file. Without
+            it, only the rules are used. scriptconv never downloads it.
     """
 
-    # Matches the per-character split used by vosk_tts: spaces and punctuation
-    # are captured so they survive as standalone pause tokens.
+    # The split of vosk_tts. The group keeps spaces and punctuation as pause tokens.
     _SPLIT = re.compile(r'([,.?!;:"() ])')
     # The diacritize stage (stressonnx) writes a combining acute (U+0301) after
     # the stressed vowel. The vosk rules read a "+" before it instead, so the
@@ -84,14 +67,12 @@ class VoskPhonemizer(BasePhonemizer):
         return self._dictionary
 
     def _stressed_entry(self, word: str) -> Optional[List[str]]:
-        """The dictionary pronunciation of a ``+``-marked word that agrees
-        with its marks, or None.
+        """The dictionary pronunciation of a ``+``-marked word that agrees with its marks, or None.
 
-        The k-th vowel letter of the word is the k-th vowel phoneme of an entry
-        (vowel phonemes end in their stress digit), so an entry whose vowel
-        count differs from the word's never matches.  An entry that stresses
-        exactly the marked vowels wins; otherwise the most probable entry that
-        stresses each marked vowel, as a compound with a second stress does.
+        The k-th vowel letter is the k-th vowel phoneme of an entry (a vowel
+        phoneme ends in its stress digit). An entry that stresses exactly the
+        marked vowels wins, else the most probable entry that stresses each
+        marked vowel, as a compound with a second stress does.
         """
         plain = word.replace("+", "")
         if plain not in self.dictionary:
@@ -120,10 +101,9 @@ class VoskPhonemizer(BasePhonemizer):
         text = text.replace("—", "-").lower()
         text = self._ACUTE_STRESS.sub(r"+\1", text).replace(self._ACUTE, "")
         for word in self._SPLIT.split(text):
-            if word == "":
+            if not word:
                 continue
             if self._SPLIT.match(word) or word == "-":
-                # space or punctuation: kept verbatim as a pause token
                 tokens.append(word)
             elif word in self.dictionary:
                 tokens.extend(self.dictionary[word])
@@ -134,13 +114,11 @@ class VoskPhonemizer(BasePhonemizer):
         return tokens
 
     def phonemize_lazy(self, text: str, lang: str) -> Iterator[List[str]]:
-        """Sentence-level lists of Vosk phoneme tokens, one sentence at a time.
+        """One list of Vosk phoneme tokens per sentence, with its punctuation.
 
-        Punctuation is preserved (it drives pausing); each sentence becomes one
-        synthesis chunk.  Multi-character tokens (``sch``, ``bj``, ``a1``) stay
-        whole, so :meth:`BasePhonemizer.phonemize_lazy`'s per-character split of
-        the phoneme *string* is deliberately bypassed — splitting ``s h`` into
-        characters would later fold back into ``sh`` (ш), a different phoneme.
+        A token such as ``sch`` stays whole: the per-character split of
+        :meth:`BasePhonemizer.phonemize_lazy` would turn ``s h`` into ``sh``
+        (ш), a different phoneme.
         """
         self.get_lang(lang)
         if not text:
