@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.0.4a152](https://github.com/TigreGotico/scriptconv/tree/0.0.4a152) (2026-11-23)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a151...0.0.4a152)
+
+**Merged pull requests:**
+
+- refactor\(phonemizers\): shorter docstrings and dead code out of the base and registry [\#417](https://github.com/TigreGotico/scriptconv/pull/417) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- refactor: simplify the notation, scripts and conventions modules [\#414](https://github.com/TigreGotico/scriptconv/pull/414) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a151](https://github.com/TigreGotico/scriptconv/tree/0.0.4a151) (2026-11-23)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a150...0.0.4a151)
@@ -381,10 +390,6 @@
 ## [0.0.4a102](https://github.com/TigreGotico/scriptconv/tree/0.0.4a102) (2026-11-16)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a101...0.0.4a102)
-
-**Merged pull requests:**
-
-- chore\(deps\): install africa-g2p through scriptconv-nonfree\[africa\] [\#276](https://github.com/TigreGotico/scriptconv/pull/276) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a101](https://github.com/TigreGotico/scriptconv/tree/0.0.4a101) (2026-11-15)
 
