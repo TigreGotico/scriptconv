@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.0.4a156](https://github.com/TigreGotico/scriptconv/tree/0.0.4a156) (2026-11-23)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a154...0.0.4a156)
+
+**Merged pull requests:**
+
+- refactor\(frontend\): shorten frontend and diacritics docs, drop a dead guard [\#418](https://github.com/TigreGotico/scriptconv/pull/418) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- refactor\(phonemizers\): shorter docstrings and leaner code in the language wrappers [\#416](https://github.com/TigreGotico/scriptconv/pull/416) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a154](https://github.com/TigreGotico/scriptconv/tree/0.0.4a154) (2026-11-23)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a153...0.0.4a154)
@@ -347,10 +356,6 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a109...0.0.4a110)
 
-**Merged pull requests:**
-
-- feat: F5-TTS text phonemizers f5tts\_char and f5tts\_pinyin [\#284](https://github.com/TigreGotico/scriptconv/pull/284) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a109](https://github.com/TigreGotico/scriptconv/tree/0.0.4a109) (2026-11-17)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a108...0.0.4a109)
@@ -378,10 +383,6 @@
 ## [0.0.4a106](https://github.com/TigreGotico/scriptconv/tree/0.0.4a106) (2026-11-16)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a105...0.0.4a106)
-
-**Merged pull requests:**
-
-- fix: test extra needs text2spoken 0.0.2a55 [\#282](https://github.com/TigreGotico/scriptconv/pull/282) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a105](https://github.com/TigreGotico/scriptconv/tree/0.0.4a105) (2026-11-16)
 
