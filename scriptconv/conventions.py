@@ -1,46 +1,27 @@
 """Orthographic conventions — script-scoped decorations, orthogonal to identity.
 
-Scripts are text *identity*: character-evident, ISO-15924-coded, the nodes of
-scriptconv's conversion space (:mod:`scriptconv.scripts`).  Conventions are
-*decorations* a script's orthography can carry or omit — optional vocalization
-(Arabic tashkeel, Hebrew niqqud), justification (kashida), spacing modes
-(Japanese wakachigaki), or mutually-exclusive spellings of the same
-information (pinyin tone marks vs digits).  A convention never participates in
-script detection or conversion routing; it is always a parameter, never a
-node.
+A script is text identity and a node of the conversion graph
+(:mod:`scriptconv.scripts`).  A convention is a decoration that a script's
+orthography can carry or omit: vocalization (Arabic tashkeel, Hebrew niqqud),
+justification (kashida), spacing (Japanese wakachigaki), or exclusive
+spellings of the same information (pinyin tone marks or digits).  A convention
+is a parameter, never a node, and plays no part in script detection.
 
-Each convention declares its *styles* — the mutually exclusive states its text
-can be in.  Binary decorations have styles ``("marked", "none")``; variant
-conventions name their spellings (``("mark", "number", "none")``).  The one
-real operation is :func:`restyle`, a partial transition matrix between styles;
-:func:`strip` and :func:`apply` are sugar for transitions to and from
-``"none"``.
+Each convention declares its *styles*, the exclusive states its text can be
+in: ``("marked", "none")`` for a binary decoration, or named spellings such as
+``("mark", "number", "none")``.  :func:`restyle` runs a transition between two
+styles; :func:`strip` and :func:`apply` restyle to and from ``"none"``.
+Stripping and deterministic respelling need no dependency.  A transition that
+needs a dictionary (applying wakachigaki is word segmentation) needs an
+optional extra.  Restoring tashkeel or niqqud is prediction, so it belongs to
+:mod:`scriptconv.diacritics` and has no transition here.
 
-Which transitions exist follows the same boundary the rest of scriptconv
-draws:
-
-* stripping and deterministic re-spelling are pure orthography — always
-  available, zero-dependency;
-* transitions that need a *dictionary lookup* (wakachigaki application =
-  word segmentation) are orthography too, but live behind the optional
-  extras, like :mod:`scriptconv.readings`;
-* transitions that need contextual *prediction* (restoring tashkeel or
-  niqqud, i.e. diacritization) are linguistic inference, so they belong to
-  :mod:`scriptconv.diacritics` and not to this module, as grapheme-to-phoneme
-  belongs to :mod:`scriptconv.phonemizers`.  Their absence is queryable data,
-  not a runtime surprise.
-
-What is **not** a convention: marks that are letter identity rather than
-decoration.  Vietnamese tone diacritics spell different words, Arabic
-hamza/madda (U+0653–U+0655) distinguish letters, and stripping them corrupts
-text — none are registered.  Casing on bicameral scripts *is* a convention in
-the sense used here, but the stdlib (``str.lower``/``str.casefold``) already
-models it correctly, so it is deliberately not duplicated.
-
-``jamo-form`` is the registry's one documented impurity: compatibility vs
-conjoining jamo is a Unicode *representation* convention rather than an
-orthographic one, registered because free text genuinely occurs in both
-repertoires and the restyle is deterministic.
+Marks that are letter identity are not conventions: Vietnamese tone marks and
+Arabic hamza/madda (U+0653–U+0655) spell different words, so stripping them
+corrupts the text.  Casing is left to ``str.lower`` and ``str.casefold``.
+``jamo-form`` (compatibility or conjoining jamo) is a Unicode representation
+choice, not an orthographic one; it is registered because free text holds
+both and the restyle is deterministic.
 """
 from __future__ import annotations
 
@@ -175,19 +156,15 @@ class Convention:
 # Shared helpers
 # ---------------------------------------------------------------------------
 
-def _in_ranges(cp: int, ranges: Tuple[Tuple[int, int], ...]) -> bool:
-    return any(lo <= cp <= hi for lo, hi in ranges)
-
-
-def _range_strip(ranges: Tuple[Tuple[int, int], ...]) -> Callable[[str], str]:
+def _range_strip(pattern: re.Pattern) -> Callable[[str], str]:
     def _strip(text: str) -> str:
-        return "".join(c for c in text if not _in_ranges(ord(c), ranges))
+        return pattern.sub("", text)
     return _strip
 
 
-def _range_detector(ranges: Tuple[Tuple[int, int], ...]) -> Callable[[str], Optional[str]]:
+def _range_detector(pattern: re.Pattern) -> Callable[[str], Optional[str]]:
     def _detect(text: str) -> Optional[str]:
-        return "marked" if any(_in_ranges(ord(c), ranges) for c in text) else "none"
+        return "marked" if pattern.search(text) else "none"
     return _detect
 
 
@@ -212,21 +189,12 @@ _WAKACHI_SPACE = re.compile(r"[ 　]+")
 
 
 def _wakachigaki_strip(text: str) -> str:
-    out = []
-    i = 0
-    while i < len(text):
-        m = _WAKACHI_SPACE.match(text, i)
-        if m:
-            before = out[-1] if out else ""
-            after = text[m.end():m.end() + 1]
-            if not (before and after and _is_japanese_flank(before[-1])
-                    and _is_japanese_flank(after)):
-                out.append(m.group(0))
-            i = m.end()
-        else:
-            out.append(text[i])
-            i += 1
-    return "".join(out)
+    def space(m: re.Match) -> str:
+        start, end = m.span()
+        if start and end < len(text) and _is_japanese_flank(text[start - 1]) and _is_japanese_flank(text[end]):
+            return ""
+        return m.group(0)
+    return _WAKACHI_SPACE.sub(space, text)
 
 
 def _wakachigaki_apply(text: str) -> str:
@@ -284,9 +252,7 @@ def _mark_syllable(syl: str, tone: int) -> str:
                 break
     if pos == -1:
         return syl
-    marked = unicodedata.normalize(
-        "NFC", syl[:pos + 1] + _TONE_COMBINING[tone] + syl[pos + 1:])
-    return marked
+    return unicodedata.normalize("NFC", syl[:pos + 1] + _TONE_COMBINING[tone] + syl[pos + 1:])
 
 
 _NUM_SYL = re.compile(r"([a-zA-ZüÜ:]+)([0-5])")
@@ -449,10 +415,11 @@ def _marks(id: str, name: str, scripts: Tuple[str, ...],
            ranges: Tuple[Tuple[int, int], ...], reference: str,
            *, default: str = "marked") -> Convention:
     """A binary decoration: strippable marks with a range-based detector."""
+    pattern = re.compile("[" + "".join(f"{re.escape(chr(lo))}-{re.escape(chr(hi))}" for lo, hi in ranges) + "]")
     return Convention(id, name, scripts, None, ("marked", "none"), default,
                       ranges, reference,
-                      transitions=(Transition("marked", "none", _range_strip(ranges)),),
-                      detector=_range_detector(ranges))
+                      transitions=(Transition("marked", "none", _range_strip(pattern)),),
+                      detector=_range_detector(pattern))
 
 
 CONVENTION_REGISTRY: Dict[str, Convention] = {c.id: c for c in (

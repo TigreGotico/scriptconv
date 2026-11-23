@@ -1,29 +1,17 @@
 """Dictionary-backed script respelling (Japanese kanji → kana, Chinese hanzi → pinyin/bopomofo).
 
-Unlike the table-driven modules (:mod:`scriptconv.translit`,
-:mod:`scriptconv.notation`), converting kanji to kana is not a codepoint
-mapping: a kanji's kana spelling is a *lexical* property resolved against a
-reading dictionary, and genuinely ambiguous readings are decided by the
-dictionary's segmentation.  This is still orthography — the output is how the
-word is written in kana, exactly as an IME or furigana would render it — not
-phonemization; no sound rules are applied.
+The kana or pinyin spelling of a kanji or hanzi is a lexical property, so a
+reading dictionary resolves it, ambiguous readings (行 xíng/háng) included.
+The output is orthography, as an IME or furigana writes it; no sound rules
+apply.
 
-The same reasoning covers Chinese: a hanzi's pinyin or bopomofo spelling is a
-lexical property with genuinely ambiguous readings (heteronyms such as 行
-xíng/háng) resolved by a phrase dictionary — standard orthographic respelling,
-not phonemization.
-
-Because it needs reading dictionaries, this module requires optional
-dependencies: ``pykakasi`` for Japanese (``pip install scriptconv[ja]``) and
-``pypinyin`` for Chinese (``pip install scriptconv[zh]``).  Importing the
-module is always safe; the dependency is resolved on first conversion and a
-missing dictionary raises :class:`ImportError` rather than silently returning
-unconverted text.
-
-pykakasi is GPL-3.0-or-later, so the Japanese functions (:func:`tokens`,
-:func:`to_hiragana`, :func:`to_katakana` and :class:`ReadingToken`) are in the
-scriptconv-copyleft package, which the ``ja`` extra installs.  The names here
-import from it on first use.
+The dictionaries are optional: ``pykakasi`` for Japanese (``scriptconv[ja]``)
+and ``pypinyin`` for Chinese (``scriptconv[zh]``).  Importing the module is
+always safe; the first conversion without its dictionary raises
+:class:`ImportError`.  pykakasi is GPL-3.0-or-later, so the Japanese names
+(:func:`tokens`, :func:`to_hiragana`, :func:`to_katakana`,
+:class:`ReadingToken`) live in scriptconv-copyleft and import from it on first
+use.
 """
 from __future__ import annotations
 
