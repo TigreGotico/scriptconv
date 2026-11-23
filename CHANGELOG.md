@@ -1,14 +1,5 @@
 # Changelog
 
-## [0.0.4a156](https://github.com/TigreGotico/scriptconv/tree/0.0.4a156) (2026-11-23)
-
-[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a154...0.0.4a156)
-
-**Merged pull requests:**
-
-- refactor\(frontend\): shorten frontend and diacritics docs, drop a dead guard [\#418](https://github.com/TigreGotico/scriptconv/pull/418) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-- refactor\(phonemizers\): shorter docstrings and leaner code in the language wrappers [\#416](https://github.com/TigreGotico/scriptconv/pull/416) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a154](https://github.com/TigreGotico/scriptconv/tree/0.0.4a154) (2026-11-23)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a153...0.0.4a154)
