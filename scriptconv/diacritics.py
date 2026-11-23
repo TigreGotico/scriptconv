@@ -1,19 +1,11 @@
-"""Diacritization: mechanism, dispatch, and graph extension.
-
-This module OWNS diacritization — lang→backend routing, lazy/cached backend
-loading (phonikud, text2tashkeel, stressonnx, bifonia), and the overlay-strip
-helpers. :mod:`scriptconv.phonemizers` (``BasePhonemizer`` and subclasses)
-runs no diacritizer: phonemization (orthography → sound) and diacritization
-(a text → text graph transform disambiguating pronunciation before G2P) are
-separate concerns. A backend only removes, through
-:func:`replace_stress_mark`, a stress mark that it does not read.
+"""Diacritization: language routing, cached backends, and the graph edges.
 
 Diacritization (Arabic tashkeel, Hebrew niqqud, East-Slavic/Turkic/Caucasian
-word stress, European-Portuguese homograph sense marks) is, architecturally,
-just another transform between text representations: it maps the ``"text"``
-node to a lang-contextual ``"text-diacritized"`` node.  Like
-:func:`scriptconv.phonemizers.register` it is opt-in — ``DEFAULT_GRAPH`` stays
-free of it until a caller extends a graph::
+word stress, European-Portuguese homograph sense marks) maps the ``"text"``
+node to a lang-contextual ``"text-diacritized"`` node. Phonemizers run no
+diacritizer; a backend only removes, through :func:`replace_stress_mark`, a
+stress mark that it does not read. Like :func:`scriptconv.phonemizers.register`
+the edges are opt-in, so ``DEFAULT_GRAPH`` stays free of them::
 
     from scriptconv.graph import DEFAULT_GRAPH
     from scriptconv import diacritics, phonemizers
@@ -25,33 +17,20 @@ free of it until a caller extends a graph::
     g.convert("Tenho muita sede hoje.", "text", "text-diacritized", lang="pt")
     # 'Tenho muita sêde hoje.'
 
-Routing ``"text" -> "ipa"`` still takes the direct phonemization edge by
-default: the diacritization edge is model-based (``lossless=False``), so it
-never out-prices a direct phonemization, and enabling this extension does not
-silently change phonemization output.  The diacritized route is taken only
-when a caller asks for ``"text-diacritized"`` explicitly.
+The diacritization edge is model-based (``lossless=False``), so ``"text" ->
+"ipa"`` keeps the direct phonemization edge; the diacritized route is taken
+only when a caller asks for ``"text-diacritized"``.
 
-A future per-engine *stance* would push this further into topology rather than
-a flag: an engine that *requires* vocalized input would carry only a
-``"text-diacritized" -> "ipa"`` edge (forcing the detour), one that *forbids*
-diacritics would carry only ``"text" -> "ipa"`` (making the detour
-unroutable), and a tolerant engine (e.g. arbtok, which self-vocalizes) carries
-both.  The strip direction (``"text-diacritized" -> "text"``) is registered too, but
-gated to languages whose marks are removable *overlay* diacritics —
-Arabic/Hebrew vocalization and East-Slavic/Turkic/Caucasian stress. Strip
-removes only the specific overlay codepoints each backend adds (combining
-acute/grave for stress, tashkeel for Arabic, niqqud for Hebrew) — never a
-blanket combining-mark filter — so precomposed native letters survive
-(Cyrillic й/ё, Latvian macrons, Azerbaijani ç/ö, Arabic hamza carriers أ إ آ ؤ
-ئ). The gate asks linguatag which tags name Arabic in Arabic script, and
-matches the other primary subtags exactly, so Aragonese (``arg``), Herero
-(``her``), Mapudungun (``arn``) etc. are never misread as Arabic/Hebrew.
-Languages whose diacritics are native orthography (European Portuguese, via
-bifonia) refuse the strip with :class:`ValueError` instead of silently
-corrupting the spelling (``café`` must never become ``cafe``). This split
-tracks which backend/model produced the marks: overlay backends (phonikud,
-tashkeel, stressonnx) are strippable; spelling-integral backends (bifonia) are
-not.
+The strip edge (``"text-diacritized" -> "text"``) exists only for overlay
+diacritics: Arabic/Hebrew vocalization (text2tashkeel, phonikud) and stress
+(stressonnx). It removes only the codepoints each backend adds, never every
+combining mark, so precomposed native letters survive (Cyrillic й/ё, Latvian
+macrons, Azerbaijani ç/ö, Arabic hamza carriers أ إ آ ؤ ئ). Diacritics that
+are native orthography (European Portuguese, via bifonia) refuse the strip
+with :class:`ValueError`, as ``café`` must never become ``cafe``. Arabic is
+decided by linguatag and the other families by exact primary subtag, so
+Aragonese (``arg``), Herero (``her``) and Mapudungun (``arn``) are never read
+as Arabic or Hebrew.
 
 A stress mark and a letter-forming mark can be the same codepoint. In NFD text
 the Macedonian letters ѓ and ќ are г and к followed by U+0301, the codepoint
@@ -99,23 +78,14 @@ from scriptconv.phonemizers.base import (
 
 LOG = logging.getLogger(__name__)
 
-#: The lang-contextual node produced by diacritization.  Like ``"text"`` it is
-#: meaningful only with ``lang=`` context and exists only in opted-in graphs.
+#: The lang-contextual node produced by diacritization; it exists only in opted-in graphs.
 DIACRITIZED = "text-diacritized"
 
-# Across East Slavic, Bulgarian/Macedonian/Slovene, Latvian, Armenian,
-# Georgian, and several Turkic/Caucasian languages, lexical word stress is
-# free (not fixed to a syllable) and ordinary orthography leaves it unwritten
-# or under-marked. The clearest case is East Slavic: stress is also mobile
-# (it shifts between forms of the same word) and unstressed vowels *reduce*
-# — Russian unstressed "о" surfaces as [ɐ] or [ə] depending on distance from
-# the stress, not [o] — so a wrong or missing mark there corrupts the vowel
-# quality of the whole word, not just its prosody. Other families in this set
-# don't necessarily reduce vowels, but still need the mark for correct stress
-# placement and prosody. stressonnx restores it as a combining acute (U+0301)
-# after the stressed vowel, covering 26 BCP-47 tags across these families
-# (24 primary subtags; Azerbaijani and Uzbek each have Cyrillic/Latin script
-# variants routed by the full tag).
+# Languages with free word stress that ordinary spelling leaves unwritten. In
+# East Slavic unstressed vowels also reduce (Russian unstressed "о" is [ɐ] or
+# [ə]), so a missing mark changes vowel quality. stressonnx writes a combining
+# acute (U+0301) after the stressed vowel for 26 BCP-47 tags over these 24 primary
+# subtags; az and uz each have a Cyrillic and a Latin variant.
 STRESS_LANGS = {
     "az", "ba", "be", "bg", "cv", "hy", "ka", "kbd", "kjh", "kk", "ky", "lv",
     "mdf", "mk", "myv", "ru", "sah", "sl", "tg", "tt", "udm", "uk", "uz", "xal",
@@ -123,15 +93,10 @@ STRESS_LANGS = {
 
 
 def _is_european_portuguese(lang: str) -> bool:
-    """True for a tag that linguatag measures at distance 0 from ``pt-PT``.
+    """True for a tag at linguatag distance 0 from ``pt-PT``: ``pt``, ``por`` and the European lects, not ``pt-BR``.
 
-    That is ``pt``, ``pt-PT`` in any case or separator, ``pt-Latn-PT``,
-    ``por``, and the European Portuguese lects (``pt-PT-x-porto``,
-    ``pt-PT-x-lisbon``). ``pt-BR``, ``pt-AO``, ``pt-MZ`` and every other
-    language are at a larger distance and return False.
-
-    Only a ``pt`` or ``por`` primary subtag reaches linguatag, so a caller
-    that never asks for Portuguese does not need the ``phonemizers`` extra.
+    Only a ``pt`` or ``por`` primary subtag loads linguatag, so other callers
+    do not need the ``phonemizers`` extra.
     """
     if _primary_subtag(lang) not in ("pt", "por"):
         return False
@@ -153,18 +118,14 @@ _ARABIC_SCRIPT_DISTANCE = 5
 def _is_arabic_script_arabic(lang: str) -> bool:
     """True for a tag that names Arabic, or a variety of Arabic, in Arabic script.
 
-    linguatag decides both halves. ``is_arabic_variety`` names the language:
-    ``ar``, the members of the ISO 639-3 ``ara`` macrolanguage and Hassaniyya
-    (``mey``), with any script or region. ``lang_distance`` to ``ar`` adds the
-    script, because tashkeel marks only Arabic script: ``ar-Latn``, ``arz-Latn``,
-    and ``acy`` and ``pga``, which CLDR writes in Latin script, return False.
-    Persian, Urdu and ``und-Arab`` are Arabic script but not Arabic, and return
-    False too.
+    ``is_arabic_variety`` names the language (``ar``, the ISO 639-3 ``ara``
+    macrolanguage, Hassaniyya ``mey``); ``lang_distance`` to ``ar`` adds the
+    script, because tashkeel marks only Arabic script. So ``ar-Latn``, and
+    ``acy`` and ``pga``, which CLDR writes in Latin script, return False, as do
+    Persian and Urdu.
 
-    ISO 639-1 gives Arabic one two-letter code, ``ar``, and every individual
-    Arabic language has a three-letter code. So any other two-letter primary
-    subtag returns False before linguatag loads, and a caller that asks for
-    ``en`` or ``he`` does not need the ``phonemizers`` extra.
+    ISO 639-1 gives Arabic one two-letter code, ``ar``, so any other two-letter
+    subtag returns False before linguatag loads.
     """
     p = _primary_subtag(lang)
     if len(p) == 2 and p != "ar":
@@ -179,26 +140,16 @@ def _is_arabic_script_arabic(lang: str) -> bool:
             and lang_distance(lang, "ar") <= _ARABIC_SCRIPT_DISTANCE)
 
 
-#: Primary subtags whose STRESS_LANGS membership does not by itself mean the
-#: bare tag is servable — stressonnx only ships script-qualified variants
-#: (az-Cyrl/az-Latn, uz-Cyrl/uz-Latn) for these, so the bare tag is script-
-#: ambiguous. Used both by the real stressonnx-backed check and by the
-#: no-extra-installed fallback, so the two never disagree.
+#: Primary subtags that stressonnx serves only with a script subtag (az-Cyrl, uz-Latn, ...).
 _SCRIPT_AMBIGUOUS_STRESS_LANGS = frozenset({"az", "uz"})
 
 
 def _is_stress_lang_fallback(lang: str) -> bool:
-    """``_is_stress_lang`` semantics without importing stressonnx.
+    """:func:`_is_stress_lang` without stressonnx installed, by the same resolution rules.
 
-    Mirrors stressonnx's own resolution rules closely enough to agree with
-    it on every tag ``STRESS_LANGS`` can produce: an exact/regional match on
-    a member whose primary subtag isn't script-ambiguous is accepted; a
-    4-letter script subtag is only meaningful for the script-ambiguous pair
-    (az/uz) and must be Cyrl/Latn; every other script-qualified tag, and
-    every bare az/uz, is rejected rather than guessed at.
+    az and uz need a Cyrl or Latn script subtag; every other member takes no
+    script subtag.
     """
-    if not isinstance(lang, str):
-        return False
     normalized = lang.replace("_", "-")
     parts = normalized.split("-")
     p = parts[0].lower()
@@ -211,24 +162,10 @@ def _is_stress_lang_fallback(lang: str) -> bool:
 
 
 def _is_stress_lang(lang: str) -> bool:
-    """True if stressonnx actually resolves *lang* to a supported model.
+    """True if stressonnx's own ``resolve_lang`` resolves *lang* to a model.
 
-    Delegates to stressonnx's own ``resolve_lang`` (the same resolver
-    :func:`_stress` triggers indirectly through ``stress()``) instead of
-    re-deriving the resolution rules here, so this and the real call can
-    never disagree — e.g. a bare ``"az"``/``"uz"`` is script-ambiguous and
-    stressonnx rejects it even though ``"az"``/``"uz"`` are primary subtags
-    of a ``STRESS_LANGS`` member, while a regional tag like ``"ru-RU"``
-    resolves fine to ``"ru"``. Only reached once :func:`_diacritizer_family`
-    has already matched the primary subtag against ``STRESS_LANGS``, so
-    non-stress tags (``en``, ``pt`` …) never pay for the stressonnx import
-    or the exception-based resolution.
-
-    Falls back to :func:`_is_stress_lang_fallback` — the same script-
-    ambiguity rule, evaluated without importing stressonnx — when the
-    optional ``[stress]`` extra isn't installed, so ``pip install
-    scriptconv[stress]`` changes only whether generation *works*, never
-    which tags are claimed as stress-family.
+    A bare ``az`` or ``uz`` does not resolve; ``ru-RU`` does. Without the
+    ``stress`` extra, :func:`_is_stress_lang_fallback` gives the same answer.
     """
     try:
         from stressonnx import ALL_LANGS
@@ -244,23 +181,11 @@ def _is_stress_lang(lang: str) -> bool:
 
 
 def _diacritizer_family(lang: str) -> Optional[str]:
-    """Which diacritization backend family handles *lang*, or ``None``.
+    """The diacritizer family of *lang*: ``"he"``, ``"ar"``, ``"stress"``, ``"pt"`` or ``None``.
 
-    Single source of truth for lang→backend routing for the *strip*
-    direction (:func:`_overlay_marks`) and for which languages carry
-    overlay marks at all: it uses the broad ``STRESS_LANGS`` primary-subtag
-    membership, not stressonnx's stricter script-resolution rules, because
-    stripping needs no model and every ``STRESS_LANGS`` member (bare az/uz
-    included) writes its overlay marks the same way regardless of script
-    ambiguity. :func:`diacritize`'s *generation* path narrows the "stress"
-    result further through :func:`_is_stress_lang` before actually calling
-    stressonnx, since only that path needs the real resolution. Returns one
-    of ``"he"`` (niqqud), ``"ar"`` (tashkeel), ``"stress"`` (stressonnx),
-    ``"pt"`` (bifonia sense diacritics), or ``None``. Hebrew and stress use
-    exact primary-subtag matching (never ``startswith``), so Herero (``her``)
-    is never misread as Hebrew. Arabic is decided by linguatag (see
-    :func:`_is_arabic_script_arabic`), so Aragonese (``arg``) and Mapudungun
-    (``arn``) are never misread as Arabic.
+    ``"stress"`` is any ``STRESS_LANGS`` primary subtag, bare az/uz included,
+    as stripping needs no model; :func:`diacritize` narrows it through
+    :func:`_is_stress_lang` before it calls stressonnx.
     """
     p = _primary_subtag(lang)
     if p == "he":
@@ -287,24 +212,17 @@ _DEFAULT_DIACRITIZER_MODEL = "rawi-ensemble"
 _PHONIKUD_CACHE: dict = {}   # resolved model path/string -> Phonikud instance
 _TASHKEEL_CACHE: dict = {}  # (model name, waqf) -> text2tashkeel Diacritizer
 
-# phonikud is a small (~100MB), public, unlicensed-restriction ONNX model, so
-# — unlike the large/licensed models behind mul.py's ByT5/Charsiu backends —
-# scriptconv auto-provisions it: no local path is required unless the caller
-# wants to override the cache (e.g. an air-gapped host).
+# A small public model, so scriptconv downloads it on first use.
 _PHONIKUD_URL = "https://huggingface.co/thewh1teagle/phonikud-onnx/resolve/main/phonikud-1.0.int8.onnx"
 
 
 def _default_phonikud_model() -> str:
-    """Resolve (downloading and caching on first use if needed) the path to
-    the default phonikud ONNX model.
+    """The path of the default phonikud model, downloaded on first use.
 
-    Cache directory: ``<base>/scriptconv/phonikud`` where ``<base>`` is
-    ``$SCRIPTCONV_CACHE`` if set, else ``$XDG_CACHE_HOME`` (default
-    ``~/.cache``) — i.e. ``~/.cache/scriptconv/phonikud`` by default. The
-    download is written to a temp file
-    in the same directory and atomically moved into place via
-    :func:`os.replace`, so a failed or interrupted download never leaves a
-    partial file at the destination path.
+    The cache is ``<base>/scriptconv/phonikud``, with ``<base>`` from
+    ``$SCRIPTCONV_CACHE``, else ``$XDG_CACHE_HOME``, else ``~/.cache``. The
+    download goes to a temporary file that replaces the destination only when
+    complete.
     """
     base = os.environ.get("SCRIPTCONV_CACHE") or os.environ.get(
         "XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
@@ -315,10 +233,7 @@ def _default_phonikud_model() -> str:
         fd, tmp_path = tempfile.mkstemp(dir=str(cache_dir), prefix=".phonikud-", suffix=".tmp")
         try:
             with os.fdopen(fd, "wb") as tmp_f, urllib.request.urlopen(_PHONIKUD_URL) as resp:
-                while True:
-                    chunk = resp.read(1024 * 1024)
-                    if not chunk:
-                        break
+                while chunk := resp.read(1024 * 1024):
                     tmp_f.write(chunk)
             os.replace(tmp_path, dest)
         except BaseException:
@@ -329,16 +244,7 @@ def _default_phonikud_model() -> str:
 
 
 def _phonikud(phonikud_model=None):
-    """Lazily build (and cache) the phonikud Phonikud instance used for Hebrew.
-
-    ``phonikud_model`` is optional: a local path to a phonikud ONNX model, or
-    a zero-arg callable resolving one lazily. When omitted, scriptconv
-    auto-provisions the small public phonikud model, downloading it once into
-    a cache dir (see :func:`_default_phonikud_model`) and reusing it on
-    subsequent calls. Pass an explicit path/callable to override — e.g. to
-    point at a model already on disk, or on an air-gapped host. Install
-    phonikud-onnx with ``pip install scriptconv[he]`` (or ``pip install
-    phonikud-onnx``)."""
+    """The cached phonikud instance of *phonikud_model*: a path, a zero-arg callable that gives one, or ``None`` for the default model."""
     model = phonikud_model() if callable(phonikud_model) else phonikud_model
     if not model:
         model = _default_phonikud_model()
@@ -466,13 +372,7 @@ def _nakdimon(text: str) -> str:
 
 
 def _tashkeel(model: Optional[str] = None, waqf: bool = False):
-    """Lazily build (and cache) the text2tashkeel Diacritizer used for Arabic.
-
-    text2tashkeel is a dependency of the ``[ar]`` extra; it restores hamza and the
-    dagger alef in addition to the standard marks. With ``waqf=True`` the
-    Diacritizer drops the case and mood endings and gives the pausal form.
-    Install with ``pip install scriptconv[tashkeel]`` (or ``pip install
-    text2tashkeel``)."""
+    """The cached text2tashkeel Diacritizer; ``waqf=True`` gives the pausal form, without case and mood endings."""
     model = model or _DEFAULT_DIACRITIZER_MODEL
     key = (model, waqf)
     if key not in _TASHKEEL_CACHE:
@@ -488,13 +388,7 @@ def _tashkeel(model: Optional[str] = None, waqf: bool = False):
 
 
 def _stress(text: str, lang: str, model: Optional[str] = None) -> str:
-    """Word-stress restoration via stressonnx, for the 26 language tags
-    it covers (see ``STRESS_LANGS``) — East Slavic, Bulgarian/Macedonian/
-    Slovene, Latvian, Armenian, Georgian, and Turkic/Caucasian languages.
-
-    stressonnx is not on PyPI yet; install straight from source. Install
-    with ``pip install scriptconv[stress]`` (or ``pip install
-    stressonnx``)."""
+    """*text* with word stress from stressonnx."""
     try:
         from stressonnx import stress
     except ImportError as e:
@@ -506,15 +400,10 @@ def _stress(text: str, lang: str, model: Optional[str] = None) -> str:
 
 
 def _sense_diacritics_pt(text: str, lang: str) -> str:
-    """European-Portuguese heterophonic-homograph sense diacritics via bifonia.
+    """*text* with bifonia's open or closed vowel marks on European-Portuguese homographs, as "sêde" (thirst).
 
-    Rewrites homographs whose pronunciation depends on meaning (e.g.
-    "sede" thirst/closed vs. seat/open) with an explicit open/closed
-    vowel diacritic. These are ordinary Portuguese orthographic marks,
-    chosen so any downstream G2P — rule-based, neural, or espeak —
-    reads them correctly. *lang* goes to bifonia unchanged, so a lect tag
-    such as ``pt-PT-x-porto`` reaches bifonia's per-lect rows. Install with
-    ``pip install scriptconv[pt]`` (or ``pip install bifonia``)."""
+    *lang* goes to bifonia unchanged, so a lect tag reaches its per-lect rows.
+    """
     try:
         from bifonia import add_extra_diacritics
     except ImportError as e:
@@ -535,42 +424,26 @@ def diacritize(text: str, lang: str = "und", diacritizer_model=None,
                waqf: Optional[bool] = None, **kwargs) -> str:
     """Add pronunciation-disambiguating diacritics to *text* for *lang*.
 
-    ``diacritizer_model=`` is the one model knob for the diacritizer edge — the
-    model for whichever backend the language routes to (there is one such knob,
-    parallel to ``phonemizer_model=`` on the ``text -> ipa`` phonemizer edge):
+    ``diacritizer_model`` is the model of whichever backend *lang* routes to:
 
-    - Hebrew (``he``) — niqqud via phonikud; ``diacritizer_model`` is the
-      phonikud ONNX path (or a zero-arg callable). Optional: when omitted the
-      small public phonikud model is auto-downloaded and cached
-      (``$SCRIPTCONV_CACHE``/``$XDG_CACHE_HOME``). phonikud writes ``|``
-      after a prefix letter (``שֶׁ|אֵינָם``); the returned text has no ``|``
-      inside a word, because a phonemizer that splits text at ``|`` would cut
-      the word. A ``|`` between two words stays. ``diacritizer_model="nakdimon"``
-      selects the Nakdimon model instead, downloaded and cached the same way;
-      text that already holds niqqud stays as written.
-    - Arabic (``ar``, every individual Arabic language such as ``arz`` or
-      ``apc``, and Hassaniyya ``mey``, in Arabic script) — tashkeel via
-      text2tashkeel (``[tashkeel]``); ``diacritizer_model`` is the
-      text2tashkeel model name (defaults to ``rawi-ensemble``). ``waqf=True``
-      gives the pausal form, without the case and mood endings; ``None`` and
-      ``False`` keep the full endings. Other backends ignore ``waqf``.
-    - East Slavic, Bulgarian/Macedonian/Slovene, Latvian, Armenian, Georgian,
-      and Turkic/Caucasian languages (``STRESS_LANGS``, 26 stressonnx tags) —
-      word stress via stressonnx (``[stress]``); ``diacritizer_model`` is the
-      stressonnx model. Stress is unwritten or under-marked in these languages,
-      and in East Slavic unstressed vowels also reduce, so a missing mark can
-      corrupt more than prosody.
-    - European Portuguese (``pt``, ``pt-PT`` and its lects, never ``pt-BR``) —
-      heterophonic-homograph sense diacritics via bifonia (``[pt]``);
-      ordinary Portuguese orthographic marks that any downstream G2P reads
-      correctly.
+    - Hebrew (``he``): niqqud from phonikud. The model is a phonikud ONNX
+      path or a zero-arg callable; without one the public model is downloaded
+      and cached. The ``|`` that phonikud writes after a prefix letter
+      (``שֶׁ|אֵינָם``) is removed inside a word, so a phonemizer that splits at
+      ``|`` keeps the word whole; a ``|`` between words stays.
+      ``"nakdimon"`` selects Nakdimon, downloaded the same way; text that
+      already holds niqqud stays as written.
+    - Arabic in Arabic script (``ar``, ``arz``, ``apc``, Hassaniyya ``mey``):
+      tashkeel from text2tashkeel, model name default ``rawi-ensemble``.
+      ``waqf=True`` gives the pausal form; other backends ignore ``waqf``.
+    - ``STRESS_LANGS``: word stress from stressonnx.
+    - European Portuguese (``pt``, ``pt-PT`` and its lects, never ``pt-BR``):
+      homograph sense diacritics from bifonia.
 
-    Unrecognized languages are returned unchanged. Each backend raises
-    ``ImportError`` naming its extra when the optional dependency is missing
-    — scriptconv never installs anything on the caller's behalf.
+    Other languages come back unchanged. A missing backend raises
+    ``ImportError`` that names its extra. ``phonikud_model=`` and ``model=``
+    are accepted as other names of ``diacritizer_model``.
     """
-    # one knob for the diacritizer edge; fold the pre-unification kwargs so
-    # older callers keep working (phonikud_model was the Hebrew-only name).
     diacritizer_model = (diacritizer_model or kwargs.get("phonikud_model")
                          or kwargs.get("model"))
     family = _diacritizer_family(lang)
@@ -581,11 +454,7 @@ def diacritize(text: str, lang: str = "und", diacritizer_model=None,
     if family == "ar":
         return _tashkeel(diacritizer_model, waqf=bool(waqf)).diacritize(text)
     if family == "stress":
-        # _diacritizer_family's "stress" match is the broad STRESS_LANGS
-        # primary-subtag test (also used for stripping); generation needs
-        # stressonnx's stricter, script-aware resolution — a bare az/uz or
-        # a script-mismatched regional tag (e.g. "ru-Latn") is script-
-        # ambiguous/unsupported and must not reach the backend at all.
+        # a bare az/uz, or a script that stressonnx does not write (ru-Latn), never reaches it
         if _is_stress_lang(lang):
             return _stress(text, lang, diacritizer_model)
         return text
@@ -594,15 +463,9 @@ def diacritize(text: str, lang: str = "und", diacritizer_model=None,
     return text
 
 
-# Combining marks each diacritization backend overlays onto the bare text.
-# Strip removes ONLY these codepoints — never a blanket combining-mark filter,
-# which (via NFD) would decompose and destroy precomposed native letters:
-# Cyrillic й/ё, Latvian ī, Azerbaijani ç/ö, and Arabic hamza carriers أ إ آ ؤ ئ.
+# The combining marks each backend overlays on the bare text, which strip removes.
+# stressonnx writes the acute; the grave also writes stress, as in Bulgarian.
 _STRESS_MARKS = frozenset({0x0300, 0x0301})            # combining grave / acute
-# U+0300 is included defensively alongside the U+0301 that stressonnx
-# actually emits, in case any backend/locale marks secondary stress with a
-# grave instead of an acute; harmless to strip since native precomposed
-# letters (e.g. Cyrillic й/ё) are unaffected either way.
 _ARABIC_MARKS = frozenset(range(0x064B, 0x0660)) | frozenset({0x0670})  # tashkeel + dagger alef
 _HEBREW_MARKS = (frozenset(range(0x05B0, 0x05BE))
                  | frozenset({0x05BF, 0x05C1, 0x05C2, 0x05C4, 0x05C5, 0x05C7}))  # niqqud
@@ -613,14 +476,7 @@ _NATIVE_ACCENTED_LETTERS = {"mk": frozenset("ЃѓЌќ")}
 
 
 def _overlay_marks(lang: str) -> "frozenset | None":
-    """The overlay codepoints for *lang*'s diacritization backend, or None.
-
-    Resolves the backend family through :func:`_diacritizer_family` (the shared
-    lang→backend routing), so this can never disagree with
-    :func:`diacritize` about which language a backend owns.
-    Only *overlay* families are strippable: ``"pt"`` (bifonia sense marks are
-    native orthography) and ``None`` both return None.
-    """
+    """The overlay codepoints of *lang*'s diacritizer family, or None where its marks are spelling or it has none."""
     family = _diacritizer_family(lang)
     if family == "stress":
         return _STRESS_MARKS
@@ -638,19 +494,12 @@ def _supports_strip(lang: str) -> bool:
 
 
 def strip_diacritics(text: str, lang: str = "und", **_) -> str:
-    """Remove the overlay diacritics *lang*'s backend adds, recovering the bare
-    text WITHOUT touching native letters.
+    """*text* without the overlay diacritics that *lang*'s backend adds; native letters stay.
 
-    Removes only the specific overlay codepoints (combining acute/grave for
-    stress, tashkeel for Arabic, niqqud for Hebrew) — precomposed native
-    letters (Cyrillic й/ё, Latvian ī, Azerbaijani ç, Arabic hamza carriers) are
-    left intact. A mark that composes with the letter before it into a letter
-    of the language's alphabet is kept too, composed with that letter. So when
-    U+0301 comes right after г or к, as in NFD ѓ and ќ, strip writes the
-    precomposed letter that NFC input gives. Raises
-    :class:`ValueError` for languages whose diacritics are part of the native
-    orthography (e.g. European Portuguese), where any removal would corrupt
-    the spelling.
+    A mark that composes with the letter before it into a letter of the
+    language's alphabet, as U+0301 after г in NFD ѓ, is kept and written
+    composed. Raises :class:`ValueError` where the diacritics are spelling, as
+    in European Portuguese.
     """
     marks = _overlay_marks(lang)
     if marks is None:
@@ -738,18 +587,12 @@ def replace_stress_mark(text: str, lang: str, before: str = "", after: str = "")
 
 
 def register(graph) -> None:
-    """Opt-in graph integration: add the diacritize/strip edge pair.
+    """Add the ``text <-> text-diacritized`` edges to *graph*.
 
-    ``text -> text-diacritized`` is model-based (``lossless=False``), so a
-    direct ``text -> ipa`` phonemization always out-prices the detour —
-    enabling this extension is safe and non-invasive.  Pair with
-    :func:`scriptconv.phonemizers.register` to make
-    ``"text-diacritized" -> "ipa"`` reachable.
-
-    ``text-diacritized -> text`` (:func:`strip_diacritics`) is cheap but not
-    lossless: a letter with a mark and the bare letter strip to one string, so
-    no reverse returns both.  It is gated: it raises for languages whose
-    diacritics are native orthography rather than removable overlays.
+    Both are ``lossless=False``: the diacritize edge is model-based, and
+    :func:`strip_diacritics` maps a marked and a bare letter to one string.
+    Pair with :func:`scriptconv.phonemizers.register` to reach
+    ``"text-diacritized" -> "ipa"``.
     """
     graph.register(
         Edge("text", DIACRITIZED,
