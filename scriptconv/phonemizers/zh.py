@@ -34,7 +34,6 @@ import re
 import unicodedata
 from typing import List
 
-
 from scriptconv.phonemizers.base import BasePhonemizer, UnreadTextError, _check_alphabet
 from scriptconv.phonemizers._thirdparty.zh_num import num2str
 from scriptconv.phonemizers.enums import Alphabet
@@ -62,45 +61,21 @@ def _standard_pinyin(syllable: str) -> str:
     return _NUE_LUE.sub(r"\1ü", syllable.replace("u:", "ü"))
 
 
-
 class JiebaPhonemizer(BasePhonemizer):
-    """
-    A non-phonemizing class that simply uses Jieba to segment Chinese text
-    into words with spaces for token separation.
-    """
+    """Chinese text cut into words by Jieba, with a space between words; no phonemes."""
 
     engine_distribution = "jieba"
+
     def __init__(self):
         super().__init__(Alphabet.HANZI)
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
-        """
-        Validates and returns the closest supported language code.
-
-        Args:
-            target_lang (str): The language code to validate.
-
-        Returns:
-            str: The validated language code.
-
-        Raises:
-            ValueError: If the language code is unsupported.
-        """
-        # this check is here only to throw an exception if invalid language is provided
+        """``"zh"`` when *target_lang* is close to it; raises ValueError otherwise."""
         return cls.match_lang(target_lang, ["zh"])
 
     def phonemize_string(self, text: str, lang: str = "zh") -> str:
-        """
-        Segments the input Chinese text using Jieba.
-
-        Args:
-            text (str): The input sentence.
-            lang (str): Language code (must be "zh").
-
-        Returns:
-            str: Tokenized text with words separated by spaces.
-        """
+        """The words of *text* as Jieba cuts them, with digits read as Chinese numbers."""
         try:
             import jieba
         except ImportError as e:
@@ -109,28 +84,23 @@ class JiebaPhonemizer(BasePhonemizer):
                 "Install it with 'pip install jieba' "
                 "(or 'pip install scriptconv[zh-phonemizers]')."
             ) from e
-        lang = self.get_lang(lang)
+        self.get_lang(lang)
         seg_list = jieba.cut(text, cut_all=False)
-        # NFKC folds full-width digits (e.g. "３") to ASCII so num2str's
-        # DIGITS table (keyed by ASCII "0"-"9") never raises KeyError on them
+        # NFKC folds a full-width digit such as "３" to the ASCII digit that num2str reads.
         seg_list = [num2str(unicodedata.normalize("NFKC", w)) if w.isdigit() else w for w in seg_list]
         return " ".join(seg_list)
 
 
 class BaseChinesePinyinPhonemizer(BasePhonemizer):
-    """
-    Base class for Chinese phonemizers using different pinyin G2P libraries.
-    Supports optional IPA conversion and segmentation via Jieba.
+    """Base of the Chinese phonemizers that read pinyin from a G2P library.
+
+    Args:
+        alphabet: ``Alphabet.PINYIN``, or ``Alphabet.IPA`` to convert the pinyin to IPA.
+        jieba: cut the text into words with Jieba before reading it.
+        retone: write the IPA tones as arrows (see :meth:`_retone`).
     """
 
     def __init__(self, alphabet=Alphabet.PINYIN, jieba: bool = True, retone=True):
-        """
-        Initializes the phonemizer.
-
-        Args:
-            ipa (bool): Whether to convert pinyin to IPA.
-            jieba (bool): Whether to segment text using Jieba before phonemization.
-        """
         _check_alphabet(self, alphabet, [Alphabet.PINYIN, Alphabet.IPA])
         super().__init__(alphabet)
         self.jieba = jieba
@@ -146,51 +116,27 @@ class BaseChinesePinyinPhonemizer(BasePhonemizer):
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
-        """
-        Validates and returns the closest supported language code.
-
-        Args:
-            target_lang (str): The language code to validate.
-
-        Returns:
-            str: The validated language code.
-
-        Raises:
-            ValueError: If the language code is unsupported.
-        """
-        # this check is here only to throw an exception if invalid language is provided
+        """``"zh"`` when *target_lang* is close to it; raises ValueError otherwise."""
         return cls.match_lang(target_lang, ["zh"])
 
     @staticmethod
     def _retone(p):
+        """*p* with tone letters as arrows, and syllabic ɻ̩ or ɹ̩ as ɨ."""
         p = p.replace('˧˩˧', '↓')  # third tone
         p = p.replace('˧˥', '↗')  # second tone
         p = p.replace('˥˩', '↘')  # fourth tone
         p = p.replace('˥', '→')  # first tone
-        p = p.replace(chr(635) + chr(809), 'ɨ').replace(chr(633) + chr(809), 'ɨ')
-        # U+0329 (combining vertical line below, syllabic diacritic) is only
-        # ever expected attached to ɻ/ɹ (U+027B/U+0279) above, which the two
-        # replacements just consumed; any leftover means pinyin_to_ipa
-        # emitted an unanticipated syllabic marking. Rather than crashing in
-        # production, leave it in place — it's still valid IPA, just not
-        # collapsed to the ɨ shorthand.
-        return p
+        # Any other syllabic mark (U+0329) stays: it is valid IPA.
+        return p.replace("\u027b\u0329", 'ɨ').replace("\u0279\u0329", 'ɨ')
 
     def to_ipa(self, phones: List[str]) -> List[str]:
-        """
-        Converts a list of pinyin syllables to IPA.
+        """The IPA of each pinyin token of *phones*.
 
         A token with no letters or digits, such as punctuation, is kept as it
         is. An erhua suffix that the backend read from 儿 gives the coda ɚ̯ of
         the syllable before it. A syllable that is not pinyin gives no IPA: it
         logs a warning, or raises :class:`UnreadTextError` when :attr:`strict`
         is set.
-
-        Args:
-            phones (List[str]): List of pinyin syllables or phrases.
-
-        Returns:
-            List[str]: Corresponding IPA.
         """
         ipa_phones: List[str] = []
         for p in phones:
@@ -244,15 +190,13 @@ class BaseChinesePinyinPhonemizer(BasePhonemizer):
 
     def phonemize_to_list(self, text: str, lang: str) -> List[str]:
         phones: List[str] = []
-        lang = self.get_lang(lang)
+        self.get_lang(lang)
         if self.jieba:
             import jieba
             for chunk in jieba.cut(text, cut_all=False):
                 if chunk.isspace():
                     continue  # each word already ends in a space
-                if chunk.isdigit():
-                    # NFKC folds full-width digits (e.g. "３") to ASCII so
-                    # num2str's DIGITS table never raises KeyError on them
+                if chunk.isdigit():  # NFKC folds a full-width digit for num2str
                     chunk = num2str(unicodedata.normalize("NFKC", chunk))
                 phones += self.get_pinyin(chunk)
                 phones += [" "]  # keep jieba whitespace
@@ -263,38 +207,16 @@ class BaseChinesePinyinPhonemizer(BasePhonemizer):
         return phones
 
     def phonemize_string(self, text: str, lang: str = "zh") -> str:
-        """
-        Converts input text to a space-separated phoneme string.
-
-        Args:
-            text (str): The input sentence.
-            lang (str): Language code (must be "zh").
-
-        Returns:
-            str: Space-separated phoneme string.
-        """
-        phones: List[str] = self.phonemize_to_list(text, lang)
-        return "".join(phones)
+        """The tokens of :meth:`phonemize_to_list` joined into one string."""
+        return "".join(self.phonemize_to_list(text, lang))
 
     @abc.abstractmethod
     def get_pinyin(self, text: str) -> List[str]:
-        """
-        Abstract method to be implemented by subclasses for converting text to pinyin.
-
-        Args:
-            text (str): Input Chinese text.
-
-        Returns:
-            List[str]: List of pinyin tokens.
-        """
-        return NotImplemented
+        """The pinyin tokens of *text*."""
 
 
 class G2pCPhonemizer(BaseChinesePinyinPhonemizer):
-    """
-    Phonemizer using g2pc (CRF-based Grapheme-to-Phoneme converter).
-    https://github.com/Kyubyong/g2pC
-    """
+    """Pinyin from g2pc, a CRF grapheme-to-phoneme model (https://github.com/Kyubyong/g2pC)."""
 
     engine_distribution = "g2pc"
 
@@ -314,23 +236,11 @@ class G2pCPhonemizer(BaseChinesePinyinPhonemizer):
         super().__init__(alphabet, jieba)
 
     def get_pinyin(self, text: str) -> List[str]:
-        """
-        Returns a list of pinyin syllables from g2pc.
-
-        Args:
-            text (str): Input Chinese text.
-
-        Returns:
-            List[str]: Pinyin tokens.
-        """
         return [a[3] for a in self.g2p(text)]
 
 
 class G2pMPhonemizer(BaseChinesePinyinPhonemizer):
-    """
-    Phonemizer using g2pM - A Neural Grapheme-to-Phoneme Conversion Package for Mandarin Chinese
-    https://github.com/kakaobrain/g2pm
-    """
+    """Pinyin from g2pM, a neural grapheme-to-phoneme model for Mandarin (https://github.com/kakaobrain/g2pm)."""
 
     engine_distribution = "g2pM"
 
@@ -350,15 +260,6 @@ class G2pMPhonemizer(BaseChinesePinyinPhonemizer):
         super().__init__(alphabet, jieba)
 
     def get_pinyin(self, text: str) -> List[str]:
-        """
-        Returns a list of pinyin tokens from g2pM.
-
-        Args:
-            text (str): Input Chinese text.
-
-        Returns:
-            List[str]: Pinyin tokens.
-        """
         tokens = self.g2p(text, tone=self.tone, char_split=self.char_split)
         # g2pM writes a reading of one letter with no "|" around it, so it joins
         # that reading to the tokens next to it. Readings of one letter come
@@ -388,9 +289,7 @@ class G2pMPhonemizer(BaseChinesePinyinPhonemizer):
 
 
 class XpinyinPhonemizer(BaseChinesePinyinPhonemizer):
-    """
-    Phonemizer using xpinyin (basic pinyin generator with optional tone marks).
-    """
+    """Pinyin from xpinyin, with tone numbers by default."""
 
     engine_distribution = "xpinyin"
 
@@ -407,22 +306,11 @@ class XpinyinPhonemizer(BaseChinesePinyinPhonemizer):
         super().__init__(alphabet, jieba)
 
     def get_pinyin(self, text: str) -> List[str]:
-        """
-        Returns a list of pinyin tokens from xpinyin.
-
-        Args:
-            text (str): Input Chinese text.
-
-        Returns:
-            List[str]: Pinyin tokens.
-        """
         return self.g2p.get_pinyin(text, tone_marks=self.tone_marks).split("-")
 
 
 class PypinyinPhonemizer(BaseChinesePinyinPhonemizer):
-    """
-    Phonemizer using pypinyin (comprehensive and accurate pinyin library).
-    """
+    """Pinyin from pypinyin."""
 
     engine_distribution = "pypinyin"
 
@@ -438,13 +326,4 @@ class PypinyinPhonemizer(BaseChinesePinyinPhonemizer):
         super().__init__(alphabet, jieba)
 
     def get_pinyin(self, text: str) -> List[str]:
-        """
-        Returns a list of pinyin tokens from pypinyin.
-
-        Args:
-            text (str): Input Chinese text.
-
-        Returns:
-            List[str]: Pinyin tokens.
-        """
         return [p[0] for p in self.g2p(text)]

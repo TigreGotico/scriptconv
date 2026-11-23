@@ -1,4 +1,4 @@
-"""multilingual phonemizers"""
+"""Phonemizers that read many languages."""
 
 import json
 import os
@@ -15,8 +15,7 @@ from scriptconv.diacritics import _diacritizer_family, strip_diacritics
 from scriptconv.phonemizers._moved import deprecated_getattr
 from scriptconv.phonemizers.enums import Alphabet
 from scriptconv.phonemizers.base import BasePhonemizer, UnsupportedLanguageError, _check_alphabet
-# minimal ONNX session construction — scriptconv has no provider
-# machinery; consumers wanting CUDA/etc. pass providers= explicitly
+# An ONNX Runtime execution provider name. A caller that wants CUDA passes providers=.
 ProviderSpec = str
 
 
@@ -43,12 +42,9 @@ def _is_hk_cantonese(lang: str) -> bool:
 
 
 class ByT5Phonemizer(BasePhonemizer):
-    """
-    A phonemizer class that uses a ByT5 ONNX model to convert text into phonemes.
-    """
+    """Text to IPA with a ByT5 ONNX model."""
     MODEL2URL = {
         "OpenVoiceOS/g2p-mbyt5-12l-ipa-childes-espeak-onnx": "https://huggingface.co/OpenVoiceOS/g2p-mbyt5-12l-ipa-childes-espeak-onnx/resolve/main/fdemelo_g2p-mbyt5-12l-ipa-childes-espeak.onnx",
-    #    "OpenVoiceOS/g2p-multilingual-byt5-tiny-8l-ipa-childes-onnx": "https://huggingface.co/OpenVoiceOS/g2p-multilingual-byt5-tiny-8l-ipa-childes-onnx/resolve/main/byt5_g2p_model.onnx"
     }
     TOKENIZER_CONFIG_URL = "https://huggingface.co/OpenVoiceOS/g2p-multilingual-byt5-tiny-8l-ipa-childes-onnx/resolve/main/tokenizer_config.json"
 
@@ -56,28 +52,22 @@ class ByT5Phonemizer(BasePhonemizer):
                  'ga-IE', 'hr-HR', 'hu-HU', 'id-ID', 'is-IS', 'it-IT', 'ja-JP', 'ko-KR', 'nb-NO', 'nl-NL', 'pl-PL',
                  'pt-BR', 'pt-PT', 'qu-PE', 'ro-RO', 'sr-RS', 'sv-SE', 'tr-TR', 'yue-CN', 'zh-CN']
 
-    _LEGACY_MODELS = ["g2p-multilingual-byt5-tiny-8l-ipa-childes-onnx"]
-    _LEGACY_LANGS = ['ca', 'cy', 'da', 'de', 'en-na', 'en-uk', 'es', 'et', 'eu', 'fa', 'fr', 'ga', 'hr', 'hu', 'id', 'is',
-                   'it', 'ja', 'ko', 'nl', 'no', 'pl', 'pt', 'pt-br', 'qu', 'ro', 'sr', 'sv', 'tr', 'zh', 'zh-yue']
-
     def __init__(self, model: Optional[str] = None, tokenizer_config: Optional[str] = None,
                  providers: Optional[Sequence[ProviderSpec]] = None,
                  use_cuda=bool(os.environ.get("CUDA", False))):
         """
-        Initializes the ByT5Phonemizer with the ONNX model and tokenizer configuration.
-        If paths are not provided, it attempts to download them to a local directory.
-
         Args:
-            model (str, optional): Path to the ONNX model file. If None, it will be downloaded.
-            tokenizer_config (str, optional): Path to the tokenizer configuration JSON file. If None, it will be downloaded.
-            providers (Sequence, optional): Ordered ONNX Runtime execution providers.
-            use_cuda (bool): Deprecated alias for ``providers=["CUDAExecutionProvider"]``.
+            model: path to a local ONNX model file. scriptconv never downloads
+                one; MODEL2URL names where the published models live.
+            tokenizer_config: path to a local ``tokenizer_config.json``
+                (see TOKENIZER_CONFIG_URL).
+            providers: ordered ONNX Runtime execution providers.
+            use_cuda: deprecated alias for ``providers=["CUDAExecutionProvider"]``.
+
+        Raises:
+            ValueError: If either path is not a file.
         """
         super().__init__(Alphabet.IPA)
-        # scriptconv never downloads models: both paths must point at local
-        # files. The MODEL2URL/TOKENIZER_CONFIG_URL constants document where
-        # the published models live; downstream stacks (phoonnx) resolve and
-        # cache them, then pass the paths here.
         if not model or not os.path.isfile(model):
             raise ValueError(
                 "ByT5 phonemization needs a local ONNX model file: pass "
@@ -96,129 +86,43 @@ class ByT5Phonemizer(BasePhonemizer):
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
-        """
-        Validates and returns the closest supported language code.
-
-        Args:
-            target_lang (str): The language code to validate.
-
-        Returns:
-            str: The validated language code.
-
-        Raises:
-            ValueError: If the language code is unsupported.
-        """
-        # Find the closest match
+        """The closest label of BYT5_LANGS; raises ValueError when none is close."""
         return cls.match_lang(target_lang, cls.BYT5_LANGS)
 
     def _decode_phones(self, preds: List[int]) -> str:
-        """
-        Decodes predicted token IDs back into phonemes.
-
-        Args:
-            preds (list): A list of predicted token IDs from the ONNX model.
-
-        Returns:
-            str: The decoded phoneme string.
-        """
-        # Convert token IDs back to bytes, excluding special/added tokens
-        phone_bytes = [
-            bytes([token - 3]) for token in preds
-            if str(token) not in self.tokens
-        ]
-        # Join bytes and decode to UTF-8, ignoring errors
-        phones = b''.join(phone_bytes).decode("utf-8", errors="ignore")
-        return phones
+        """The UTF-8 text of the predicted token ids, without the added tokens."""
+        return bytes(token - 3 for token in preds
+                     if str(token) not in self.tokens).decode("utf-8", errors="ignore")
 
     @classmethod
     def _encode_text(cls, text: str, lang: str) -> "np.ndarray":
+        """The input ids of ``<lang>: text``, with *lang* matched to a model label."""
         import numpy as np
-        """
-        Encodes input text and language into a numpy array suitable for the model.
-        This function replaces the Hugging Face tokenizer for input preparation.
-
-        Args:
-            text (str): The input text to encode.
-            lang (str): The language code for the text.
-
-        Returns:
-            numpy.ndarray: A numpy array of encoded input IDs.
-        """
-        lang = cls.get_lang(lang)  # match lang code
-        # Prepend language tag and encode the string to bytes
-        encoded_bytes = f"<{lang}>: {text}".encode("utf-8")
-        # Convert bytes to a list of integers, adding a shift to account for special tokens
-        # (<pad>, </s>, <unk> are typically 0, 1, 2, so we shift by 3 to avoid collision)
-        model_inputs = np.array([list(byte + 3 for byte in encoded_bytes)], dtype=np.int64)
-        return model_inputs
+        encoded_bytes = f"<{cls.get_lang(lang)}>: {text}".encode("utf-8")
+        # Byte b is token b + 3: ids 0, 1 and 2 are <pad>, </s> and <unk>.
+        return np.array([[byte + 3 for byte in encoded_bytes]], dtype=np.int64)
 
     def _infer_onnx(self, text: str, lang: str) -> str:
+        """The phonemes of *text* by greedy decoding; ``""`` for blank text."""
         import numpy as np
-        """
-        Performs inference using ONNX Runtime without relying on Hugging Face Tokenizer.
-
-        Args:
-            text (str): The input text for G2P conversion.
-            lang (str): The language of the input text.
-
-        Returns:
-            str: The predicted phoneme string. Returns an empty string if the input text is empty.
-        """
         if not text.strip():
             return ""
-
-        # Get the names of the model's output tensors
-        onnx_output_names: List[str] = [out.name for out in self.session.get_outputs()]
-
-        # Use the custom _encode_text function to prepare input_ids
-        input_ids_np: "np.ndarray" = self._encode_text(text, lang)
-
-        # Manually create attention_mask (all ones for ByT5, indicating all tokens are attended to)
-        attention_mask_np: "np.ndarray" = np.ones_like(input_ids_np, dtype=np.int64)
-
-        # Hardcode decoder_start_token_id for ByT5 (typically 0 for pad_token_id)
-        # This is the initial token fed to the decoder to start generation.
-        decoder_start_token_id: int = 0  # Corresponds to <pad> for ByT5
-
+        output_names = [out.name for out in self.session.get_outputs()]
+        input_ids = self._encode_text(text, lang)
+        attention_mask = np.ones_like(input_ids, dtype=np.int64)
+        # Decoding starts at <pad> (0) and stops at </s> (1) or after 512 tokens.
+        decoder_input_ids = np.array([[0]], dtype=np.int64)
         generated_ids: List[int] = []
-        # Initialize the decoder input with the start token
-        decoder_input_ids_np: "np.ndarray" = np.array([[decoder_start_token_id]], dtype=np.int64)
-
-        max_length: int = 512  # Maximum length for the generated sequence
-
-        # Greedy decoding loop
-        for _ in range(max_length):
-            # Prepare inputs for the ONNX session
-            onnx_inputs: Dict[str, "np.ndarray"] = {
-                "input_ids": input_ids_np,
-                "attention_mask": attention_mask_np,
-                "decoder_input_ids": decoder_input_ids_np
-            }
-
-            # Run inference
-            outputs: List["np.ndarray"] = self.session.run(onnx_output_names, onnx_inputs)
-            logits: "np.ndarray" = outputs[0]  # Get the logits from the model output
-
-            # Get the logits for the last token in the sequence
-            next_token_logits: "np.ndarray" = logits[0, -1, :]
-            # Predict the next token by taking the argmax of the logits
-            next_token_id: int = np.argmax(next_token_logits).item()  # .item() to get scalar from numpy array
+        for _ in range(512):
+            logits = self.session.run(output_names, {"input_ids": input_ids,
+                                                     "attention_mask": attention_mask,
+                                                     "decoder_input_ids": decoder_input_ids})[0]
+            next_token_id = np.argmax(logits[0, -1, :]).item()
             generated_ids.append(next_token_id)
-
-            # Assuming EOS token ID for ByT5 is 1 (corresponds to </s>)
-            # This is a common convention for T5 models.
-            eos_token_id: int = 1
-            # If the EOS token is generated, stop decoding
-            if next_token_id == eos_token_id:
+            if next_token_id == 1:
                 break
-
-            # Append the newly generated token to the decoder input for the next step
-            decoder_input_ids_np = np.concatenate((decoder_input_ids_np,
-                                                   np.array([[next_token_id]],
-                                                            dtype=np.int64)),
-                                                  axis=1)
-
-        # Decode the generated token IDs into phonemes
+            decoder_input_ids = np.concatenate(
+                (decoder_input_ids, np.array([[next_token_id]], dtype=np.int64)), axis=1)
         return self._decode_phones(generated_ids)
 
     def phonemize_string(self, text: str, lang: str) -> str:
@@ -226,10 +130,7 @@ class ByT5Phonemizer(BasePhonemizer):
 
 
 class CharsiuPhonemizer(ByT5Phonemizer):
-    """
-    A phonemizer class that uses a Charsiu ByT5 ONNX model to convert text into phonemes.
-    """
-    # TODO - more models
+    """Text to IPA with a Charsiu ByT5 ONNX model, one word at a time."""
     MODEL2URL = {
         "Jarbas/charsiu_g2p_multilingual_byT5_tiny_16_layers_100_onnx": "https://huggingface.co/Jarbas/charsiu_g2p_multilingual_byT5_tiny_16_layers_100_onnx/resolve/main/charsiu_g2p_multilingual_byT5_tiny_16_layers_100.onnx"
     }
@@ -263,33 +164,12 @@ class CharsiuPhonemizer(ByT5Phonemizer):
     def __init__(self, model: Optional[str] = None, tokenizer_config: Optional[str] = None,
                  providers: Optional[Sequence[ProviderSpec]] = None,
                  use_cuda=bool(os.environ.get("CUDA", False))):
-        """
-        Initializes the ByT5Phonemizer with the ONNX model and tokenizer configuration.
-        If paths are not provided, it attempts to download them to a local directory.
-
-        Args:
-            model (str, optional): Path to the ONNX model file. If None, it will be downloaded.
-            tokenizer_config (str, optional): Path to the tokenizer configuration JSON file. If None, it will be downloaded.
-            providers (Sequence, optional): Ordered ONNX Runtime execution providers.
-            use_cuda (bool): Deprecated alias for ``providers=["CUDAExecutionProvider"]``.
-        """
         model = model or "Jarbas/charsiu_g2p_multilingual_byT5_tiny_16_layers_100_onnx"
         super().__init__(model, tokenizer_config, providers, use_cuda)
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
-        """
-        Validates and returns the closest supported language code.
-
-        Args:
-            target_lang (str): The language code to validate.
-
-        Returns:
-            str: The validated language code.
-
-        Raises:
-            ValueError: If the language code is unsupported.
-        """
+        """The closest label of BYT5_LANGS, matched through MATCH_TAGS; raises ValueError when none is close."""
         if _is_hk_cantonese(target_lang):
             return "yue"
         if target_lang.lower() in cls.BYT5_LANGS:
@@ -298,11 +178,23 @@ class CharsiuPhonemizer(ByT5Phonemizer):
         return tags[cls.match_lang(target_lang, list(tags))]
 
     def phonemize_string(self, text: str, lang: str) -> str:
-        # charsiu models can't handle whitespace, need to be phonemized word by word
+        # The Charsiu models read one word: whitespace breaks them.
         return " ".join([self._infer_onnx(w, lang) for w in text.split()])
 
 
-_GRUUT = threading.local()
+class _GruutProcessors(threading.local):
+    """The gruut processors of this thread, by language.
+
+    gruut's lexicon is a sqlite connection, which only its own thread can use.
+    gruut reads every sentence after the first, and the part-of-speech tags,
+    with ``default_lang``, so each language needs its own processor.
+    """
+
+    def __init__(self):
+        self.processors = {}
+
+
+_GRUUT = _GruutProcessors()
 
 
 class _CopyingLookup:
@@ -324,10 +216,7 @@ class _CopyingLookup:
 
 
 class GruutPhonemizer(BasePhonemizer):
-    """
-    A phonemizer class that uses the Gruut library to convert text into phonemes.
-    Note: Gruut's internal segmentation is sentence-based
-    """
+    """Text to IPA with gruut, which splits the text into sentences itself."""
 
     engine_distribution = "gruut"
     GRUUT_LANGS = ["en", "ar", "ca", "cs", "de", "es", "fa", "fr", "it",
@@ -338,25 +227,11 @@ class GruutPhonemizer(BasePhonemizer):
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
-        """
-        Validates and returns the closest supported language code.
-
-        Args:
-            target_lang (str): The language code to validate.
-
-        Returns:
-            str: The validated language code.
-
-        Raises:
-            ValueError: If the language code is unsupported.
-        """
+        """The closest code of GRUUT_LANGS; raises ValueError when none is close."""
         return cls.match_lang(target_lang, cls.GRUUT_LANGS)
 
     def _text_to_phonemes(self, text: str, lang: Optional[str] = None):
-        """
-        Generates phonemes for text using Gruut's sentence processing.
-        Yields lists of word phonemes for each sentence.
-        """
+        """The word phonemes of each sentence of *text*, one list per sentence."""
         lang = self.get_lang(lang)
         try:
             from gruut import TextProcessor
@@ -366,17 +241,11 @@ class GruutPhonemizer(BasePhonemizer):
                 "Install it with 'pip install gruut' "
                 "(or 'pip install scriptconv[gruut]')."
             ) from e
-        # one processor per thread, as gruut.sentences keeps it: the lexicon
-        # is a sqlite connection, which only its own thread can use.
-        # One processor per language too: gruut reads every sentence after
-        # the first, and the part-of-speech tags, with default_lang.
-        processors = getattr(_GRUUT, "processors", None)
-        if processors is None:
-            processors = _GRUUT.processors = {}
+        processors = _GRUUT.processors
         processor = processors.get(lang)
         if processor is None:
-            # cache the processor only once its lookup copies: a processor
-            # stored before a failed get_settings would leak on the next call
+            # Cache the processor only once its lookup copies: a processor
+            # stored before a failed get_settings would leak on the next call.
             processor = TextProcessor(default_lang=lang)
             settings = processor.get_settings(lang)
             if settings.lookup_phonemes is not None:
@@ -395,14 +264,11 @@ class GruutPhonemizer(BasePhonemizer):
                 sent_phonemes[-1] = ["!"]
             elif sentence.text.endswith(".") or sent_phonemes[-1] == ["‖"]:
                 sent_phonemes[-1] = ["."]
-            if sent_phonemes:
-                yield sent_phonemes
+            yield sent_phonemes
 
     def phonemize_string(self, text: str, lang: str) -> str:
-        pho = ""
-        for sent_phonemes in self._text_to_phonemes(text, lang):
-            pho += " ".join(["".join(w) for w in sent_phonemes]) + " "
-        return pho.strip()
+        return " ".join(" ".join("".join(w) for w in sent_phonemes)
+                        for sent_phonemes in self._text_to_phonemes(text, lang)).strip()
 
 
 def _stop_goruut_server(process: subprocess.Popen) -> None:
@@ -415,9 +281,10 @@ def _stop_goruut_server(process: subprocess.Popen) -> None:
 
 
 class GoruutPhonemizer(BasePhonemizer):
-    """
-    A phonemizer class that uses the pygoruut library to convert text into phonemes.
-    https://github.com/neurlang/pygoruut/
+    """Text to IPA with pygoruut (https://github.com/neurlang/pygoruut/).
+
+    With *remote_url*, such as ``"https://hashtron.cloud"``, a remote server
+    reads the text; without it, a local goruut server starts.
     """
 
     engine_distribution = "pygoruut"
@@ -572,7 +439,6 @@ class GoruutPhonemizer(BasePhonemizer):
         self.pygoruut_langs = PygoruutLanguages()
         self._server_finalizer = None
         if remote_url is not None:
-            # 'https://hashtron.cloud'
             self.pygoruut = Pygoruut(api=remote_url)
         else:
             self.pygoruut = Pygoruut()
@@ -592,23 +458,12 @@ class GoruutPhonemizer(BasePhonemizer):
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
-        """
-        Validates and returns the closest supported language code.
-
-        Args:
-            target_lang (str): The language code to validate.
-
-        Returns:
-            str: The validated language code.
-
-        Raises:
-            ValueError: If the language code is unsupported.
-        """
+        """The goruut language name closest to *target_lang*; raises ValueError when none is close."""
         if target_lang in cls.GORUUT_LANGS_NON_STD:
             return target_lang
         if target_lang.lower() == "en-us":
             return 'EnglishAmerican'
-        if target_lang.lower() == "en-gb" or target_lang.lower() == "en-uk":
+        if target_lang.lower() in ("en-gb", "en-uk"):
             return 'EnglishBritish'
         if _is_hk_cantonese(target_lang):
             return cls.ISO639["yue"]
@@ -627,8 +482,7 @@ class GoruutPhonemizer(BasePhonemizer):
 
 
 class EpitranPhonemizer(BasePhonemizer):
-    """
-    """
+    """Text to IPA with epitran, one rule map per language and script."""
 
     engine_distribution = "epitran"
     EPITRAN_LANGS = ['hsn-Latn', 'ful-Latn', 'jpn-Kana', 'tel-Telu', 'nld-Latn', 'aze-Latn', 'amh-Ethi-pp',
@@ -667,19 +521,12 @@ class EpitranPhonemizer(BasePhonemizer):
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
-        """
-        Validates and returns the closest supported language code.
-
-        Args:
-            target_lang (str): The language code to validate.
-
-        Returns:
-            str: The validated language code.
+        """The closest code of EPITRAN_LANGS.
 
         Raises:
-            ValueError: If the language code is unsupported, or if it is
-                Japanese without a Kana or Hira script subtag. A refused
-                Korean tag gets a hint to use ko-Hang or kor-Hang.
+            ValueError: If no code is close, or if the tag is Japanese without
+                a Kana or Hira script subtag. A refused Korean tag gets a hint
+                to use ko-Hang or kor-Hang.
         """
         # Each epitran Japanese map converts one kana script. Kanji and the
         # other kana script pass through unchanged, so a request for Jpan or
@@ -714,32 +561,21 @@ class EpitranPhonemizer(BasePhonemizer):
 
 
 class PhonetisaurusPhonemizer(BasePhonemizer):
-    """WFST grapheme-to-phoneme, through the ``phonetisaurus`` bindings.
+    """WFST grapheme-to-phoneme through the ``phonetisaurus`` bindings.
 
     https://github.com/AdolfVonKleist/Phonetisaurus
 
-    Phonetisaurus has no rules and no language list of its own: all of its
-    knowledge is in one trained FST, so the language and the symbol set are
-    properties of the MODEL, not of this wrapper. That has three consequences,
-    and each one is a design decision rather than a limitation to work around:
+    All the knowledge of Phonetisaurus is in one trained FST, so the language
+    and the symbol set belong to the model, not to this wrapper:
 
-    * ``model`` is required. scriptconv never downloads a model (the same rule
-      :class:`ByT5Phonemizer` follows). ``MODEL_SOURCES`` names where published
-      models live; a caller resolves one and passes the path.
-    * ``alphabet`` is declared by the caller, because only the caller knows
-      what the model was trained to emit. A CMUdict-trained model emits ARPA,
-      an o2i-trained or espeak-trained one emits IPA. The wrapper cannot read
-      it off the FST, so it does not guess.
-    * There is no language check and no ``LANG_DEFAULTS`` entry. A wrapper that
-      cannot know its own model's language must not be any language's default.
+    * ``model`` is required. scriptconv never downloads a model;
+      ``MODEL_SOURCES`` names where published models live.
+    * The caller declares ``alphabet``, because the FST does not tell what it
+      emits: a CMUdict model emits ARPA, an o2i or espeak model emits IPA.
+    * There is no language check and no ``LANG_DEFAULTS`` entry.
 
-    ``phonetisaurus`` ships the binaries it drives and the shared objects they
-    link against, and ``predict`` runs them under the ``PATH`` and
-    ``LD_LIBRARY_PATH`` from ``phonetisaurus.guess_environment()``. The apply
-    path needs no system package. Training is the exception: ``estimate-ngram``
-    also needs ``libquadmath.so.0`` from the host GCC runtime (``libquadmath0``
-    on Debian and Ubuntu). Training is not exercised here: this wrapper only
-    applies a model.
+    ``phonetisaurus`` ships the binaries that ``predict`` runs and the shared
+    objects they link against, so applying a model needs no system package.
     """
 
     engine_distribution = "phonetisaurus"
@@ -764,16 +600,10 @@ class PhonetisaurusPhonemizer(BasePhonemizer):
         """
         Args:
             model: path to a trained Phonetisaurus FST. Required.
-            alphabet: the symbol set the model emits. The caller states it.
-            nbest: how many pronunciations the engine ranks per word. The
-                BEST one is returned whatever this is, so a higher value
-                changes the search, not the output shape. ``predict`` prints
-                one line per ranked pronunciation, best first, and yields one
-                pair per line, so the wrapper keeps the FIRST pair it sees for
-                a word and drops the rest.
-            separator: joins the symbols of one word. Models are trained on
-                symbol sequences, so the parts need a separator to stay
-                readable; pass "" for a bare string.
+            alphabet: the symbol set the model emits.
+            nbest: how many pronunciations the engine ranks per word. The best
+                one is returned whatever this is.
+            separator: joins the symbols of one word; pass "" for a bare string.
             normalizer: see :class:`BasePhonemizer`.
         """
         _check_alphabet(self, alphabet, self.SUPPORTED_ALPHABETS)
@@ -797,18 +627,13 @@ class PhonetisaurusPhonemizer(BasePhonemizer):
         self.separator = separator
 
     def phonemize_string(self, text: str, lang: str) -> str:
-        """Phonemize ``text``. ``lang`` is accepted and not used: the model
-        decides the language, so a language argument here would claim a
-        routing this wrapper does not do."""
+        """The symbols of each word of *text*. *lang* is not used: the model decides the language."""
         words = text.split()
         if not words:
             return ""
-        # predict() yields (word, symbols) and may reorder or drop a word it
-        # cannot read, so the result is indexed by word rather than zipped.
-        #
-        # With nbest > 1 it yields one pair PER RANKED PRONUNCIATION, best
-        # first, so a word appears more than once. dict() would keep the last
-        # pair, which is the WORST-ranked reading. Keep the first instead.
+        # predict() may reorder or drop a word, so the result is indexed by
+        # word. With nbest > 1 it yields one pair per ranked pronunciation,
+        # best first: keep the first pair of each word.
         guesses: Dict[str, List[str]] = {}
         for word, symbols in self.phonetisaurus.predict(
                 words, self.model, nbest=self.nbest):
