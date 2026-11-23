@@ -1,23 +1,14 @@
 """Phonemizer contract and base implementations.
 
-This subpackage holds scriptconv's phonemizer integrations: *wrappers* around
-external phonemizer engines behind optional extras — the same boundary as
-:mod:`scriptconv.readings` wrapping reading dictionaries.  The zero-dependency
-core stays free of them, and no grapheme-to-phoneme rules are implemented in
-the core; in-tree
-implementations live under ``_thirdparty`` with their provenance, installed
-only with the ``phonemizers`` extras.
+The phonemizers are wrappers around external engines behind optional extras;
+the zero-dependency core holds no grapheme-to-phoneme rules. The
+``phonemizers`` extra provides sentence chunking (``quebra_frases``) and
+language matching (``linguatag``).
 
-The ``phonemizers`` base extra provides sentence chunking (``quebra_frases``)
-and language matching (``linguatag``).
-
-**Normalization is injectable, not built in.**  TTS stacks normalize numbers,
-dates and abbreviations before phonemizing; that requires language resources
-scriptconv does not ship.  Pass ``normalizer=`` (a ``(text, lang) -> str``
-callable) at construction to run it inside ``phonemize_lazy``; without it the
-raw text is phonemized as-is.  Downstream TTS injects its own normalizer, so
-calling a wrapper through scriptconv directly and through a TTS stack can
-legitimately differ on text containing digits.
+Normalization is injected, not built in: ``normalizer=``, a
+``(text, lang) -> str`` callable, runs inside ``phonemize_lazy``. Without it
+the raw text is phonemized as written, so text with digits can read
+differently here than through a TTS stack that injects its own normalizer.
 """
 import abc
 import dataclasses
@@ -41,34 +32,26 @@ RawPhonemizedChunks = List[Tuple[str, str, bool]]
 PhonemizedChunks = list[list[str]]
 
 # Clause punctuation kept by ``keep_punctuation``, mapped to the symbol a voice
-# is trained on. These are the six clause types Piper appends after every
-# espeak-ng clause (piper-phonemize ``src/phonemize.cpp``): a full stop,
-# question mark and exclamation mark stand alone, a comma, colon and semicolon
-# are followed by a space. Arabic script has its own comma, semicolon and
-# question mark; they map onto the same symbols.
+# is trained on: the six clause types Piper appends after each espeak-ng clause
+# (piper-phonemize ``src/phonemize.cpp``). A comma, colon and semicolon take a
+# space after them. The Arabic-script marks map onto the same symbols.
 CLAUSE_PUNCTUATION = {".": ".", "?": "?", "!": "!", ",": ",", ":": ":", ";": ";",
                       "\u060c": ",", "\u061b": ";", "\u061f": "?"}
 _PAUSE_PUNCTUATION = {",", ":", ";"}
 _CLAUSE_TOKENS = frozenset(CLAUSE_PUNCTUATION.values())
-# A mark that the table reads as "!" or "?", between two letters with no space
-# after it, is no clause break, but it still separates two words.
+# A mark read as "!" or "?" between two letters is no clause break, but it separates two words.
 _SEPARATING_MARKS = frozenset(mark for mark, symbol in CLAUSE_PUNCTUATION.items()
                               if symbol in ("!", "?"))
-# The characters that Unicode names a hyphen. Between two letters each one is
-# the hyphen of a compound, and the backend reads it as "-".
+# The Unicode hyphens. Between two letters each one is read as "-".
 _HYPHENS = frozenset("-\u2010\u2011\ufe63\uff0d")
-# The dashes. A dash is no letter of a word, so between two words, as in
-# "Lisboa–Porto", it separates them.
+# The dashes. Between two words, as in "Lisboa–Porto", a dash separates them.
 _DASHES = frozenset("\u2012\u2013\u2014\u2015\u2e3a\u2e3b\ufe31\ufe32\ufe58")
 # A clause ends at punctuation followed by whitespace, as in espeak-ng, so the
 # "," in "10,4" or the ":" in "16:30" never splits. A lone "." is left to the
-# sentence tokenizer, which knows abbreviations; inside a sentence an ellipsis
-# or "|" still ends a clause, as in chunk_text, but carries no symbol (espeak-ng
-# reads an ellipsis as a spoken-name pause, which Piper does not keep).
-# A match starts only where a run of marks starts, and the run must reach
-# whitespace, so each run is read a fixed number of times and the split takes
-# linear time. Group 1 is the break: the first mark of the run that ends a
-# clause, through the end of the run.
+# sentence tokenizer, which knows abbreviations. An ellipsis or "|" ends a
+# clause with no symbol. A match starts only where a run of marks starts and
+# must reach whitespace, so the split takes linear time. Group 1 is the break:
+# the first clause-ending mark of the run through the end of the run.
 _CLAUSE_BREAK = re.compile(
     r"(?<![^\w\s])(?=[^\w\s]*+\s)[^\w\s]*?((?:\.\.|\u2026|[,:;!?|\u060c\u061b\u061f])[^\w\s]*+)")
 # Starts only where a run of marks starts, so a long run is read once.
@@ -79,7 +62,7 @@ _LANG_FLAGS = re.compile(r"\([^)]+\)")
 _WHITESPACE = re.compile(r"\s")
 # The text before the first letter or digit: whitespace and marks.
 _WORDLESS_START = re.compile(r"[\W_]*")
-# The stress mark that the diacritize stage (stressonnx) writes after a stressed vowel.
+# The stress mark that the diacritize stage writes after a stressed vowel.
 STRESS_MARK = "\u0301"
 # The methods through which text reaches a backend.
 _TEXT_METHODS = ("phonemize_string", "phonemize_to_list", "phonemize", "phonemize_lazy",
@@ -87,29 +70,15 @@ _TEXT_METHODS = ("phonemize_string", "phonemize_to_list", "phonemize", "phonemiz
 
 
 def join_sentences(sentences: Iterable[List[str]], keep_punctuation: bool = True) -> List[str]:
-    """Per-sentence phonemes joined into one flat training stream.
+    """Per-sentence phonemes joined into one flat training stream, as Piper flattens them.
 
-    A sentence that ends in a clause token joins the next one with no space,
-    as Piper flattens its sentences. A sentence that ends in a space also
-    joins with no space. Every other sentence, as one the sentence tokenizer
-    ends at an ASCII "...", takes one space before the next sentence, so its
-    last word stays apart from the first word of the next sentence. No
-    sentence starts with a space, because a voice never saw a space at the
-    start of an utterance, so the space exists only here.
-
-    The sentences come without their text, so this function cannot see the
-    whitespace between them, and a sentence that ends with no token always
-    takes the space. Text that writes no space between two sentences, as
-    Chinese and Japanese do after ``。！？``, gets one here.
-    :meth:`BasePhonemizer.phonemize_to_list` reads the text, and adds the
-    space only where the text writes whitespace between the two sentences.
-
-    Without *keep_punctuation* no sentence ends in a token, so one space
-    separates every two sentences. With it, a sentence that ends in a clause
-    symbol (``. ? ! , : ;``) counts as ending in a token. A phoneme written
-    with the same character, such as an ASCII ``":"`` for vowel length, counts
-    the same way. :meth:`BasePhonemizer.phonemize_to_list` knows which symbols
-    it appended, so it joins its own sentences without that ambiguity.
+    A sentence that ends in a clause symbol (with *keep_punctuation*) or in a
+    space joins the next one directly; any other sentence takes one space
+    before the next. No sentence starts with a space. This function does not
+    see the text, so it adds the space even where the text writes none, as
+    after Chinese ``。``; :meth:`BasePhonemizer.phonemize_to_list` reads the
+    text and does not. A phoneme written with a clause symbol's character,
+    such as ``":"`` for vowel length, counts as that symbol here.
     """
     return _join((sentence, keep_punctuation and bool(sentence)
                   and sentence[-1] in _CLAUSE_TOKENS, True) for sentence in sentences)
@@ -118,9 +87,7 @@ def join_sentences(sentences: Iterable[List[str]], keep_punctuation: bool = True
 def _join(sentences: Iterable[Tuple[List[str], bool, bool]]) -> List[str]:
     """``(phonemes, ends_in_token, spaced)`` sentences joined by the rule of :func:`join_sentences`.
 
-    *spaced* tells whether the text writes whitespace before the first word
-    of the sentence. Where it writes none, no space comes between the two
-    sentences.
+    *spaced* tells whether the text writes whitespace before the sentence; without it no space is added.
     """
     phonemes: List[str] = []
     joins = True
@@ -135,11 +102,7 @@ def _join(sentences: Iterable[Tuple[List[str], bool, bool]]) -> List[str]:
 
 
 def _clause_breaks_as_spaces(phonemes: str) -> str:
-    """*phonemes* with each clause break that a backend prints as a line break read as one space.
-
-    espeak-ng prints each clause on its own line. The next clause starts a new
-    word, so a break between two clauses is a space, and never a double one.
-    """
+    """*phonemes* with each line break between clauses, as espeak-ng prints them, read as one space."""
     if "\n" not in phonemes:
         return phonemes
     return " ".join(line.strip() for line in phonemes.split("\n") if line.strip())
@@ -278,62 +241,39 @@ class Segment:
     mark: Optional[str] = None
     """The clause symbol that ends the segment, a value of
     :data:`CLAUSE_PUNCTUATION`, or ``None``. The frontend appends it when it
-    keeps punctuation. A bounded segment holds its marks among its own
-    symbols, so the frontend appends nothing to it, and the mark tells only
-    that the segment ends at a mark."""
+    keeps punctuation, except to a bounded segment, which holds its marks
+    among its own symbols."""
     ends_sentence: bool = True
     """Whether the segment ends a sentence."""
     streams: Mapping[str, Tuple] = dataclasses.field(default_factory=dict)
     """Side streams of the backend, such as stress, each in step with :attr:`phonemes`."""
     ends_paragraph: bool = False
-    """Whether a paragraph break (one or more blank lines) follows the
-    segment in the text. Only a segment that ends a sentence ends a
-    paragraph."""
+    """Whether a blank line follows the segment. Only a segment that ends a sentence ends a paragraph."""
     bounded: bool = False
-    """Whether the first symbol of :attr:`phonemes` is the backend's start
-    symbol and the last its end symbol, as ``<bos>`` and ``<eos>``. Where the
-    frontend joins two bounded segments, the inner end and start symbols go,
-    with their stream values. A segment with no mark then takes the
-    backend's :meth:`~BasePhonemizer.word_break` before the next one."""
+    """Whether :attr:`phonemes` starts with the backend's start symbol and ends
+    with its end symbol, as ``<bos>`` and ``<eos>``. Where the frontend joins
+    two bounded segments, the inner end and start symbols go with their stream
+    values, and a segment with no mark takes :meth:`~BasePhonemizer.word_break`."""
     text: Optional[str] = None
-    """The source text of the segment after the frontend's text stages
-    (casing, normalise, diacritize), as the backend read it; it never holds a
-    clause mark that the frontend appends; ``None`` when the backend cannot
-    say."""
+    """The text the backend read for the segment, after the frontend's text
+    stages and without an appended clause mark; ``None`` when the backend cannot say."""
 
 
 class MissingLanguageError(ValueError):
-    """No language reached :meth:`BasePhonemizer.match_lang` at all.
+    """No language reached :meth:`BasePhonemizer.match_lang`: the target was ``None``, ``""`` or ``"und"``.
 
-    Raised for ``None``/``""``/``"und"`` targets, which is a distinct failure
-    from an unsupported-but-present tag: it means whatever called into the
-    phonemizer never determined a language for the text, an upstream
-    config/data defect rather than a phonemizer capability gap.
+    This is a defect of the caller, not a language the backend lacks.
     """
 
 
 def _primary_subtag(lang: str) -> str:
-    """Lowercase, ``_``→``-`` normalized primary language subtag.
-
-    Used for exact-match language routing (e.g. registry lang defaults,
-    diacritization backend selection) rather than ``str.startswith``, so
-    e.g. Berber (``ber``) never false-matches Belarusian (``be``).
-    """
+    """The lowercase primary subtag of *lang*, for exact matching: ``ber`` never matches ``be``."""
     return lang.lower().replace("_", "-").split("-")[0]
 
 
 def _check_alphabet(phonemizer, alphabet: Alphabet,
                     supported: List[Alphabet]) -> None:
-    """Reject an output alphabet a wrapper cannot emit, with a usable message.
-
-    Wrappers used to guard this with a bare ``assert``, which surfaced as an
-    ``AssertionError`` carrying an empty message — the caller learned nothing
-    about which alphabet it asked for or which ones exist. That matters because
-    :func:`~scriptconv.phonemizers.registry.get_phonemizer` injects its own
-    ``alphabet=`` default into every constructor that declares the parameter,
-    so an unsupported default is hit by ordinary registry use, not just by
-    callers passing an odd value.
-    """
+    """Raise :class:`ValueError` naming *alphabet* and the *supported* ones when *phonemizer* cannot emit it."""
     if alphabet not in supported:
         raise ValueError(
             f"{type(phonemizer).__name__} cannot emit "
@@ -373,32 +313,16 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
     keep_punctuation: bool = False
     """Keep clause punctuation (``, . ? ! : ;``) in the phoneme output.
 
-    Off by default, so voices trained without punctuation receive exactly the
-    sequences they were trained on. When on, :meth:`phonemize_to_list` and
-    :meth:`phonemize_lazy` phonemize clause by clause and append each clause's
-    symbol the way Piper does. With the flag on or off,
-    :meth:`phonemize_to_list` of a text is the sentences that
-    :meth:`phonemize_lazy` yields for it, joined by the rule of
-    :func:`join_sentences`. :meth:`phonemize_lazy` first runs the
-    ``normalizer`` hook, and :meth:`phonemize_to_list` does not, so with a
-    hook the two read the same text only when the caller normalizes first.
-    A backend that overrides either method owns its own output and
-    ignores this flag, since honouring it on one side only would make training
-    and synthesis disagree.
+    When on, :meth:`phonemize_to_list` and :meth:`phonemize_lazy` phonemize
+    clause by clause and append each clause's symbol the way Piper does. A
+    backend that overrides either method ignores the flag, so training and
+    synthesis never disagree.
     """
 
     strict: bool = False
     """Raise :class:`UnreadTextError` when a pinyin backend meets a syllable
-    that is not pinyin, or a digit it cannot read.
-
-    Subclasses of
-    :class:`~scriptconv.phonemizers.zh.BaseChinesePinyinPhonemizer` read this
-    field when they write IPA, for a syllable that is not pinyin.
-    :class:`~scriptconv.phonemizers.g2pw.G2PWPhonemizer` reads it for a
-    digit, which gives no symbol. With the field off, they log a warning and
-    drop the syllable or the digit. Every other backend ignores the field.
-    :class:`~scriptconv.frontend.TextFrontend` sets it from
-    ``FrontendConfig.strict``.
+    that is not pinyin, or a digit it cannot read; off, it logs a warning and
+    drops it. Only the Chinese pinyin backends and G2PW read the field.
     """
 
     owned_stages: ClassVar[frozenset[str]] = frozenset()
@@ -416,25 +340,19 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
     """
 
     engine_distribution: ClassVar[Optional[str]] = None
-    """The distribution that holds the engine. ``None`` means code inside
-    scriptconv, or inside the scriptconv-copyleft or scriptconv-nonfree
-    package that holds the wrapper. It is declared, because the module of a
-    wrapper class names scriptconv and not the engine that produced the
-    phonemes."""
+    """The distribution that holds the engine; ``None`` for code inside the
+    package that holds the wrapper (scriptconv, scriptconv-copyleft or scriptconv-nonfree)."""
 
     stress_mark_langs: ClassVar[frozenset[str]] = frozenset()
     """Languages in which this backend reads the stress mark (U+0301 after a vowel) as stress.
 
-    ``scripts/probe_stress_marks.py`` gives the declaration: only a language
-    in which the mark moves the stress to the marked vowel, and changes
-    nothing else, is declared. For a language of
-    :data:`scriptconv.diacritics.STRESS_LANGS` that the backend does not
-    declare, the backend removes the mark from its text before it reads it.
+    ``scripts/probe_stress_marks.py`` decides the declaration. In a language of
+    :data:`scriptconv.diacritics.STRESS_LANGS` that is not declared, the mark
+    is removed from the text before the backend reads it.
     """
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        # every text path, also one that a backend overrides, reads the mark as declared
         for name in _TEXT_METHODS:
             if name in cls.__dict__:
                 method = cls.__dict__[name]
@@ -448,8 +366,6 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
                  normalizer: Optional[Callable[[str, str], str]] = None):
         super().__init__()
         self.alphabet = alphabet
-        # optional (text, lang) -> str hook run before chunking; see module
-        # docstring — scriptconv performs no normalization of its own
         self.normalizer = normalizer
 
     @abc.abstractmethod
@@ -461,20 +377,13 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         return _declared(self.stress_mark_langs, lang)
 
     def phonemize_to_list(self, text: str, lang: str) -> List[str]:
-        """Phonemes of *text* as one flat list, without normalization.
+        """Phonemes of *text* as one flat list, without the ``normalizer`` hook.
 
-        The list is the sentences of :meth:`phonemize` joined by the rule of
-        :func:`join_sentences`, so a voice trains on the sequences that
-        synthesis gives it. A space comes between two sentences only where
-        the text writes whitespace between them, so Chinese and Japanese
-        sentences join with none. Without :attr:`keep_punctuation` no
-        punctuation reaches the list, so no sentence ends in a symbol. With
-        it, each clause's symbol comes before its space, and a sentence that
-        ends in an appended symbol joins the next one with no space. Clause
-        breaks that a backend prints as ``"\\n"`` are not phonemes: each
-        becomes one space, because the next clause starts a new word. A
-        backend that overrides :meth:`phonemize_lazy` keeps its own synthesis,
-        so its list is the whole text read by :meth:`phonemize_string`.
+        The list is the sentences of :meth:`phonemize_lazy` joined by the rule
+        of :func:`join_sentences`, with a space between two sentences only
+        where the text writes whitespace. A line break a backend prints between
+        clauses becomes one space. A backend that overrides
+        :meth:`phonemize_lazy` gives the whole text read by :meth:`phonemize_string`.
         """
         if self._keeps_punctuation():
             return _join(self._punctuated_sentences(text, lang))
@@ -483,24 +392,13 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         return _join(self._bare_sentences(text, lang))
 
     def phonemize(self, text: str, lang: str) -> PhonemizedChunks:
-        # PhonemizedChunks is list[list[str]]; empty text yields no
-        # sentences. (Returning the raw (str, str, bool) tuple form here
-        # corrupted the type and broke callers that mutate each sentence,
-        # e.g. inline ``[[phoneme]]`` blocks in TTSVoice.phonemize.)
+        """One phoneme list per sentence; empty text gives none."""
         return list(self.phonemize_lazy(text, lang))
 
     def phonemize_lazy(self, text: str, lang: str) -> Iterator[List[str]]:
-        """Lazy, per-sentence variant of :meth:`phonemize`.
+        """One phoneme list per sentence, each read only when the caller pulls it.
 
-        Yields one phoneme list per sentence-level chunk, invoking the
-        (potentially expensive) ``phonemize_string`` only as each sentence is
-        pulled from the generator. This lets a caller start synthesizing
-        sentence 1 before sentence 2 has been phonemized, cutting
-        time-to-first-audio.
-
-        Normalization and chunking still run over the *whole* text up front (both
-        are cheap and order-sensitive), so ``list(self.phonemize_lazy(text)) ==
-        self.phonemize(text)`` holds for any input.
+        The ``normalizer`` hook and the sentence split run over the whole text first.
         """
         if not text:
             return
@@ -512,20 +410,12 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
             yield from (phonemes for phonemes, _, _ in self._bare_sentences(text, lang))
 
     def phonemize_segments(self, text: str, lang: str) -> Iterator[Segment]:
-        """The segments of *text* in reading order, read in one pass.
+        """The segments of *text* in reading order.
 
         A backend that sets :attr:`reads_whole_text` overrides this method and
-        cuts its own output at its own sentence and clause marks. The segment
-        text holds no punctuation: the mark that ends a segment is in
-        :attr:`Segment.mark`.
-
-        For any other backend, :class:`~scriptconv.frontend.TextFrontend`
-        calls this method on each sentence or clause, and a segment is a
-        sentence of :meth:`phonemize_lazy`. A backend with side streams, or
-        with its own start and end symbols, overrides it to give them. A
-        single segment carries the input *text* (stripped) as its
-        :attr:`Segment.text`; when the backend yields more than one, the
-        segment text is ``None``.
+        cuts its output at its own marks. For any other backend a segment is a
+        sentence of :meth:`phonemize_lazy`, and :attr:`Segment.text` is the
+        stripped *text* only when there is one segment.
 
         Raises:
             NotImplementedError: If the backend reads whole text and does not
@@ -541,43 +431,31 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
     def word_break(self) -> Segment:
         """The symbol that separates two words in this backend's output, with its stream values.
 
-        :class:`~scriptconv.frontend.TextFrontend` writes it where it joins
-        two pieces with no clause symbol between them, and around an inline
-        block. A stream that the segment lacks takes 0.
+        The frontend writes it between two pieces with no clause symbol and
+        around an inline block. A stream that the segment lacks takes 0.
         """
         return Segment((" ",))
 
     def mark_symbols(self, marks: str) -> Optional[Segment]:
         """The symbols that this backend writes for *marks* after a word, with their stream values, or ``None``.
 
-        This is the backend's mark table. *marks* is a run of closing marks,
-        such as ``.``, ``...`` or ``?!``, or a quote that opens the next word,
-        with the whitespace before them in the text, if any.
-        :class:`~scriptconv.frontend.TextFrontend` reads it for the marks
-        after an inline block, and writes the symbols of the table after the
-        block. ``None`` declares no table.
+        *marks* is a run of closing marks, such as ``...`` or ``?!``, or a
+        quote that opens the next word, with any whitespace before them. The
+        frontend reads it for the marks after an inline block.
         """
         return None
 
     def _bare_sentences(self, text: str, lang: str) -> Iterator[Tuple[List[str], bool, bool]]:
-        """Per-sentence phonemes, with the punctuation removed before the backend.
+        """Per-sentence phonemes, each chunk of :meth:`chunk_text` read alone without punctuation.
 
-        The backend reads each chunk of :meth:`chunk_text` alone. A ``:``,
-        ``;``, ``...`` or ``|`` inside a sentence is a clause break, so it is a
-        space, as a ``,`` is. In ``el`` a ``;`` is the question mark, so it
-        ends the sentence.
-
-        A backend that owns ``normalize`` reads the text with its own rules, so
-        its chunk reaches it as written, stripped of outer whitespace, with the
-        punctuation that its normaliser reads.
-
-        Each sentence comes with the two flags of
-        :meth:`_punctuated_sentences`, and it never ends in a token.
+        In ``el`` a ``;`` is the question mark, so it ends the sentence. A
+        backend that owns ``normalize`` reads each chunk stripped but with its
+        punctuation. Each sentence comes with the flags of
+        :meth:`_punctuated_sentences`, and never ends in a token.
         """
         question_semicolon = _primary_subtag(lang) == "el"
         sentence: List[List[str]] = []
-        # where the first word with phonemes of the sentence starts in the
-        # text, and where the last chunk of the last sentence with phonemes ends
+        # where the sentence's first word with phonemes starts, and where the last sentence with phonemes ends
         word: Optional[int] = None
         end = cursor = 0
         for chunk, punct, eos in self.chunk_text(text):
@@ -587,17 +465,14 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
                 cursor = found + len(chunk)
             read = (chunk.strip() if "normalize" in self.owned_stages
                     else self.remove_punctuation(chunk))
-            phoneme_str = _clause_breaks_as_spaces(self.phonemize_string(read, lang))
-            # Filter out (lang) switch (flags) that surround words from languages
-            # other than the current voice — mirrors _process_phones().
-            phoneme_str = re.sub(r"\([^)]+\)", "", phoneme_str)
+            # drop the (lang) flags that espeak-ng writes around words of another language
+            phoneme_str = _LANG_FLAGS.sub("", _clause_breaks_as_spaces(self.phonemize_string(read, lang)))
             if phoneme_str and word is None:
                 word = found + _WORDLESS_START.match(chunk).end()
             sentence.append(list(phoneme_str))
             if eos or (question_semicolon and punct == ";"):
                 phonemes = join_sentences(sentence, keep_punctuation=False)
-                # the gap is read only for a sentence with phonemes, so each
-                # character is read once
+                # the gap is searched only for a sentence with phonemes, so each character is read once
                 yield phonemes, False, bool(phonemes and _WHITESPACE.search(text, end, word))
                 if phonemes:
                     end = cursor
@@ -611,22 +486,14 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
                 and cls.phonemize_lazy is BasePhonemizer.phonemize_lazy)
 
     def _punctuated_sentences(self, text: str, lang: str) -> Iterator[Tuple[List[str], bool, bool]]:
-        """Per-sentence phonemes with each clause's punctuation appended.
+        """Per-sentence phonemes with each clause's symbol appended.
 
-        Each clause is phonemized on its own with its punctuation removed, so
-        the backend sees the same words in training and in synthesis, and the
-        clause's symbol is appended after it: bare for ``. ? !``, followed by a
-        space for ``, : ;``. A space also separates a clause from the next one
-        in the same sentence, after any symbol or none. No sentence starts with
-        a space: :func:`join_sentences` adds the space between two sentences.
-        Each sentence comes with whether it ends in an appended symbol, and
-        whether the text writes whitespace between its first word and the
-        last sentence before it that gives phonemes.
-
-        A backend that owns ``normalize`` reads the text with its own rules, so
-        each clause reaches it as written, stripped of outer whitespace, with
-        the punctuation that its normaliser reads; the base still appends the
-        clause symbol.
+        Each clause is read alone without punctuation (a backend that owns
+        ``normalize`` reads it stripped but with its punctuation), then its
+        symbol follows: bare for ``. ? !``, with a space for ``, : ;``. A space
+        separates two clauses of one sentence. Each sentence comes with whether
+        it ends in an appended symbol, and whether the text writes whitespace
+        between it and the last sentence that gave phonemes.
         """
         try:
             from quebra_frases import sentence_tokenize
@@ -664,23 +531,6 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
                 end = cursor
 
     @staticmethod
-    def _process_phones(raw_phones: RawPhonemizedChunks) -> PhonemizedChunks:
-        """Text to phonemes grouped by sentence."""
-        all_phonemes: list[list[str]] = []
-        sentence_phonemes: list[str] = []
-        for phonemes_str, terminator_str, end_of_sentence in raw_phones:
-            # Filter out (lang) switch (flags).
-            # These surround words from languages other than the current voice.
-            phonemes_str = re.sub(r"\([^)]+\)", "", phonemes_str)
-            sentence_phonemes.extend(list(phonemes_str))
-            if end_of_sentence:
-                all_phonemes.append(sentence_phonemes)
-                sentence_phonemes = []
-        if sentence_phonemes:
-            all_phonemes.append(sentence_phonemes)
-        return all_phonemes
-
-    @staticmethod
     def _match_lang(target_lang: str, valid_langs: Union[str, List[str]]):
         """Closest supported language and its distance (linguatag closest_lang)."""
         from linguatag import closest_lang, lang_distance
@@ -695,14 +545,7 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
 
     @staticmethod
     def match_lang(target_lang: str, valid_langs: List[str]) -> str:
-        """
-        Validates and returns the closest supported language code.
-
-        Args:
-            target_lang (str): The language code to validate.
-
-        Returns:
-            str: The validated language code.
+        """The supported language in *valid_langs* closest to *target_lang*.
 
         Raises:
             MissingLanguageError: If no language reached the matcher at all
@@ -714,7 +557,6 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
                 f"no language provided to phonemize: {target_lang!r}")
         lang, score = BasePhonemizer._match_lang(target_lang, valid_langs)
         if score > 10:
-            # raise an error for unsupported language
             raise UnsupportedLanguageError(f"unsupported language code: {target_lang}")
         return lang
 
@@ -780,29 +622,14 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
 
     @staticmethod
     def remove_punctuation(text):
-        """
-        Removes punctuation characters from a string, based on unicode punctuation
-        categories (P*) rather than ASCII-only ``string.punctuation``. This also strips
-        non-ASCII punctuation such as Arabic ``،``/``؟`` and curly quotes.
+        """*text* without Unicode punctuation (category P), stripped.
 
-        Apostrophes and hyphens sandwiched between letters (e.g. "don't", "well-known")
-        are preserved so contractions and compounds aren't broken apart, and any
-        punctuation character sandwiched between two digits (e.g. the ":" in a clock
-        time "16:30", the "," in "10,4", the "." in "92.073", the "-" in "1139-1185")
-        is preserved so the per-language normalizers still see it as a single token,
-        matching the digit:digit exemption in ``chunk_text``.
-
-        A hyphen written as U+2010, U+2011, U+FE63 or U+FF0D between two
-        letters becomes ``-``, so "guarda‐chuva" with U+2010 reads
-        as "guarda-chuva". A hyphen between a letter and a digit, as in
-        "COVID-19", is no letter of a word, and neither is a dash (U+2012 to
-        U+2015 and their other forms) between two letters or a letter and a
-        digit, as in "Lisboa–Porto". Each becomes a space.
-
-        A mark that :data:`CLAUSE_PUNCTUATION` reads as ``!`` or ``?``, such as
-        the Arabic ``؟``, between two letters, as in "Sim!Não", or between a
-        digit and a letter, as in "4.50!They", still separates two words, so a
-        run of them becomes one space.
+        An apostrophe or hyphen between two letters stays ("don't"), and any
+        Unicode hyphen there becomes ``-``. Any mark between two digits stays
+        ("16:30", "10,4"). A hyphen between a letter and a digit ("COVID-19")
+        or a dash between two words ("Lisboa–Porto") becomes a space, and so
+        does a run of marks read as ``!`` or ``?`` between a letter or digit
+        and a letter ("Sim!Não").
         """
         out = []
         chars = list(text)
@@ -842,19 +669,14 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
 
     @staticmethod
     def chunk_text(text: str, delimiters: Optional[List[str]] = None) -> TextChunks:
-        """
-        Split input text into sentence-aware chunks using sentence tokenization and optional intra-sentence delimiters.
+        """Split *text* into sentences, and each sentence at *delimiters*.
 
-        Parameters:
-            text (str): Input text to split. If empty, returns a single empty chunk.
-            delimiters (Optional[List[str]]): List of substring delimiters to split sentences by (defaults to [":", ";", "...", "|"]).
-                ":" and ";" cut only before whitespace or the end of the text.
-
-        Returns:
-            TextChunks: A list of tuples (substring, terminator, end_of_sentence) where:
-                - `substring` is the chunk text with surrounding whitespace removed,
-                - `terminator` is the delimiter that followed the substring or the sentence-final punctuation if none matched,
-                - `end_of_sentence` is `True` for the final chunk of a tokenized sentence, `False` otherwise.
+        *delimiters* defaults to ``[":", ";", "...", "|"]``. ``:`` and ``;`` cut
+        only before whitespace or the end; any other delimiter cuts unless it
+        stands between two digits. Each chunk is ``(text, terminator,
+        end_of_sentence)``, the text stripped, the terminator the delimiter
+        after it or the sentence's final ASCII punctuation (``"."`` when there
+        is none). Empty *text* gives one empty chunk.
         """
         if not text:
             return [('', '', True)]
@@ -866,60 +688,33 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
                 "sentence chunking needs quebra-frases — install with "
                 "`pip install scriptconv[phonemizers]`") from None
 
-        results: TextChunks = []
-        delimiters = delimiters or [":", ";", "...", "|"]
-
-        # ":" and ";" cut only before whitespace or the end, as in
-        # split_clauses, so "16:30" and the Bengali "নি:সন্দেহে" stay whole.
-        # Any other delimiter cuts unless it stands between two digits.
-        def _delim_alt(delimiter: str) -> str:
+        # ":" and ";" cut only before whitespace, so "16:30" and the Bengali "নি:সন্দেহে" stay whole
+        alternatives = []
+        for delimiter in delimiters or [":", ";", "...", "|"]:
             escaped = re.escape(delimiter)
-            if delimiter in (":", ";"):
-                return f"{escaped}(?=\\s|$)"
-            return f"(?:(?<!\\d){escaped}|{escaped}(?!\\d))"
-
-        delimiter_pattern = _delim_alt(delimiters[0])
-        for delimiter in delimiters[1:]:
-            delimiter_pattern += f"|{_delim_alt(delimiter)}"
-
+            alternatives.append(f"{escaped}(?=\\s|$)" if delimiter in (":", ";")
+                                else f"(?:(?<!\\d){escaped}|{escaped}(?!\\d))")
+        splitter = re.compile(f"({'|'.join(alternatives)})")
+        results: TextChunks = []
         for sentence in sentence_tokenize(text):
-            # Default punctuation if no specific punctuation found
             default_punc = sentence[-1] if sentence and sentence[-1] in string.punctuation else "."
-
-            # Use regex to split the sentence by any of the delimiters
-            parts = re.split(f'({delimiter_pattern})', sentence)
-
-            # Group parts into chunks (text + delimiter)
-            chunks = []
+            parts = splitter.split(sentence)
             for i in range(0, len(parts), 2):
-                # If there's a delimiter after the text, use it
                 delimiter = parts[i + 1] if i + 1 < len(parts) else default_punc
-
-                # Last chunk is marked as complete
-                is_last = (i + 2 >= len(parts))
-
-                chunks.append((parts[i].strip(), delimiter.strip(), is_last))
-
-            results.extend(chunks)
-
+                results.append((parts[i].strip(), delimiter.strip(), i + 2 >= len(parts)))
         return results
 
 
 class GraphemePhonemizer(BasePhonemizer):
-    """
-    A phonemizer class that treats input text as graphemes (characters).
-    It performs text normalization and returns the normalized text as a string
-    of characters. A hyphen between two letters is part of the word, as in
-    ``motse-moholo``, so it stays. Any other hyphen becomes a space.
+    """The text itself as the phonemes, after the character rules below.
 
-    ``stress_notation`` is how the output writes the stress mark (U+0301
-    after a vowel) of a :data:`scriptconv.diacritics.STRESS_LANGS` language:
-    ``"acute"`` keeps U+0301, ``"plus"`` writes ``+`` before the stressed
-    vowel (``прив+ет``), and ``"none"`` removes the mark. In any other
-    language an acute is spelling and stays.
+    A hyphen between two letters stays, as in ``motse-moholo``; any other
+    hyphen becomes a space. ``stress_notation`` writes the stress mark of a
+    :data:`scriptconv.diacritics.STRESS_LANGS` language: ``"acute"`` keeps
+    U+0301, ``"plus"`` writes ``+`` before the stressed vowel (``прив+ет``),
+    and ``"none"`` removes it. In any other language an acute is spelling and stays.
     """
     STRESS_NOTATIONS = ("acute", "plus", "none")
-    # Regular expression matching whitespace:
     whitespace_re = re.compile(r"\s+")
 
     lowercase: bool = True
@@ -962,25 +757,14 @@ class GraphemePhonemizer(BasePhonemizer):
         return {"stress_notation": self.stress_notation}
 
     def phonemize_string(self, text: str, lang: str) -> str:
-        """
-        Normalizes input text by applying a series of transformations
-        and returns it as a sequence of graphemes.
-
-        Parameters:
-            text (str): Input text to be converted to graphemes.
-            lang (str): The language code (ignored for grapheme phonemization,
-                        but required by BasePhonemizer).
-
-        Returns:
-            str: A normalized string of graphemes.
-        """
+        """*text* after the character rules; *lang* matters only for the ``"plus"`` stress notation."""
         if self.lowercase:
             text = text.lower()
         text = "".join(char if char in self.in_word_chars and _between_letters(text, i)
                        else self.replace_chars.get(char, char)
                        for i, char in enumerate(text))
         text = text.translate(dict.fromkeys(map(ord, self.drop_chars)))
-        text = re.sub(self.whitespace_re, " ", text).strip()
+        text = self.whitespace_re.sub(" ", text).strip()
         if self.stress_notation == "plus":
             from scriptconv.diacritics import replace_stress_mark
             text = replace_stress_mark(text, lang, before="+")
@@ -999,9 +783,7 @@ class GraphemePhonemizer(BasePhonemizer):
 
 
 class UnicodeCodepointPhonemizer(BasePhonemizer):
-    """Phonemes = codepoints
-    normalization also splits accents and punctuation into it's own codepoints
-    """
+    """The codepoints of the text in a Unicode normal form; NFD splits accents into their own codepoints."""
 
     def __init__(self, form: Literal["NFC", "NFD", "NFKC", "NFKD"] = "NFD"):
         self.form = form
@@ -1015,15 +797,5 @@ class UnicodeCodepointPhonemizer(BasePhonemizer):
         return {"form": self.form}
 
     def phonemize_string(self, text: str, lang: str) -> str:
-        # Phonemes = codepoints
-        """
-        Normalize the input text to Unicode NFD so phonemes correspond to individual Unicode codepoints.
-
-        Parameters:
-            text (str): The input string to normalize.
-            lang (str): Language code (ignored by this implementation).
-
-        Returns:
-            str: The input text normalized to Unicode NFD, with combining marks separated into distinct codepoints.
-        """
+        """*text* in the normal form :attr:`form`; *lang* is ignored."""
         return unicodedata.normalize(self.form, text)
