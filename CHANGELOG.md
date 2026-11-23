@@ -1,8 +1,20 @@
 # Changelog
 
+## [0.0.4a154](https://github.com/TigreGotico/scriptconv/tree/0.0.4a154) (2026-11-23)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a153...0.0.4a154)
+
+**Merged pull requests:**
+
+- refactor\(phonemizers\): shorter docstrings and simpler code in the multilingual, English and Chinese backends [\#415](https://github.com/TigreGotico/scriptconv/pull/415) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a153](https://github.com/TigreGotico/scriptconv/tree/0.0.4a153) (2026-11-23)
 
-[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a151...0.0.4a153)
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a152...0.0.4a153)
+
+## [0.0.4a152](https://github.com/TigreGotico/scriptconv/tree/0.0.4a152) (2026-11-23)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a151...0.0.4a152)
 
 **Merged pull requests:**
 
@@ -374,10 +386,6 @@
 ## [0.0.4a105](https://github.com/TigreGotico/scriptconv/tree/0.0.4a105) (2026-11-16)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a104...0.0.4a105)
-
-**Merged pull requests:**
-
-- test: hold the second run of marks after a block [\#280](https://github.com/TigreGotico/scriptconv/pull/280) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a104](https://github.com/TigreGotico/scriptconv/tree/0.0.4a104) (2026-11-16)
 
