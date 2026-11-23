@@ -669,6 +669,59 @@ Limits:
   thirty", and `fell to -5 degrees` reads the sign as "dash". Normalise such
   text first.
 
+## NeMo IPA, American English
+
+`Phonemizer.NEMO_IPA` gives the symbols that NVIDIA NeMo's English `IpaG2p`
+gives to the Magpie TTS `english_phoneme` sub-tokenizer. A caller that
+indexes an English Magpie voice maps each character of the string to a token
+id. The backend follows NeMo at commit `fd6a8775` (tag v3.0.0) and needs no
+NeMo or torch package. The module docstring of `scriptconv/phonemizers/nemo_ipa.py`
+names the NeMo files, and `scriptconv/phonemizers/_thirdparty/nemo/NOTICE`
+holds the credit that the Apache License asks for. Install the backend with
+`pip install scriptconv[en-phonemizers]`.
+
+```python
+from scriptconv.phonemizers import Phonemizer, get_phonemizer
+
+nemo = get_phonemizer(Phonemizer.NEMO_IPA)
+nemo.phonemize_string("She read the lead sheet at the café.", "en-US")
+# 'ˈʃi READ ðə LEAD ˈʃit ˈæt ðə kəˈfeɪ.'
+```
+
+A word of the dictionary gives its first pronunciation. A heteronym, such as
+`read` and `lead` above, and a word that the dictionary lacks give upper-case
+letters. A hyphen splits a word that the dictionary lacks, and each part is
+looked up alone. A word with `'s` or `s` after a dictionary word takes `s`,
+`z` or `ɪz`. An accent is removed first. Digits stay digits. The punctuation
+of the vocabulary stays, and a character that the vocabulary lacks is dropped,
+as in NeMo. A space stays, also two in a row, except at the end.
+The output has no random choice: NeMo keeps a word as letters with a
+probability only while it trains, and this backend has no such parameter.
+
+The two data files come from the Hugging Face Hub, at a fixed revision, into
+the shared Hugging Face cache, from `Phoonnx/magpietts-multi-357m-unicode` at
+revision `a0e169ad`. Each file must have its pinned sha256. Pass
+`dictionary=` or `heteronyms=` to read a local file instead.
+
+| File | Source | sha256 | Size |
+|---|---|---|---|
+| `ipa_cmudict-0.7b_nv23.01.txt` | `assets/tokenizer/dc7d60d6b15a4651b21c9ca2932b62c6_ipa_cmudict-0.7b_nv23.01.txt` | `7ea5c4c2c59cc780748b24d4ab60bd689779c4ac4ea7e27c0a8c3e20f300c0fa` | 3.1 MB |
+| `heteronyms-052722` | `assets/tokenizer/61d57a4ccb064d1e8e3d9f871c571932_heteronyms-052722` | `b701909aedf753172eff223950f8859cd4b9b4c80199cf0a6e9ac4a307c8f8ec` | 1.6 KB |
+
+The backend owns no stage. `identity(lang)` gives a `revision` that hashes the
+code on the path of the backend and the sha256 of the two data files.
+
+Limits:
+
+- The backend reads American English only. A tag must resolve to `en-US`, or
+  to a lect of it. A bare `en` is British English by the default-region rule,
+  so it is refused with `UnsupportedLanguageError`.
+- The backend does not write numbers, dates or symbols as words. Normalise
+  such text first.
+- `phonemize_string` returns the symbol string with its punctuation.
+  `phonemize` and the frontend remove the punctuation before the backend
+  reads the text.
+
 ## Backends in scriptconv-copyleft and scriptconv-nonfree
 
 A wrapper moves out of scriptconv when its own code or a dependency of its
@@ -948,7 +1001,7 @@ f5.phonemize_to_list("我们用iPhone打电话。", "zh")
 
 Multilingual: espeak (subprocess with espyak fallback), gruut, goruut,
 epitran, transphone, ByT5/Charsiu (ONNX), the misaki family (en/ja/zh/ko/vi).
-Per-language: English (DeepPhonemizer, OpenPhonemizer, g2p_en, dizione, Leokani G2P), Liberian
+Per-language: English (DeepPhonemizer, OpenPhonemizer, g2p_en, dizione, Leokani G2P, NeMo IPA), Liberian
 English (kolokwa, `lir`), Japanese
 (OpenJTalk, cutlet, pykakasi, and `openjtalk_prosody`: OpenJTalk IPA with the
 accent marks `↑ ↓ #`), Korean (g2pk, KoG2P), Chinese (jieba, g2pM,

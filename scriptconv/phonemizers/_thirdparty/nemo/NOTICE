@@ -1,0 +1,23 @@
+NeMo IPA phonemizer (scriptconv/phonemizers/nemo_ipa.py)
+
+This module follows the logic of the IpaG2p, IPATokenizer and text
+preprocessing code of NVIDIA NeMo, https://github.com/NVIDIA/NeMo, at commit
+fd6a877539710e2b98f28c43272ff81312f83417 (tag v3.0.0):
+
+  nemo/collections/tts/g2p/models/i18n_ipa.py
+  nemo/collections/common/tokenizers/text_to_speech/tokenizer_utils.py
+  nemo/collections/common/tokenizers/text_to_speech/tts_tokenizers.py
+
+Copyright (c) 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+NeMo is licensed under the Apache License, Version 2.0
+(http://www.apache.org/licenses/LICENSE-2.0). NeMo has no NOTICE file. The
+module is a new implementation for strings of that logic: it holds no file of
+NeMo, it needs no NeMo or torch package, and it differs from NeMo in the two
+places that its module docstring lists.
+
+The module downloads two data files from the Hugging Face repository
+Phoonnx/magpietts-multi-357m-unicode: ipa_cmudict-0.7b_nv23.01.txt, which is
+the CMU Pronouncing Dictionary (BSD-2-Clause, see
+scriptconv/phonemizers/_thirdparty/dizione/built/LICENSE.cmudict) with IPA
+pronunciations, and heteronyms-052722. Neither file is in the wheel.
