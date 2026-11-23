@@ -136,7 +136,8 @@ class DizionePhonemizer(BasePhonemizer):
 
     A ``!`` or ``?`` between two letters with no space after it, as in
     ``Sim!Não!``, is no clause mark: dizione reads it as a space, so it gives
-    no symbol. The methods read the text that way, :meth:`tokens` too.
+    no symbol (tts-punctuation). The methods read the text that way,
+    :meth:`tokens` too.
     """
 
     owned_stages: ClassVar[frozenset[str]] = frozenset({"normalize"})

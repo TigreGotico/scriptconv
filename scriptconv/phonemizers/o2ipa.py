@@ -31,7 +31,8 @@ _KNOWN_SPECS: set[str] = set()
 class Orthography2IPAPhonemizer(BasePhonemizer):
     """Any language that ``orthography2ipa.resolve`` maps to a spec, to IPA.
 
-    The engine of each language is built on first use and kept.
+    The BCP-47 closest match lives in orthography2ipa, so this wrapper does not
+    repeat it. The engine of each language is built on first use and kept.
     """
 
     engine_distribution = "orthography2ipa"
@@ -122,6 +123,8 @@ class Orthography2IPAPhonemizer(BasePhonemizer):
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
         """*target_lang* as the orthography2ipa spec code that ``orthography2ipa.resolve`` gives.
+
+        ``orthography2ipa.resolve`` does the BCP-47 closest match.
 
         Raises:
             ValueError: If orthography2ipa has no spec for *target_lang*.

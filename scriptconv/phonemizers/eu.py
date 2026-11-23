@@ -6,8 +6,8 @@ from scriptconv.phonemizers.enums import Alphabet
 class EuskaphonePhonemizer(BasePhonemizer):
     """Basque to IPA through ``euskaphone``, for eight lects: Batua and the historical dialects.
 
-    The per-call ``lang`` picks the lect (``eu``, ``eu-x-zuberera``, ...), so one
-    instance serves every dialect. euskaphone reads numbers, dates and
+    The per-call ``lang``, a BCP-47 code (``eu``, ``eu-x-zuberera``, ...), picks
+    the lect, so one instance serves every dialect. euskaphone reads numbers, dates and
     abbreviations through ``text2spoken``, so this backend owns the
     ``normalize`` stage. ``AhoTTSPhonemizer`` in scriptconv-copyleft is a
     different engine, a port of the AhoTTS front-end.
