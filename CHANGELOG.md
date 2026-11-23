@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a151](https://github.com/TigreGotico/scriptconv/tree/0.0.4a151) (2026-11-23)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a150...0.0.4a151)
+
+**Merged pull requests:**
+
+- feat: add the NEMO\_IPA backend, the IPA G2P of NVIDIA NeMo for Magpie TTS [\#413](https://github.com/TigreGotico/scriptconv/pull/413) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a150](https://github.com/TigreGotico/scriptconv/tree/0.0.4a150) (2026-11-22)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a149...0.0.4a150)
@@ -369,10 +377,6 @@
 ## [0.0.4a103](https://github.com/TigreGotico/scriptconv/tree/0.0.4a103) (2026-11-16)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a102...0.0.4a103)
-
-**Merged pull requests:**
-
-- feat: g2pW Chinese backend, Nakdimon Hebrew diacritizer, OpenJTalk on pyopenjtalk-plus [\#274](https://github.com/TigreGotico/scriptconv/pull/274) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a102](https://github.com/TigreGotico/scriptconv/tree/0.0.4a102) (2026-11-16)
 
