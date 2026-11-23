@@ -84,7 +84,7 @@ DIACRITIZED = "text-diacritized"
 # Languages with free word stress that ordinary spelling leaves unwritten. In
 # East Slavic unstressed vowels also reduce (Russian unstressed "о" is [ɐ] or
 # [ə]), so a missing mark changes vowel quality. stressonnx writes a combining
-# acute (U+0301) after the stressed vowel for 26 tags over these 24 primary
+# acute (U+0301) after the stressed vowel for 26 BCP-47 tags over these 24 primary
 # subtags; az and uz each have a Cyrillic and a Latin variant.
 STRESS_LANGS = {
     "az", "ba", "be", "bg", "cv", "hy", "ka", "kbd", "kjh", "kk", "ky", "lv",
@@ -120,9 +120,12 @@ def _is_arabic_script_arabic(lang: str) -> bool:
 
     ``is_arabic_variety`` names the language (``ar``, the ISO 639-3 ``ara``
     macrolanguage, Hassaniyya ``mey``); ``lang_distance`` to ``ar`` adds the
-    script, so ``ar-Latn``, ``acy``, ``pga``, Persian and Urdu return False.
-    Arabic has no two-letter code but ``ar``, so any other two-letter subtag
-    returns False before linguatag loads.
+    script, because tashkeel marks only Arabic script. So ``ar-Latn``, and
+    ``acy`` and ``pga``, which CLDR writes in Latin script, return False, as do
+    Persian and Urdu.
+
+    ISO 639-1 gives Arabic one two-letter code, ``ar``, so any other two-letter
+    subtag returns False before linguatag loads.
     """
     p = _primary_subtag(lang)
     if len(p) == 2 and p != "ar":

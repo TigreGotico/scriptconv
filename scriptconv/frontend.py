@@ -100,7 +100,8 @@ to the stages raises it. Version 1 cut the raw text into sentences before
 normalisation."""
 
 # One dizione call on English text dense in dates and prices stays under 100 ms up to this size
-# (scripts/time_owner_backends.txt); at 2,000 characters one run took 100.5 ms.
+# (scripts/time_owner_backends.py, output in scripts/time_owner_backends.txt); at 2,000 characters
+# one run took 100.5 ms.
 WHOLE_TEXT_LIMIT = 1_750
 """The default of :attr:`FrontendConfig.whole_text_limit`."""
 
@@ -607,8 +608,8 @@ class TextFrontend:
     def phonemize_flat(self, text: str, stages: Optional[Stages] = None) -> List[str]:
         """Phonemes of *text* as one list, for training: the ``none`` chunk.
 
-        The sentences join by the rule of
-        :func:`~scriptconv.phonemizers.base.join_sentences`, with a space only
+        The sentences join by the rule of tts-punctuation, as
+        :func:`~scriptconv.phonemizers.base.join_sentences` joins them, with a space only
         where the text writes whitespace between two sentences. Where two
         bounded segments join, the inner end and start symbols go.
         """
@@ -851,7 +852,8 @@ class TextFrontend:
         """Move the symbols at the start of *piece* that write *marks* to the end of *held*, in place of its word break.
 
         *held* ends in a block, and *marks* are the closing marks after it
-        (:func:`_marks_after`), which close the block's sentence. A backend
+        (:func:`_marks_after`), which close the block's sentence, as
+        tts-punctuation puts a closing mark with the sentence that it ends. A backend
         with a mark table
         (:meth:`~scriptconv.phonemizers.base.BasePhonemizer.mark_symbols`) can
         read marks in another way where a word follows, so the symbols are
