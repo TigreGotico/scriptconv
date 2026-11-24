@@ -162,6 +162,7 @@ symbol at each position. Characters not in the ARPABET table are replaced by `un
 (default `"?"`), pass `unknown=""` to drop them silently. A space has no token and is
 dropped, so the output keeps no word boundary: `"ɛ ɛ"` and `"ɛɛ"` both give `EH EH`.
 The tied affricates `t͡ʃ` and `d͡ʒ` give `CH` and `JH`, with the tie above or below.
+The tied forms and the forms with a non-syllabic mark of AY, EY, OW, AW and OY give the same symbol as the plain form: `a͡ɪ`, `ai̯` and `aɪ̯` give `AY`. The SSB `əʊ` row follows the same rule and gives `OW`.
 
 With `stress=True`, a stress mark gives its digit to the next vowel. The IPA puts the
 mark before the stressed syllable, so `bəˈnænə` gives `B AH0 N AE1 N AH0`, as in the

@@ -183,9 +183,12 @@ for _tie in ("\u0361", "\u035C"):
     _IPA_TO_ARPA.setdefault("d" + _tie + "ʒ", "JH")
 # A diphthong written with a tie bar or a non-syllabic mark on its glide reads
 # as the plain sequence of the same row, and the glide may be ɪ/i or ʊ/u.
+# The SSB əʊ row reads as OW as the GA oʊ row does, so it takes the same forms.
 _GLIDE_SPELLINGS = {"ɪ": "ɪi", "ʊ": "ʊu"}
-for _arpa in ("AY", "EY", "OW", "AW", "OY"):
-    _nucleus, _glide = _ARPA_BASE[_arpa]
+_DIPHTHONG_ROWS = [(_arpa, *_ARPA_BASE[_arpa])
+                   for _arpa in ("AY", "EY", "OW", "AW", "OY")]
+_DIPHTHONG_ROWS.append(("OW", "ə", "ʊ"))
+for _arpa, _nucleus, _glide in _DIPHTHONG_ROWS:
     for _g in _GLIDE_SPELLINGS[_glide]:
         _IPA_TO_ARPA.setdefault(_nucleus + _g + "\u032F", _arpa)
         for _tie in ("\u0361", "\u035C"):
