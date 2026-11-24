@@ -506,7 +506,8 @@ Each character that is not a letter, a digit, a space, a hyphen or one of
 model has no symbol for it, so it gives no phonemes. The text splits at
 spaces and at those marks, which stay in the output. A word that is not in the
 dictionary splits at hyphens and before each inner capital, so `DIY` gives
-`d-a-j`.
+`d-a-j`. The model reads at most 5,000 ids. With two bounding ids and three ids
+per letter, a spelling of more than 1,666 letters raises `ValueError`.
 
 The model files must have their pinned sha256. With no network and no cached
 copy that passes the check, the constructor raises `ModelUnavailableError`.
