@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a158](https://github.com/TigreGotico/scriptconv/tree/0.0.4a158) (2026-11-24)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a157...0.0.4a158)
+
+**Merged pull requests:**
+
+- fix\(frontend\): a chunk value that is no Chunk names the valid values [\#430](https://github.com/TigreGotico/scriptconv/pull/430) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a157](https://github.com/TigreGotico/scriptconv/tree/0.0.4a157) (2026-11-24)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a156...0.0.4a157)
@@ -371,10 +379,6 @@
 ## [0.0.4a109](https://github.com/TigreGotico/scriptconv/tree/0.0.4a109) (2026-11-17)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a108...0.0.4a109)
-
-**Merged pull requests:**
-
-- fix\(gruut\): wrap the lookup before the processor is cached [\#289](https://github.com/TigreGotico/scriptconv/pull/289) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a108](https://github.com/TigreGotico/scriptconv/tree/0.0.4a108) (2026-11-17)
 
