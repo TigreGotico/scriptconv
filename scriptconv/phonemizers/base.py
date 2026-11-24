@@ -62,6 +62,8 @@ _LANG_FLAGS = re.compile(r"\([^)]+\)")
 _WHITESPACE = re.compile(r"\s")
 # The text before the first letter or digit: whitespace and marks.
 _WORDLESS_START = re.compile(r"[\W_]*")
+# Primary language tags whose question mark is ";".
+_GREEK_TAGS = frozenset({"el", "ell", "gre"})
 # The stress mark that the diacritize stage writes after a stressed vowel.
 STRESS_MARK = "\u0301"
 # The methods through which text reaches a backend.
@@ -448,12 +450,13 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
     def _bare_sentences(self, text: str, lang: str) -> Iterator[Tuple[List[str], bool, bool]]:
         """Per-sentence phonemes, each chunk of :meth:`chunk_text` read alone without punctuation.
 
-        In ``el`` a ``;`` is the question mark, so it ends the sentence. A
-        backend that owns ``normalize`` reads each chunk stripped but with its
-        punctuation. Each sentence comes with the flags of
-        :meth:`_punctuated_sentences`, and never ends in a token.
+        In Greek a ``;`` is the question mark, so it ends the sentence. The
+        tags ``el``, ``ell`` and ``gre`` name Greek. A backend that owns
+        ``normalize`` reads each chunk stripped but with its punctuation. Each
+        sentence comes with the flags of :meth:`_punctuated_sentences`, and
+        never ends in a token.
         """
-        question_semicolon = _primary_subtag(lang) == "el"
+        question_semicolon = _primary_subtag(lang) in _GREEK_TAGS
         sentence: List[List[str]] = []
         # where the sentence's first word with phonemes starts, and where the last sentence with phonemes ends
         word: Optional[int] = None
