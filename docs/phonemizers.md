@@ -296,9 +296,10 @@ Strip removes only the marks that a backend adds: the combining acute and
 grave for stress, tashkeel for Arabic and niqqud for Hebrew. It does not
 remove every combining mark, so precomposed letters stay: Cyrillic й and ё,
 Latvian macrons, Azerbaijani ç and ö, and the Arabic hamza carriers. Strip
-works only for these added marks. For every other language it raises
-`ValueError`, European Portuguese included, because there the marks are
-spelling:
+works only for these added marks. For a language with no added marks, such as
+English, it raises `ValueError` saying that scriptconv has no overlay
+diacritics. European Portuguese raises the same exception for a different
+reason: there the marks are spelling:
 
 ```python
 from scriptconv import DEFAULT_GRAPH
