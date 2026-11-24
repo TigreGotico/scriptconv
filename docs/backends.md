@@ -148,11 +148,17 @@ To skip a download, give a local file where the code accepts one:
   of the heteronyms file through `heteronyms=`.
 
 The g2pW backend takes no model path. Its constructor has only an `alphabet`
-parameter, and `get_phonemizer` drops a `model=` value for it. The Leokani
-G2P and kolokwa-g2p backends take no model path either. The g2pW, Leokani G2P
-and kolokwa-g2p models, the stressonnx models and the fp32 text2tashkeel
-weights come from the Hugging Face cache. To run these offline, fill the cache
-first and then set `HF_HUB_OFFLINE=1`:
+parameter, so `get_phonemizer(Phonemizer.G2PW, model=...)` raises `ValueError`.
+Any backend whose constructor has no `model`, `engine` or `register` parameter
+does the same. An empty string means no model. The kolokwa-g2p backend takes
+no model path either. Leokani G2P takes a model name, `micro` or `mini`,
+through `model=`. The g2pW, Leokani G2P and
+kolokwa-g2p models, the stressonnx models and the fp32 text2tashkeel weights
+come from the Hugging Face cache. To run these offline, fill the cache first
+and then set `HF_HUB_OFFLINE=1`:
+
+A backend that declares a `model` parameter still receives an empty string.
+That value reaches the backend and may name no model there.
 
 ```python
 import inspect
