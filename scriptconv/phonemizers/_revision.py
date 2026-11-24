@@ -365,6 +365,7 @@ def code_tokens(source: bytes) -> List[Tuple[str, str]]:
 
 
 def _source_text(lines: List[str], start: Tuple[int, int], end: Tuple[int, int]) -> str:
+    """The source from *start* to *end*, two (line, column) positions of :mod:`tokenize` with lines from 1."""
     (first, first_column), (last, last_column) = start, end
     if first == last:
         return lines[first - 1][first_column:last_column]
@@ -372,6 +373,7 @@ def _source_text(lines: List[str], start: Tuple[int, int], end: Tuple[int, int])
 
 
 def _without_string_statements(tokens: List[Tuple[str, str]]) -> List[Tuple[str, str]]:
+    """*tokens* without each run of strings that is a whole statement, as a docstring is, and its NEWLINE."""
     kept: List[Tuple[str, str]] = []
     at = 0
     while at < len(tokens):
