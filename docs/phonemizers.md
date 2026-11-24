@@ -832,10 +832,10 @@ and they are not for commercial use. scriptconv-nonfree states the terms in
 Arabic-Phonetiser (2016, CC BY-NC 4.0). None of the three is a language
 default: `ArbtokPhonemizer` is the Arabic default (`LANG_DEFAULTS["ar"]`).
 
-`Phonemizer.MANTOQ` (`MantoqPhonemizer`) runs the full mantoq pipeline:
-mantoq's own diacritizer adds tashkeel to bare text, and then the phonetiser
-runs. It uses an installed `mantoq` package, else the copy vendored in
-scriptconv-nonfree. The default `alphabet=Alphabet.BUCKWALTER` returns the
+`Phonemizer.MANTOQ` (`MantoqPhonemizer`) runs the mantoq pipeline: digits
+become Arabic number words, and then the phonetiser runs. It uses an
+installed `mantoq` package, else the copy vendored in scriptconv-nonfree.
+The vendored copy runs no diacritizer, so give it text with tashkeel. The default `alphabet=Alphabet.BUCKWALTER` returns the
 raw mantoq inventory, the notation that published models trained on.
 `Alphabet.HALABI` is the accurate name, and it returns the same string. No
 separate Buckwalter transliteration step is in this pipeline, so
