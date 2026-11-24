@@ -43,9 +43,11 @@ _CLAUSE_TOKENS = frozenset(CLAUSE_PUNCTUATION.values())
 _SEPARATING_MARKS = frozenset(mark for mark, symbol in CLAUSE_PUNCTUATION.items()
                               if symbol in ("!", "?"))
 # The Unicode hyphens. Between two letters each one is read as "-".
-_HYPHENS = frozenset("-\u2010\u2011\ufe63\uff0d")
+_HYPHENS = frozenset("-\u058a\u05be\u2010\u2011\ufe63\uff0d")
 # The dashes. Between two words, as in "Lisboa–Porto", a dash separates them.
 _DASHES = frozenset("\u2012\u2013\u2014\u2015\u2e3a\u2e3b\ufe31\ufe32\ufe58")
+# Every hyphen and dash. A run of two or more between words is one dash.
+_DASH_RUN = _HYPHENS | _DASHES
 # A clause ends at punctuation followed by whitespace, as in espeak-ng, so the
 # "," in "10,4" or the ":" in "16:30" never splits. A lone "." is left to the
 # sentence tokenizer, which knows abbreviations. An ellipsis or "|" ends a
@@ -629,12 +631,16 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         ("16:30", "10,4"). A hyphen between a letter and a digit ("COVID-19")
         or a dash between two words ("Lisboa–Porto") becomes a space, and so
         does a run of marks read as ``!`` or ``?`` between a letter or digit
-        and a letter ("Sim!Não").
+        and a letter ("Sim!Não"). Two or more hyphens or dashes between words
+        read as one dash and give one space; they never join the words.
         """
         out = []
         chars = list(text)
         separates = False
+        skip = 0
         for i, c in enumerate(chars):
+            if i < skip:
+                continue
             if c in ("'", "’") and _between_letters(text, i):
                 out.append(c)
                 continue
@@ -659,6 +665,19 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
                     and chars[i - 1].isdigit() and chars[i + 1].isdigit():
                 out.append(c)
                 continue
+            if c in _DASH_RUN:
+                end = i + 1
+                while end < len(chars) and chars[end] in _DASH_RUN:
+                    end += 1
+                if end - i > 1:
+                    skip = end
+                    letter = i - 1
+                    while letter > 0 and unicodedata.category(chars[letter]).startswith("M"):
+                        letter -= 1
+                    if letter >= 0 and chars[letter].isalnum() \
+                            and end < len(chars) and chars[end].isalnum():
+                        out.append(" ")
+                    continue
             if (c in _HYPHENS or c in _DASHES) and _between_letters(text, i, str.isalnum):
                 out.append(" ")
                 continue

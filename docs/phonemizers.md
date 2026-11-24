@@ -161,6 +161,14 @@ the voices trained on that output learned none. Each sentence is then one list
 of `phonemize(text)`: a `:`, `;`, `...` or `|` inside a sentence is a space, as
 a `,` is. In `el` a `;` is the question mark, so it ends the sentence.
 
+When punctuation is removed, a single hyphen between letters stays in the
+word, as `flew-slowly` does. The Armenian hyphen (U+058A) and the Hebrew maqaf
+(U+05BE) become that hyphen. A dash immediately between a letter and a letter
+or digit gives a space, as `flew—slowly` gives `flew slowly`. Two or more
+hyphens or dashes immediately between two letters or digits also give one
+space. A dash run followed by punctuation or a combining mark does not give
+that space.
+
 Set `keep_punctuation = True` on the instance, or pass `keep_punctuation=True`
 to `get_phonemizer`, to keep it as Piper does. Each clause is then phonemized
 alone and followed by its symbol: `.` `?` `!` alone, and `,` `:` `;` followed
