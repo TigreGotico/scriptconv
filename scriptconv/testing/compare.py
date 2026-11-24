@@ -15,7 +15,8 @@ The phoneme error rate (PER) of a category is the edit distance between the
 backend output and ``expected_ipa``, summed over the rows of the category,
 divided by the summed segment count of ``expected_ipa``. Segments come from
 ``orthography2ipa.allophony.segment_ipa``. Whitespace, syllable marks,
-prosodic boundaries and tie bars are not segments, so ``t͡s`` scores as ``ts``.
+prosodic boundaries, tie bars and the non-syllabic mark are not segments, so
+``t͡s`` scores as ``ts`` and ``ai̯`` scores as ``ai``.
 A stress mark is one segment, because stress placement changes what a voice
 says. A row whose ``expected_ipa`` has no segments is skipped with a warning.
 
@@ -54,9 +55,9 @@ CATEGORIES = ("plain", "number", "date", "abbreviation", "homograph", "contact")
 TIERS = ("gold", "silver")
 COLUMNS = ("id", "lang", "category", "text", "expected_ipa", "source", "tier")
 
-# Syllable boundaries, linking marks, prosodic group boundaries and the tie
-# bars above (U+0361) and below (U+035C).
-_NOT_SEGMENTS = str.maketrans("", "", ".‿|‖\u0361\u035c")
+# Syllable boundaries, linking marks, prosodic group boundaries, the tie bars
+# above (U+0361) and below (U+035C) and the non-syllabic mark (U+032F).
+_NOT_SEGMENTS = str.maketrans("", "", ".‿|‖\u0361\u035c\u032f")
 # Skip reasons that are defects in the sentence set, not filters.
 DEFECTS = ("column count", "unknown category", "unknown tier", "empty text or expected_ipa", "duplicate id",
            "duplicate text")

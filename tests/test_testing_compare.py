@@ -107,6 +107,7 @@ def test_edit_distance_matches_hand_count(ref, hyp, distance):
     ("aˌpa", ["a", "ˌ", "p", "a"]),                # secondary stress inside a word
     ("t\u0361sa", ["t", "s", "a"]),                # a tie bar above is not a segment
     ("t\u035csa", ["t", "s", "a"]),                # nor is a tie bar below
+    ("ai\u032f", ["a", "i"]),                      # nor is the non-syllabic mark
 ])
 def test_segments_match_hand_split(ipa, expected):
     assert segments(ipa) == expected
@@ -618,3 +619,8 @@ def test_cli_rejects_a_wrong_header(tmp_path):
     with pytest.raises(SystemExit) as exit_info:
         main(["--lang", "pt-PT", "--tsv", str(tsv), "--backend", "orthography2ipa"])
     assert exit_info.value.code == 2
+
+
+def test_non_syllabic_mark_scores_as_the_bare_sequence():
+    rows = [Row("1", "es-ES", "plain", "x1", "ˈai̯ɾe", "t", "gold")]
+    assert per_by_category(rows, Table({"x1": "ˈaiɾe"})) == {"plain": 0.0}
