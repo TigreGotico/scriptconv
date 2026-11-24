@@ -312,9 +312,10 @@ Three rules hold for every backend:
   and phonetisaurus need a local `model=` path. These download on first use:
   the phonikud and Nakdimon Hebrew diacritizers, the fp32 text2tashkeel
   weights, the stressonnx models, the g2pW model, the Leokani G2P and
-  kolokwa-g2p models, the two data files of the `nemo_ipa` backend, a named
-  DeepPhonemizer checkpoint and the NLTK data of the `g2pen` backend.
-  [docs/backends.md](docs/backends.md#model-files) names each cache location.
+  kolokwa-g2p models, the two data files of the `nemo_ipa` backend and a named
+  DeepPhonemizer checkpoint. The `g2pen` backend reads local NLTK data and
+  downloads nothing. [docs/backends.md](docs/backends.md#model-files) names
+  each cache location.
 - **orthography2ipa uses the packaged lexicons.** The `o2i` extra installs
   [o2i-lexicons](https://github.com/TigreGotico/o2i-lexicons), which holds
   the words that the orthography2ipa rules get wrong. Pass
