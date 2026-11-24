@@ -1197,3 +1197,31 @@ def test_buckwalter_wasla_and_dagger_alef():
     assert buckwalter_to_arabic("`") == "ٰ"
     assert arabic_to_buckwalter("رحمٰن") == "rHm`n"
     assert arabic_to_buckwalter("ٱ") == "{"
+
+
+# ---------------------------------------------------------------------------
+# Tied and non-syllabic diphthongs read as the plain diphthong row
+# ---------------------------------------------------------------------------
+
+_DIPHTHONG_FORMS = [
+    ("AY", "a͡ɪ"), ("AY", "a͡i"), ("AY", "a͜ɪ"), ("AY", "a͜i"),
+    ("AY", "aɪ̯"), ("AY", "ai̯"),
+    ("EY", "e͡ɪ"), ("EY", "e͡i"), ("EY", "e͜ɪ"), ("EY", "e͜i"),
+    ("EY", "eɪ̯"), ("EY", "ei̯"),
+    ("OW", "o͡ʊ"), ("OW", "o͡u"), ("OW", "o͜ʊ"), ("OW", "o͜u"),
+    ("OW", "oʊ̯"), ("OW", "ou̯"),
+    ("AW", "a͡ʊ"), ("AW", "a͡u"), ("AW", "a͜ʊ"), ("AW", "a͜u"),
+    ("AW", "aʊ̯"), ("AW", "au̯"),
+    ("OY", "ɔ͡ɪ"), ("OY", "ɔ͡i"), ("OY", "ɔ͜ɪ"), ("OY", "ɔ͜i"),
+    ("OY", "ɔɪ̯"), ("OY", "ɔi̯"),
+]
+
+
+@pytest.mark.parametrize("arpa, written", _DIPHTHONG_FORMS)
+def test_tied_and_nonsyllabic_diphthongs_equal_the_plain_row(arpa, written):
+    plain = arpa_to_ipa(arpa)
+    assert ipa_to_arpa("m" + written + "t") == ipa_to_arpa("m" + plain + "t") == f"M {arpa} T"
+
+
+def test_diphthong_aliases_leave_arpa_output_unchanged():
+    assert [arpa_to_ipa(a) for a in ("AY", "EY", "OW", "AW", "OY")] == ["aɪ", "eɪ", "oʊ", "aʊ", "ɔɪ"]

@@ -181,6 +181,15 @@ _IPA_TO_ARPA.setdefault("ɫ̩", "EL")
 for _tie in ("\u0361", "\u035C"):
     _IPA_TO_ARPA.setdefault("t" + _tie + "ʃ", "CH")
     _IPA_TO_ARPA.setdefault("d" + _tie + "ʒ", "JH")
+# A diphthong written with a tie bar or a non-syllabic mark on its glide reads
+# as the plain sequence of the same row, and the glide may be ɪ/i or ʊ/u.
+_GLIDE_SPELLINGS = {"ɪ": "ɪi", "ʊ": "ʊu"}
+for _arpa in ("AY", "EY", "OW", "AW", "OY"):
+    _nucleus, _glide = _ARPA_BASE[_arpa]
+    for _g in _GLIDE_SPELLINGS[_glide]:
+        _IPA_TO_ARPA.setdefault(_nucleus + _g + "\u032F", _arpa)
+        for _tie in ("\u0361", "\u035C"):
+            _IPA_TO_ARPA.setdefault(_nucleus + _tie + _g, _arpa)
 # Bare/long NURSE vowel (non-rhotic British ɜ, ɜː) has no dedicated ARPA symbol —
 # ARPABET is rhotic-only, so it collapses onto the same "ER" as the r-colored ɝ.
 _IPA_TO_ARPA.setdefault("ɜː", "ER")
