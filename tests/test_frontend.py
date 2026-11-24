@@ -199,6 +199,12 @@ class TestSegmentText:
         frontend = build(Echo(), stages=Stages(diacritize=False))
         assert [s.text for s in frontend.segments(text, Stages(chunk=chunk))] == expected
 
+    def test_a_chunk_value_that_is_no_chunk_names_every_chunk(self):
+        with pytest.raises(ValueError) as error:
+            Stages(chunk="word")
+        assert "'word'" in str(error.value)
+        assert all(repr(chunk.value) in str(error.value) for chunk in Chunk)
+
     def test_a_sentence_the_backend_splits_does_not_repeat_its_text(self):
         class Splitter(Echo):
             def phonemize_lazy(self, text, lang):
