@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.0.4a157](https://github.com/TigreGotico/scriptconv/tree/0.0.4a157) (2026-11-24)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a156...0.0.4a157)
+
+**Merged pull requests:**
+
+- refactor: docstrings for two revision helpers, plain enum comments [\#428](https://github.com/TigreGotico/scriptconv/pull/428) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a156](https://github.com/TigreGotico/scriptconv/tree/0.0.4a156) (2026-11-23)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a155...0.0.4a156)
+
+## [0.0.4a155](https://github.com/TigreGotico/scriptconv/tree/0.0.4a155) (2026-11-23)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a154...0.0.4a155)
+
+**Merged pull requests:**
+
+- refactor\(frontend\): shorten frontend and diacritics docs, drop a dead guard [\#418](https://github.com/TigreGotico/scriptconv/pull/418) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- refactor\(phonemizers\): shorter docstrings and leaner code in the language wrappers [\#416](https://github.com/TigreGotico/scriptconv/pull/416) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a154](https://github.com/TigreGotico/scriptconv/tree/0.0.4a154) (2026-11-23)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a153...0.0.4a154)
@@ -359,17 +380,9 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a107...0.0.4a108)
 
-**Merged pull requests:**
-
-- fix\(gruut\): keep the lexicon unchanged across liaison calls [\#287](https://github.com/TigreGotico/scriptconv/pull/287) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a107](https://github.com/TigreGotico/scriptconv/tree/0.0.4a107) (2026-11-16)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a106...0.0.4a107)
-
-**Merged pull requests:**
-
-- fix: normalize extra pulls text2spoken fr [\#285](https://github.com/TigreGotico/scriptconv/pull/285) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a106](https://github.com/TigreGotico/scriptconv/tree/0.0.4a106) (2026-11-16)
 
