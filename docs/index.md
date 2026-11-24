@@ -33,8 +33,9 @@ representation, how to add or remove its optional marks, and how it sounds.
 7. **[graph.md](graph.md)**: the conversion graph: nodes, edges, routing that
    prefers lossless edges, and explicit extension.
 8. **[phonemizers.md](phonemizers.md)**: the phonemizer contract, the
-   registry and the per-language defaults, normalisation, identity and the
-   sister packages.
+   registry and the per-language defaults, identity, `diacritize` and the
+   stress marks, the model-backed engines, the sister packages and the
+   sentence gate.
 9. **[frontend.md](frontend.md)**: every option of `TextFrontend`: inline
    phoneme blocks, chunk sizes, strict mode and its identity.
 10. **[ovos.md](ovos.md)**: scriptconv phonemizers in OVOS through
