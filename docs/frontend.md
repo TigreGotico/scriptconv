@@ -1,5 +1,13 @@
 # From text to phonemes, `scriptconv.frontend`
 
+<!-- agent-hint
+covers: every option of TextFrontend: the stage order, whole-text backends, chunk sizes, inline blocks, configuration, stages, methods, failures and the identity
+source: scriptconv/frontend.py, scriptconv/phonemizers/base.py (Segment, join_sentences), scriptconv/phonemizers/_identity_cache.py
+generated: no
+verify: python scripts/check_doc_page.py docs/frontend.md
+see: docs/stack.md, docs/phonemizers.md, docs/ovos.md
+-->
+
 `TextFrontend` takes text to phonemes for a voice. It joins the text stages and
 a phonemizer backend in one fixed order, and every method runs that order. A
 TTS stack builds one frontend when it loads a voice, and calls it for each
@@ -11,7 +19,7 @@ from scriptconv.phonemizers import Phonemizer
 
 frontend = TextFrontend(FrontendConfig("pt-PT", Phonemizer.ESPEAK))
 frontend.phonemize("Olá mundo. Tenho sede.")
-# [['ɔ', 'l', 'ˈ', 'a', ' ', 'm', 'ˈ', 'u', '̃', 'ŋ', 'd', 'ʊ'], ['t', 'ˌ', 'e', 'ɲ', ...]]
+# [['ɔ', 'l', 'ˈ', 'a', ' ', 'm', 'ˈ', 'u', '̃', 'ŋ', 'd', 'ʊ'], ['t', 'ˌ', 'e', 'ɲ', 'ʊ', ' ', 's', 'ˈ', 'e', 'd', 'ɨ']]
 ```
 
 The frontend needs the `phonemizers` extra, and the extra of its backend.
@@ -107,8 +115,9 @@ written, and the backend reads each sentence alone.
 
 An owner of `normalize` gets no casing, and the frontend logs one warning
 when a call sets one. Casing would change the text before the backend
-normalises it: in capitals, tugaphone no longer reads `15H30` as a time, and
-in lower case it no longer reads `xix` as a numeral.
+normalises it. Tugaphone reads `15h30` as a time and `XIX` as a numeral, but
+it does not read `15H30` in capitals as a time, nor `xix` in lower case as a
+numeral.
 
 ## Chunk size
 
@@ -122,28 +131,33 @@ in lower case it no longer reads `xix` as a numeral.
 | `NONE` | The whole text | Offline rendering and dataset work |
 
 `chunk` takes a `Chunk` or its value, such as `"clause"`. Any other value
-raises `ValueError`.
+raises `ValueError`:
+
+```python
+Stages(chunk="word")  # ValueError: chunk 'word' is not one of 'sentence', 'clause', 'paragraph', 'none'
+```
 
 The stage order is the same at every size: the frontend reads the whole text
 first, then cuts it into sentences, and a chunk is a sentence, a clause, the
 sentences of a paragraph, or every sentence. One rule joins two pieces at every
 size, the rule of the clause tokens: a piece that ends in a clause symbol, or
 in a space, joins the next one with no space, and any other piece takes one
-space. Inside a sentence, a clause that ends in `!` or `?` takes a space after
-the symbol, as the text writes one. No chunk starts with a space. So the
+space. Inside a sentence, a clause symbol with another clause after it takes
+a space after it, as `olá, ` below shows. No chunk starts with a space. So the
 chunks of every size, joined by this rule, are the result of
 `phonemize_flat`, and at `NONE` size the one chunk is that result:
 
 ```python
 frontend = TextFrontend(FrontendConfig("pt", Phonemizer.GRAPHEMES, keep_punctuation=True))
-text = "Olá! Tudo bem? Sim.\n\nAté logo."
-frontend.phonemize(text)                                # 'olá! tudo bem?', 'sim.', 'até logo.'
-frontend.phonemize(text, Stages(chunk="clause"))        # 'olá! ', 'tudo bem?', 'sim.', 'até logo.'
-frontend.phonemize(text, Stages(chunk="paragraph"))     # 'olá! tudo bem?sim.', 'até logo.'
-frontend.phonemize(text, Stages(chunk="none"))          # 'olá! tudo bem?sim.até logo.'
+text = "Olá, tudo bem? Sim.\n\nAté logo."
+[''.join(c) for c in frontend.phonemize(text)]                             # ['olá, tudo bem?', 'sim.', 'até logo.']
+[''.join(c) for c in frontend.phonemize(text, Stages(chunk="clause"))]     # ['olá, ', 'tudo bem?', 'sim.', 'até logo.']
+[''.join(c) for c in frontend.phonemize(text, Stages(chunk="paragraph"))]  # ['olá, tudo bem?sim.', 'até logo.']
+[''.join(c) for c in frontend.phonemize(text, Stages(chunk="none"))]       # ['olá, tudo bem?sim.até logo.']
+''.join(frontend.phonemize_flat(text))                                      # 'olá, tudo bem?sim.até logo.'
 ```
 
-The comments show each chunk as a string. The frontend cuts the normalised
+The examples show each chunk as a string. The frontend cuts the normalised
 text at each blank line before it cuts sentences. So a blank line ends a
 paragraph, and a sentence, whatever comes before it: a title with no mark, a
 `!`, a `:`, a `;`, an ellipsis, or a closing quote or bracket. The hook reads
@@ -264,9 +278,9 @@ A backend can still cut inside a chunk that is too long for its own limit.
 
 `TextFrontend(config, backend=None)` builds the backend from the
 configuration. Give `backend=` an instance to use that instance. The backend
-reads with the `keep_punctuation` of the configuration. When the instance has
-another value, the frontend uses a shallow copy with the configured value, and
-the instance that you gave does not change.
+reads with the `keep_punctuation` and the `strict` of the configuration. When
+the instance has other values, the frontend uses a shallow copy with the
+configured values, and the instance that you gave does not change.
 
 A voice trained with an espeak voice that is not its text language sets
 `phonemizer_lang`. A Twi voice trained with the espeak voice `lfn` uses
@@ -295,16 +309,19 @@ frontend, and each call can give its own:
 | `chunk` | `None` | The chunk size, a `Chunk` or its value. `None` takes `Chunk.SENTENCE` |
 
 A value that the call sets wins. A value of `None` takes the value of the
-frontend, and then the language of the configuration.
+frontend. A `lang` that neither sets is the language of the configuration.
 
 When neither sets `diacritize`, Arabic diacritizes and other languages do not.
 Arabic means `ar` with any region, and each Arabic language in Arabic script,
 such as `arz` and `apc`. linguatag measures these at a distance of 5 or less
 from `ar`.
 
+The graphemes frontend of the chunk example shows what the diacritizer adds.
+With `diacritize=True`, bifonia writes the closed vowel of *sêde* (thirst):
+
 ```python
-frontend.phonemize("Tenho sede.", Stages(diacritize=True))   # bifonia marks 'sêde'
-frontend.phonemize("hello", Stages(lang="en-GB", diacritize=False))
+frontend.phonemize("Tenho sede.", Stages(diacritize=True))   # [['t', 'e', 'n', 'h', 'o', ' ', 's', 'ê', 'd', 'e', '.']]
+frontend.phonemize("hello", Stages(lang="en-GB", diacritize=False))  # [['h', 'e', 'l', 'l', 'o']]
 ```
 
 `diacritize=False` means that the frontend adds no diacritizer. A backend that
@@ -318,6 +335,7 @@ owns the stage still runs it, because it needs the marks to read the text.
 | `phonemize(text, stages=None)` | A list of phoneme lists, one per chunk | The same, all at once |
 | `phonemize_flat(text, stages=None)` | One phoneme list | Training. The sentence chunks of `phonemize`, joined by the rule of the clause tokens |
 | `segments(text, stages=None)` | An iterator of `Segment`, one per chunk | The chunks with the side streams of a whole-text backend, in step with the symbols |
+| `say_as(text, interpret_as, format=None, detail=None, lang=None)` | A string | The text in the form that an SSML `say-as` element names, read by the normalisation hook. The hook runs also for a backend that owns `normalize`. With no hook, or without the `normalize` extra, the text comes back as written, with one warning |
 | `prepare(text, stages=None)` | The text after the stages | An engine that reads text and not phonemes. The whitespace at the edges of each piece of text between blocks stays |
 | `identity()` | A `PhonemizerIdentity` | What phonemizes the language of the frontend, with `frontend` set to `FRONTEND_VERSION` |
 | `with_backend(backend)` | A new `TextFrontend` | The same configuration with another backend instance |
@@ -406,8 +424,8 @@ and a hash of these inputs:
 - each scriptconv module that `scriptconv.frontend` imports, such as
   `diacritics`
 - the settings that change the output: `keep_punctuation`, `strict`,
-  `whole_text_limit`, the alphabet, the resolved language, the chunk size and
-  whether the normaliser runs
+  `whole_text_limit`, the alphabet, the resolved language, the language that
+  the backend reads, the chunk size and whether the normaliser runs
 - `text2spoken.revision(lang)` when the normaliser is `spoken_normalizer()`
 
 The `revision` is `None` when scriptconv cannot vouch for a stage, so a
@@ -461,4 +479,4 @@ written gives no entry and no error. Two processes can write one entry at
 once: each writes a temporary file and renames it into place.
 
 ---
-[← phonemizers](phonemizers.md) · [Home](../README.md) · [ovos →](ovos.md)
+[Index](index.md) · [← phonemizers](phonemizers.md) · [ovos →](ovos.md)
