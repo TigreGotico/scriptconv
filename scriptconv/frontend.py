@@ -188,7 +188,12 @@ class Stages:
 
     def __post_init__(self):
         if self.chunk is not None:
-            object.__setattr__(self, "chunk", Chunk(self.chunk))
+            try:
+                chunk = Chunk(self.chunk)
+            except ValueError:
+                values = ", ".join(repr(c.value) for c in Chunk)
+                raise ValueError(f"chunk {self.chunk!r} is not one of {values}") from None
+            object.__setattr__(self, "chunk", chunk)
 
 
 @dataclasses.dataclass(frozen=True)
