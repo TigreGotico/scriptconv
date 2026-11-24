@@ -84,6 +84,18 @@ class TestPackagedLexicons(unittest.TestCase):
         self.assertFalse(off.packaged_lexicons)
         self.assertTrue(get_phonemizer(Phonemizer.ORTHOGRAPHY2IPA).packaged_lexicons)
 
+    def test_get_lang_never_caches_an_unsupported_language(self):
+        from scriptconv.phonemizers import UnsupportedLanguageError
+        from scriptconv.phonemizers.o2ipa import _KNOWN_SPECS
+
+        known_before = _KNOWN_SPECS.copy()
+        _KNOWN_SPECS.clear()
+        self.addCleanup(_KNOWN_SPECS.update, known_before)
+        for call in range(2):
+            with self.subTest(call=call):
+                with self.assertRaises(UnsupportedLanguageError):
+                    Orthography2IPAPhonemizer.get_lang("xx")
+
 
 if __name__ == "__main__":
     unittest.main()

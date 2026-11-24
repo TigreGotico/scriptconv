@@ -66,6 +66,18 @@ class TestRegistryCompleteness(unittest.TestCase):
                                    GraphemePhonemizer))
 
 
+class LangFlagBackend(BasePhonemizer):
+    """Writes the espeak-ng ``(lang)`` flags that the base front end strips."""
+
+    def phonemize_string(self, text, lang):
+        return "(en)a(pt)"
+
+
+class TestEspeakLanguageFlags(unittest.TestCase):
+    def test_lang_flags_are_dropped_from_phonemes(self):
+        self.assertEqual(LangFlagBackend().phonemize("a", "en"), [["a"]])
+
+
 class TestBaseContract(unittest.TestCase):
     def test_phonemize_returns_sentence_lists(self):
         g = GraphemePhonemizer()

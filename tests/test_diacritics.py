@@ -199,6 +199,32 @@ class TestDefaultPhonikudModelProvisioning:
         urlopen_calls_after = sum(1 for c in calls if isinstance(c, tuple))
         assert urlopen_calls_before == urlopen_calls_after == 1
 
+    def test_multi_chunk_download_writes_every_byte(self, monkeypatch, tmp_path):
+        from scriptconv import diacritics
+
+        first = b"a" * (1024 * 1024)
+        second = b"last byte"
+        payload = first + second
+        monkeypatch.setenv("SCRIPTCONV_CACHE", str(tmp_path))
+
+        class FakeResponse:
+            def __init__(self):
+                self.parts = iter([first, second])
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+            def read(self, n):
+                return next(self.parts, b"")
+
+        monkeypatch.setattr(diacritics.urllib.request, "urlopen", lambda url: FakeResponse())
+        path = diacritics._default_phonikud_model()
+        with open(path, "rb") as f:
+            assert f.read() == payload
+
     def test_failed_download_leaves_no_partial_file(self, monkeypatch, tmp_path):
         from scriptconv import diacritics
 
@@ -424,9 +450,13 @@ class TestFamilyAgreesWithStressonnxResolution:
         from scriptconv.diacritics import _is_stress_lang, _is_stress_lang_fallback
 
         probes = ["ru", "ru-RU", "ru-Latn", "az", "uz", "az-Latn", "az-Cyrl",
-                  "uz-Latn", "uz-Cyrl", "uk", "be", "ka", "hy", "ber", "en"]
+                  "uz-Latn", "uz-Cyrl", "uk", "be", "be_BY", "ka", "hy", "ber", "en"]
         for tag in probes:
             assert _is_stress_lang_fallback(tag) == _is_stress_lang(tag), tag
+
+    def test_fallback_reads_underscore_as_a_tag_separator(self):
+        from scriptconv.diacritics import _is_stress_lang_fallback
+        assert _is_stress_lang_fallback("be_BY") is True
 
 
 class TestStressFamilyRoutingWithoutStressonnxInstalled:
