@@ -112,8 +112,9 @@ def get_phonemizer(phonemizer: Phonemizer,
 
     *model* goes to the constructor's ``model``, ``engine`` or ``register``
     parameter, and *alphabet* to its ``alphabet`` parameter, when it has one.
-    Other *kwargs* go to the constructor, except ``normalizer=`` and
-    ``keep_punctuation=``, which are set on the instance.
+    A non-empty *model* raises ValueError when the constructor has none of
+    those parameters. Other *kwargs* go to the constructor, except
+    ``normalizer=`` and ``keep_punctuation=``, which are set on the instance.
     """
     phonemizer = Phonemizer(phonemizer)
     cls = get_phonemizer_class(phonemizer)
@@ -131,6 +132,12 @@ def get_phonemizer(phonemizer: Phonemizer,
                 if name in params:
                     kwargs.setdefault(name, model)
                     break
+            else:
+                # Voice configs use an empty string for "no model".
+                if model:
+                    raise ValueError(
+                        f"phonemizer {phonemizer.value!r} cannot take model={model!r}: "
+                        f"{cls.__name__} has no model, engine or register parameter")
         inst = cls(**kwargs)
     if normalizer is not None:
         inst.normalizer = normalizer
