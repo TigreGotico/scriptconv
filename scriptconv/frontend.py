@@ -107,9 +107,26 @@ WHOLE_TEXT_LIMIT = 1_750
 
 # The word that stands for a block when the frontend reads the mark after it.
 _BLOCK_WORD = "casa"
-# Text that ends in whitespace and then only marks. The marks join the block
-# after them as they join a plain word, and the whitespace stays.
-_SPACE_BEFORE_BLOCK = re.compile(r"\s\W*$")
+
+
+def _space_before_block(text):
+    """Whether whitespace stands at or before the trailing marks of *text*.
+
+    A mark run after the last word stays with the block after it, and the
+    whitespace before that run stays as a word break. Reading backwards gives
+    the same answer as ``r"\\s\\W*$"``: the first whitespace in the run of
+    non-word characters at the end answers yes, and a word character before
+    that run answers no. A long run of whitespace therefore costs linear work
+    instead of quadratic work.
+    """
+    for char in reversed(text):
+        if char.isspace():
+            return True
+        if char.isalnum() or char == "_":
+            return False
+    return False
+
+
 # The quotes and apostrophes that can open a word besides the categories of
 # opening and closing quotes (Pi, Pf).
 _OPENING_MARKS = frozenset("\"'\u2019\u2018\u201a\u201e\u00ab\u00bb\u2039\u203a\u00a1\u00bf")
@@ -1096,7 +1113,7 @@ class TextFrontend:
         phonemes = piece.phonemes
         space, space_streams = self._space.phonemes, self._space.streams
         tail = text.rsplit(None, 1)[-1] if text[-1:].strip() else ""
-        separated = (_SPACE_BEFORE_BLOCK.search(text) or tail[-1:] in _HYPHENS
+        separated = (_space_before_block(text) or tail[-1:] in _HYPHENS
                      or self.backend.remove_punctuation(tail + _BLOCK_WORD).endswith(" " + _BLOCK_WORD))
         if piece.bounds is not None:
             if separated and phonemes and phonemes[-1] != space[0] and not piece.ends_in_token:
