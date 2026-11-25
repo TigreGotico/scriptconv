@@ -258,6 +258,10 @@ def frontend(backend=None, lang="pt-PT", **config):
 
 
 class TestFrontendRevision:
+    def test_keep_punctuation_changes_the_revision(self):
+        assert frontend(keep_punctuation=True).identity().revision == (
+            frontend().identity().revision + ";keep_punctuation")
+
     def test_the_frontend_keeps_the_backend_revision_when_no_stage_adds_one(self):
         assert frontend().identity().revision == GraphemePhonemizer().identity("pt-PT").revision
 
