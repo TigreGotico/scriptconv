@@ -31,17 +31,20 @@ def make_session(model_path, providers=None, use_cuda=False):
 
 
 def _is_hk_cantonese(lang: str) -> bool:
-    """True for Cantonese, or Chinese in Hong Kong or Macau.
+    """True for Cantonese in a Han script, or Chinese in Hong Kong or Macau in Traditional script.
 
     The Cantonese resources of Charsiu, Goruut and Transphone carry no region
     and are written in Traditional script, so these tags resolve to them
-    directly, not by language distance.
+    directly, not by language distance. A tag that names another script
+    (`yue-Latn`, `zh-Hans-HK`) gets no Cantonese resource from this rule.
     """
     try:
         tag = parse(standardize_lang(lang))
     except LanguageTagError:
         return False
-    return tag.language == "yue" or (tag.language == "zh" and tag.region in ("HK", "MO"))
+    if tag.language == "yue":
+        return tag.script in (None, "Hani", "Hans", "Hant")
+    return tag.language == "zh" and tag.region in ("HK", "MO") and tag.script in (None, "Hani", "Hant")
 
 
 class ByT5Phonemizer(BasePhonemizer):
