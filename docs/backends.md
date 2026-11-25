@@ -39,7 +39,7 @@ hold the restricted wrappers. The Licensing section of the
 ![Horizontal bars of the backends per extra: 59 backends in 26 extras. Package counts: scriptconv 35, scriptconv-copyleft 18, scriptconv-nonfree 6. The largest extras are zh-phonemizers 7, en-phonemizers 6, misaki 6, phonemizers 5 and ar-phonemizers 4.](figures/backends-by-extra.svg)
 
 *Figure: the 59 backends by extra. Read the colour: the `misaki`, `espeak`,
-`ko` and `th` extras install copyleft wrappers only, and `ar-phonemizers`,
+`ko`, `th`, `gl`, `fa` and `transphone` extras install copyleft wrappers only, and `ar-phonemizers`,
 `ja-phonemizers`, `eu` and `he` mix two packages.*
 
 ## The table

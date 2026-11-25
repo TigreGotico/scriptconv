@@ -1,7 +1,7 @@
 # Performance
 
 <!-- agent-hint
-covers: what a first call and a warm call cost, how time grows with text length, the timing of the backends that read whole text, and how to measure
+covers: what a first call and a warm call cost, how time grows with text length, the timing of the backend that reads whole text (dizione), and how to measure
 source: scripts/time_owner_backends.py and scripts/time_owner_backends.txt, WHOLE_TEXT_LIMIT in scriptconv/frontend.py, scripts/docs_figures.py
 generated: no, but docs/figures/owner-backend-timing.svg comes from scripts/docs_figures.py. Edit the script, not the SVG
 verify: python scripts/docs_figures.py --check && python scripts/check_doc_page.py docs/performance.md
@@ -9,8 +9,9 @@ see: docs/frontend.md, docs/backends.md
 -->
 
 This page shows what a phonemizer call costs, how the cost grows with the
-length of the text, and how to measure it on your own machine. Every number
-comes from one laptop and one run, so read the shape, not the digits.
+length of the text, and how to measure it on your own machine. The first-call,
+warm-call and length numbers come from one laptop. The whole-text numbers come
+from two runs on a 24-core machine. Read the shape, not the digits.
 
 ## The first call costs most
 
@@ -87,8 +88,9 @@ WHOLE_TEXT_LIMIT                                    # 1750
 FrontendConfig("en-US").whole_text_limit            # 1750
 ```
 
-The limit is the largest size at which one dizione call on dense English
-text stays under 100 ms in every run of the script. Set
+The limit comes from the steady-mode timing in
+`scripts/time_owner_backends.txt`: every dizione call on dense English text
+stays under 100 ms up to 1,750 characters, and at 2,000 one run took 100.5 ms. Set
 `FrontendConfig.whole_text_limit` to a larger number, or to `None`, to turn
 the cut off for offline work.
 
