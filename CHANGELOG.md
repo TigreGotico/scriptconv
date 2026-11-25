@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a175](https://github.com/TigreGotico/scriptconv/tree/0.0.4a175) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a174...0.0.4a175)
+
+**Merged pull requests:**
+
+- docs: complete pages, figures and navigation [\#471](https://github.com/TigreGotico/scriptconv/pull/471) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a174](https://github.com/TigreGotico/scriptconv/tree/0.0.4a174) (2026-11-25)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a173...0.0.4a174)
