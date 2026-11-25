@@ -4,12 +4,9 @@ Provides ISO-15924 script codes, character-range detection, per-language
 default script, normalisation of free-form script labels, and bulk text
 analysis (dominant-script detection, script distribution, base direction).
 
-The ``Latn`` registry entry covers the IPA Extensions block (U+0250–U+02AF)
-and Latin Extended Additional (U+1E00–U+1EFF) in addition to the core Latin
-and Latin Extended blocks.  This means IPA characters like ``ɑ``, ``ʃ``,
-``ŋ`` are classified as Latin-script by :func:`char_script` and
-:func:`detect_script`, which is correct per Unicode but may surprise callers
-who expect phonetic symbols to be unrecognised.
+The ``Latn`` entry covers the IPA Extensions block (U+0250–U+02AF), so IPA
+characters such as ``ɑ``, ``ʃ`` and ``ŋ`` count as Latin script, as Unicode
+assigns them.
 """
 from __future__ import annotations
 
@@ -346,8 +343,7 @@ SCRIPT_REGISTRY: dict[str, Script] = {
 }
 
 # Typological class per script (Daniels & Bright, *The World's Writing
-# Systems*, 1996). Kept as a compact map so the registry literal above stays
-# focused on codepoint ranges; applied to each entry below.
+# Systems*, 1996).
 _SCRIPT_TYPES: dict[str, str] = {
     "Latn": "alphabet", "Cyrl": "alphabet", "Grek": "alphabet",
     "Armn": "alphabet", "Geor": "alphabet", "Glag": "alphabet",
@@ -364,45 +360,24 @@ _SCRIPT_TYPES: dict[str, str] = {
     "Hang": "featural",
 }
 for _code, _stype in _SCRIPT_TYPES.items():
-    if _code in SCRIPT_REGISTRY:
-        SCRIPT_REGISTRY[_code] = replace(SCRIPT_REGISTRY[_code], script_type=_stype)
+    SCRIPT_REGISTRY[_code] = replace(SCRIPT_REGISTRY[_code], script_type=_stype)
 
 
 # ---------------------------------------------------------------------------
-# Optimised char_script — flat sorted interval list with bisect
-#
-# Instead of iterating every script × every range on each call, we build a
-# single sorted list of (start, script_code) and use ``bisect_right`` to
-# find the last range that starts at or before the codepoint.  This is
-# O(log n) per character instead of O(n × ranges).
+# char_script — every range of the registry, sorted by start, for bisect
 # ---------------------------------------------------------------------------
 
-# Build flat interval list: [(start, code), ...] sorted by start.
-# For each codepoint we bisect to find the last interval that starts ≤ cp,
-# then check if cp ≤ that interval's end (stored separately).
-_INTERVAL_STARTS: list[int] = []
-_INTERVAL_ENDS: list[int] = []
-_INTERVAL_SCRIPTS: list[str] = []
-
-for _code, _script in SCRIPT_REGISTRY.items():
-    for _lo, _hi in _script.char_ranges:
-        _INTERVAL_STARTS.append(_lo)
-        _INTERVAL_ENDS.append(_hi)
-        _INTERVAL_SCRIPTS.append(_code)
-
-# Sort all three lists by start codepoint
-_SORTED_INDICES = sorted(range(len(_INTERVAL_STARTS)), key=lambda i: _INTERVAL_STARTS[i])
-_SORTED_STARTS = [_INTERVAL_STARTS[i] for i in _SORTED_INDICES]
-_SORTED_ENDS = [_INTERVAL_ENDS[i] for i in _SORTED_INDICES]
-_SORTED_SCRIPTS = [_INTERVAL_SCRIPTS[i] for i in _SORTED_INDICES]
+_INTERVALS = sorted((lo, hi, code) for code, script in SCRIPT_REGISTRY.items()
+                    for lo, hi in script.char_ranges)
+_SORTED_STARTS = [lo for lo, _, _ in _INTERVALS]
+_SORTED_ENDS = [hi for _, hi, _ in _INTERVALS]
+_SORTED_SCRIPTS = [code for _, _, code in _INTERVALS]
 
 
 def char_script(ch: str) -> Optional[str]:
     """Return the ISO-15924 code for a single character, or ``None``.
 
-    Uses O(log n) binary search over the precomputed interval list.
-    Characters in the IPA Extensions block (U+0250–U+02AF) and Latin
-    Extended Additional (U+1E00–U+1EFF) are classified as ``"Latn"``.
+    IPA Extensions (U+0250–U+02AF) count as ``"Latn"``.
 
     Examples
     --------
@@ -410,16 +385,14 @@ def char_script(ch: str) -> Optional[str]:
     'Latn'
     >>> char_script("ɑ")  # IPA Extension — classified as Latin
     'Latn'
-    >>> char_script(" ")
-    >>> # None
+    >>> char_script(" ") is None
+    True
     """
     if len(ch) != 1:
         return None
     cp = ord(ch)
-    # Only the interval immediately at-or-before cp (idx) is ever checked —
-    # correct only because SCRIPT_REGISTRY's char_ranges are non-overlapping,
-    # so at most one interval can ever contain cp. If ranges ever overlapped,
-    # this single-candidate check would silently miss matches.
+    # Only the last range that starts at or before cp is checked, which is
+    # correct while the registry ranges do not overlap.
     idx = bisect_right(_SORTED_STARTS, cp) - 1
     if idx >= 0 and cp <= _SORTED_ENDS[idx]:
         return _SORTED_SCRIPTS[idx]
@@ -433,13 +406,10 @@ def char_script(ch: str) -> Optional[str]:
 def detect_script(text: str) -> Optional[str]:
     """Return the ISO-15924 code of the dominant script in *text*.
 
-    Counts script-bearing characters only (skips ASCII digits, spaces,
-    punctuation, combining marks).  Returns ``None`` for empty or purely
-    non-alphabetic input.
-
-    IPA characters (U+0250–U+02AF) are classified as Latin script.
-    Combining marks (U+0300–U+036F) are not assigned to any script and
-    are skipped.
+    Counts only the characters that :func:`char_script` assigns to a script,
+    so digits, spaces, punctuation and combining marks do not count.  A tie
+    goes to the code that sorts last.  Returns ``None`` when no character
+    counts.
 
     Examples
     --------
@@ -460,22 +430,9 @@ def detect_script(text: str) -> Optional[str]:
 
 
 def script_distribution(text: str) -> dict[str, int]:
-    """Return character counts per script in *text*.
+    """Return the count of characters per script in *text*, largest first.
 
-    Only characters assigned to a registered script are counted.  The
-    result is sorted by count descending.
-
-    Parameters
-    ----------
-    text:
-        Input string (may contain any Unicode characters).
-
-    Returns
-    -------
-    dict[str, int]
-        Mapping of ISO-15924 code to character count, sorted by
-        count descending.  Empty dict for empty or purely
-        non-alphabetic input.
+    Only characters that :func:`char_script` assigns to a script count.
 
     Examples
     --------
@@ -502,10 +459,6 @@ def script_runs(text: str) -> list[tuple[Optional[str], str]]:
     rather than starting a new one, following the resolution model of
     Unicode UAX #24; a run of leading neutrals carries ``None``.
 
-    Unlike :func:`detect_script` (which flattens to one dominant script),
-    this preserves the structure of mixed-script text — e.g. a Cyrillic
-    word embedded in a Latin sentence.
-
     Examples
     --------
     >>> script_runs("привет hello")
@@ -526,19 +479,8 @@ def script_runs(text: str) -> list[tuple[Optional[str], str]]:
 def base_direction(text: str) -> str:
     """Detect the base text direction of *text*.
 
-    Returns ``"ltr"`` if the majority of script-bearing characters belong
-    to left-to-right scripts, ``"rtl"`` for right-to-left, or ``"mixed"``
-    when counts are equal or the input has no script-bearing characters.
-
-    Parameters
-    ----------
-    text:
-        Input string.
-
-    Returns
-    -------
-    str
-        ``"ltr"``, ``"rtl"``, or ``"mixed"``.
+    Returns ``"ltr"`` or ``"rtl"`` for the direction of most script-bearing
+    characters, and ``"mixed"`` on a tie or when no character has a script.
 
     Examples
     --------
@@ -733,18 +675,7 @@ for _lang, _script in _LANG_TO_SCRIPT.items():
 
 
 def script_to_langs(code: str) -> list[str]:
-    """Return the languages whose default script is *code*.
-
-    Parameters
-    ----------
-    code:
-        ISO-15924 script code (e.g. ``"Latn"``).
-
-    Returns
-    -------
-    list[str]
-        Sorted list of ISO 639 language codes.  Empty list for
-        unknown scripts.
+    """Return the sorted language codes whose default script is *code*, empty for an unknown script.
 
     Examples
     --------
@@ -757,9 +688,7 @@ def script_to_langs(code: str) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# normalize_script_tag — free-form labels → ISO-15924
-#
-# Free-form and MMS-style labels mapped to ISO 15924.
+# normalize_script_tag — free-form and MMS-style labels → ISO-15924
 # ---------------------------------------------------------------------------
 
 _LABEL_MAP: dict[str, str] = {
@@ -848,10 +777,4 @@ def normalize_script_tag(label: str) -> Optional[str]:
     'Hang'
     """
     normalised = label.strip().lower()
-    # Direct label lookup
-    if normalised in _LABEL_MAP:
-        return _LABEL_MAP[normalised]
-    # ISO-15924 code (case-insensitive)
-    if normalised in _ISO_LOWER:
-        return _ISO_LOWER[normalised]
-    return None
+    return _LABEL_MAP.get(normalised) or _ISO_LOWER.get(normalised)

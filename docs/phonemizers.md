@@ -1,45 +1,57 @@
 # From spelling to sound, `scriptconv.phonemizers`
 
-Everything else in scriptconv rewrites *symbols*. Phonemization answers a
-different question, how text is *pronounced*, and that needs language
-knowledge beyond symbol tables: pronunciation dictionaries, rule engines,
-neural models. The core therefore contains no grapheme-to-phoneme rules at
-all, this subpackage wraps real G2P **engines** behind optional extras, gives
-every language a sensible default, and lets the caller override anything.
+<!-- agent-hint
+covers: the BasePhonemizer contract, the registry and the language defaults, identity and revision, diacritize, stress marks, the model-backed engines, the sister packages and the sentence gate
+source: scriptconv/phonemizers/base.py, registry.py, g2pw.py, lir.py, dizione.py, leokani.py, nemo_ipa.py, shami.py, f5tts.py; scriptconv/diacritics.py; scriptconv/testing/compare.py
+generated: no
+verify: python scripts/check_doc_page.py docs/phonemizers.md
+see: docs/backends.md, docs/frontend.md, docs/graph.md
+-->
+
+This page tells how scriptconv turns text into phonemes, and what each
+phonemizer backend gives. [backends.md](backends.md) lists every backend with
+its class and its extra.
+
+The other modules of scriptconv rewrite *symbols*. Phonemization tells how
+text is *pronounced*, and that needs language knowledge: pronunciation
+dictionaries, rule engines and neural models. The core holds no
+grapheme-to-phoneme (G2P) rules. This subpackage wraps G2P **engines** behind
+optional extras, gives each language a default backend, and lets the caller
+choose another one.
 
 ```python
 from scriptconv.phonemizers import phonemize, Phonemizer
 
-phonemize("kaixo mundua", "eu")                      # 'kai̯ʃo mundua'
-phonemize("hello", "en", override=Phonemizer.GRUUT)  # a specific backend
+phonemize("kaixo mundua", "eu")                      # 'kai̯ˈʃo munˈdua'
+phonemize("hello", "en", override=Phonemizer.GRUUT)  # 'hɛlˈoʊ'
 ```
 
 ## The contract
 
-Every backend subclasses `BasePhonemizer` and speaks the same interface:
+Each backend subclasses `BasePhonemizer` and has the same methods:
 
-- `phonemize_string(text, lang) -> str`, the raw phoneme string.
-- `phonemize(text, lang) -> list[list[str]]`, sentence-chunked phoneme
-  lists, with a lazy variant (`phonemize_lazy`) that phonemizes one sentence
-  at a time so a consumer can start on sentence one before sentence two is
-  ready.
-- `alphabet=`, the output symbol set, for engines that can emit more than
-  one (`Alphabet.IPA`, `Alphabet.ARPA`, engine-native inventories).
+| Name | Gives |
+| --- | --- |
+| `phonemize_string(text, lang) -> str` | The phoneme string of the whole text |
+| `phonemize(text, lang) -> list[list[str]]` | One phoneme list for each sentence |
+| `phonemize_lazy(text, lang)` | The same lists, one at a time, so a consumer can start on the first sentence before the next one is read |
+| `phonemize_to_list(text, lang) -> list[str]` | The sentences of `phonemize_lazy` joined in one list |
+| `alphabet=` | The output symbol set, for an engine that can write more than one (`Alphabet.IPA`, `Alphabet.ARPA` or a notation of the engine) |
 
-**Normalization is injectable, not built in.** Speech pipelines expand
-numbers, dates, and abbreviations before phonemizing ("call me at 5" should
-not phonemize a digit), that requires language resources scriptconv does not
-ship. Pass `normalizer=`, any `(text, lang) -> str` callable, and it runs
-inside `phonemize_lazy`, without it, the raw text is phonemized as-is. A
-pipeline that injects its own normalizer and one that doesn't will therefore
-legitimately differ on text containing digits. `TextFrontend` takes the same
-callable as its `normalizer` hook and runs it in a fixed stage order, see
+**Normalisation is a hook.** A speech pipeline writes numbers, dates and
+abbreviations as words before G2P, so that "call me at 5" does not reach the
+backend as a digit. That needs language resources that scriptconv does not
+ship. Pass `normalizer=`, a `(text, lang) -> str` callable, and
+`phonemize_lazy` runs it first. Without it, the backend reads the text as
+written. So a pipeline with a normaliser and one without it give different
+phonemes for text with digits. `TextFrontend` takes the same callable as its
+`normalizer` hook and runs it in a fixed stage order, see
 [frontend.md](frontend.md).
 
 **A backend can own a stage.** The class attribute `owned_stages` names the
 stages that a backend always runs itself, so a frontend skips them. The names
 are `normalize` and `diacritize`. Tugaphone owns `normalize` and `diacritize`,
-Arbtok owns `diacritize`, and dizione and Shami own `normalize`. A
+euskaphone owns `normalize`, and Arbtok owns `diacritize`. A
 stage that a backend runs only with an optional dependency is not owned.
 
 **A backend reports what produced its output.** `identity(lang)` returns a
@@ -52,48 +64,44 @@ spec that gives the phonemes did not change. The class attribute
 `engine_distribution` names the package that supplies the engine, and `None`
 means the code is in this repository.
 
-**Some backends hold a `revision`.** For `graphemes`, `unicode` and
-`matoub_kab`, the `revision` is `sc1:` and a hash of the code and data on the
-path of the backend. `dizione` takes it from its engine.
+**The `revision` is a version string.** It lists each distribution that gives
+the phonemes, with its installed version, in this form:
 
-For `tugaphone`, `orthography2ipa`, `mwl_phonemizer` and `barranquenho`, the
-`revision` is `sc1:` and a hash of the revision that the engine gives and of
-the code on the path of the backend. The engine revision is
-`tugaphone.revision(lect)` or the orthography2ipa spec revision of the lect,
-with its packaged lexicon. The files of the distributions that the engine
-revision covers leave the hash. So an engine release that keeps its revision
-keeps the `revision` of the backend, and a change of the scriptconv code on
-the path changes it. When the engine gives no revision, the backend has none,
-with one warning.
+```text
+scriptconv==X;<sister package>==S;<engine>==Y;<data>==Z
+```
 
-A probe in a fresh process builds the backend. It reads a text with every
-clause mark through `phonemize` and `phonemize_to_list`, with
-`keep_punctuation` off and on. The hash then covers these inputs:
+`scriptconv` comes first, then the sister package that holds the backend
+(`scriptconv-copyleft` or `scriptconv-nonfree`), then the engine distribution
+(`engine_distribution`), then the data distributions of the class attribute
+`revision_distributions`. A name appears once. For `espeak` the engine version
+is the version of the espeak-ng binary. A backend written in scriptconv has
+the string `scriptconv==X`.
 
-- each scriptconv module that the probe loads, and each scriptconv data file
-  that it opens
-- each other distribution that the probe loads, such as quebra-frases, whole
-- the source file of each class of the backend outside scriptconv, so a
-  subclass counts
-- the arguments of the backend, a character rule set on the instance, the
-  language and the Unicode version of Python
+`revision_distributions` names the packages besides the engine whose data
+changes the phonemes:
 
-The code of a module counts as its tokens. Comments, blank lines, docstrings
-and `version.py` do not count. A release that changes code or data on the path
-of the backend changes the `revision`. A release that changes only other
-backends, docs or `version.py` keeps it, and `differs_from` then reports
-nothing.
+| Backend | Data distributions |
+| --- | --- |
+| `orthography2ipa`, `mwl_phonemizer`, `barranquenho` | `o2i-lexicons` |
+| `euskaphone` | `orthography2ipa`, `text2spoken` |
+| `gruut` | the language pack of the lect, `gruut-lang-fr` for `fr` |
 
-The first `identity` call for a backend and a language runs the probe. Later
-calls use the stored value. A backend that calls an engine outside scriptconv
-has no `revision`, so a change of its `version` always shows. A probe that
-fails, runs longer than 120 seconds or prints no result also gives no
-`revision`, with one warning per backend and language in a process. So does a
-probe that finds scriptconv imported before it starts, for example by a
-`sitecustomize.py`.
+`tugaphone` names its own distributions: its part of the string is the value
+of `tugaphone.revision(lect)`, so the string is `scriptconv==X;` and that value.
 
-A `TextFrontend` has its own `revision`, which covers the frontend stages too.
-See [frontend](frontend.md).
+A data distribution that is not installed stays out of the string. An engine
+that is not installed raises `ImportError`.
+
+So a release of any listed distribution changes the `revision`, and
+`differs_from` reports it first. A release of scriptconv changes it too, also
+when the phonemes of the backend stay the same. A constructor argument or a
+setting on the instance, such as a character rule, does not change it. A
+backend class that subclasses `BasePhonemizer` directly, outside scriptconv and
+its sister packages, reports `scriptconv==X`.
+
+A `TextFrontend` adds the stage libraries that it runs to the `revision`. See
+[frontend](frontend.md).
 
 **Failures have types.** Each error below is a `FrontendError`, which is a
 `ValueError`. `UnsupportedLanguageError` means the backend has no reading for
@@ -101,78 +109,107 @@ the language. `StageError` means a stage failed. `UnreadTextError` means text
 stayed unread, and its `unread` attribute lists that text.
 `ModelUnavailableError` means a model cannot load.
 
-**Punctuation is opt-in.** By default no punctuation reaches the phonemes,
-which is what every voice trained on scriptconv's output so far has learned.
-Each sentence is then one list of `phonemize(text)`: a `:`, `;`, `...` or `|`
-inside a sentence is a space, as a `,` is. In `el` a `;` is the question mark,
-so it ends the sentence.
-Set `keep_punctuation = True` on the instance (or pass `keep_punctuation=True`
-to `get_phonemizer`) to keep it the way Piper does: each clause is phonemized
-on its own and followed by its symbol, `.` `?` `!` alone and `,` `:` `;`
-followed by a space (Arabic `،` `؛` `؟` map to the same symbols). With the
-flag set, `phonemize_to_list(text)` equals the sentences of `phonemize(text)`
-joined, so a voice trains on the same sequence it is later fed. Backends that
-override `phonemize_to_list` or `phonemize_lazy` keep their own output and
-ignore the flag. In either mode `phonemize_to_list` never returns the newline
-espeak-ng prints at a clause break.
+**Punctuation is opt-in.** By default no punctuation reaches the phonemes, and
+the voices trained on that output learned none. Each sentence is then one list
+of `phonemize(text)`: a `:`, `;`, `...` or `|` inside a sentence is a space, as
+a `,` is. In Greek a `;` is the question mark, so it ends the sentence. The
+tags `el`, `ell` and `gre` name Greek.
+
+When punctuation is removed, a single hyphen between letters stays in the
+word, as `flew-slowly` does. The Armenian hyphen (U+058A) and the Hebrew maqaf
+(U+05BE) become that hyphen. A dash immediately between a letter and a letter
+or digit gives a space, as `flew—slowly` gives `flew slowly`. Two or more
+hyphens or dashes immediately between two letters or digits also give one
+space. A dash run followed by punctuation or a combining mark does not give
+that space.
+
+Set `keep_punctuation = True` on the instance, or pass `keep_punctuation=True`
+to `get_phonemizer`, to keep it as Piper does. Each clause is then phonemized
+alone and followed by its symbol: `.` `?` `!` alone, and `,` `:` `;` followed
+by a space. The Arabic `،` `؛` `؟` map to the same symbols. With the flag set,
+`phonemize_to_list(text)` equals the sentences of `phonemize(text)` joined, so
+a voice trains on the same sequence that it reads later. A backend that
+overrides `phonemize_to_list` or `phonemize_lazy` keeps its own output and
+ignores the flag. In either mode `phonemize_to_list` never returns the line
+break that espeak-ng prints at a clause break.
 
 ## The registry and per-language defaults
 
-Every backend is a `Phonemizer` enum member whose string value is wire
-format, configuration files store these strings, so they never change. The
-registry maps each member to its module, class, and extra as *data*, classes
-import lazily, and a missing backing package raises an `ImportError` that
-names the extra to install. There are no silent gaps: every member either
-resolves or explains itself.
+Each backend is a `Phonemizer` enum member. Its string value is wire format:
+configuration files store these strings, so they do not change. The registry
+maps each member to its module, its class and its extra. A class imports only
+when it is used, and a missing package raises an `ImportError` that names the
+extra to install. So each member either resolves or tells why it cannot.
 
-`phonemizer_for_lang(lang, alphabet=Alphabet.IPA, override=None)` picks the
-default, resolving in-house engines first:
+`phonemizer_for_lang(lang, alphabet=Alphabet.IPA, override=None, model=None)`
+picks the backend for a language. `override=` always wins. Then it takes the
+first of these that can write the requested alphabet:
 
-1. the explicit per-language chain (Arabic to arbtok, Basque to euskaphone,
-   Mirandese to its orthography2ipa specs, Portuguese to tugaphone, Hebrew to
-   phonikud, Galician to Cotovía, and Russian to vosk for their own notations, only
-   when their own notation is requested: a candidate must be able to *emit*
-   the requested alphabet)
-2. orthography2ipa, wherever it has a spec for the language
-3. espeak as the universal fallback (the espeak-ng subprocess, or the
-   pure-Python espyak port when the binary is absent)
+1. The candidates of `LANG_DEFAULTS` for the primary subtag, in order:
 
-**Arabic never falls back.** If arbtok is ineligible or missing, resolution
-raises instead of silently degrading to another engine, wrong phonemes are
-worse than no phonemes.
+   | Language | Candidates |
+   | --- | --- |
+   | `ar` | arbtok |
+   | `eu` | euskaphone |
+   | `mwl` | Mirandese, from its orthography2ipa specs |
+   | `pt` | tugaphone |
+   | `he` | phonikud |
+   | `lir` | kolokwa |
+   | `gl` | Cotovía, then orthography2ipa, then espeak |
+   | `ru` | vosk, then orthography2ipa, then espeak |
+
+   Cotovía writes only its own notation, and vosk only the vosk-tts
+   inventory. So Galician and Russian take them only when the caller asks for
+   that alphabet, and IPA goes to orthography2ipa.
+2. orthography2ipa, for IPA, when it has a spec for the language.
+3. espeak, the last resort: the espeak-ng program, or the pure-Python espyak
+   port when the program is not installed.
+
+**Arabic never falls back.** When no Arabic candidate can write the alphabet,
+`phonemizer_for_lang` raises `ValueError`, and a missing arbtok raises
+`ImportError`. Wrong phonemes are worse than no phonemes.
 
 ## Joining the graph
 
-Phonemization enters the [conversion graph](graph.md) only on request:
+Phonemization enters the [conversion graph](graph.md) only when the caller
+adds it:
 
 ```python
 from scriptconv import DEFAULT_GRAPH
 from scriptconv import phonemizers
 
 g = DEFAULT_GRAPH.extend(phonemizers.register)
-g.convert("bom dia", "text", "ipa", lang="pt")   # 'ˈbõ ˈdʒiɐ'
-g.convert("hello", "text", "arpa", lang="en", override=Phonemizer.GRUUT)
+g.convert("bom dia", "text", "ipa", lang="pt")   # 'ˈbõ ˈdiɐ'
+g.convert("hello", "text", "arpa", lang="en", override=Phonemizer.GRUUT)  # 'HH EH L OW'
 ```
 
-`register` adds a `text` node, the context language's ordinary written form,
-meaningful only with `lang=`, and one dispatching edge that resolves the
-per-language default (or the `override=` context key). `DEFAULT_GRAPH` itself
-stays free of sound-producing edges.
+`register` adds the `text` node, the ordinary written form of the language
+that the `lang=` context key names. It adds two edges, `text -> ipa` and
+`text-diacritized -> ipa`. Each one phonemizes with the default backend of the
+language, or with the `override=` backend, and takes the model from the
+`phonemizer_model=` context key. The second example routes on from `ipa` to
+`arpa` through the notation edges. `DEFAULT_GRAPH` itself holds no edge that
+gives sound.
 
-## Pre-G2P diacritics, `add_diacritics`
+## Diacritics before G2P, `diacritize`
 
-Some languages need pronunciation disambiguated *before* G2P runs, because
-ordinary orthography drops information a downstream G2P engine depends on.
-`BasePhonemizer.add_diacritics(text, lang, model=None)` wraps
-four such backends, each lazy-imported and each raising a named
-`ImportError` when its extra is missing:
+Some spellings leave out information that a G2P engine needs. The function
+`scriptconv.diacritics.diacritize(text, lang="und", diacritizer_model=None, waqf=None)`
+adds those marks before the backend reads the text. A phonemizer runs no
+diacritizer itself: `TextFrontend` runs `diacritize` in its diacritize stage,
+and the graph runs it on its `text -> text-diacritized` edge.
 
-| Language(s) | Backend | Extra | What it restores |
+`diacritize` sends the text to one of four backends by the language. Each
+backend loads only when it is used, and a missing one raises an `ImportError`
+that names its extra. `phonikud_model=` and `model=` are other names of
+`diacritizer_model`. Text in any other language comes back unchanged.
+
+| Language | Backend | Extra | What it adds |
 |---|---|---|---|
-| `he` | phonikud (`phonikud_model=`), or Nakdimon with `diacritizer_model="nakdimon"` | `he` | niqqud, without the `\|` that phonikud writes after a prefix letter |
-| Arabic in Arabic script, as linguatag reads the tag: `ar` with any region, the individual Arabic languages such as `arz`, `apc` and `ary`, and Hassaniyya `mey` (not `ar-Latn`, nor `acy` and `pga`, which CLDR writes in Latin script) | text2tashkeel; `waqf=True` gives the pausal form | `tashkeel` | tashkeel (+ hamza, dagger alef) |
-| 26 stressonnx tags (`STRESS_LANGS`): East Slavic (`ru`, `uk`, `be`), Bulgarian/Macedonian/Slovene (`bg`, `mk`, `sl`), Latvian (`lv`), Armenian (`hy`), Georgian (`ka`), Turkic/Caucasian (`az`, `ba`, `cv`, `kbd`, `kjh`, `kk`, `ky`, `mdf`, `myv`, `sah`, `tg`, `tt`, `udm`, `uz`, `xal`) | stressonnx | `stress` | word stress |
-| Tags at linguatag distance 0 from `pt-PT`: `pt`, `pt-PT`, `pt-Latn-PT`, `por`, and lects such as `pt-PT-x-porto` (not `pt-BR`, `pt-AO`, `pt-MZ`) | bifonia, which receives the full tag | `pt` | heterophonic-homograph sense diacritics |
+| `he` | phonikud, or Nakdimon with `diacritizer_model="nakdimon"` | `he` | niqqud, without the `\|` that phonikud writes after a prefix letter |
+| Arabic in Arabic script, as linguatag reads the tag: `ar` with any region, the individual Arabic languages such as `arz`, `apc` and `ary`, and Hassaniyya `mey`. Not `ar-Latn`, and not `acy` and `pga`, which CLDR writes in Latin script | text2tashkeel; `waqf=True` gives the pausal form | `tashkeel` | tashkeel, hamza and dagger alef |
+| The 24 primary subtags of `STRESS_LANGS`: `ru`, `uk`, `be`, `bg`, `mk`, `sl`, `lv`, `hy`, `ka`, `az`, `ba`, `cv`, `kbd`, `kjh`, `kk`, `ky`, `mdf`, `myv`, `sah`, `tg`, `tt`, `udm`, `uz` and `xal` | stressonnx | `stress` | word stress |
+| Tags at linguatag distance 0 from `pt-PT`: `pt`, `pt-PT`, `pt-Latn-PT`, `por`, and lects such as `pt-PT-x-porto`. Not `pt-BR`, `pt-AO` or `pt-MZ` | bifonia, which receives the full tag | `pt` | sense marks on heterophonic homographs |
 
 phonikud is the Hebrew default. `diacritize(text, "he",
 diacritizer_model="nakdimon")` uses Nakdimon instead (Gershuni and Pinter,
@@ -186,47 +223,45 @@ under the MIT licence:
 |---|---|---|---|---|
 | `Nakdimon.onnx` | github.com/elazarg/nakdimon, `nakdimon/data/` | `5b73cdd6a43ad465faabc8c1118933592df356c8` | 21 MB | MIT |
 
-Stress is free and either unwritten or under-marked in all of these
-languages. East Slavic is the clearest case: stress is also mobile (it
-shifts between forms of the same word), and unstressed vowels reduce
-(Russian о→[ɐ]/[ə] depending on distance from the stress), so a wrong or
-missing mark corrupts the vowel quality of the whole word, not just its
-prosody. The other families don't necessarily reduce vowels but still need
-the mark for correct stress placement. stressonnx marks the stressed vowel
-with a combining acute (U+0301), `az` and `uz` have Cyrillic/Latin script
-variants (e.g. `az-Latn`) routed by the full tag, which is passed straight
-through so stressonnx can pick the right one. stressonnx is not yet
-published to PyPI, so `scriptconv[stress]` installs from source. European
-Portuguese has heterophonic homographs whose pronunciation
-depends on meaning (*sede* "thirst" → closed *sêde*, *sede* "seat" → open
-*séde*), bifonia rewrites these with an explicit open/closed-vowel diacritic.
-These are ordinary Portuguese orthographic marks, chosen so any downstream
-G2P, rule-based, neural, or espeak, reads them correctly. It is
-deliberately scoped to European Portuguese, Brazilian Portuguese's vowel
-system differs, and `add_diacritics`
-routes `pt-BR` straight through unchanged. Hebrew and stress routing
-matches on the primary subtag exactly (not a prefix check), so e.g.
-Berber (`ber`) never false-matches Belarusian (`be`). Arabic and European
-Portuguese routing asks linguatag, so Aragonese (`arg`) and Mapudungun
-(`arn`) never route to tashkeel.
+Stress is free in all of the stress languages, and their spelling writes it
+seldom or never. In East Slavic, stress also moves between the forms of a
+word, and an unstressed vowel reduces: Russian о is [ɐ] or [ə] by its distance
+from the stress. So a wrong or missing mark changes the vowels of the whole
+word, not only its stress. The other families need the mark for the place of
+the stress. stressonnx writes a combining acute (U+0301) after the stressed
+vowel. stressonnx serves 26 tags, because `az` and `uz` each have a Cyrillic
+and a Latin model. The full tag, such as `az-Latn`, goes to stressonnx
+unchanged, so it picks the right model. A bare `az` or `uz` names no model,
+and its text comes back unchanged.
 
-Diacritization is also exposed as a graph transform, via
-`scriptconv.diacritics.register`, parallel to the phonemization edge above,
-it adds a lang-contextual `text-diacritized` node and two edges: `text ->
-text-diacritized` (restore, wrapping `add_diacritics`, model-based and
-expensive) and `text-diacritized -> text` (strip, cheap). Neither edge is
-lossless: strip maps a letter with a mark and the bare letter to one string. Strip
-removes only the specific overlay codepoints each backend adds, combining
-acute/grave for stress, tashkeel for Arabic, niqqud for Hebrew, never a
-blanket combining-mark filter, so precomposed native letters (Cyrillic й/ё,
-Latvian macrons, Azerbaijani ç/ö, Arabic hamza carriers) are left intact.
-A cheapest path never visits a node twice, so routing never takes the round
-trip unless asked.
-Strip only works for *overlay* diacritics, Arabic/Hebrew vocalization and
-East-Slavic/Turkic/Caucasian stress, whose bare form carries no marks, gated
-by exact primary-subtag match, and raises `ValueError` for languages where
-the marks are native orthography (European Portuguese/bifonia), since
-removing them would corrupt the spelling:
+European Portuguese has heterophonic homographs: the meaning gives the
+pronunciation (*sede* "thirst" is closed *sêde*, and *sede* "seat" is open
+*séde*). bifonia writes an open or a closed vowel mark on these words. The
+marks are ordinary Portuguese spelling, so any G2P engine reads them: a rule
+engine, a neural model or espeak. Brazilian Portuguese has another vowel
+system, so `diacritize` gives `pt-BR` text back unchanged.
+
+Hebrew and stress routing compare the primary subtag exactly, so Berber
+(`ber`) never matches Belarusian (`be`). Arabic and European Portuguese
+routing ask linguatag, so Aragonese (`arg`) and Mapudungun (`arn`) never reach
+tashkeel.
+
+`scriptconv.diacritics.register` adds the same step to a graph. It adds the
+lang-contextual node `text-diacritized` and two edges: `text ->
+text-diacritized` runs `diacritize`, and `text-diacritized -> text` runs
+`strip_diacritics`. Neither edge is lossless. The first one runs a model, and
+strip maps a marked letter and its bare letter to one string. A cheapest route
+never visits a node twice, so a route takes the round trip only when the
+caller asks for `text-diacritized`.
+
+Strip removes only the marks that a backend adds: the combining acute and
+grave for stress, tashkeel for Arabic and niqqud for Hebrew. It does not
+remove every combining mark, so precomposed letters stay: Cyrillic й and ё,
+Latvian macrons, Azerbaijani ç and ö, and the Arabic hamza carriers. Strip
+works only for these added marks. For a language with no added marks, such as
+English, it raises `ValueError` saying that scriptconv has no overlay
+diacritics. European Portuguese raises the same exception for a different
+reason: there the marks are spelling:
 
 ```python
 from scriptconv import DEFAULT_GRAPH
@@ -236,11 +271,10 @@ g = DEFAULT_GRAPH.extend(diacritics.register)
 g.convert("Tenho muita sede hoje.", "text", "text-diacritized", lang="pt")
 # 'Tenho muita sêde hoje.'
 g.convert("за́мок", "text-diacritized", "text", lang="ru")   # 'замок'
-g.convert("sêde", "text-diacritized", "text", lang="pt")     # raises ValueError
+g.convert("sêde", "text-diacritized", "text", lang="pt")     # ValueError: cannot strip diacritics for lang='pt'
 ```
 
-`add_diacritics` remains the single dispatch point, the graph edge is a thin
-wrapper, not a second implementation.
+The graph edge calls `diacritize`. It is not a second implementation.
 
 ### Stress marks and the backends that read them
 
@@ -318,23 +352,23 @@ uses for Hebrew, has 69 keys with niqqud. goruut reads `ثُبُوتٌ` as `θub
 and the bare `ثبوت` as `fbuːt`. goruut does not map every letter and mark
 pair, so some marked words keep an Arabic or Hebrew letter in the IPA.
 
-## Model-backed engines: download policy
+## Model-backed engines: who downloads the model
 
-ByT5 and Charsiu run large, licensed ONNX models. They require explicit local
-paths, `model=` and `tokenizer_config=`, and raise immediately when the
-files are absent. Downloading and caching those model files is deliberately
-the caller's concern, the class constants document where the published
-models live.
+ByT5 and Charsiu run large ONNX models under their own licences. They need
+local paths, `model=` and `tokenizer_config=`, and raise at once when the
+files are not there. scriptconv never downloads them: the caller downloads
+and caches the files, and the class constants name where the published models
+are.
 
-Small, known-good, unencumbered models are the exception. The Hebrew
-diacritizer (phonikud, see `diacritics.py`) auto-provisions its ONNX model
-using only the stdlib (`urllib.request`) into a cache dir on first use:
-`<base>/scriptconv/phonikud` where `<base>` is `$SCRIPTCONV_CACHE` if set,
-else `$XDG_CACHE_HOME` (default `~/.cache`), and reuses it afterward. Pass
-`phonikud_model=<path or zero-arg callable>` to override, e.g. on an
-air-gapped host. (`en.py`'s DeepPhonemizer backend similarly fetches its own
-model via the `dp` package, that fetch is DeepPhonemizer's, not scriptconv's,
-but the net effect for a caller is the same, no local path required.)
+scriptconv downloads a small, public model on first use. The Hebrew
+diacritizer (phonikud, in `diacritics.py`) downloads its ONNX model with the
+standard library (`urllib.request`) into `<base>/scriptconv/phonikud`, and
+reads it from there afterwards. `<base>` is `$SCRIPTCONV_CACHE` when it is
+set, else `$XDG_CACHE_HOME`, else `~/.cache`. Pass `phonikud_model=` a path or
+a zero-argument callable to use another model, for example on a host with no
+network. The DeepPhonemizer backend in `en.py` downloads a checkpoint named in
+`DeepPhonemizer.MODELS` into `~/.local/share/deepphonemizer`, so it needs no
+local path either.
 
 The Nakdimon model follows the same rule. It goes into
 `<base>/scriptconv/nakdimon`, from a fixed commit of its repository. The
@@ -393,7 +427,13 @@ when a run holds a number:
 
 ```python
 g2pw.phonemize("他跑了3000米，花了15分钟。", "zh")
-# WARNING g2pW gives no symbol for '3000', '15' in '他跑了3000米，花了15分钟。'; numbers belong to the normalisation stage
+# [['t', 'a', '1', 'p', 'ao', '3', 'l', 'e', '5', 'm', 'i', '3', '，', 'h', 'ua', '1', 'l', 'e', '5', 'f', 'en', '1', 'zh', 'ong', '1', '。']]
+```
+
+The call logs this warning:
+
+```text
+g2pW gives no symbol for '3000', '15' in '他跑了3000米，花了15分钟。'; numbers belong to the normalisation stage
 ```
 
 With `strict=True` (`FrontendConfig.strict`, or the backend's `strict`
@@ -407,6 +447,38 @@ as `《》`, gives no symbol and no warning.
 | `tokenizer.json` | Hugging Face model `google-bert/bert-base-chinese` | `8f23c25b06e129b6c986331a13d8d025a92cf0ea` | 269 KB | Apache-2.0 |
 | Three reading tables, in the wheel | github.com/GitYCC/g2pW, `g2pw/` | `b9328ce8129c4717a70f16a2688542a0197541dd` | 1.9 MB | Apache-2.0 |
 
+## Kolokwa, Liberian English
+
+`Phonemizer.KOLOKWA` reads Liberian English (Kolokwa, ISO 639-3 `lir`) with
+the kolokwa-g2p model of michsethowusu, a Forward Transformer of the
+`phonemize` package, with a pronouncing dictionary of 12,006 words. It runs an
+ONNX export of the model on onnxruntime, with no torch. It is the default for
+`lir`. It does not read `en` or `en-LR`, so the default for those tags does
+not change. Install it with `pip install scriptconv[lir]`.
+
+```python
+from scriptconv.phonemizers import phonemizer_for_lang
+
+phonemizer_for_lang("lir").phonemize_string("da man dey go drink cold water", "lir")
+# 'ðæ mæ̃n de ko tɹɪ̃ŋk ko wɔtə˞'
+```
+
+The text reads as `phonemize` 0.2.4 reads it, and the output is the same.
+Each character that is not a letter, a digit, a space, a hyphen or one of
+`().,:?!/–` goes, so an apostrophe goes. A digit stays in the text, but the
+model has no symbol for it, so it gives no phonemes. The text splits at
+spaces and at those marks, which stay in the output. A word that is not in the
+dictionary splits at hyphens and before each inner capital, so `DIY` gives
+`d-a-j`. The model reads at most 5,000 ids. With two bounding ids and three ids
+per letter, a spelling of more than 1,666 letters raises `ValueError`.
+
+The model files must have their pinned sha256. With no network and no cached
+copy that passes the check, the constructor raises `ModelUnavailableError`.
+
+| File | Source | Revision | Size | Licence |
+|---|---|---|---|---|
+| `model.onnx`, `kolokwa.json` | Hugging Face model `TigreGotico/kolokwa-g2p-onnx`, the ONNX export of `michsethowusu/kolokwa-g2p` at `92ed3b721a4f80f98d5b741fdd16352ca320f121` | `3729a707e532ba2929c884288bacf5d5d76f7316` | 59 MB | MIT |
+
 ## dizione, American English
 
 `Phonemizer.DIZIONE` reads American English text into IPA. The engine is
@@ -416,7 +488,8 @@ licence and the upstream commit in `UPSTREAM.md`. dizione looks words up in a
 dictionary built from CMUdict. It picks the reading of a homograph from the
 words around it, and a small model guesses the words that the dictionary does
 not have. Its own text rules read numbers, dates, money, units and
-abbreviations.
+abbreviations. Install the backend with `pip install scriptconv[en-phonemizers]`,
+which holds numpy for that model.
 
 ```python
 from scriptconv.phonemizers.dizione import DizionePhonemizer
@@ -448,13 +521,13 @@ sound, and it ends a sentence when the run holds `.`, `?` or `!`. A full stop
 that dizione reads as part of an abbreviation, as in `Mrs.`, ends nothing. A
 closing bracket after the run, or a quotation mark that closes an open
 quotation, stays with the clause that ends, and so does a clause mark after
-it, as in `"Stop." .`, so no clause starts with a mark. A `!` or `?` between two letters
-with no space after it, as in `Sim!Não!`, is no clause mark: the backend reads
-it as a space, in `tokens()` too. A sentence that a blank line follows ends a
-paragraph, unless dizione's own rules read the blank line away, as in
-`Jan.\n\n5`. dizione reads a blank line as a space, so a blank line after
-`:`, `;`, an ellipsis or a title ends no paragraph. With `keep_punctuation`,
-the frontend writes the clause symbol of each mark.
+it, as in `"Stop." .`, so no clause starts with a mark. A `!` or `?` between
+two letters with no space after it, as in `Sim!Não!`, is no clause mark: the
+backend reads it as a space, in `tokens()` too. A sentence that a blank line
+follows ends a paragraph, unless dizione's own rules read the blank line away,
+as in `Jan.\n\n5`. dizione reads a blank line as a space, so a blank line
+after `:`, `;`, an ellipsis or a title ends no paragraph. With
+`keep_punctuation`, the frontend writes the clause symbol of each mark.
 
 `DizionePhonemizer(tokens=True)` changes `phonemize_segments` only: each
 segment is then a clause of dizione's own tokens, with its own `<bos>` and
@@ -525,31 +598,162 @@ Limits:
 - `keep_punctuation` has no effect: the IPA string has no punctuation, and
   `tokens()` has all of it.
 
+## Leokani G2P, American English
+
+`Phonemizer.LEOKANI` reads American English text into the phoneme codes of
+Kokoro and misaki. The engine is
+[Leokani G2P](https://github.com/Milliwatt-Labs/leokani-g2p) by Milliwatt
+Labs. Its code is MIT, and its model files are CC BY 4.0. The code is
+vendored byte for byte under `scriptconv/phonemizers/_thirdparty/leokani/`,
+with its `LICENSE`, its `NOTICE` and its source revision. Leokani G2P looks
+each word up in its lexicon and guesses the other words with a
+letter-to-sound model. A context model then picks how each word is said in
+its clause. Install the backend with `pip install scriptconv[en-phonemizers]`,
+which holds numpy, onnxruntime and huggingface_hub.
+
+```python
+from scriptconv.phonemizers import Phonemizer, get_phonemizer
+
+leokani = get_phonemizer(Phonemizer.LEOKANI)
+leokani.phonemize_string("The wind was cold, so we read inside.", "en-US")
+# 'ðə wˈɪnd wʌz kˈOld, sˌO wi ɹˈid ɪnsˈId.'
+leokani.phonemize("The wind was cold, so we read inside.", "en-US")[0][:8]
+# ['ð', 'ə', ' ', 'w', 'ˈ', 'ɪ', 'n', 'd']
+```
+
+The output alphabet is `Alphabet.IPA`, with the codes that the `misaki_en`
+backend writes: `A`, `I`, `O`, `W` and `Y` stand for the diphthongs eɪ, aɪ,
+oʊ, aʊ and ɔɪ, and `ᵊ` and `ᵻ` for reduced vowels. A Kokoro voice reads these
+codes as they are. `phonemize_string` returns the output of the engine
+unchanged, with the punctuation that the text holds. `phonemize` and the
+frontend remove the punctuation before the engine reads the text, as for
+the other backends.
+
+`model="mini"` loads the larger model, which reads names and rare words
+better. `micro` is the default:
+`get_phonemizer(Phonemizer.LEOKANI, model="mini")`.
+
+The model files come from the Hugging Face Hub, at a fixed revision, into the
+shared Hugging Face cache, from the upstream repository
+`milliwattlabs/leokani-g2p` at revision `a819acc8`. Each file must have its
+pinned sha256. A cached file with another sha256 is
+downloaded again once, unless the Hub is offline (`HF_HUB_OFFLINE`). With no
+copy that passes the check, the backend raises `ModelUnavailableError`.
+
+| File | Source | Revision | Size | Licence |
+|---|---|---|---|---|
+| `leokani_g2p.py`, in the wheel | Hugging Face model `milliwattlabs/leokani-g2p`; the same file is `src/leokani_g2p/runtime.py` of github.com/Milliwatt-Labs/leokani-g2p at `df8bc119` (1.3.0) | `a819acc86471a04a01ba3d3f30f3765e4675c7ca` | 189 KB | MIT |
+| `micro` model: the lexicon and three ONNX models | Hugging Face model `milliwattlabs/leokani-g2p` | `a819acc86471a04a01ba3d3f30f3765e4675c7ca` | 10.2 MB | CC BY 4.0 |
+| `mini` model, in `mini/` | Hugging Face model `milliwattlabs/leokani-g2p` | `a819acc86471a04a01ba3d3f30f3765e4675c7ca` | 10.8 MB | CC BY 4.0 |
+
+Credit the engine as: Leokani G2P by Milliwatt Labs (milliwattlabs.com).
+
+The backend owns no stage, so the frontend runs its normalise stage first.
+Leokani G2P then runs its own text rules on the result, which read numbers,
+money, dates, times, units and web addresses. `identity(lang)` gives a
+`revision` that hashes the code on the path of the backend, the vendored
+engine with it. That code holds the model revision and the sha256 of each
+model file, so another model gives another `revision`.
+
+Limits:
+
+- Leokani G2P reads American English only. A tag must resolve to `en-US`, or
+  to a lect of it such as `en-US-x-nyc`. A bare `en` is British English by
+  the default-region rule, so it is refused with `UnsupportedLanguageError`.
+- The engine reads a number word with a hyphen, such as `ninety-nine`, as one
+  word with one stress: `nˈIntinˈIn`. Its own text rules write `99` as two
+  words, `nˈInti nˈIn`. A normaliser that writes hyphens, as text2spoken
+  does, gives the first form.
+- When the engine reads the digits itself, `at 14:30` reads as "fourteen
+  thirty", and `fell to -5 degrees` reads the sign as "dash". Normalise such
+  text first.
+
+## NeMo IPA, American English
+
+`Phonemizer.NEMO_IPA` gives the symbols that NVIDIA NeMo's English `IpaG2p`
+gives to the Magpie TTS `english_phoneme` sub-tokenizer. A caller that
+indexes an English Magpie voice maps each character of the string to a token
+id. The backend follows NeMo at commit `fd6a8775` (tag v3.0.0) and needs no
+NeMo or torch package. The module docstring of `scriptconv/phonemizers/nemo_ipa.py`
+names the NeMo files, and `scriptconv/phonemizers/_thirdparty/nemo/NOTICE`
+holds the credit that the Apache License asks for. Install the backend with
+`pip install scriptconv[en-phonemizers]`.
+
+```python
+from scriptconv.phonemizers import Phonemizer, get_phonemizer
+
+nemo = get_phonemizer(Phonemizer.NEMO_IPA)
+nemo.phonemize_string("She read the lead sheet at the café.", "en-US")
+# 'ˈʃi READ ðə LEAD ˈʃit ˈæt ðə kəˈfeɪ.'
+```
+
+A word of the dictionary gives its first pronunciation. A heteronym, such as
+`read` and `lead` above, and a word that the dictionary lacks give upper-case
+letters. A hyphen splits a word that the dictionary lacks, and each part is
+looked up alone. A word with `'s` or `s` after a dictionary word takes `s`,
+`z` or `ɪz`. An accent is removed first. Digits stay digits. The punctuation
+of the vocabulary stays, and a character that the vocabulary lacks is dropped,
+as in NeMo. A space stays, also two in a row, except at the end.
+The output has no random choice: NeMo keeps a word as letters with a
+probability only while it trains, and this backend has no such parameter.
+
+The two data files come from the Hugging Face Hub, at a fixed revision, into
+the shared Hugging Face cache, from `Phoonnx/magpietts-multi-357m-unicode` at
+revision `a0e169ad`. They are the copies that the Magpie TTS checkpoint holds.
+The dictionary is not byte-identical to the copy in the NeMo tree (sha256
+`7ea5c4c2` against `dd0927ff`): the two differ only in the order of the two
+readings of `A`, and the pin follows the checkpoint. Each file must have its
+pinned sha256. Pass `dictionary=` or `heteronyms=` to read a local file
+instead.
+
+| File | Source | sha256 | Size |
+|---|---|---|---|
+| `ipa_cmudict-0.7b_nv23.01.txt` | `assets/tokenizer/dc7d60d6b15a4651b21c9ca2932b62c6_ipa_cmudict-0.7b_nv23.01.txt` | `7ea5c4c2c59cc780748b24d4ab60bd689779c4ac4ea7e27c0a8c3e20f300c0fa` | 3.1 MB |
+| `heteronyms-052722` | `assets/tokenizer/61d57a4ccb064d1e8e3d9f871c571932_heteronyms-052722` | `b701909aedf753172eff223950f8859cd4b9b4c80199cf0a6e9ac4a307c8f8ec` | 1.6 KB |
+
+The backend owns no stage. `identity(lang)` gives a `revision` that hashes the
+code on the path of the backend and the sha256 of the two data files.
+
+Limits:
+
+- The backend reads American English only. A tag must resolve to `en-US`, or
+  to a lect of it. A bare `en` is British English by the default-region rule,
+  so it is refused with `UnsupportedLanguageError`.
+- NeMo raises `IndexError` for any text whose kept symbols are only spaces,
+  such as `½ ¼ ¾`. The backend gives an empty string.
+- The backend does not write numbers, dates or symbols as words. Normalise
+  such text first.
+- `phonemize_string` returns the symbol string with its punctuation.
+  `phonemize` and the frontend remove the punctuation before the backend
+  reads the text.
+
 ## Backends in scriptconv-copyleft and scriptconv-nonfree
 
-A wrapper moves out of scriptconv when its own code or a dependency of its
+A wrapper is not in scriptconv when its own code or a dependency of its
 engine is under a copyleft or a non-commercial licence. A wrapper that only
 starts a separate program stays: Shami starts the espeak-ng command.
 Two sister packages hold those wrappers, and their vendored code, under the
 licences of that code:
 
 - **scriptconv-copyleft** holds KoG2P and the espeak, Cotovía, AhoTTS,
-  transphone, misaki, g2pfa, g2pk and pykakasi wrappers, and the Japanese
-  functions of `scriptconv.readings`.
+  transphone, misaki, g2pfa, g2pk and pykakasi wrappers, the Lithuanian
+  pitch-accent backend `espeak_lt_accent`, the Hebrew `hebrew_ipa`, Japanese
+  `openjtalk_prosody` and Thai `tltk` backends, and the Japanese functions of
+  `scriptconv.readings`.
 - **scriptconv-nonfree** holds mantoq, iqra_phonetiser and their wrappers
   (Mantoq, Halabi, Iqra), and the viphoneme, africa-g2p and ghana-g2p
   wrappers.
 
-The registry keeps every member and its extra. A moved member imports from
-its sister package when it is resolved, and the extra that served it
-installs that package, so `pip install scriptconv[espeak]` still gives the
-espeak backend. Without the sister package, `get_phonemizer` raises an
-`ImportError` that names the extra. scriptconv never imports a sister
-package at package import time.
+The registry keeps every member and its extra. Such a member imports from
+its sister package when it is resolved, and its extra installs that package,
+so `pip install scriptconv[espeak]` gives the espeak backend. Without the
+sister package, `get_phonemizer` raises an `ImportError` that names the
+extra. scriptconv never imports a sister package when scriptconv itself
+imports.
 
-The old import paths, for example
+The import paths of these classes in scriptconv, for example
 `scriptconv.phonemizers.mul.EspeakPhonemizer`, give the class from the
-sister package with a `DeprecationWarning` until the release that
+sister package with a `DeprecationWarning`. They stay until the release that
 `scriptconv.phonemizers._moved.REMOVAL_VERSION` names.
 
 ### africa-g2p and ghana-g2p
@@ -579,60 +783,51 @@ Both backends refuse a draft table with `UnsupportedLanguageError`, and the
 message names the table, its `confidence` and the africa-g2p version.
 `allow_draft_rules=True` on the constructor, or as a keyword of
 `get_phonemizer`, accepts the drafts:
-
-```python
-from scriptconv.phonemizers import Phonemizer, get_phonemizer
-
-get_phonemizer(Phonemizer.AFRICA_G2P, allow_draft_rules=True).phonemize_string("aba", "aab")
-```
+`get_phonemizer(Phonemizer.AFRICA_G2P, allow_draft_rules=True).phonemize_string("aba", "aab")`
+gives `'a b a'` from the draft table of `aab`.
 
 The code of africa-g2p is Apache-2.0. Its rule tables have no licence grant,
 and they are not for commercial use. scriptconv-nonfree states the terms in
 `LICENSE.africa-g2p-data.md`.
 
-### Three Arabic edges on the same Halabi phonetiser
+### Three Arabic edges on the Halabi phonetiser
 
-`mantoq`, `halabi` and `iqra` share one backend — Nawar Halabi's
-Arabic-Phonetiser (2016, CC BY-NC 4.0), vendored in scriptconv-nonfree or
-installed as the `mantoq` package — at three different points in its
-pipeline:
+`mantoq`, `halabi` and `iqra` read Arabic with Nawar Halabi's
+Arabic-Phonetiser (2016, CC BY-NC 4.0). None of the three is a language
+default: `ArbtokPhonemizer` is the Arabic default (`LANG_DEFAULTS["ar"]`).
 
-- `Phonemizer.MANTOQ` (`MantoqPhonemizer`): the full pipeline, mantoq's own
-  diacritizer restoring tashkeel on bare text before the phonetiser runs.
-  Preserves its long-standing contract, because published models trained on
-  Halabi-notation phoneme sequences depend on it: the default
-  `alphabet=Alphabet.BUCKWALTER` returns the raw inventory (that historical
-  label persists — `Alphabet.HALABI` is the accurate name and returns the
-  byte-identical string; there is no separate orthographic Buckwalter
-  transliteration layer in this pipeline to distinguish it from, so
-  `BUCKWALTER` is kept only as a back-compat alias, not because the label was
-  ever meaningfully different), and `Alphabet.IPA` converts through
-  [`halabi_to_ipa`](notation.md).
-- `Phonemizer.HALABI` (`HalabiPhonemizer`): the phonetiser called directly,
-  no diacritizer — **input must already be fully vowelized** (bare text is
-  garbage in, garbage out, matching upstream). `Alphabet.HALABI` (default)
-  is the raw notation verbatim, including the stress/vowel-realization digit
-  suffix and the emphatic-context uppercase vowels mantoq's own
-  `simplify_phonemes` folds away; `Alphabet.IPA` strips the digits and
-  converts through `halabi_to_ipa`.
-- `Phonemizer.IQRA` (`IqraPhonemizer`): the same direct-phonetiser call as
-  `HALABI`, post-processed to match the IqraEval shared task's `phoneme_ref`
-  convention (Interspeech 2025, doi:10.21437/Interspeech.2025-2411 — "we
-  employed the phonetizer introduced by Nawar Halabi"). Three deterministic,
-  tajwid/grammar-cited text transforms run before phonetisation (universal
-  tanwin elision, wāw al-jamāʿah's silent alif, utterance-initial hamzat
-  al-waṣl on the definite article); see `scripts/benchmark_iqraeval.py` for
-  the verification methodology (77.6% exact token-match against a 2,588-row
-  IqraEval/Iqra_train dev-split sample) and `IqraPhonemizer`'s docstring for
-  the named residual divergence classes, most of which are bugs in the
-  vendored phonetiser itself rather than gaps in this edge's post-processing.
-  `Alphabet.IPA` converts through
-  [`iqra_halabi_to_ipa`](notation.md), which — unlike `halabi_to_ipa` — keeps
-  the emphatic-context vowels distinct, matching `phoneme_ref`'s own
-  notation.
+`Phonemizer.MANTOQ` (`MantoqPhonemizer`) runs the mantoq pipeline: digits
+become Arabic number words, and then the phonetiser runs. It uses an
+installed `mantoq` package, else the copy vendored in scriptconv-nonfree.
+The vendored copy runs no diacritizer, so give it text with tashkeel. The default `alphabet=Alphabet.BUCKWALTER` returns the
+raw mantoq inventory, the notation that published models trained on.
+`Alphabet.HALABI` is the accurate name, and it returns the same string. No
+separate Buckwalter transliteration step is in this pipeline, so
+`BUCKWALTER` is only a second name. `Alphabet.IPA` converts through
+[`halabi_to_ipa`](notation.md).
 
-None of the three is selected automatically for any language;
-`ArbtokPhonemizer` is the Arabic default (`LANG_DEFAULTS["ar"]`).
+`Phonemizer.HALABI` (`HalabiPhonemizer`) calls the phonetiser directly, with
+no diacritizer. **The input must have full tashkeel.** Bare text gives wrong
+output, as upstream does. `Alphabet.HALABI`, the default, is the raw notation
+as written: the stress and vowel digit after a vowel, and the upper-case
+vowels of an emphatic context, which mantoq's own `simplify_phonemes` folds.
+`Alphabet.IPA` removes the digits and converts through `halabi_to_ipa`.
+
+`Phonemizer.IQRA` (`IqraPhonemizer`) gives the `phoneme_ref` notation of the
+IqraEval shared task (Interspeech 2025, doi:10.21437/Interspeech.2025-2411:
+"we employed the phonetizer introduced by Nawar Halabi"). It runs a port of
+the task's own phonetiser, `phonetiser/phonetise_Arabic.py` of
+Iqra-Eval/MSA_phonetiser, which writes `phoneme_ref`. That port is vendored
+apart from the mantoq copy that the other two edges use. Three text
+transforms run before it, each cited to its tajwid or grammar rule in
+`_iqra_preprocess`: tanwin goes everywhere, the silent alif of wāw
+al-jamāʿah goes, and an utterance-initial hamzat al-waṣl on the definite
+article reads as hamza with fatḥa. `scripts/benchmark_iqraeval.py` measures
+exact token agreement with `phoneme_ref`, and its docstring gives the method
+and the result: 2,544 of 2,588 rows of the dev split (98.3%) match exactly.
+`Alphabet.HALABI`, the default, gives the cleaned tokens of `phoneme_ref`.
+`Alphabet.IPA` converts through [`iqra_halabi_to_ipa`](notation.md), which
+keeps the emphatic-context vowels apart, as `phoneme_ref` does.
 
 ## The sentence gate
 
@@ -653,13 +848,14 @@ Run the gate on one language:
 
 ```bash
 python -m scriptconv.testing.compare --lang pt-PT \
-    --tsv tests/data/sentences/pt-PT.tsv --backend tugaphone \
+    --tsv sentences.tsv --backend mypackage.frontend:backend \
     --stages homographs:homograph
 ```
 
 `--backend` takes a scriptconv phonemizer name, or `module:attribute` for
-your own backend. Each item of `--stages` is a stage name and the category
-that the stage must improve.
+your own backend. A backend is any object with a
+`phonemize(text, lang) -> list[list[str]]` method. Each item of `--stages` is
+a stage name and the category that the stage must improve.
 
 The gate counts the phoneme error rate (PER) for each category. The PER is
 the edit distance from the backend output to `expected_ipa`, divided by the
@@ -688,7 +884,9 @@ A stage passes when both of these are true:
 
 To switch a stage off, the gate calls `backend.without(stage)`. This method
 returns the same backend without that stage. When a backend has no `without`
-method, the gate prints `not ablatable` for each stage.
+method, the gate prints `not ablatable` for each stage. No backend in
+scriptconv has `without`, so a stage gate needs a backend that you write, and
+a scriptconv backend name gives only the comparison with orthography2ipa.
 
 The output gives the rows read, scored and skipped, with the reason for
 each skip. A row of another language is a filter. These rows are defects,
@@ -747,8 +945,9 @@ from scriptconv.phonemizers.shami import ShamiPhonemizer, SYMBOL_TO_ID_90
 
 phonemizer = ShamiPhonemizer(inventory=90)
 phonemes, lang_ids = phonemizer.phonemize_with_language_ids("شو، هلق.", "ar")
-# phonemes[0] holds 'sil' after the comma and 'brk' after the full stop
-ids = [SYMBOL_TO_ID_90[p] for p in phonemes[0]]
+phonemes[0]  # ['<bos>', 'ʃ', 'ˈ', 'uː', 'sil', ' ', 'h', 'l', 'ʔ', 'brk', '<eos>']
+[SYMBOL_TO_ID_90[p] for p in phonemes[0]]  # [1, 35, 18, 77, 88, 4, 37, 43, 50, 89, 2]
+ShamiPhonemizer(inventory="88")  # ValueError: no Shami inventory has '88' symbols
 ```
 
 `ShamiPhonemizer.phonemize_segments` gives one segment per sentence, with its
@@ -798,24 +997,44 @@ f5.phonemize_to_list("我们用iPhone打电话。", "zh")
 `convert_char_to_pinyin` carries the MIT licence of F5-TTS in
 `scriptconv/phonemizers/_thirdparty/LICENSE.f5tts`.
 
-## The backend catalog
+## Backends with their own output
 
-Multilingual: espeak (subprocess with espyak fallback), gruut, goruut,
-epitran, transphone, ByT5/Charsiu (ONNX), the misaki family (en/ja/zh/ko/vi).
-Per-language: English (DeepPhonemizer, OpenPhonemizer, g2p_en, dizione), Japanese
-(OpenJTalk, cutlet, pykakasi), Korean (g2pk, KoG2P), Chinese (jieba, g2pM,
-xpinyin, pypinyin, g2pW), F5-TTS voices (`f5tts_char`, `f5tts_pinyin`), Arabic (arbtok, mantoq), Hebrew (phonikud), Persian,
-Vietnamese (viphoneme, Python below 3.12 only), Portuguese (tugaphone), Galician
-(Cotovía), Russian (vosk, the vosk-tts inventory, `Alphabet.VOSK`, with the
-voice's pronunciation dictionary passed as `phonemizer_model`), Basque
-(AhoTTS, euskaphone), African languages (africa-g2p, ghana-g2p), Mirandese and Barranquenho (the orthography2ipa specs
-`mwl`, `mwl-x-sendim`, `mwl-x-ifanes` and `ext-PT-x-barranco`), Levantine
-Arabic/English code-switching (shami, whose `phonemize_with_language_ids` also returns the
-parallel per-phoneme language-ID stream), and orthography2ipa for its
-data-driven language specs. Trivial built-ins that need no extra:
-`GraphemePhonemizer` (normalized characters, where a hyphen between two
-letters stays as part of the word) and `UnicodeCodepointPhonemizer`
-(codepoints as phonemes).
+[backends.md](backends.md) lists every backend with its class, its extra and
+its language default. Most backends give IPA. These give something else, or
+need a note:
+
+| Backend | Output |
+| --- | --- |
+| `openjtalk_prosody` | OpenJTalk IPA with the accent marks `↑ ↓ #` |
+| `hebrew_ipa` | IPA with stress, from text that carries niqqud |
+| `tltk` | Thai IPA with a tone digit for each syllable, in the `th` extra |
+| `espeak_lt_accent` | Lithuanian espeak-ng IPA with the three pitch accents `ˈ`, `ˌ`, `ˋ` from the stress dictionary of Reginutė, in the `espeak` extra |
+| `vosk` | The vosk-tts inventory, `Alphabet.VOSK`. The pronunciation dictionary of the voice goes in as `model=` |
+| `shami` | Levantine Arabic and English IPA. `phonemize_with_language_ids` also returns a language id for each phoneme |
+| `mwl_phonemizer`, `barranquenho` | The orthography2ipa specs `mwl`, `mwl-x-sendim`, `mwl-x-ifanes` and `ext-PT-x-barranco` |
+| `viphoneme` | Vietnamese IPA, on Python below 3.12 only |
+| `graphemes` | The normalised characters (`GraphemePhonemizer`), with no extra |
+| `unicode` | The codepoints of the text (`UnicodeCodepointPhonemizer`), with no extra |
+
+`hebrew_ipa` reads the niqqud that the text carries and adds none, so text
+without niqqud gives no phonemes. Hebrew does not diacritize by default. A
+caller with text without niqqud turns the diacritize stage on, for example
+`frontend.phonemize(text, Stages(lang="he", diacritize=True))`, and the
+phonikud model of the `he` extra then adds the niqqud.
+
+`GraphemePhonemizer` keeps a hyphen between two letters as part of the word.
+It takes its character rules as keyword arguments, so a voice can match the
+text it trained on. `lowercase`, `in_word_chars`, `replace_chars` and
+`drop_chars` each replace the class default when they are given, and the
+identity revision then holds them. A voice whose training text had no hyphen
+in a word sets `in_word_chars=""`, and every hyphen becomes a space:
+
+```python
+from scriptconv.phonemizers.base import GraphemePhonemizer
+
+GraphemePhonemizer().phonemize_string("Ela mora em Vila-Real.", "pt")  # 'ela mora em vila-real.'
+GraphemePhonemizer(in_word_chars="").phonemize_string("Ela mora em Vila-Real.", "pt")  # 'ela mora em vila real.'
+```
 
 The OpenJTalk backend runs on pyopenjtalk-plus with onnxruntime, which the
 `ja-phonemizers` extra installs. pyopenjtalk installs the same `pyopenjtalk`
@@ -825,7 +1044,14 @@ each installed distribution and refuses, with an `ImportError` that names the
 fix, an install where pyopenjtalk owns the module or where onnxruntime does not
 import. The check is `scriptconv.phonemizers.openjtalk_engine.require_pyopenjtalk_plus`.
 The pyopenjtalk-plus wheel holds the OpenJTalk dictionary, so the first use
-needs no network.
+needs no network. The backend writes kana or Hepburn romaji, so it takes
+`Alphabet.KANA` or `Alphabet.HEPBURN`:
+
+```python
+from scriptconv.phonemizers import Alphabet, Phonemizer, get_phonemizer
+
+get_phonemizer(Phonemizer.OPENJTALK, Alphabet.KANA).phonemize_string("何時ですか", "ja")  # 'ナンジデスカ'
+```
 
 pyopenjtalk reads the variable `OPEN_JTALK_DICT_DIR` when it imports, and opens
 that dictionary in place of the bundled one at its first reading. The readings
@@ -838,17 +1064,18 @@ refused. A path with a `..` component is refused too, because the system
 applies `..` after it follows a link, so `/a/link/../b` can name a directory
 that `/a/b` does not.
 
-```python
-# OPEN_JTALK_DICT_DIR=/usr/share/open_jtalk/dic python
-get_phonemizer(Phonemizer.OPENJTALK)
-# ImportError: The OpenJTalk phonemizer reads the dictionary of pyopenjtalk-plus, but
-# OPEN_JTALK_DICT_DIR is '/usr/share/open_jtalk/dic', not
-# '.../site-packages/pyopenjtalk/dictionary'. Unset OPEN_JTALK_DICT_DIR, then start
-# Python again.
+```bash
+OPEN_JTALK_DICT_DIR=/usr/share/open_jtalk/dic python -c "
+from scriptconv.phonemizers import Alphabet, Phonemizer, get_phonemizer
+get_phonemizer(Phonemizer.OPENJTALK, Alphabet.KANA)"
+```
+
+```text
+ImportError: The OpenJTalk phonemizer reads the dictionary of pyopenjtalk-plus, but OPEN_JTALK_DICT_DIR is '/usr/share/open_jtalk/dic', not '.../site-packages/pyopenjtalk/dictionary'. Unset OPEN_JTALK_DICT_DIR, then start Python again.
 ```
 
 See [ovos.md](ovos.md) for using this layer from OVOS through
 `ovos-scriptconv-g2p-plugin`.
 
 ---
-[← graph](graph.md) · [frontend →](frontend.md) · [Home](../README.md)
+[Index](index.md) · [← graph](graph.md) · [frontend →](frontend.md)

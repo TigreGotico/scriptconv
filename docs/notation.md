@@ -1,6 +1,16 @@
 # scriptconv.notation
 
-Phoneme-notation transcoding. All tables are pure Python data, zero runtime dependencies.
+<!-- agent-hint
+covers: the notation converters, the errors= policy and the NOTATION_INFO fidelity flags
+source: scriptconv/notation.py
+generated: no
+verify: python scripts/check_doc_page.py docs/notation.md
+see: docs/graph.md for routing between notations
+-->
+
+This page shows how to convert a phoneme string between IPA and the other
+notations, and what each converter does with a symbol outside its table. All
+tables are pure Python data with no runtime dependencies.
 
 ```python
 from scriptconv.notation import (
@@ -24,14 +34,19 @@ class Notation(str, Enum):
     BUCKWALTER = "buckwalter"
     ARABIC     = "arabic"
     LEXIQUE    = "lexique"
+    KIRSHENBAUM = "kirshenbaum"
+    COTOVIA    = "cotovia"
+    RFE        = "rfe"
+    HALABI     = "halabi"
+    MISAKI     = "misaki"
 ```
 
 `Notation` is a `str` subclass. Its string values (`"ipa"`, `"arpa"`, etc.) are accepted
 anywhere a `Notation` is expected:
 
 ```python
-convert("S", "x-sampa", "ipa")            # string values
-convert("S", Notation.XSAMPA, Notation.IPA)  # enum members, equivalent
+convert("S", "x-sampa", "ipa")                # 'ʃ'  (string values)
+convert("S", Notation.XSAMPA, Notation.IPA)   # 'ʃ'  (enum members, the same result)
 ```
 
 ---
@@ -39,7 +54,7 @@ convert("S", Notation.XSAMPA, Notation.IPA)  # enum members, equivalent
 ## convert, facade
 
 ```python
-def convert(text: str, src: str | Notation, dst: str | Notation) -> str
+def convert(text: str, src: str | Notation, dst: str | Notation, errors: str = "pass") -> str
 ```
 
 Routes a conversion through the appropriate pair function, or chains through IPA when
@@ -105,6 +120,40 @@ because the caller asked for ARPABET with no stress digits.
 
 ---
 
+## Fidelity of each notation
+
+Transcoding faithfulness depends on the target notation's inventory. IPA is
+the hub, so notation-to-notation conversion goes through IPA. The table
+below states, for each notation, whether a round-trip is exact and what
+happens to a symbol the table does not know.
+
+Every converter (and `convert()`) accepts a codecs-style `errors=` policy
+for symbols outside its table. `"pass"` keeps the symbol (the default
+everywhere except `ipa_to_arpa`). `"replace"` substitutes the notation's
+placeholder (`?`, the historical `ipa_to_arpa` default, tunable via
+`unknown=`). `"ignore"` drops the symbol. `"strict"` raises
+`UnknownSymbolError` naming the symbol, its position, and the notation. The
+"Unknown-token behaviour" column below describes the per-converter default.
+
+| Notation | `to_ipa` → `from_ipa` round-trip | `from_ipa` → `to_ipa` round-trip | Unknown-token behaviour |
+|----------|----------------------------------|----------------------------------|-------------------------|
+| **ARPABET** | **Exact with `stress=True`** (digits map to IPA `ˈ`/`ˌ` before the stressed vowel. Residues: extended-ARPABET `AX` and `AXR` normalise to CMUdict's `AH0` and `ER0` spellings, stable from the IPA side). Default `stress=False` drops digits, and merges `AH0` with `AX` and `ER0` with `AXR` | **Lossy** (ARPABET is an English-only inventory, so any IPA symbol outside it becomes the *unknown* placeholder) | `arpa_to_ipa`: passed through unchanged. `ipa_to_arpa`: diacritics, suprasegmentals and word gaps are dropped. Other out-of-inventory symbols follow `errors=` (default `"replace"` → `?`) |
+| **X-SAMPA** | Exact for every spelling Wells lists. A second spelling (`v\`, `_=`, `_~`) returns as the first (`P`, `=`, `~`) | Exact for every symbol Wells lists, each taken alone, including diacritics and tones | Passed through unchanged |
+| **Buckwalter ↔ Arabic** | Exact | Exact. An Arabic presentation form, such as the lam-alef ligature `ﻻ`, returns as the letters it stands for | Follows `errors=` (default: passed through) |
+| **Halabi → IPA** | One-directional (gemination and word markers are consumed. There is no IPA to Halabi) | Not applicable | Follows `errors=` (default: passed through) |
+| **Lexique ↔ IPA** | Exact except the `°`/`3` schwa pair (both map to `ə`. The reverse always produces `°`) | **Lossy** (French inventory. IPA outside it passes through) | Passed through unchanged |
+| **Kirshenbaum ↔ IPA** | **Lossy** (keys such as `F`, `K` and `P`, the digits and punctuation give output that is not IPA) | **Lossy** (restricted ASCII inventory. IPA outside it passes through) | Passed through unchanged |
+| **Cotovía ↔ IPA** | Exact except the three `L`/`Z`/`jj` symbols for `ʎ` normalise to `L` | **Lossy** (Galician/Spanish inventory. IPA outside it passes through) | Passed through unchanged |
+| **RFE ↔ IPA** | Exact except `ñ`/`n̮` for `ɲ` normalise to `ñ` | **Lossy** (core Spanish/Romance inventory. IPA outside it passes through) | Passed through unchanged |
+
+A test backs every row. `NOTATION_INFO` exposes the same facts to
+code, so a program can branch on whether a conversion is safe before making
+it. Its flags follow one definition of lossless, which
+the [Queryable fidelity](#queryable-fidelity-notation_info) section states. A
+conversion with `stress=True` or another option can be exact where the flag is
+`False`, because the flag measures the defaults.
+
+
 ## ARPABET ↔ IPA
 
 Table derived from [chorusai/arpa2ipa](https://github.com/chorusai/arpa2ipa) (Apache-2.0).
@@ -115,7 +164,7 @@ refers to for IPA. `tests/test_notation_sources.py` quotes both.
 ### arpa_to_ipa
 
 ```python
-def arpa_to_ipa(arpa_sequence: str) -> str
+def arpa_to_ipa(arpa_sequence: str, errors: str = "pass", stress: bool = False) -> str
 ```
 
 Converts a space-separated ARPABET token sequence to an IPA string. Stress digits
@@ -148,6 +197,7 @@ symbol at each position. Characters not in the ARPABET table are replaced by `un
 (default `"?"`), pass `unknown=""` to drop them silently. A space has no token and is
 dropped, so the output keeps no word boundary: `"ɛ ɛ"` and `"ɛɛ"` both give `EH EH`.
 The tied affricates `t͡ʃ` and `d͡ʒ` give `CH` and `JH`, with the tie above or below.
+The tied forms and the forms with a non-syllabic mark of AY, EY, OW, AW and OY give the same symbol as the plain form: `a͡ɪ`, `ai̯` and `aɪ̯` give `AY`. The SSB `əʊ` row follows the same rule and gives `OW`.
 
 With `stress=True`, a stress mark gives its digit to the next vowel. The IPA puts the
 mark before the stressed syllable, so `bəˈnænə` gives `B AH0 N AE1 N AH0`, as in the
@@ -196,7 +246,7 @@ quotes it row by row and lists each spelling left out, with the reason.
 ### xsampa_to_ipa
 
 ```python
-def xsampa_to_ipa(xsampa: str) -> str
+def xsampa_to_ipa(xsampa: str, errors: str = "pass") -> str
 ```
 
 Converts an X-SAMPA string to IPA. Multi-character symbols are matched **longest-first**
@@ -227,7 +277,7 @@ xsampa_to_ipa('"tS@n')  # "ˈtʃən"
 ### ipa_to_xsampa
 
 ```python
-def ipa_to_xsampa(ipa: str) -> str
+def ipa_to_xsampa(ipa: str, errors: str = "pass") -> str
 ```
 
 Converts an IPA string to X-SAMPA. Longest-first matching on IPA keys. Unknown IPA
@@ -294,7 +344,7 @@ Table follows Tim Buckwalter's published Arabic transliteration scheme, a
 ### buckwalter_to_arabic
 
 ```python
-def buckwalter_to_arabic(bw: str) -> str
+def buckwalter_to_arabic(bw: str, errors: str = "pass") -> str
 ```
 
 Converts a Buckwalter-encoded string to Arabic Unicode. Unknown characters are passed
@@ -309,7 +359,7 @@ buckwalter_to_arabic("p")       # "ة"   (ta marbuta)
 ### arabic_to_buckwalter
 
 ```python
-def arabic_to_buckwalter(arabic: str) -> str
+def arabic_to_buckwalter(arabic: str, errors: str = "pass") -> str
 ```
 
 Converts Arabic Unicode to Buckwalter transliteration. Unknown characters are passed
@@ -389,7 +439,7 @@ Lexique phoneme string represents exactly one phoneme.
 ### lexique_to_ipa
 
 ```python
-def lexique_to_ipa(lexique: str) -> str
+def lexique_to_ipa(lexique: str, errors: str = "pass") -> str
 ```
 
 Converts a Lexique phoneme-code string to IPA. Each character is looked up
@@ -401,13 +451,13 @@ lexique_to_ipa("v5")      # "vɛ̃"     (vin)
 lexique_to_ipa("aNo")     # "aɲo"    (agneau, N=ɲ palatal nasal)
 lexique_to_ipa("kaGiG")   # "kaŋiŋ"  (camping, G=ŋ velar nasal)
 lexique_to_ipa("d@s")     # "dɑ̃s"   (dans)
-lexique_to_ipa("abd°Ra")  # "abdəʁa" (° = schwa élidable)
+lexique_to_ipa("abd°Ra")  # "abdəʁa"  (° = schwa élidable)
 ```
 
 ### ipa_to_lexique
 
 ```python
-def ipa_to_lexique(ipa: str) -> str
+def ipa_to_lexique(ipa: str, errors: str = "pass") -> str
 ```
 
 Converts an IPA string to Lexique codes. Longest-first matching on IPA keys. Symbols
@@ -491,8 +541,8 @@ through IPA). Does not perform any conversion.
 ```python
 can_convert("arpa", "ipa")         # True  (direct)
 can_convert("arpa", "x-sampa")     # True  (indirect: arpa→ipa→x-sampa)
-can_convert("buckwalter", "ipa")   # False (not supported)
-can_convert("ipa", "ipa")          # False (identity, use convert() instead)
+can_convert("buckwalter", "ipa")   # False  (not supported)
+can_convert("ipa", "ipa")          # False  (identity: use convert() instead)
 ```
 
 ---
@@ -524,6 +574,8 @@ the factual ASCII → IPA codepoint correspondence of that standard (index *i* �
 the IPA codepoint for ASCII `0x20+i`), cross-checked against espeak-ng.
 
 ```python
+from scriptconv.notation import kirshenbaum_to_ipa, ipa_to_kirshenbaum
+
 kirshenbaum_to_ipa("S")   # "ʃ"
 ipa_to_kirshenbaum("ŋ")   # "N"
 ```
@@ -539,9 +591,9 @@ instead of reading prose:
 ```python
 from scriptconv import NOTATION_INFO, Notation
 info = NOTATION_INFO[Notation.ARPA]
-info.lossless_from_ipa   # False, restricted English inventory
-info.token_separated     # True (space-separated ARPABET tokens)
-info.reference           # citation URL/string
+info.lossless_from_ipa   # False  (restricted English inventory)
+info.token_separated     # True  (space-separated ARPABET tokens)
+info.reference           # 'http://www.speech.cs.cmu.edu/cgi-bin/cmudict; https://en.wikipedia.org/wiki/ARPABET'
 ```
 
 Each `NotationInfo` carries `lossless_to_ipa`, `lossless_from_ipa`,
@@ -587,9 +639,11 @@ Extensions, Spacing Modifier Letters, or Phonetic Extensions blocks, or an IPA
 combining diacritic:
 
 ```python
+from scriptconv.notation import looks_like_ipa
+
 looks_like_ipa("pʰɑtʃ")   # True
 looks_like_ipa("ˈhɛloʊ")  # True
-looks_like_ipa("hello")   # False, no distinctive marker
+looks_like_ipa("hello")   # False  (no distinctive marker)
 ```
 
 A transcription written only with characters IPA shares with the Latin
@@ -608,6 +662,8 @@ its `fonemas.cpp`, symbols are matched longest-first (`tS`, `rr` before single
 characters).
 
 ```python
+from scriptconv.notation import cotovia_to_ipa, ipa_to_cotovia
+
 cotovia_to_ipa("tS")      # "tʃ"
 cotovia_to_ipa("karro")   # "karo"  (rr = trill r, single r = tap ɾ)
 ipa_to_cotovia("ʎ")       # "L"     (canonical palatal-lateral symbol)
@@ -626,9 +682,11 @@ philology. scriptconv provides its core, well-attested inventory (rare
 interdental and variant diacritic symbols from the full standard are omitted).
 
 ```python
+from scriptconv.notation import rfe_to_ipa, ipa_to_rfe
+
 rfe_to_ipa("kaša")   # "kaʃa"
 ipa_to_rfe("ɲ")      # "ñ"     (canonical, n̮ is also accepted on input)
-rfe_to_ipa("far̄a")  # trill r (r̄), single r is the tap ɾ
+rfe_to_ipa("far̄a")  # "fara"  (r̄ is the trill r, a single r is the tap ɾ)
 ```
 
 The palatal nasal accepts both `ñ` and `n̮` on input and emits `ñ`, the
@@ -667,8 +725,8 @@ from scriptconv import convert, can_convert
 
 halabi_to_ipa("s a l aa m")        # 's a l aː m'
 halabi_to_ipa("b_dbl_a")           # 'bːa'      (consonant gemination)
-convert("mrHbaa", "halabi", "x-sampa")   # routes halabi → ipa → x-sampa
-can_convert("ipa", "halabi")       # False, one-directional by design
+convert("mrHbaa", "halabi", "x-sampa")   # "mrX\\ba:"  (halabi → ipa → x-sampa)
+can_convert("ipa", "halabi")       # False  (one-directional by design)
 ```
 
 The inventory's semantics are honoured precisely: `_dbl_` geminates only
@@ -676,15 +734,15 @@ consonants (the pipeline never emits it after a vowel), `_sil_` becomes a
 pause, `_eos_`/`_pad_` are dropped, and a pre-tokenized sequence (as returned
 by the mantoq package's `g2p`) is accepted directly, since joining tokens
 into a string is ambiguous. The token → IPA table maps the inventory's
-phonetic values; the phonetiser *engine* itself lives in
-[phonemizers](phonemizers.md) under its own license.
+phonetic values. The phonetiser *engine* is the `halabi` backend, which
+scriptconv-nonfree holds under its own licence (see [backends](backends.md)).
 
 `halabi_to_ipa` also accepts the RAW (pre-`simplify_phonemes`) phonetiser
-output — the emphatic-context uppercase vowels (`A`/`AA`/`I`/`II`/`U`/`UU`)
+output: the emphatic-context uppercase vowels (`A`/`AA`/`I`/`II`/`U`/`UU`)
 that `Phonemizer.HALABI` returns natively, since mantoq's own g2p folds them
 to the plain forms above before a caller ever sees them.
 
-### `iqra_halabi_to_ipa` — the IqraEval `phoneme_ref` flavor
+### `iqra_halabi_to_ipa`, the IqraEval `phoneme_ref` flavor
 
 `Phonemizer.IQRA`'s output uses a related but distinct table: gemination is a
 literal doubled consonant letter (`bb`, `nn`, …) rather than a `_dbl_`
@@ -699,5 +757,29 @@ from scriptconv.notation import iqra_halabi_to_ipa
 iqra_halabi_to_ipa("f ii h i x A y r aa t")   # 'fiːhixɑjraːt'
 ```
 
+## Misaki → IPA (misaki and Kokoro codes)
+
+The `misaki_en` and `leokani` backends write the codes of the misaki G2P,
+which Kokoro voices are trained on. The codes are IPA with a few letters of
+their own: `A`, `I`, `O`, `Q`, `W` and `Y` for the diphthongs, `ʤ` and `ʧ`
+for the affricates, and `ᵊ` for a reduced schwa. `misaki_to_ipa` expands
+them as the misaki symbol page ([EN_PHONES.md](https://github.com/hexgrad/misaki/blob/main/EN_PHONES.md))
+gives them, so that another notation can read the result:
+
+```python
+from scriptconv.notation import misaki_to_ipa
+from scriptconv import convert, can_convert
+
+misaki_to_ipa("hˈA ʤˈʌmp")        # 'hˈeɪ dʒˈʌmp'
+convert("hˈI", "misaki", "arpa")   # 'HH AY'
+convert("ɡˈO", "misaki", "x-sampa")   # 'g"oU'
+can_convert("ipa", "misaki")       # False  (one-directional)
+```
+
+The page gives no IPA value for `ᵻ` ("somewhere in between `ə` and `ɪ`"),
+so it stays as written. `Alphabet.MISAKI` asks the `leokani` backend for
+these codes. `Alphabet.IPA` gives the same codes, because the voices trained
+on them read them under that name.
+
 ---
-[← scripts](scripts.md) · [Home](../README.md) · [translit →](translit.md)
+[Index](index.md) · [← scripts](scripts.md) · [translit →](translit.md)

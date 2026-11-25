@@ -1,300 +1,532 @@
 # Changelog
 
-## [0.0.4a123](https://github.com/TigreGotico/scriptconv/tree/0.0.4a123) (2026-11-18)
+## [0.0.4a176](https://github.com/TigreGotico/scriptconv/tree/0.0.4a176) (2026-11-25)
 
-[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a122...0.0.4a123)
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a175...0.0.4a176)
 
 **Merged pull requests:**
 
-- fix: dizione reads a spelling over 28 letters in pieces instead of exhausting memory [\#342](https://github.com/TigreGotico/scriptconv/pull/342) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- test: keep the stress tables standalone of stressonnx internals [\#474](https://github.com/TigreGotico/scriptconv/pull/474) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- refactor: identity revision is a version string [\#472](https://github.com/TigreGotico/scriptconv/pull/472) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a175](https://github.com/TigreGotico/scriptconv/tree/0.0.4a175) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a174...0.0.4a175)
+
+**Merged pull requests:**
+
+- docs: complete pages, figures and navigation [\#471](https://github.com/TigreGotico/scriptconv/pull/471) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a174](https://github.com/TigreGotico/scriptconv/tree/0.0.4a174) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a173...0.0.4a174)
+
+**Merged pull requests:**
+
+- fix\(deps\): floor orthography2ipa at 7.126.2a2 [\#469](https://github.com/TigreGotico/scriptconv/pull/469) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a173](https://github.com/TigreGotico/scriptconv/tree/0.0.4a173) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a172...0.0.4a173)
+
+**Merged pull requests:**
+
+- fix\(lir\): reject a spelling longer than the model buffer [\#452](https://github.com/TigreGotico/scriptconv/pull/452) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.0.4a172](https://github.com/TigreGotico/scriptconv/tree/0.0.4a172) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a171...0.0.4a172)
+
+## [0.0.4a171](https://github.com/TigreGotico/scriptconv/tree/0.0.4a171) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a170...0.0.4a171)
+
+**Merged pull requests:**
+
+- docs\(compare\): use a caller-supplied TSV path [\#451](https://github.com/TigreGotico/scriptconv/pull/451) ([JarbasAl](https://github.com/JarbasAl))
+- fix\(registry\): reject an unused model path [\#450](https://github.com/TigreGotico/scriptconv/pull/450) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.0.4a170](https://github.com/TigreGotico/scriptconv/tree/0.0.4a170) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a169...0.0.4a170)
+
+## [0.0.4a169](https://github.com/TigreGotico/scriptconv/tree/0.0.4a169) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a168...0.0.4a169)
+
+## [0.0.4a168](https://github.com/TigreGotico/scriptconv/tree/0.0.4a168) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a167...0.0.4a168)
+
+**Merged pull requests:**
+
+- fix\(diacritics\): name the missing overlay marks [\#449](https://github.com/TigreGotico/scriptconv/pull/449) ([JarbasAl](https://github.com/JarbasAl))
+- fix\(phonemizers\): treat ell and gre as Greek for ; [\#448](https://github.com/TigreGotico/scriptconv/pull/448) ([JarbasAl](https://github.com/JarbasAl))
+- fix\(notation\): read tied and non-syllabic əʊ as OW [\#447](https://github.com/TigreGotico/scriptconv/pull/447) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.0.4a167](https://github.com/TigreGotico/scriptconv/tree/0.0.4a167) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a166...0.0.4a167)
+
+## [0.0.4a166](https://github.com/TigreGotico/scriptconv/tree/0.0.4a166) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a165...0.0.4a166)
+
+## [0.0.4a165](https://github.com/TigreGotico/scriptconv/tree/0.0.4a165) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a164...0.0.4a165)
+
+**Merged pull requests:**
+
+- perf\(frontend\): read only the end before a block [\#446](https://github.com/TigreGotico/scriptconv/pull/446) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.0.4a164](https://github.com/TigreGotico/scriptconv/tree/0.0.4a164) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a163...0.0.4a164)
+
+**Merged pull requests:**
+
+- fix\(frontend\): keep a word break at a run of dashes [\#444](https://github.com/TigreGotico/scriptconv/pull/444) ([JarbasAl](https://github.com/JarbasAl))
+- fix\(en\): read g2pen NLTK data from disk without downloading [\#439](https://github.com/TigreGotico/scriptconv/pull/439) ([JarbasAl](https://github.com/JarbasAl))
+- test: pin seven rules that mutants could break [\#432](https://github.com/TigreGotico/scriptconv/pull/432) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a163](https://github.com/TigreGotico/scriptconv/tree/0.0.4a163) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a162...0.0.4a163)
+
+**Merged pull requests:**
+
+- fix: give the Cantonese resources only to a Han-script tag [\#457](https://github.com/TigreGotico/scriptconv/pull/457) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a162](https://github.com/TigreGotico/scriptconv/tree/0.0.4a162) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a161...0.0.4a162)
+
+**Merged pull requests:**
+
+- fix: read language tags through linguatag in the phonemizer backends and the frontend [\#455](https://github.com/TigreGotico/scriptconv/pull/455) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a161](https://github.com/TigreGotico/scriptconv/tree/0.0.4a161) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a160...0.0.4a161)
+
+**Merged pull requests:**
+
+- feat: misaki notation and alphabet, expanded to IPA before other notations [\#453](https://github.com/TigreGotico/scriptconv/pull/453) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a160](https://github.com/TigreGotico/scriptconv/tree/0.0.4a160) (2026-11-24)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a159...0.0.4a160)
+
+**Merged pull requests:**
+
+- fix\(notation\): read tied and non-syllabic diphthongs in ipa\_to\_arpa [\#437](https://github.com/TigreGotico/scriptconv/pull/437) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a159](https://github.com/TigreGotico/scriptconv/tree/0.0.4a159) (2026-11-24)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a158...0.0.4a159)
+
+**Merged pull requests:**
+
+- docs: README, docs index, navigation and agent hints [\#433](https://github.com/TigreGotico/scriptconv/pull/433) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a158](https://github.com/TigreGotico/scriptconv/tree/0.0.4a158) (2026-11-24)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a157...0.0.4a158)
+
+**Merged pull requests:**
+
+- fix\(frontend\): a chunk value that is no Chunk names the valid values [\#430](https://github.com/TigreGotico/scriptconv/pull/430) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a157](https://github.com/TigreGotico/scriptconv/tree/0.0.4a157) (2026-11-24)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a156...0.0.4a157)
+
+**Merged pull requests:**
+
+- refactor: docstrings for two revision helpers, plain enum comments [\#428](https://github.com/TigreGotico/scriptconv/pull/428) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a156](https://github.com/TigreGotico/scriptconv/tree/0.0.4a156) (2026-11-23)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a155...0.0.4a156)
+
+## [0.0.4a155](https://github.com/TigreGotico/scriptconv/tree/0.0.4a155) (2026-11-23)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a154...0.0.4a155)
+
+**Merged pull requests:**
+
+- refactor\(frontend\): shorten frontend and diacritics docs, drop a dead guard [\#418](https://github.com/TigreGotico/scriptconv/pull/418) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- refactor\(phonemizers\): shorter docstrings and leaner code in the language wrappers [\#416](https://github.com/TigreGotico/scriptconv/pull/416) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a154](https://github.com/TigreGotico/scriptconv/tree/0.0.4a154) (2026-11-23)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a153...0.0.4a154)
+
+**Merged pull requests:**
+
+- refactor\(phonemizers\): shorter docstrings and simpler code in the multilingual, English and Chinese backends [\#415](https://github.com/TigreGotico/scriptconv/pull/415) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a153](https://github.com/TigreGotico/scriptconv/tree/0.0.4a153) (2026-11-23)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a152...0.0.4a153)
+
+## [0.0.4a152](https://github.com/TigreGotico/scriptconv/tree/0.0.4a152) (2026-11-23)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a151...0.0.4a152)
+
+**Merged pull requests:**
+
+- refactor\(phonemizers\): shorter docstrings and dead code out of the base and registry [\#417](https://github.com/TigreGotico/scriptconv/pull/417) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- refactor: simplify the notation, scripts and conventions modules [\#414](https://github.com/TigreGotico/scriptconv/pull/414) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a151](https://github.com/TigreGotico/scriptconv/tree/0.0.4a151) (2026-11-23)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a150...0.0.4a151)
+
+**Merged pull requests:**
+
+- feat: add the NEMO\_IPA backend, the IPA G2P of NVIDIA NeMo for Magpie TTS [\#413](https://github.com/TigreGotico/scriptconv/pull/413) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a150](https://github.com/TigreGotico/scriptconv/tree/0.0.4a150) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a149...0.0.4a150)
+
+**Merged pull requests:**
+
+- fix\(shami\): scale the espeak-ng timeout with the text length [\#405](https://github.com/TigreGotico/scriptconv/pull/405) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a149](https://github.com/TigreGotico/scriptconv/tree/0.0.4a149) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a148...0.0.4a149)
+
+**Merged pull requests:**
+
+- perf\(phonemizers\): compute the backend revision without a probe process [\#396](https://github.com/TigreGotico/scriptconv/pull/396) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a148](https://github.com/TigreGotico/scriptconv/tree/0.0.4a148) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a147...0.0.4a148)
+
+**Merged pull requests:**
+
+- fix\(shami\): send the espeak-ng text on stdin [\#403](https://github.com/TigreGotico/scriptconv/pull/403) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a147](https://github.com/TigreGotico/scriptconv/tree/0.0.4a147) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a146...0.0.4a147)
+
+**Merged pull requests:**
+
+- fix: Shami money reads other digit scripts as ASCII digits [\#398](https://github.com/TigreGotico/scriptconv/pull/398) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a146](https://github.com/TigreGotico/scriptconv/tree/0.0.4a146) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a145...0.0.4a146)
+
+**Merged pull requests:**
+
+- fix: Shami reads a digit run over 15 digits digit by digit [\#395](https://github.com/TigreGotico/scriptconv/pull/395) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a145](https://github.com/TigreGotico/scriptconv/tree/0.0.4a145) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a144...0.0.4a145)
+
+**Merged pull requests:**
+
+- fix\(frontend\): no casing for a backend that owns normalize [\#390](https://github.com/TigreGotico/scriptconv/pull/390) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a144](https://github.com/TigreGotico/scriptconv/tree/0.0.4a144) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a143...0.0.4a144)
+
+**Merged pull requests:**
+
+- fix\(identity\): an engine backend's revision covers the scriptconv read path [\#369](https://github.com/TigreGotico/scriptconv/pull/369) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a143](https://github.com/TigreGotico/scriptconv/tree/0.0.4a143) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a142...0.0.4a143)
+
+**Merged pull requests:**
+
+- feat: FrontendConfig.phonemizer\_lang, a backend language apart from the text language [\#389](https://github.com/TigreGotico/scriptconv/pull/389) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a142](https://github.com/TigreGotico/scriptconv/tree/0.0.4a142) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a141...0.0.4a142)
+
+**Merged pull requests:**
+
+- feat: hebrew\_ipa, openjtalk\_prosody and tltk registry rows [\#371](https://github.com/TigreGotico/scriptconv/pull/371) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a141](https://github.com/TigreGotico/scriptconv/tree/0.0.4a141) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a140...0.0.4a141)
+
+**Merged pull requests:**
+
+- fix: Shami reads the emphatics that espeak-ng writes with a bridge below [\#384](https://github.com/TigreGotico/scriptconv/pull/384) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- fix: join sentences with the space that the text writes [\#382](https://github.com/TigreGotico/scriptconv/pull/382) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a140](https://github.com/TigreGotico/scriptconv/tree/0.0.4a140) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a139...0.0.4a140)
+
+**Merged pull requests:**
+
+- fix: cap tokenizers below 1.0 in the he extra [\#385](https://github.com/TigreGotico/scriptconv/pull/385) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- feat: espeak\_lt\_accent, Lithuanian with the three pitch accents [\#370](https://github.com/TigreGotico/scriptconv/pull/370) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a139](https://github.com/TigreGotico/scriptconv/tree/0.0.4a139) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a138...0.0.4a139)
+
+**Merged pull requests:**
+
+- docs: generate the backend table from the registry, and test it [\#375](https://github.com/TigreGotico/scriptconv/pull/375) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a138](https://github.com/TigreGotico/scriptconv/tree/0.0.4a138) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a137...0.0.4a138)
+
+**Merged pull requests:**
+
+- docs: README, docs index, navigation and agent hints [\#374](https://github.com/TigreGotico/scriptconv/pull/374) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a137](https://github.com/TigreGotico/scriptconv/tree/0.0.4a137) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a136...0.0.4a137)
+
+**Merged pull requests:**
+
+- feat: Kolokwa \(Liberian English, lir\) phonemizer on kolokwa-g2p [\#376](https://github.com/TigreGotico/scriptconv/pull/376) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a136](https://github.com/TigreGotico/scriptconv/tree/0.0.4a136) (2026-11-22)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a135...0.0.4a136)
+
+**Merged pull requests:**
+
+- feat: add the Leokani G2P backend for American English [\#373](https://github.com/TigreGotico/scriptconv/pull/373) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a135](https://github.com/TigreGotico/scriptconv/tree/0.0.4a135) (2026-11-21)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a134...0.0.4a135)
+
+**Merged pull requests:**
+
+- fix\(identity\): a dependency of a preloaded package counts in the revision [\#372](https://github.com/TigreGotico/scriptconv/pull/372) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a134](https://github.com/TigreGotico/scriptconv/tree/0.0.4a134) (2026-11-21)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a133...0.0.4a134)
+
+**Merged pull requests:**
+
+- feat: euskaphone owns normalize [\#360](https://github.com/TigreGotico/scriptconv/pull/360) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a133](https://github.com/TigreGotico/scriptconv/tree/0.0.4a133) (2026-11-19)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a132...0.0.4a133)
+
+**Merged pull requests:**
+
+- fix: the dizione revision covers the scriptconv wrapper code [\#357](https://github.com/TigreGotico/scriptconv/pull/357) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a132](https://github.com/TigreGotico/scriptconv/tree/0.0.4a132) (2026-11-19)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a131...0.0.4a132)
+
+**Merged pull requests:**
+
+- fix: a module loaded before the revision probe counts when the backend imports it [\#358](https://github.com/TigreGotico/scriptconv/pull/358) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- fix: keep\_punctuation and the whitespace pattern join the backend revision [\#356](https://github.com/TigreGotico/scriptconv/pull/356) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a131](https://github.com/TigreGotico/scriptconv/tree/0.0.4a131) (2026-11-19)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a130...0.0.4a131)
+
+## [0.0.4a130](https://github.com/TigreGotico/scriptconv/tree/0.0.4a130) (2026-11-19)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a129...0.0.4a130)
+
+## [0.0.4a129](https://github.com/TigreGotico/scriptconv/tree/0.0.4a129) (2026-11-19)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a128...0.0.4a129)
+
+**Merged pull requests:**
+
+- fix: a mark after a digit separates two words, and a colon inside a word stays in it [\#362](https://github.com/TigreGotico/scriptconv/pull/362) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- fix\(frontend\): a hyphen or dash next to a word, and a mark before a block, separate two words [\#361](https://github.com/TigreGotico/scriptconv/pull/361) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a128](https://github.com/TigreGotico/scriptconv/tree/0.0.4a128) (2026-11-19)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a127...0.0.4a128)
+
+## [0.0.4a127](https://github.com/TigreGotico/scriptconv/tree/0.0.4a127) (2026-11-18)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a126...0.0.4a127)
+
+## [0.0.4a126](https://github.com/TigreGotico/scriptconv/tree/0.0.4a126) (2026-11-18)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a125...0.0.4a126)
+
+## [0.0.4a125](https://github.com/TigreGotico/scriptconv/tree/0.0.4a125) (2026-11-18)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a124...0.0.4a125)
+
+## [0.0.4a124](https://github.com/TigreGotico/scriptconv/tree/0.0.4a124) (2026-11-18)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a123...0.0.4a124)
+
+## [0.0.4a123](https://github.com/TigreGotico/scriptconv/tree/0.0.4a123) (2026-11-18)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a122...0.0.4a123)
 
 ## [0.0.4a122](https://github.com/TigreGotico/scriptconv/tree/0.0.4a122) (2026-11-18)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a121...0.0.4a122)
 
-**Merged pull requests:**
-
-- fix: Segment.text keeps the words before an inline block and the mark after it [\#336](https://github.com/TigreGotico/scriptconv/pull/336) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a121](https://github.com/TigreGotico/scriptconv/tree/0.0.4a121) (2026-11-18)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a120...0.0.4a121)
-
-**Merged pull requests:**
-
-- feat: tugaphone owns normalize; owners read their text with its punctuation [\#338](https://github.com/TigreGotico/scriptconv/pull/338) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a120](https://github.com/TigreGotico/scriptconv/tree/0.0.4a120) (2026-11-18)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a119...0.0.4a120)
 
-**Merged pull requests:**
-
-- feat: Segment.text holds the staged source text of a chunk [\#334](https://github.com/TigreGotico/scriptconv/pull/334) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a119](https://github.com/TigreGotico/scriptconv/tree/0.0.4a119) (2026-11-18)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a118...0.0.4a119)
-
-**Merged pull requests:**
-
-- docs: say what PhonemizerIdentity.revision holds, and the cache hit cost [\#332](https://github.com/TigreGotico/scriptconv/pull/332) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a118](https://github.com/TigreGotico/scriptconv/tree/0.0.4a118) (2026-11-18)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a117...0.0.4a118)
 
-**Merged pull requests:**
-
-- feat: keep TextFrontend.identity on disk [\#329](https://github.com/TigreGotico/scriptconv/pull/329) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a117](https://github.com/TigreGotico/scriptconv/tree/0.0.4a117) (2026-11-18)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a116...0.0.4a117)
-
-**Merged pull requests:**
-
-- feat: tugaphone revision, wrapper code in the o2i-family revisions, and probe failure fixes [\#328](https://github.com/TigreGotico/scriptconv/pull/328) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a116](https://github.com/TigreGotico/scriptconv/tree/0.0.4a116) (2026-11-18)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a115...0.0.4a116)
 
-**Merged pull requests:**
-
-- feat: identity revision for the grapheme, unicode and matoub\_kab backends [\#322](https://github.com/TigreGotico/scriptconv/pull/322) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a115](https://github.com/TigreGotico/scriptconv/tree/0.0.4a115) (2026-11-17)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a114...0.0.4a115)
-
-**Merged pull requests:**
-
-- feat: TextFrontend.say\_as reads a run in the form that SSML names [\#317](https://github.com/TigreGotico/scriptconv/pull/317) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a114](https://github.com/TigreGotico/scriptconv/tree/0.0.4a114) (2026-11-17)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a113...0.0.4a114)
 
-**Merged pull requests:**
-
-- fix: the normalize extra takes text2spoken\[pt\] only [\#314](https://github.com/TigreGotico/scriptconv/pull/314) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a113](https://github.com/TigreGotico/scriptconv/tree/0.0.4a113) (2026-11-17)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a112...0.0.4a113)
-
-**Merged pull requests:**
-
-- fix\(frontend\): a semicolon or colon inside a sentence is a space [\#293](https://github.com/TigreGotico/scriptconv/pull/293) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a112](https://github.com/TigreGotico/scriptconv/tree/0.0.4a112) (2026-11-17)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a111...0.0.4a112)
 
-**Merged pull requests:**
-
-- fix\(graphemes\): keep an in-word hyphen [\#292](https://github.com/TigreGotico/scriptconv/pull/292) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a111](https://github.com/TigreGotico/scriptconv/tree/0.0.4a111) (2026-11-17)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a110...0.0.4a111)
-
-**Merged pull requests:**
-
-- fix: normalize extra pulls text2spoken nl [\#294](https://github.com/TigreGotico/scriptconv/pull/294) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a110](https://github.com/TigreGotico/scriptconv/tree/0.0.4a110) (2026-11-17)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a109...0.0.4a110)
 
-**Merged pull requests:**
-
-- feat: F5-TTS text phonemizers f5tts\_char and f5tts\_pinyin [\#284](https://github.com/TigreGotico/scriptconv/pull/284) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a109](https://github.com/TigreGotico/scriptconv/tree/0.0.4a109) (2026-11-17)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a108...0.0.4a109)
-
-**Merged pull requests:**
-
-- fix\(gruut\): wrap the lookup before the processor is cached [\#289](https://github.com/TigreGotico/scriptconv/pull/289) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a108](https://github.com/TigreGotico/scriptconv/tree/0.0.4a108) (2026-11-17)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a107...0.0.4a108)
 
-**Merged pull requests:**
-
-- fix\(gruut\): keep the lexicon unchanged across liaison calls [\#287](https://github.com/TigreGotico/scriptconv/pull/287) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a107](https://github.com/TigreGotico/scriptconv/tree/0.0.4a107) (2026-11-16)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a106...0.0.4a107)
-
-**Merged pull requests:**
-
-- fix: normalize extra pulls text2spoken fr [\#285](https://github.com/TigreGotico/scriptconv/pull/285) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a106](https://github.com/TigreGotico/scriptconv/tree/0.0.4a106) (2026-11-16)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a105...0.0.4a106)
 
-**Merged pull requests:**
-
-- fix: test extra needs text2spoken 0.0.2a55 [\#282](https://github.com/TigreGotico/scriptconv/pull/282) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a105](https://github.com/TigreGotico/scriptconv/tree/0.0.4a105) (2026-11-16)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a104...0.0.4a105)
-
-**Merged pull requests:**
-
-- test: hold the second run of marks after a block [\#280](https://github.com/TigreGotico/scriptconv/pull/280) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a104](https://github.com/TigreGotico/scriptconv/tree/0.0.4a104) (2026-11-16)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a103...0.0.4a104)
 
-**Merged pull requests:**
-
-- feat\(frontend\): read the whole text before cutting it into chunks [\#272](https://github.com/TigreGotico/scriptconv/pull/272) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a103](https://github.com/TigreGotico/scriptconv/tree/0.0.4a103) (2026-11-16)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a102...0.0.4a103)
-
-**Merged pull requests:**
-
-- feat: g2pW Chinese backend, Nakdimon Hebrew diacritizer, OpenJTalk on pyopenjtalk-plus [\#274](https://github.com/TigreGotico/scriptconv/pull/274) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a102](https://github.com/TigreGotico/scriptconv/tree/0.0.4a102) (2026-11-16)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a101...0.0.4a102)
 
-**Merged pull requests:**
-
-- chore\(deps\): install africa-g2p through scriptconv-nonfree\[africa\] [\#276](https://github.com/TigreGotico/scriptconv/pull/276) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a101](https://github.com/TigreGotico/scriptconv/tree/0.0.4a101) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a100...0.0.4a101)
-
-**Merged pull requests:**
-
-- fix: remove a stress mark that the backend does not read [\#273](https://github.com/TigreGotico/scriptconv/pull/273) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a100](https://github.com/TigreGotico/scriptconv/tree/0.0.4a100) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a99...0.0.4a100)
 
-**Merged pull requests:**
-
-- feat: add the 90-symbol Shami inventory [\#268](https://github.com/TigreGotico/scriptconv/pull/268) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a99](https://github.com/TigreGotico/scriptconv/tree/0.0.4a99) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a98...0.0.4a99)
-
-**Merged pull requests:**
-
-- feat: add the dizione English phonemizer [\#269](https://github.com/TigreGotico/scriptconv/pull/269) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a98](https://github.com/TigreGotico/scriptconv/tree/0.0.4a98) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a97...0.0.4a98)
 
-**Merged pull requests:**
-
-- refactor: take restricted backends from scriptconv-copyleft and scriptconv-nonfree [\#264](https://github.com/TigreGotico/scriptconv/pull/264) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a97](https://github.com/TigreGotico/scriptconv/tree/0.0.4a97) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a96...0.0.4a97)
-
-**Merged pull requests:**
-
-- fix\(frontend\): read blocks as their plain text at marks and line breaks [\#263](https://github.com/TigreGotico/scriptconv/pull/263) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a96](https://github.com/TigreGotico/scriptconv/tree/0.0.4a96) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a95...0.0.4a96)
 
-**Merged pull requests:**
-
-- fix\(frontend\): a block after a sentence token joins with no space [\#259](https://github.com/TigreGotico/scriptconv/pull/259) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a95](https://github.com/TigreGotico/scriptconv/tree/0.0.4a95) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a94...0.0.4a95)
-
-**Merged pull requests:**
-
-- fix\(deps\): the normalize extra pulls the ar extra of text2spoken [\#258](https://github.com/TigreGotico/scriptconv/pull/258) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a94](https://github.com/TigreGotico/scriptconv/tree/0.0.4a94) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a93...0.0.4a94)
 
-**Merged pull requests:**
-
-- fix: read the g2pM erhua suffix r5 as a rhotic coda [\#247](https://github.com/TigreGotico/scriptconv/pull/247) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a93](https://github.com/TigreGotico/scriptconv/tree/0.0.4a93) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a92...0.0.4a93)
-
-**Merged pull requests:**
-
-- fix\(deps\): the test extra pulls the normalize extra [\#255](https://github.com/TigreGotico/scriptconv/pull/255) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a92](https://github.com/TigreGotico/scriptconv/tree/0.0.4a92) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a91...0.0.4a92)
 
-**Merged pull requests:**
-
-- fix\(deps\): the normalize extra pulls the es extra of text2spoken [\#253](https://github.com/TigreGotico/scriptconv/pull/253) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a91](https://github.com/TigreGotico/scriptconv/tree/0.0.4a91) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a90...0.0.4a91)
-
-**Merged pull requests:**
-
-- test\(frontend\): pin the mark after a block for digits, end blocks and closing brackets [\#250](https://github.com/TigreGotico/scriptconv/pull/250) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a90](https://github.com/TigreGotico/scriptconv/tree/0.0.4a90) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a89...0.0.4a90)
 
-**Merged pull requests:**
-
-- fix\(deps\): the normalize extra pulls the eu extra of text2spoken [\#251](https://github.com/TigreGotico/scriptconv/pull/251) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a89](https://github.com/TigreGotico/scriptconv/tree/0.0.4a89) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a88...0.0.4a89)
-
-**Merged pull requests:**
-
-- fix\(frontend\): skip the stages when no mark can follow a block [\#246](https://github.com/TigreGotico/scriptconv/pull/246) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a88](https://github.com/TigreGotico/scriptconv/tree/0.0.4a88) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a87...0.0.4a88)
 
-**Merged pull requests:**
-
-- fix: match Charsiu dialect labels to their BCP-47 tags [\#245](https://github.com/TigreGotico/scriptconv/pull/245) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a87](https://github.com/TigreGotico/scriptconv/tree/0.0.4a87) (2026-11-15)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a86...0.0.4a87)
-
-**Merged pull requests:**
-
-- fix: prefix Charsiu input with the Charsiu language label [\#238](https://github.com/TigreGotico/scriptconv/pull/238) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a86](https://github.com/TigreGotico/scriptconv/tree/0.0.4a86) (2026-11-14)
 
@@ -304,17 +536,9 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a84...0.0.4a85)
 
-**Merged pull requests:**
-
-- fix\(frontend\): one space around a block and keep the mark after it [\#236](https://github.com/TigreGotico/scriptconv/pull/236) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a84](https://github.com/TigreGotico/scriptconv/tree/0.0.4a84) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a83...0.0.4a84)
-
-**Merged pull requests:**
-
-- fix: match Charsiu labels by the script of their data [\#237](https://github.com/TigreGotico/scriptconv/pull/237) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a83](https://github.com/TigreGotico/scriptconv/tree/0.0.4a83) (2026-11-14)
 
@@ -332,33 +556,17 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a79...0.0.4a80)
 
-**Merged pull requests:**
-
-- fix\(phonemizers\): break a Preferred-Value tie by the requested code [\#231](https://github.com/TigreGotico/scriptconv/pull/231) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a79](https://github.com/TigreGotico/scriptconv/tree/0.0.4a79) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a78...0.0.4a79)
-
-**Merged pull requests:**
-
-- fix: with keep\_punctuation off, phonemize\_to\_list returns the joined synthesis chunks [\#225](https://github.com/TigreGotico/scriptconv/pull/225) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a78](https://github.com/TigreGotico/scriptconv/tree/0.0.4a78) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a77...0.0.4a78)
 
-**Merged pull requests:**
-
-- docs\(diacritics\): state the strip NFD claim and the §325 citation exactly [\#230](https://github.com/TigreGotico/scriptconv/pull/230) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a77](https://github.com/TigreGotico/scriptconv/tree/0.0.4a77) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a76...0.0.4a77)
-
-**Merged pull requests:**
-
-- fix\(diacritics\): keep the acute of Macedonian ѓ and ќ in NFD text [\#228](https://github.com/TigreGotico/scriptconv/pull/228) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a76](https://github.com/TigreGotico/scriptconv/tree/0.0.4a76) (2026-11-14)
 
@@ -372,33 +580,17 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a73...0.0.4a74)
 
-**Merged pull requests:**
-
-- fix: keep the joint space out of synthesis chunks and read clause breaks as spaces [\#223](https://github.com/TigreGotico/scriptconv/pull/223) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a73](https://github.com/TigreGotico/scriptconv/tree/0.0.4a73) (2026-11-14)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a72...0.0.4a73)
-
-**Merged pull requests:**
-
-- fix: keep words apart at a sentence with no mark and at a joined ! or ? [\#221](https://github.com/TigreGotico/scriptconv/pull/221) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a72](https://github.com/TigreGotico/scriptconv/tree/0.0.4a72) (2026-11-13)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a71...0.0.4a72)
 
-**Merged pull requests:**
-
-- fix: make the normalize extra install every text2spoken language [\#219](https://github.com/TigreGotico/scriptconv/pull/219) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a71](https://github.com/TigreGotico/scriptconv/tree/0.0.4a71) (2026-11-13)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a70...0.0.4a71)
-
-**Merged pull requests:**
-
-- fix\(vosk\): look up a stress-marked word in the dictionary [\#217](https://github.com/TigreGotico/scriptconv/pull/217) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a70](https://github.com/TigreGotico/scriptconv/tree/0.0.4a70) (2026-11-13)
 

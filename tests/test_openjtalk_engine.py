@@ -55,13 +55,16 @@ def both_installed(tmp_path, monkeypatch):
     def install(owner: str, order: list[str]):
         module_file.write_bytes(contents[owner])
         dists = {name: SimpleNamespace(files=[SimpleNamespace(hash=_record_hash(contents[name]),
-                                                              locate=lambda: module_file)])
+                                                              locate=lambda: module_file)],
+                                       version=VERSIONS[name], requires=None)
                  for name in VERSIONS}
         monkeypatch.setattr(pyopenjtalk, "__file__", str(module_file))
         monkeypatch.setattr(pyopenjtalk, "OPEN_JTALK_DICT_DIR", str(module_file.parent / "dictionary").encode())
         monkeypatch.setattr(metadata, "packages_distributions", lambda: {"pyopenjtalk": order})
-        monkeypatch.setattr(metadata, "distribution", dists.__getitem__)
-        monkeypatch.setattr(metadata, "version", VERSIONS.__getitem__)
+        # Other names reach the real metadata: the revision reads the version of each distribution under the backend.
+        real_distribution, real_version = metadata.distribution, metadata.version
+        monkeypatch.setattr(metadata, "distribution", lambda name: dists[name] if name in dists else real_distribution(name))
+        monkeypatch.setattr(metadata, "version", lambda name: VERSIONS[name] if name in VERSIONS else real_version(name))
 
     return install
 

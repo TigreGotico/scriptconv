@@ -1,5 +1,13 @@
 # From text to phonemes, `scriptconv.frontend`
 
+<!-- agent-hint
+covers: every option of TextFrontend: the stage order, whole-text backends, chunk sizes, inline blocks, configuration, stages, methods, failures and the identity
+source: scriptconv/frontend.py, scriptconv/phonemizers/base.py (Segment, join_sentences)
+generated: no
+verify: python scripts/check_doc_page.py docs/frontend.md
+see: docs/stack.md, docs/phonemizers.md, docs/ovos.md
+-->
+
 `TextFrontend` takes text to phonemes for a voice. It joins the text stages and
 a phonemizer backend in one fixed order, and every method runs that order. A
 TTS stack builds one frontend when it loads a voice, and calls it for each
@@ -11,7 +19,7 @@ from scriptconv.phonemizers import Phonemizer
 
 frontend = TextFrontend(FrontendConfig("pt-PT", Phonemizer.ESPEAK))
 frontend.phonemize("Olá mundo. Tenho sede.")
-# [['ɔ', 'l', 'ˈ', 'a', ' ', 'm', 'ˈ', 'u', '̃', 'ŋ', 'd', 'ʊ'], ['t', 'ˌ', 'e', 'ɲ', ...]]
+# [['ɔ', 'l', 'ˈ', 'a', ' ', 'm', 'ˈ', 'u', '̃', 'ŋ', 'd', 'ʊ'], ['t', 'ˌ', 'e', 'ɲ', 'ʊ', ' ', 's', 'ˈ', 'e', 'd', 'ɨ']]
 ```
 
 The frontend needs the `phonemizers` extra, and the extra of its backend.
@@ -25,7 +33,8 @@ order:
    block, and its symbols go into the output as written.
 2. Run the normalisation hook on the whole text, if the configuration sets
    one.
-3. Apply casing, if the call sets a casing function.
+3. Apply casing, if the call sets a casing function and the backend does
+   not own `normalize`.
 4. Cut the normalised text at its blank lines, then into sentences, or into
    clauses at `CLAUSE` size.
 5. For each sentence or clause, lazily: diacritize, then run the backend. The
@@ -47,9 +56,8 @@ block marks the `ي`, not the space after it.
 
 A backend can own a stage. It then runs that stage itself, and the frontend
 skips it. A backend can own `normalize`, `diacritize` or both. Tugaphone owns
-`normalize` and `diacritize`, Arbtok owns `diacritize`, and dizione and Shami
-own `normalize`. Shami reads each Arabic span through text2spoken's Levantine
-(`apc`) reading and each English span through its English one. The normalisation hook
+`normalize` and `diacritize`, Arbtok owns `diacritize`, and dizione and
+euskaphone own `normalize`. The normalisation hook
 runs for every backend that does not own `normalize`, because the caller
 chooses it.
 
@@ -103,7 +111,13 @@ garbage collection of the process can fall inside one call and add to it.
 
 An owner of `normalize` that cannot report its marks keeps
 `reads_whole_text = False`. The frontend then cuts the text into sentences as
-written, before casing, and the backend reads each sentence alone.
+written, and the backend reads each sentence alone.
+
+An owner of `normalize` gets no casing, and the frontend logs one warning
+when a call sets one. Casing would change the text before the backend
+normalises it. Tugaphone reads `15h30` as a time and `XIX` as a numeral, but
+it does not read `15H30` in capitals as a time, nor `xix` in lower case as a
+numeral.
 
 ## Chunk size
 
@@ -117,28 +131,33 @@ written, before casing, and the backend reads each sentence alone.
 | `NONE` | The whole text | Offline rendering and dataset work |
 
 `chunk` takes a `Chunk` or its value, such as `"clause"`. Any other value
-raises `ValueError`.
+raises `ValueError`:
+
+```python
+Stages(chunk="word")  # ValueError: chunk 'word' is not one of 'sentence', 'clause', 'paragraph', 'none'
+```
 
 The stage order is the same at every size: the frontend reads the whole text
 first, then cuts it into sentences, and a chunk is a sentence, a clause, the
 sentences of a paragraph, or every sentence. One rule joins two pieces at every
 size, the rule of the clause tokens: a piece that ends in a clause symbol, or
 in a space, joins the next one with no space, and any other piece takes one
-space. Inside a sentence, a clause that ends in `!` or `?` takes a space after
-the symbol, as the text writes one. No chunk starts with a space. So the
+space. Inside a sentence, a clause symbol with another clause after it takes
+a space after it, as `olá, ` below shows. No chunk starts with a space. So the
 chunks of every size, joined by this rule, are the result of
 `phonemize_flat`, and at `NONE` size the one chunk is that result:
 
 ```python
 frontend = TextFrontend(FrontendConfig("pt", Phonemizer.GRAPHEMES, keep_punctuation=True))
-text = "Olá! Tudo bem? Sim.\n\nAté logo."
-frontend.phonemize(text)                                # 'olá! tudo bem?', 'sim.', 'até logo.'
-frontend.phonemize(text, Stages(chunk="clause"))        # 'olá! ', 'tudo bem?', 'sim.', 'até logo.'
-frontend.phonemize(text, Stages(chunk="paragraph"))     # 'olá! tudo bem?sim.', 'até logo.'
-frontend.phonemize(text, Stages(chunk="none"))          # 'olá! tudo bem?sim.até logo.'
+text = "Olá, tudo bem? Sim.\n\nAté logo."
+[''.join(c) for c in frontend.phonemize(text)]                             # ['olá, tudo bem?', 'sim.', 'até logo.']
+[''.join(c) for c in frontend.phonemize(text, Stages(chunk="clause"))]     # ['olá, ', 'tudo bem?', 'sim.', 'até logo.']
+[''.join(c) for c in frontend.phonemize(text, Stages(chunk="paragraph"))]  # ['olá, tudo bem?sim.', 'até logo.']
+[''.join(c) for c in frontend.phonemize(text, Stages(chunk="none"))]       # ['olá, tudo bem?sim.até logo.']
+''.join(frontend.phonemize_flat(text))                                      # 'olá, tudo bem?sim.até logo.'
 ```
 
-The comments show each chunk as a string. The frontend cuts the normalised
+The examples show each chunk as a string. The frontend cuts the normalised
 text at each blank line before it cuts sentences. So a blank line ends a
 paragraph, and a sentence, whatever comes before it: a title with no mark, a
 `!`, a `:`, a `;`, an ellipsis, or a closing quote or bracket. The hook reads
@@ -247,20 +266,29 @@ A backend can still cut inside a chunk that is too long for its own limit.
 | Field | Default | Meaning |
 | --- | --- | --- |
 | `lang` | Required | The language of the voice |
-| `phonemizer` | `None` | The backend. `None` takes the default backend for `lang` |
+| `phonemizer` | `None` | The backend. `None` takes the default backend for `phonemizer_lang`, else for `lang` |
 | `alphabet` | `Alphabet.IPA` | The output alphabet of the backend |
 | `model` | `None` | The model of a model-backed backend |
 | `stages` | `Stages()` | The stage settings of the frontend |
 | `normalizer` | `None` | A `(text, lang) -> str` hook. `None` means no normalisation |
+| `phonemizer_lang` | `None` | The language the backend reads, when it is not `lang`. The normaliser, the diacritizer and casing read `lang` |
 | `keep_punctuation` | `False` | Keep clause punctuation, as the voice was trained |
 | `strict` | `False` | Raise on a failure, instead of a warning |
 | `whole_text_limit` | `WHOLE_TEXT_LIMIT` | Above this many characters, a whole-text backend reads each paragraph alone. `None` turns the cut off |
 
 `TextFrontend(config, backend=None)` builds the backend from the
 configuration. Give `backend=` an instance to use that instance. The backend
-reads with the `keep_punctuation` of the configuration. When the instance has
-another value, the frontend uses a shallow copy with the configured value, and
-the instance that you gave does not change.
+reads with the `keep_punctuation` and the `strict` of the configuration. When
+the instance has other values, the frontend uses a shallow copy with the
+configured values, and the instance that you gave does not change.
+
+A voice trained with an espeak voice that is not its text language sets
+`phonemizer_lang`. A Twi voice trained with the espeak voice `lfn` uses
+`FrontendConfig("tw", phonemizer_lang="lfn", phonemizer=Phonemizer.ESPEAK)`:
+Twi text is normalised as Twi and phonemized as `lfn`. A call whose
+`Stages.lang` is not `lang`, such as a cloning reference, phonemizes in its
+own language. The comparison ignores case and reads `_` as `-`, so `en-us`
+and `en_US` are the language `en-US`.
 
 When the backend has a `get_lang` method, the frontend calls it once, so an
 unsupported language fails when the frontend is built. The Grapheme and
@@ -277,20 +305,23 @@ frontend, and each call can give its own:
 | `diacritize` | `None` | `True` or `False` adds or skips the diacritizer |
 | `diacritizer_model` | `None` | The model of the diacritizer |
 | `lang` | `None` | The language of the text, for example a cloning reference |
-| `casing` | `None` | A `str -> str` function. Training sets one |
+| `casing` | `None` | A `str -> str` function. Training sets one. A backend that owns `normalize` gets none |
 | `chunk` | `None` | The chunk size, a `Chunk` or its value. `None` takes `Chunk.SENTENCE` |
 
 A value that the call sets wins. A value of `None` takes the value of the
-frontend, and then the language of the configuration.
+frontend. A `lang` that neither sets is the language of the configuration.
 
 When neither sets `diacritize`, Arabic diacritizes and other languages do not.
 Arabic means `ar` with any region, and each Arabic language in Arabic script,
 such as `arz` and `apc`. linguatag measures these at a distance of 5 or less
 from `ar`.
 
+The graphemes frontend of the chunk example shows what the diacritizer adds.
+With `diacritize=True`, bifonia writes the closed vowel of *sêde* (thirst):
+
 ```python
-frontend.phonemize("Tenho sede.", Stages(diacritize=True))   # bifonia marks 'sêde'
-frontend.phonemize("hello", Stages(lang="en-GB", diacritize=False))
+frontend.phonemize("Tenho sede.", Stages(diacritize=True))   # [['t', 'e', 'n', 'h', 'o', ' ', 's', 'ê', 'd', 'e', '.']]
+frontend.phonemize("hello", Stages(lang="en-GB", diacritize=False))  # [['h', 'e', 'l', 'l', 'o']]
 ```
 
 `diacritize=False` means that the frontend adds no diacritizer. A backend that
@@ -304,6 +335,7 @@ owns the stage still runs it, because it needs the marks to read the text.
 | `phonemize(text, stages=None)` | A list of phoneme lists, one per chunk | The same, all at once |
 | `phonemize_flat(text, stages=None)` | One phoneme list | Training. The sentence chunks of `phonemize`, joined by the rule of the clause tokens |
 | `segments(text, stages=None)` | An iterator of `Segment`, one per chunk | The chunks with the side streams of a whole-text backend, in step with the symbols |
+| `say_as(text, interpret_as, format=None, detail=None, lang=None)` | A string | The text in the form that an SSML `say-as` element names, read by the normalisation hook. The hook runs also for a backend that owns `normalize`. With no hook, or without the `normalize` extra, the text comes back as written, with one warning |
 | `prepare(text, stages=None)` | The text after the stages | An engine that reads text and not phonemes. The whitespace at the edges of each piece of text between blocks stays |
 | `identity()` | A `PhonemizerIdentity` | What phonemizes the language of the frontend, with `frontend` set to `FRONTEND_VERSION` |
 | `with_backend(backend)` | A new `TextFrontend` | The same configuration with another backend instance |
@@ -385,66 +417,32 @@ Build a `TextFrontend` to get the phonemes that a voice reads.
 stage order. A change to the steps raises it, so a dataset phonemized under
 older steps is detectable. A backend called directly has `frontend=None`.
 
-The `revision` of a frontend is not the `revision` of its backend. It is `sc1:`
-and a hash of these inputs:
+The `revision` of a frontend is the `revision` of its backend, then one
+`;name==version` for each stage library that the frontend runs:
 
-- the `revision` of the backend
-- each scriptconv module that a frontend loads when it reads a probe text
-  through the backend, such as `frontend` and `diacritics`
-- the settings that change the output: `keep_punctuation`, `strict`,
-  `whole_text_limit`, the alphabet, the resolved language, the chunk size and
-  whether the normaliser runs
-- `text2spoken.revision(lang)` when the normaliser is `spoken_normalizer()`
+- `text2spoken` when the normaliser is `spoken_normalizer()` and normalisation
+  is on. A backend that owns `normalize` adds nothing.
+- the diacritizer distribution of the language, when the frontend diacritizes
+  with the default model: `text2tashkeel` for Arabic, `stressonnx` for the
+  stress languages, `bifonia` for European Portuguese and `phonikud-onnx` for
+  Hebrew. A backend that owns `diacritize` adds nothing.
+
+```text
+scriptconv==X;text2tashkeel==Y
+```
 
 The `revision` is `None` when scriptconv cannot vouch for a stage, so a
 `version` difference shows. These cases give `None`:
 
 - the backend has no `revision`
-- the normaliser is another callable
-- the installed text2spoken has no `revision`
-- the frontend diacritizes
+- the normaliser is another callable, or text2spoken is not installed
+- the frontend diacritizes with a model that the stages name
+- the diacritizer is not installed
 - a casing runs
 
-**The identity is kept on disk.** The first `identity()` of a frontend runs
-the revision probes, which take seconds. An identity with a `revision` is then
-written to `~/.cache/scriptconv/identity/` (`$XDG_CACHE_HOME` when it is set,
-`~/Library/Caches` on macOS, `%LOCALAPPDATA%` on Windows). A later process
-reads it back with no probe and no call into the backend. In an install with
-no editable installs, a hit takes about a millisecond. Each checkout on the
-path and each editable install adds the time to read the state of its files,
-so in a development venv with hundreds of editable installs a hit takes about
-60 to 75 ms. phoonnx runs this check in a background thread, so a voice load
-does not wait for it.
-
-An entry is found by the Python interpreter and version, the `sys.path`
-entries, the Unicode version, the backend class with its arguments and
-instance settings, and the frontend settings. A hit also needs the state of
-these files and directories to stay as it was before the identity was
-computed:
-
-- the names in each `sys.path` directory, so an installed or removed
-  distribution gives a miss
-- the size and modification time of the `RECORD` of each distribution, so a
-  reinstalled one gives a miss
-- each package and module of each checkout on the path and of each editable
-  install, whether or not the process imports it. A file counts by its size
-  and modification time, and a directory by its names, so new bytecode in
-  `__pycache__` changes nothing
-- the source file of each class of the backend outside scriptconv
-
-A checkout is a `sys.path` directory that is not a site or standard library
-directory, such as an entry of `PYTHONPATH` or the target of a `.pth` file. An
-editable install is found by its `direct_url.json` or its setuptools finder.
-The state is taken before the identity is computed, so a change that lands
-during the computation gives a miss at the next call.
-
-Two edits are not seen: an edit of an installed file that keeps the `RECORD`
-as it is, and an edit that keeps the size of a file and puts its old
-modification time back.
-
-An entry that cannot be read is a miss, and a cache directory that cannot be
-written gives no entry and no error. Two processes can write one entry at
-once: each writes a temporary file and renames it into place.
+`identity()` reads installed versions only. After the engine imports, a call
+takes from under a millisecond to a few tens of milliseconds; the first call
+can take longer, because it resolves the language through the engine.
 
 ---
-[← phonemizers](phonemizers.md) · [Home](../README.md) · [ovos →](ovos.md)
+[Index](index.md) · [← phonemizers](phonemizers.md) · [ovos →](ovos.md)

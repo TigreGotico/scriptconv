@@ -10,6 +10,14 @@ ARPABET table derived from chorusai/arpa2ipa
 X-SAMPA table from J.C. Wells, "Computer-coding the IPA: a proposed extension
   of SAMPA" (https://www.phon.ucl.ac.uk/home/sampa/x-sampa.htm).
 Buckwalter ↔ Arabic table follows Tim Buckwalter's transliteration scheme.
+Misaki table from hexgrad/misaki, EN_PHONES.md
+  (https://github.com/hexgrad/misaki/blob/main/EN_PHONES.md): "`A`: [...]
+  Expands to `eɪ` in IPA.", "`I`: [...] Expands to `aɪ` in IPA.", "`W`: [...]
+  Expands to `aʊ` in IPA.", "`Y`: [...] Expands to `ɔɪ` in IPA.", "`O`: [...]
+  Expands to `oʊ` in IPA.", "`Q`: [...] Expands to `əʊ` in IPA.", "`ʤ`: [...]
+  merges `dʒ`", "`ʧ`: [...] merges `tʃ`", "`ᵊ`: Small schwa, muted version of
+  `ə`". For `ᵻ` the page gives no IPA value ("A sound somewhere in between `ə`
+  and `ɪ`"), so it passes through.
 Lexique phoneme-code table from:
   New, B. & Pallier, C. — Manuel de Lexique 3, v3.11, Tableau 2 (p. 12).
   Lexique383, https://github.com/chrplr/openlexicon, CC BY-SA 4.0.
@@ -46,6 +54,7 @@ __all__ = [
     "rfe_to_ipa",
     "ipa_to_rfe",
     "halabi_to_ipa",
+    "misaki_to_ipa",
     "iqra_halabi_to_ipa",
     "looks_like_ipa",
 ]
@@ -64,6 +73,7 @@ class Notation(str, Enum):
     COTOVIA = "cotovia"  # Universidade de Vigo Cotovía TTS notation (gl)
     RFE = "rfe"
     HALABI = "halabi"  # Halabi Arabic-Phonetiser phoneme notation (ar)
+    MISAKI = "misaki"  # misaki and Kokoro phoneme codes (en)
 
     def __repr__(self) -> str:
         return f"Notation.{self.name}"
@@ -181,6 +191,18 @@ _IPA_TO_ARPA.setdefault("ɫ̩", "EL")
 for _tie in ("\u0361", "\u035C"):
     _IPA_TO_ARPA.setdefault("t" + _tie + "ʃ", "CH")
     _IPA_TO_ARPA.setdefault("d" + _tie + "ʒ", "JH")
+# A diphthong written with a tie bar or a non-syllabic mark on its glide reads
+# as the plain sequence of the same row, and the glide may be ɪ/i or ʊ/u.
+# The SSB əʊ row reads as OW as the GA oʊ row does, so it takes the same forms.
+_GLIDE_SPELLINGS = {"ɪ": "ɪi", "ʊ": "ʊu"}
+_DIPHTHONG_ROWS = [(_arpa, *_ARPA_BASE[_arpa])
+                   for _arpa in ("AY", "EY", "OW", "AW", "OY")]
+_DIPHTHONG_ROWS.append(("OW", "ə", "ʊ"))
+for _arpa, _nucleus, _glide in _DIPHTHONG_ROWS:
+    for _g in _GLIDE_SPELLINGS[_glide]:
+        _IPA_TO_ARPA.setdefault(_nucleus + _g + "\u032F", _arpa)
+        for _tie in ("\u0361", "\u035C"):
+            _IPA_TO_ARPA.setdefault(_nucleus + _tie + _g, _arpa)
 # Bare/long NURSE vowel (non-rhotic British ɜ, ɜː) has no dedicated ARPA symbol —
 # ARPABET is rhotic-only, so it collapses onto the same "ER" as the r-colored ɝ.
 _IPA_TO_ARPA.setdefault("ɜː", "ER")
@@ -201,7 +223,6 @@ _ARPA_VOWELS = {"AO", "AA", "IY", "UW", "EH", "IH", "UH", "AH", "AE", "AX",
 # Syllabic consonants: the nucleus of a syllable that has no ARPABET vowel.
 _ARPA_SYLLABIC = {"EM", "EN", "ENG", "EL"}
 _STRESS_MARKS = {"ˈ": "1", "ˌ": "2"}  # IPA primary/secondary stress
-
 
 
 class UnknownSymbolError(ValueError):
@@ -242,6 +263,24 @@ def _unknown(symbol: str, position: int, notation: str, errors: str,
     raise ValueError(f"errors must be one of {_ERROR_POLICIES}, not {errors!r}")
 
 
+def _transcode(text: str, pattern: re.Pattern, table: dict[str, str],
+               notation: str, errors: str) -> str:
+    """Map *text* through *table*, matching *pattern* (longest key first) at each position."""
+    result = []
+    pos = 0
+    while pos < len(text):
+        m = pattern.match(text, pos)
+        if m:
+            result.append(table[m.group(0)])
+            pos = m.end()
+        else:
+            out = _unknown(text[pos], pos, notation, errors)
+            if out:
+                result.append(out)
+            pos += 1
+    return "".join(result)
+
+
 def arpa_to_ipa(arpa_sequence: str, errors: str = "pass",
                 stress: bool = False) -> str:
     """Convert a space-separated ARPABET sequence to an IPA string.
@@ -249,11 +288,11 @@ def arpa_to_ipa(arpa_sequence: str, errors: str = "pass",
     With ``stress=True``, ARPABET stress digits are preserved as IPA stress
     marks placed immediately before the stressed vowel's symbol: ``AH1`` →
     ``ˈʌ``, ``AH2`` → ``ˌʌ``, ``AH0`` → unmarked (a purely notational,
-    reversible convention — no syllabification is performed).  The default
-    ``stress=False`` keeps the historical behavior of stripping the digits.
-    ``errors`` selects the unknown-token policy: ``"pass"`` (default) keeps
-    the token, ``"replace"`` substitutes ``?``, ``"ignore"`` drops it,
-    ``"strict"`` raises :class:`UnknownSymbolError`.
+    reversible convention — no syllabification is performed).  With the
+    default ``stress=False`` the digits are stripped.  ``errors`` selects the
+    unknown-token policy: ``"pass"`` (default) keeps the token, ``"replace"``
+    substitutes ``?``, ``"ignore"`` drops it, ``"strict"`` raises
+    :class:`UnknownSymbolError`.
 
     Examples
     --------
@@ -282,23 +321,20 @@ def ipa_to_arpa(ipa_string: str, unknown: str = "?",
                 errors: str = "replace", stress: bool = False) -> str:
     """Convert an IPA string to a space-separated ARPABET sequence.
 
-    Matches longest IPA symbol first.  With ``stress=True``, IPA stress
-    marks (``ˈ``/``ˌ``) preceding a vowel-class symbol are emitted as that
-    vowel's stress digit (``1``/``2``) and unmarked vowels receive ``0`` —
-    the reverse of :func:`arpa_to_ipa`'s ``stress=True`` convention.
-    A stress mark stands before the stressed syllable, so with
-    ``stress=True`` its digit goes to the next vowel, after any onset.
-    ``errors`` selects the unknown-symbol policy (default ``"replace"``,
-    preserving the historical behavior of substituting *unknown*, ``"?"``);
-    ``unknown=""`` still drops silently.  Under the other policies, combining
-    marks and modifier letters qualify the preceding phoneme and are dropped
-    rather than treated as unknowns.  ``"strict"`` drops no mark: it raises
-    on a mark with no ARPABET value, on a stress mark that no vowel
-    follows, and on a stress mark whose syllable has a syllabic consonant
-    (``EL``, ``EM``, ``EN``, ``ENG``) and no vowel.  With ``stress=False`` a stress mark is dropped under every
-    policy, because the caller asked for no stress digits.  Spaces, the
-    characters with the Unicode White_Space property, are dropped too: ARPABET
-    tokens are space-separated, so the output keeps no word boundary.
+    Matches the longest IPA symbol first.  With ``stress=True``, a stress mark
+    (``ˈ``/``ˌ``) becomes the digit ``1``/``2`` of the next vowel, after any
+    onset, and an unmarked vowel takes ``0``: the reverse of
+    :func:`arpa_to_ipa` with ``stress=True``.  With ``stress=False`` every
+    stress mark is dropped.
+
+    ``errors`` selects the unknown-symbol policy.  The default ``"replace"``
+    writes *unknown*; ``unknown=""`` drops the symbol.  Except under
+    ``"strict"``, combining marks and modifier letters qualify the phoneme
+    before them and are dropped.  ``"strict"`` raises on a mark with no
+    ARPABET value, on a stress mark that no vowel follows, and on a stress
+    mark whose syllable has a syllabic consonant (``EL``, ``EM``, ``EN``,
+    ``ENG``) and no vowel.  White_Space characters are dropped: ARPABET tokens
+    are space-separated, so the output keeps no word boundary.
 
     Examples
     --------
@@ -878,19 +914,7 @@ def ipa_to_lexique(ipa: str, errors: str = "pass") -> str:
     >>> ipa_to_lexique("dø")
     'd2'
     """
-    result = []
-    pos = 0
-    while pos < len(ipa):
-        m = _IPA_LX_RE.match(ipa, pos)
-        if m:
-            result.append(_IPA_TO_LEXIQUE[m.group(0)])
-            pos = m.end()
-        else:
-            out = _unknown(ipa[pos], pos, "lexique", errors)
-            if out:
-                result.append(out)
-            pos += 1
-    return "".join(result)
+    return _transcode(ipa, _IPA_LX_RE, _IPA_TO_LEXIQUE, "lexique", errors)
 
 
 # ---------------------------------------------------------------------------
@@ -1037,19 +1061,7 @@ def cotovia_to_ipa(cotovia: str, errors: str = "pass") -> str:
     >>> cotovia_to_ipa("karro")
     'karo'
     """
-    result = []
-    pos = 0
-    while pos < len(cotovia):
-        m = _CV_RE.match(cotovia, pos)
-        if m:
-            result.append(_COTOVIA_TO_IPA[m.group(0)])
-            pos = m.end()
-        else:
-            out = _unknown(cotovia[pos], pos, "cotovia", errors)
-            if out:
-                result.append(out)
-            pos += 1
-    return "".join(result)
+    return _transcode(cotovia, _CV_RE, _COTOVIA_TO_IPA, "cotovia", errors)
 
 
 def ipa_to_cotovia(ipa: str, errors: str = "pass") -> str:
@@ -1065,19 +1077,7 @@ def ipa_to_cotovia(ipa: str, errors: str = "pass") -> str:
     >>> ipa_to_cotovia("ʎ")
     'L'
     """
-    result = []
-    pos = 0
-    while pos < len(ipa):
-        m = _IPA_CV_RE.match(ipa, pos)
-        if m:
-            result.append(_IPA_TO_COTOVIA[m.group(0)])
-            pos = m.end()
-        else:
-            out = _unknown(ipa[pos], pos, "cotovia", errors)
-            if out:
-                result.append(out)
-            pos += 1
-    return "".join(result)
+    return _transcode(ipa, _IPA_CV_RE, _IPA_TO_COTOVIA, "cotovia", errors)
 
 
 # ---------------------------------------------------------------------------
@@ -1161,19 +1161,7 @@ def rfe_to_ipa(rfe: str, errors: str = "pass") -> str:
     >>> rfe_to_ipa("kaša")
     'kaʃa'
     """
-    result = []
-    pos = 0
-    while pos < len(rfe):
-        m = _RFE_RE.match(rfe, pos)
-        if m:
-            result.append(_RFE_TO_IPA[m.group(0)])
-            pos = m.end()
-        else:
-            out = _unknown(rfe[pos], pos, "rfe", errors)
-            if out:
-                result.append(out)
-            pos += 1
-    return "".join(result)
+    return _transcode(rfe, _RFE_RE, _RFE_TO_IPA, "rfe", errors)
 
 
 def ipa_to_rfe(ipa: str, errors: str = "pass") -> str:
@@ -1189,20 +1177,7 @@ def ipa_to_rfe(ipa: str, errors: str = "pass") -> str:
     >>> ipa_to_rfe("ɲ")
     'ñ'
     """
-    result = []
-    pos = 0
-    while pos < len(ipa):
-        m = _IPA_RFE_RE.match(ipa, pos)
-        if m:
-            result.append(_IPA_TO_RFE[m.group(0)])
-            pos = m.end()
-        else:
-            out = _unknown(ipa[pos], pos, "rfe", errors)
-            if out:
-                result.append(out)
-            pos += 1
-    return "".join(result)
-
+    return _transcode(ipa, _IPA_RFE_RE, _IPA_TO_RFE, "rfe", errors)
 
 
 # ---------------------------------------------------------------------------
@@ -1257,6 +1232,25 @@ _HALABI_MULTI = ("_dbl_", "_+_", "_sil_", "_eos_", "_pad_",
                  "aaaa", "aa", "ii", "uu", "AA", "II", "UU")
 
 
+_MISAKI_TO_IPA = str.maketrans({
+    "A": "eɪ", "I": "aɪ", "W": "aʊ", "Y": "ɔɪ", "O": "oʊ", "Q": "əʊ",
+    "ʤ": "dʒ", "ʧ": "tʃ", "ᵊ": "ə",
+})
+
+
+def misaki_to_ipa(misaki: str, errors: str = "pass") -> str:
+    """Expand the misaki codes of *misaki* to IPA; every other symbol is IPA
+    already and stays as it is.
+
+    >>> misaki_to_ipa("hˈA ʤˈʌmp")
+    'hˈeɪ dʒˈʌmp'
+
+    *errors* is accepted for the conversion graph and has no effect: misaki
+    has no symbol outside this table and IPA.
+    """
+    return misaki.translate(_MISAKI_TO_IPA)
+
+
 def _tokenize_halabi(text: str) -> list[str]:
     tokens = []
     i = 0
@@ -1306,15 +1300,11 @@ def halabi_to_ipa(halabi: str | list[str], errors: str = "pass") -> str:
                     and not out[-1].endswith("ː"):
                 out[-1] += "ː"
             continue
-        if tok == "_sil_":
+        if tok in ("_sil_", "_+_"):
             out.append(" ")
             last_tok = None
             continue
         if tok in ("_eos_", "_pad_"):
-            last_tok = None
-            continue
-        if tok == "_+_":
-            out.append(" ")
             last_tok = None
             continue
         if tok == "<":
@@ -1410,44 +1400,16 @@ def convert(text: str, src: str | Notation, dst: str | Notation,
             errors: str = "pass") -> str:
     """Convert *text* from *src* notation to *dst* notation.
 
-    Supported pairs (direct):
-      - ``arpa`` ↔ ``ipa``
-      - ``x-sampa`` ↔ ``ipa``
-      - ``lexique`` ↔ ``ipa``
-      - ``buckwalter`` ↔ ``arabic``
-
-    Indirect pairs route through IPA (e.g. ``arpa`` → ``x-sampa`` goes
-    ``arpa`` → ``ipa`` → ``x-sampa``).
-
-    Parameters
-    ----------
-    text:
-        Input string.
-    src:
-        Source notation (``Notation`` member or its string value).
-    dst:
-        Target notation.
-
-    Returns
-    -------
-    str
-        Converted string.
-
-    Raises
-    ------
-    ValueError
-        When *src* or *dst* is not a recognised ``Notation`` value, or when
-        the requested conversion path is not supported.
+    *src* and *dst* are :class:`Notation` members or their values.  The route
+    comes from :data:`scriptconv.graph.DEFAULT_GRAPH`: a notation pair goes
+    through IPA (``arpa`` → ``ipa`` → ``x-sampa``), Buckwalter ↔ Arabic is
+    direct.  Raises :class:`ValueError` for an unknown notation or a pair with
+    no route.
     """
     src = Notation(src)
     dst = Notation(dst)
-
     if src == dst:
         return text
-
-    # Routing lives on the shared conversion graph; the notation tables below
-    # are registered there as edges (IPA-pivot pairs route through the "ipa"
-    # node, Buckwalter <-> Arabic is a direct edge).
     from scriptconv.graph import DEFAULT_GRAPH
     try:
         return DEFAULT_GRAPH.convert(text, src.value, dst.value, errors=errors)
@@ -1467,6 +1429,7 @@ def convert(text: str, src: str | Notation, dst: str | Notation,
 
 _TO_IPA: dict[Notation, "callable"] = {
     Notation.HALABI: halabi_to_ipa,
+    Notation.MISAKI: misaki_to_ipa,
     Notation.ARPA: arpa_to_ipa,
     Notation.XSAMPA: xsampa_to_ipa,
     Notation.LEXIQUE: lexique_to_ipa,
@@ -1498,12 +1461,8 @@ _NOTATION_VALUES = {n.value for n in Notation}
 def can_convert(src: str | Notation, dst: str | Notation) -> bool:
     """Return ``True`` if a conversion from *src* to *dst* is supported.
 
-    Parameters
-    ----------
-    src:
-        Source notation.
-    dst:
-        Target notation.
+    A notation to itself is no conversion and gives ``False``, unlike
+    :meth:`scriptconv.graph.ConversionGraph.can_convert`.
 
     Examples
     --------
@@ -1517,17 +1476,13 @@ def can_convert(src: str | Notation, dst: str | Notation) -> bool:
     src = Notation(src)
     dst = Notation(dst)
     if src == dst:
-        # historical contract: identity is not a "conversion" here, unlike
-        # graph.ConversionGraph.can_convert (which deliberately returns True
-        # for identity — an empty route is a valid, zero-cost conversion there)
         return False
     from scriptconv.graph import DEFAULT_GRAPH
     try:
         route = DEFAULT_GRAPH.route(src.value, dst.value)
     except ValueError:
         return False
-    # only notation-to-notation reachability counts here; guard against paths
-    # that would leave the notation node set (none exist today, cheap to keep)
+    # Only a route that stays on notation nodes counts.
     return all(e.src in _NOTATION_VALUES and e.dst in _NOTATION_VALUES
                for e in route)
 
@@ -1623,6 +1578,11 @@ NOTATION_INFO: dict[Notation, NotationInfo] = {
         reference="Phonetic alphabet of Nawar Halabi's Arabic-Phonetiser "
                   "(mantoq G2P inventory); one-directional to IPA",
     ),
+    Notation.MISAKI: NotationInfo(
+        Notation.MISAKI, lossless_to_ipa=False, lossless_from_ipa=False,
+        token_separated=False,
+        reference="hexgrad/misaki EN_PHONES.md; one-directional to IPA",
+    ),
     Notation.BUCKWALTER: NotationInfo(
         Notation.BUCKWALTER, lossless_to_ipa=False, lossless_from_ipa=False,
         token_separated=False,
@@ -1635,29 +1595,14 @@ NOTATION_INFO: dict[Notation, NotationInfo] = {
 # convert_batch — line-by-line generator
 # ---------------------------------------------------------------------------
 
-
 def convert_batch(
     lines: Iterable[str],
     src: str | Notation,
     dst: str | Notation,
 ) -> Generator[str, None, None]:
-    """Convert each line from *src* to *dst* notation, yielding results.
+    """Convert each line from *src* to *dst* notation.
 
-    Blank lines are yielded unchanged (no conversion attempted).
-
-    Parameters
-    ----------
-    lines:
-        Iterable of input strings (e.g. file lines).
-    src:
-        Source notation.
-    dst:
-        Target notation.
-
-    Yields
-    ------
-    str
-        Converted string for each input line.
+    Line endings are stripped; a blank line is yielded empty.
 
     Examples
     --------
@@ -1678,42 +1623,21 @@ def convert_batch(
 # looks_like_ipa — heuristic notation detection
 # ---------------------------------------------------------------------------
 
-# Unicode blocks/characters that are distinctive to IPA transcription.  Basic
-# Latin letters (p, a, t, …) and the Greek letters IPA borrows (β, θ, χ) are
-# deliberately excluded: they are indistinguishable from ordinary Latin/Greek
-# text, so they carry no signal.
-_IPA_DISTINCTIVE_RANGES = (
-    (0x0250, 0x02AF),  # IPA Extensions
-    (0x02B0, 0x02FF),  # Spacing Modifier Letters (ˈ ˌ ː ˑ ʰ ʲ …)
-    (0x0363, 0x036F),  # Combining diacritics used in IPA
-    (0x1D00, 0x1D7F),  # Phonetic Extensions
-    (0x1D80, 0x1DBF),  # Phonetic Extensions Supplement
-)
-# Individual combining marks common in IPA (nasalisation, syllabicity, etc.).
-_IPA_DISTINCTIVE_CHARS = frozenset("̩̪̥̃̊͜͡")
-
-
-def _is_ipa_distinctive(ch: str) -> bool:
-    cp = ord(ch)
-    if ch in _IPA_DISTINCTIVE_CHARS:
-        return True
-    return any(lo <= cp <= hi for lo, hi in _IPA_DISTINCTIVE_RANGES)
+# Characters distinctive to IPA transcription: IPA Extensions and Spacing
+# Modifier Letters (U+0250-02FF), combining diacritics U+0363-036F, Phonetic
+# Extensions and its Supplement (U+1D00-1DBF), and the combining marks IPA uses
+# for nasalisation, syllabicity and ties.  Basic Latin letters and the Greek
+# letters IPA borrows (β, θ, χ) carry no signal: ordinary text has them too.
+_IPA_DISTINCTIVE = re.compile("[\u0250-\u02ff\u0363-\u036f\u1d00-\u1dbf"
+                              "\u0303\u0329\u032a\u0325\u030a\u0361\u035c]")
 
 
 def looks_like_ipa(text: str) -> bool:
-    """Heuristically decide whether *text* is an IPA transcription.
+    """Whether *text* holds a character distinctive to IPA (``ɑ``, ``ʃ``, ``ː``, ``ˈ``, nasalisation).
 
-    Returns ``True`` when *text* contains at least one character that is
-    distinctive to IPA — from the IPA Extensions, Spacing Modifier Letters,
-    or Phonetic Extensions blocks, or an IPA combining diacritic (e.g.
-    ``ɑ``, ``ʃ``, ``ː``, ``ˈ``, nasalisation).
-
-    This is a positive-signal heuristic, not a classifier: a transcription
-    written only with characters IPA shares with the Latin alphabet
-    (``"pat"``, ``"bad"``) has no distinctive marker and returns ``False``.
-    It cannot be otherwise — those characters are the same codepoints as
-    ordinary text. Use it to *guard* against feeding IPA where orthography
-    is expected, not to prove a string is not IPA.
+    A transcription written only with letters that IPA shares with Latin
+    (``"pat"``) gives ``False``, so use this to guard against IPA where
+    orthography is expected, not to prove that a string is not IPA.
 
     Examples
     --------
@@ -1724,4 +1648,4 @@ def looks_like_ipa(text: str) -> bool:
     >>> looks_like_ipa("hello")
     False
     """
-    return any(_is_ipa_distinctive(ch) for ch in text)
+    return _IPA_DISTINCTIVE.search(text) is not None

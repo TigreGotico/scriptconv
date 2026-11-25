@@ -1,12 +1,20 @@
+"""English phonemizers: DeepPhonemizer, OpenPhonemizer and g2p_en."""
 from scriptconv.notation import _ARPA_TO_IPA as arpa_to_ipa_lookup
-from scriptconv.phonemizers.base import BasePhonemizer
+from scriptconv.phonemizers.base import BasePhonemizer, ModelUnavailableError
 from scriptconv.phonemizers.enums import Alphabet
 
 
+def _nltk_resource_present(nltk, resource):
+    """True when NLTK finds *resource* on disk, without downloading it."""
+    try:
+        nltk.data.find(resource)
+    except LookupError:
+        return False
+    return True
+
+
 class DeepPhonemizer(BasePhonemizer):
-    """
-    https://github.com/spring-media/DeepPhonemizer
-    """
+    """https://github.com/spring-media/DeepPhonemizer"""
 
     engine_distribution = "deep-phonemizer"
     MODELS = {
@@ -28,10 +36,10 @@ class DeepPhonemizer(BasePhonemizer):
                 "phonemizer. Install them with 'pip install deep-phonemizer torch' "
                 "(or 'pip install scriptconv[en-phonemizers]')."
             ) from e
-        # needed for latest torch version
-        torch.serialization.add_safe_globals([dp.preprocessing.text.Preprocessor])
-        torch.serialization.add_safe_globals([dp.preprocessing.text.LanguageTokenizer])
-        torch.serialization.add_safe_globals([dp.preprocessing.text.SequenceTokenizer])
+        # torch.load reads only the classes it allows, and the checkpoint holds these.
+        torch.serialization.add_safe_globals([dp.preprocessing.text.Preprocessor,
+                                              dp.preprocessing.text.LanguageTokenizer,
+                                              dp.preprocessing.text.SequenceTokenizer])
 
         if "ipa" in model:
             super().__init__(Alphabet.IPA)
@@ -61,42 +69,16 @@ class DeepPhonemizer(BasePhonemizer):
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
-        """
-        Validates and returns the closest supported language code.
-
-        Args:
-            target_lang (str): The language code to validate.
-
-        Returns:
-            str: The validated language code.
-
-        Raises:
-            ValueError: If the language code is unsupported.
-        """
-        # this check is here only to throw an exception if invalid language is provided
+        """The closest supported code; raises ValueError when none is close."""
         return cls.match_lang(target_lang, ['de', 'en_us'])
 
     def phonemize_string(self, text: str, lang: str) -> str:
-        """
-        Normalizes input text by applying a series of transformations
-        and returns it as a sequence of graphemes.
-
-        Parameters:
-            text (str): Input text to be converted to graphemes.
-            lang (str): The language code (ignored for grapheme phonemization,
-                        but required by BasePhonemizer).
-
-        Returns:
-            str: A normalized string of graphemes.
-        """
         lang = self.get_lang(lang)
         return self.phonemizer(text, lang)
 
 
 class OpenPhonemizer(BasePhonemizer):
-    """
-    https://github.com/NeuralVox/OpenPhonemizer
-    """
+    """https://github.com/NeuralVox/OpenPhonemizer"""
 
     engine_distribution = "openphonemizer"
 
@@ -104,7 +86,6 @@ class OpenPhonemizer(BasePhonemizer):
         try:
             from openphonemizer import OpenPhonemizer
             import torch
-            # needed for latest torch version
             import dp
         except ImportError as e:
             raise ImportError(
@@ -112,51 +93,26 @@ class OpenPhonemizer(BasePhonemizer):
                 "phonemizer. Install them with 'pip install openphonemizer torch' "
                 "(or 'pip install scriptconv[en-phonemizers]')."
             ) from e
-        torch.serialization.add_safe_globals([dp.preprocessing.text.Preprocessor])
-        torch.serialization.add_safe_globals([dp.preprocessing.text.LanguageTokenizer])
-        torch.serialization.add_safe_globals([dp.preprocessing.text.SequenceTokenizer])
+        # torch.load reads only the classes it allows, and the checkpoint holds these.
+        torch.serialization.add_safe_globals([dp.preprocessing.text.Preprocessor,
+                                              dp.preprocessing.text.LanguageTokenizer,
+                                              dp.preprocessing.text.SequenceTokenizer])
 
         self.phonemizer = OpenPhonemizer()
         super().__init__(Alphabet.IPA)
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
-        """
-        Validates and returns the closest supported language code.
-
-        Args:
-            target_lang (str): The language code to validate.
-
-        Returns:
-            str: The validated language code.
-
-        Raises:
-            ValueError: If the language code is unsupported.
-        """
-        # this check is here only to throw an exception if invalid language is provided
+        """The closest supported code; raises ValueError when none is close."""
         return cls.match_lang(target_lang, ["en"])
 
     def phonemize_string(self, text: str, lang: str) -> str:
-        """
-        Normalizes input text by applying a series of transformations
-        and returns it as a sequence of graphemes.
-
-        Parameters:
-            text (str): Input text to be converted to graphemes.
-            lang (str): The language code (ignored for grapheme phonemization,
-                        but required by BasePhonemizer).
-
-        Returns:
-            str: A normalized string of graphemes.
-        """
-        lang = self.get_lang(lang)
+        self.get_lang(lang)
         return self.phonemizer(text)
 
 
 class G2PEnPhonemizer(BasePhonemizer):
-    """
-    https://github.com/Kyubyong/g2p
-    """
+    """https://github.com/Kyubyong/g2p"""
 
     engine_distribution = "g2p_en"
 
@@ -164,8 +120,33 @@ class G2PEnPhonemizer(BasePhonemizer):
         assert alphabet in [Alphabet.IPA, Alphabet.ARPA]
         try:
             import nltk
-            nltk.download('averaged_perceptron_tagger_eng')
-            nltk.download('cmudict')
+            from nltk.tag import perceptron
+        except ImportError as e:
+            raise ImportError(
+                "g2p_en is required for the G2PEn phonemizer. "
+                "Install it with 'pip install g2p_en' "
+                "(or 'pip install scriptconv[en-phonemizers]')."
+            ) from e
+        # g2p_en checks the zip form of these two resources at import and calls
+        # nltk.download when either is absent. Check them first so a build
+        # never starts a download inside the engine.
+        packages = ["averaged_perceptron_tagger"]
+        resources = ["taggers/averaged_perceptron_tagger.zip"]
+        if hasattr(perceptron, "PICKLE"):
+            resources.append(f"taggers/averaged_perceptron_tagger/{perceptron.PICKLE}")
+        else:
+            packages.append("averaged_perceptron_tagger_eng")
+            resources.append("taggers/averaged_perceptron_tagger_eng/")
+        # NLTK reads cmudict from the zip; no bare directory is required.
+        resources.append("corpora/cmudict.zip")
+        packages.append("cmudict")
+        missing = [resource for resource in resources if not _nltk_resource_present(nltk, resource)]
+        if missing:
+            raise ModelUnavailableError(
+                f"g2pen needs NLTK data on disk: {', '.join(missing)}. "
+                f"Install it with 'python -m nltk.downloader {' '.join(packages)}'."
+            )
+        try:
             from g2p_en import G2p
         except ImportError as e:
             raise ImportError(
@@ -178,36 +159,12 @@ class G2PEnPhonemizer(BasePhonemizer):
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
-        """
-        Validates and returns the closest supported language code.
-
-        Args:
-            target_lang (str): The language code to validate.
-
-        Returns:
-            str: The validated language code.
-
-        Raises:
-            ValueError: If the language code is unsupported.
-        """
-        # this check is here only to throw an exception if invalid language is provided
+        """The closest supported code; raises ValueError when none is close."""
         return cls.match_lang(target_lang, ["en"])
 
     def phonemize_string(self, text: str, lang: str) -> str:
-        """
-        Normalizes input text by applying a series of transformations
-        and returns it as a sequence of graphemes.
-
-        Parameters:
-            text (str): Input text to be converted to graphemes.
-            lang (str): The language code (ignored for grapheme phonemization,
-                        but required by BasePhonemizer).
-
-        Returns:
-            str: A normalized string of graphemes.
-        """
-        lang = self.get_lang(lang)
-        # NOTE: this model returns ARPA not IPA, may need to map phonemes
+        self.get_lang(lang)
+        # g2p_en gives ARPAbet; IPA maps each symbol through the ARPABet table.
         if self.alphabet == Alphabet.ARPA:
             return self.g2p(text)
         return "".join([arpa_to_ipa_lookup.get(pho, pho) for pho in self.g2p(text)])

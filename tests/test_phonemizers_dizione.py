@@ -7,7 +7,10 @@ and ``FULL_VOWELS``, and its rule that an unstressed ``ER`` is ``ɚ``. Stress 1
 writes ``ˈ`` and stress 2 writes ``ˌ`` directly before the vowel.
 """
 import hashlib
-import shutil
+import subprocess
+import sys
+import tomllib
+from pathlib import Path
 
 import pytest
 
@@ -22,6 +25,7 @@ from scriptconv.phonemizers import (
 from scriptconv.phonemizers._thirdparty import dizione
 from scriptconv.phonemizers._thirdparty.dizione.symbols import SYMBOL_TO_ID, Phonemized
 from scriptconv.phonemizers.dizione import DATA_DIR, DizionePhonemizer, _token_clauses
+from scriptconv.phonemizers.registry import PHONEMIZER_REGISTRY
 
 
 @pytest.fixture(scope="module")
@@ -254,56 +258,9 @@ class TestOverrides:
 
 
 class TestIdentity:
-    def test_the_revision_is_dizione_s_build_fingerprint(self, phonemizer, data_dir):
-        identity = phonemizer.identity("en-us")
-        assert (identity.backend, identity.lang) == ("dizione", "en-US")
-        assert identity.revision == dizione.identity(data_dir)["fingerprint"]
-        assert identity.revision == \
-            "f41b6f9dac16c0b3ac492e255fcbebf6b73f737b20a62dfba7576ceb208f9190"
-
-    def test_the_revision_hashes_the_given_data(self, phonemizer, tmp_path):
-        data = tmp_path / "built"
-        shutil.copytree(DATA_DIR, data)
-        with open(data / "g2p.json", "a", encoding="utf-8") as f:
-            f.write("\n")
-        revision = DizionePhonemizer(data_dir=data).identity("en-US").revision
-        assert revision == dizione.identity(data)["fingerprint"]
-        assert revision != phonemizer.identity("en-US").revision
-
-    def test_overrides_change_the_revision(self, phonemizer, data_dir):
-        plain = phonemizer.identity("en-US").revision
-        first = DizionePhonemizer(data_dir=data_dir, overrides={"cat": "K IH1 T", "dog": "D AA1 G"})
-        same = DizionePhonemizer(data_dir=data_dir, overrides={"dog": "D AA1 G", "cat": "K IH1 T"})
-        other = DizionePhonemizer(data_dir=data_dir, overrides={"cat": "K AE1 T"})
-        revisions = {first.identity("en-US").revision, other.identity("en-US").revision, plain}
-        assert len(revisions) == 3
-        assert same.identity("en-US").revision == first.identity("en-US").revision
-
-    def test_a_taught_name_changes_the_revision(self, phonemizer, data_dir):
-        name = DizionePhonemizer(data_dir=data_dir,
-                                 overrides={"tung tung sahur": "T UW1 NG | T UW2 NG | S AA0 HH UH1 R"})
-        assert name.identity("en-US").revision != phonemizer.identity("en-US").revision
-        other = DizionePhonemizer(data_dir=data_dir,
-                                  overrides={"tung tung sahur": "T UW1 NG | T UW1 NG | S AA0 HH UH1 R"})
-        assert other.identity("en-US").revision != name.identity("en-US").revision
-
-    def test_overrides_keep_the_data_in_the_revision(self, data_dir, tmp_path):
-        data = tmp_path / "built"
-        shutil.copytree(DATA_DIR, data)
-        with open(data / "g2p.json", "a", encoding="utf-8") as f:
-            f.write("\n")
-        overrides = {"cat": "K IH1 T"}
-        assert DizionePhonemizer(data_dir=data, overrides=overrides).identity("en-US").revision != \
-            DizionePhonemizer(data_dir=data_dir, overrides=overrides).identity("en-US").revision
-
-    def test_the_overrides_file_of_the_environment_changes_the_revision(self, phonemizer, data_dir,
-                                                                        monkeypatch, tmp_path):
-        table = tmp_path / "overrides.txt"
-        table.write_text("ship  SH AA1 P\n", encoding="utf-8")
-        monkeypatch.setenv("DIZIONE_OVERRIDES", str(table))
-        taught = DizionePhonemizer(data_dir=data_dir)
-        assert taught.phonemize_string("ship", "en-US") == "ʃˈɑːp"
-        assert taught.identity("en-US").revision != phonemizer.identity("en-US").revision
+    def test_the_revision_is_the_same_for_two_instances(self, phonemizer, data_dir):
+        assert phonemizer.identity("en-US").revision is not None
+        assert DizionePhonemizer(data_dir=data_dir).identity("en-US") == phonemizer.identity("en-US")
 
     def test_the_token_convention_is_version_4(self):
         assert dizione.VERSION == 4
@@ -346,3 +303,20 @@ def test_the_package_holds_the_pinned_data():
     found = {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
              for path in DATA_DIR.iterdir() if path.is_file()}
     assert found == BUILT
+
+
+def test_without_numpy_the_import_names_the_extra_that_installs_it():
+    code = ("import sys; sys.modules['numpy'] = None\n"
+            "from scriptconv.phonemizers.dizione import DizionePhonemizer")
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
+                            cwd=Path(__file__).resolve().parents[1])
+    assert result.returncode != 0
+    assert "ImportError: numpy is required for the dizione phonemizer" in result.stderr
+    assert "scriptconv[en-phonemizers]" in result.stderr
+
+
+def test_the_extra_that_the_registry_names_for_dizione_holds_numpy():
+    extra = PHONEMIZER_REGISTRY[Phonemizer.DIZIONE][2]
+    pyproject = tomllib.loads((Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(encoding="utf-8"))
+    requirements = pyproject["project"]["optional-dependencies"][extra]
+    assert any(requirement.split(">")[0].split("<")[0].split("=")[0].strip() == "numpy" for requirement in requirements)

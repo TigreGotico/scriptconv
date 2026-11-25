@@ -32,8 +32,15 @@ class TestEnums(unittest.TestCase):
         self.assertEqual(Phonemizer.MATOUB_KAB.value, "matoub_kab")
         self.assertEqual(Phonemizer.DIZIONE.value, "dizione")
         self.assertEqual(Phonemizer.G2PW.value, "g2pw")
-        self.assertEqual(len(list(Phonemizer)), 52)  # +HALABI, +IQRA, +GHANA_G2P, +PHONETISAURUS, +MATOUB_KAB, +DIZIONE, +G2PW, +F5TTS_CHAR, +F5TTS_PINYIN
-        self.assertEqual(len(list(Alphabet)), 23)  # incl. HALABI, VOSK, AFRICA_G2P
+        self.assertEqual(Phonemizer.LEOKANI.value, "leokani")
+        self.assertEqual(Phonemizer.NEMO_IPA.value, "nemo_ipa")
+        self.assertEqual(Phonemizer.KOLOKWA.value, "kolokwa")
+        self.assertEqual(Phonemizer.ESPEAK_LT_ACCENT.value, "espeak_lt_accent")
+        self.assertEqual(Phonemizer.HEBREW_IPA.value, "hebrew_ipa")
+        self.assertEqual(Phonemizer.OPENJTALK_PROSODY.value, "openjtalk_prosody")
+        self.assertEqual(Phonemizer.TLTK.value, "tltk")
+        self.assertEqual(len(list(Phonemizer)), 59)  # +HALABI, +IQRA, +GHANA_G2P, +PHONETISAURUS, +MATOUB_KAB, +DIZIONE, +G2PW, +F5TTS_CHAR, +F5TTS_PINYIN, +LEOKANI, +KOLOKWA, +ESPEAK_LT_ACCENT, +HEBREW_IPA, +OPENJTALK_PROSODY, +TLTK, +NEMO_IPA
+        self.assertEqual(len(list(Alphabet)), 24)  # incl. HALABI, VOSK, AFRICA_G2P, MISAKI
 
 
 class TestRegistryCompleteness(unittest.TestCase):
@@ -57,6 +64,18 @@ class TestRegistryCompleteness(unittest.TestCase):
                                    UnicodeCodepointPhonemizer))
         self.assertTrue(issubclass(get_phonemizer_class(Phonemizer.GRAPHEMES),
                                    GraphemePhonemizer))
+
+
+class LangFlagBackend(BasePhonemizer):
+    """Writes the espeak-ng ``(lang)`` flags that the base front end strips."""
+
+    def phonemize_string(self, text, lang):
+        return "(en)a(pt)"
+
+
+class TestEspeakLanguageFlags(unittest.TestCase):
+    def test_lang_flags_are_dropped_from_phonemes(self):
+        self.assertEqual(LangFlagBackend().phonemize("a", "en"), [["a"]])
 
 
 class TestBaseContract(unittest.TestCase):
@@ -436,3 +455,33 @@ class TestGraphemeHyphen(unittest.TestCase):
         self.assertEqual(g.phonemize_string("-kum ayibo-", "xh"), "kum ayibo")
         self.assertEqual(g.phonemize_string("-kum", "xh"), "kum")
         self.assertEqual(g.phonemize_string("10-20", "en"), "10 20")
+
+
+class TestRemovePunctuationHyphensAndDashes(unittest.TestCase):
+    """tts-punctuation: "A hyphen between two letters is part of the word",
+    and "A hyphen with a space next to it, or at a word edge, is no part of a
+    word: it gives no symbol, and a space separates the two words." A dash is
+    no letter of a word either. The hyphen forms are the characters that
+    Unicode names HYPHEN, NON-BREAKING HYPHEN, SMALL HYPHEN-MINUS and
+    FULLWIDTH HYPHEN-MINUS."""
+
+    def test_every_form_of_the_hyphen_between_two_letters_is_a_hyphen(self):
+        for hyphen in "‐‑﹣－":
+            with self.subTest(hyphen=hex(ord(hyphen))):
+                self.assertEqual(BasePhonemizer.remove_punctuation(f"guarda{hyphen}chuva."), "guarda-chuva")
+
+    def test_a_dash_between_two_letters_is_a_space(self):
+        self.assertEqual(BasePhonemizer.remove_punctuation("Lisboa–Porto."), "Lisboa Porto")
+        self.assertEqual(BasePhonemizer.remove_punctuation("sim—não"), "sim não")
+
+    def test_a_hyphen_between_a_letter_and_a_digit_is_a_space(self):
+        self.assertEqual(BasePhonemizer.remove_punctuation("COVID-19 chegou."), "COVID 19 chegou")
+        self.assertEqual(BasePhonemizer.remove_punctuation("3-D"), "3 D")
+        self.assertEqual(BasePhonemizer.remove_punctuation("COVID–19"), "COVID 19")
+
+    def test_a_mark_between_two_digits_stays(self):
+        self.assertEqual(BasePhonemizer.remove_punctuation("1139-1185"), "1139-1185")
+        self.assertEqual(BasePhonemizer.remove_punctuation("1139–1185"), "1139–1185")
+
+    def test_the_grapheme_backend_reads_the_hyphen_at_a_digit_as_a_space(self):
+        self.assertEqual(GraphemePhonemizer().phonemize_to_list("COVID-19", "en"), list("covid 19"))

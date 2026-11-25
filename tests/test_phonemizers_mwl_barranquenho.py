@@ -10,6 +10,8 @@ import sys
 import tomllib
 from pathlib import Path
 
+from importlib import metadata
+
 import pytest
 
 from scriptconv.phonemizers import Phonemizer, get_phonemizer
@@ -73,9 +75,8 @@ def test_identity_names_the_orthography2ipa_engine(phonemizer, lang, spec, backe
     engine = Orthography2IPAPhonemizer().identity(spec)
     assert (identity.distribution, identity.version) == (engine.distribution, engine.version)
     assert (identity.backend, identity.lang) == (backend, lang)
-    # the wrapper hashes its own code too, so its revision is its own
-    assert identity.revision.startswith("sc1:") and engine.revision.startswith("sc1:")
-    assert identity.revision != engine.revision
+    assert identity.revision == engine.revision == "scriptconv=={};orthography2ipa=={};o2i-lexicons=={}".format(
+        *map(metadata.version, ("scriptconv", "orthography2ipa", "o2i-lexicons")))
 
 
 def test_no_extra_installs_an_archived_package():

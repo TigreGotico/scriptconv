@@ -10,7 +10,7 @@ import re
 import sys
 import time
 import tomllib
-from importlib.metadata import metadata
+from importlib.metadata import metadata, version as metadata_version
 from pathlib import Path
 
 import pytest
@@ -27,6 +27,7 @@ from scriptconv.phonemizers import (
     StageError,
     UnreadTextError,
     UnsupportedLanguageError,
+    Segment,
     get_phonemizer,
     phonemize,
 )
@@ -198,6 +199,12 @@ class TestSegmentText:
         frontend = build(Echo(), stages=Stages(diacritize=False))
         assert [s.text for s in frontend.segments(text, Stages(chunk=chunk))] == expected
 
+    def test_a_chunk_value_that_is_no_chunk_names_every_chunk(self):
+        with pytest.raises(ValueError) as error:
+            Stages(chunk="word")
+        assert "'word'" in str(error.value)
+        assert all(repr(chunk.value) in str(error.value) for chunk in Chunk)
+
     def test_a_sentence_the_backend_splits_does_not_repeat_its_text(self):
         class Splitter(Echo):
             def phonemize_lazy(self, text, lang):
@@ -224,7 +231,7 @@ class TestSegmentText:
         (Chunk.SENTENCE, "اقرأ [[h a l o]] الآن.", ["اقرأ [[h a l o]]", "الآن."]),
         (Chunk.CLAUSE, "اقرأ [[h a l o]] الآن.", ["اقرأ [[h a l o]]", "الآن."]),
         (Chunk.PARAGRAPH, "اقرأ [[h a l o]] الآن.", ["اقرأ [[h a l o]] الآن."]),
-        (Chunk.SENTENCE, "ab [[xy]] cd. ef.", ["ab [[xy]]", "cd.", "ef."]),
+        (Chunk.SENTENCE, "ab [[xy]] gato. ef.", ["ab [[xy]]", "gato.", "ef."]),
         (Chunk.PARAGRAPH, "ab [[xy]] cd. ef.", ["ab [[xy]] cd. ef."]),
         (Chunk.SENTENCE, "a [[x]] b [[y]] c.", ["a [[x]]", "b [[y]]", "c."]),
         (Chunk.CLAUSE, "a [[x]] b [[y]] c.", ["a [[x]]", "b [[y]]", "c."]),
@@ -245,6 +252,20 @@ class TestSegmentText:
     def test_a_block_keeps_the_staged_words_before_it(self, chunk, text, expected):
         frontend = build(Echo(), stages=Stages(diacritize=False))
         assert [s.text for s in frontend.segments(text, Stages(chunk=chunk))] == expected
+
+    # The text of a chunk joins the texts of its pieces. A join that adds each
+    # text to the text joined so far copies all of it again at each piece, so
+    # the copies grow with the square of the number of pieces. A join that
+    # collects the texts and joins them once copies no characters through +.
+
+    def test_the_texts_of_a_chunk_join_in_linear_time(self, monkeypatch):
+        monkeypatch.setattr(Joined, "copied", 0)
+        # every second piece follows whitespace in the text
+        pieces = [frontend_module._Piece(["a"], text=Joined("ab"), spaced=bool(number % 2))
+                  for number in range(10000)]
+        joined = frontend_module._join(pieces, Segment((" ",)))
+        assert joined.text == "ab" + " abab" * 4999 + " ab"
+        assert Joined.copied <= 2 * len(joined.text), Joined.copied
 
     def test_the_words_before_a_block_are_the_staged_text(self):
         frontend = build(Echo(), normalizer=lambda text, lang: text.upper(),
@@ -346,7 +367,7 @@ class TestInlineBlocks:
         ("Tu viens [[x]] ?", "Tu viens x ?"),
         ("Tu viens [[x]] ?", "Tu viens x ?"),
         ("[[x]] , b", "x , b"),
-        ("Um [[x]]. Dois; três.", "Um x. Dois; três."),
+        ("Um [[gato]]. Dois; três.", "Um gato. Dois; três."),
         ("[[x]] ; [[y]] !", "x ; y !"),
         ("[[x]],[[y]]", "x,y"),
         ("[[x]].[[y]]", "x.y"),
@@ -397,7 +418,7 @@ class TestInlineBlocks:
 
     @pytest.mark.parametrize("text, lazy, flat", [
         ("Olá [[x]] sim. [[y]], b.",
-         ["Olá", "sim.", "a, b.", ", b."], ["Olá", "sim.", "a, b.", ", b."]),
+         ["Olá", "sim.", "casa, b.", ", b."], ["Olá", "sim.", "casa, b.", ", b."]),
         # a digit gives the clause a word, as a letter does
         ("Olá [[x]] 2 gatos, b.", ["Olá", "2 gatos, b."], ["Olá", "2 gatos, b."]),
         # no text after the block gives no mark
@@ -545,11 +566,11 @@ class TestInlineBlocks:
 
     @pytest.mark.parametrize("keep", [True, False])
     @pytest.mark.parametrize("text", [
-        "[[x]]. [[?]]... vem.",
-        "[[x]]. [[?]] vem.",
-        "[[x]]. [[!]] vem.",
+        "[[gato]]. [[?]]... vem.",
+        "[[gato]]. [[?]] vem.",
+        "[[gato]]. [[!]] vem.",
         "Sim. [[,]] vem.",
-        "[[x]]? [[?]]. vem.",
+        "[[gato]]? [[?]]. vem.",
         "Olá [[x]] [[?]] sim.",
         "Sim [[x.]]...",
         "Sim [[x.]][[]] vem.",
@@ -559,10 +580,10 @@ class TestInlineBlocks:
                                                keep_punctuation=keep,
                                                stages=Stages(diacritize=False)))
         symbols = re.search(r"\[\[([^\]]*\W)\]\]", text)[1]
-        # "k" stands for that block in the plain text, and its symbols take its place
-        plain = (text.replace(f"[[{symbols}]]", "k").replace("[[]]", "")
+        # "já" stands for that block in the plain text, and its symbols take its place
+        plain = (text.replace(f"[[{symbols}]]", "já").replace("[[]]", "")
                  .replace("[[", "").replace("]]", ""))
-        expected = list("".join(frontend.phonemize_flat(plain)).replace("k", symbols))
+        expected = list("".join(frontend.phonemize_flat(plain)).replace("já", symbols))
         assert frontend.phonemize_flat(text) == expected
         assert join_sentences(frontend.phonemize(text), keep) == expected
 
@@ -572,6 +593,27 @@ class TestInlineBlocks:
         frontend = TextFrontend(FrontendConfig("pt-PT", Phonemizer.GRAPHEMES, keep_punctuation=keep,
                                                stages=Stages(diacritize=False)))
         assert frontend.phonemize_flat("Sim [[x.]]-vem.") == list(expected)
+
+    # tts-punctuation: "A hyphen with a space next to it, or at a word edge,
+    # is no part of a word: it gives no symbol, and a space separates the two
+    # words." A hyphen next to a block stands at the edge of a word.
+    @pytest.mark.parametrize("keep, expected", [(True, "sim vem xy."), (False, "sim vem xy")])
+    def test_a_hyphen_before_a_block_is_no_letter_of_a_word(self, keep, expected):
+        frontend = TextFrontend(FrontendConfig("pt-PT", Phonemizer.GRAPHEMES, keep_punctuation=keep,
+                                               stages=Stages(diacritize=False)))
+        assert frontend.phonemize_flat("Sim vem-[[xy]].") == list(expected)
+        assert frontend.phonemize("Sim vem-[[xy]].") == [list(expected)]
+
+    # tts-punctuation: a "!" or "?" between two letters "still separates two
+    # words, so it becomes a space". The block is the word after the mark.
+    @pytest.mark.parametrize("keep", [True, False])
+    @pytest.mark.parametrize("text", ["Sim![[rui]]", "Sim?[[rui]] vem.", "Sim?![[rui]] vem."])
+    def test_a_mark_that_separates_two_words_before_a_block_is_a_space(self, keep, text):
+        frontend = TextFrontend(FrontendConfig("pt-PT", Phonemizer.GRAPHEMES, keep_punctuation=keep,
+                                               stages=Stages(diacritize=False)))
+        plain = text.replace("[[", "").replace("]]", "")
+        assert "".join(frontend.phonemize_flat(plain)).startswith("sim rui")
+        assert frontend.phonemize_flat(text) == frontend.phonemize_flat(plain)
 
     # A backend can write a phoneme with the character of a clause symbol, as
     # X-SAMPA writes ":" for length and "?" for a glottal stop. That phoneme
@@ -921,8 +963,8 @@ class TestFailurePolicy:
 class TestBackends:
     def test_grapheme_and_unicode_backends_build_without_get_lang(self):
         graphemes = TextFrontend(FrontendConfig("xx-Test", Phonemizer.GRAPHEMES))
-        assert graphemes.phonemize("Ab-c. Dé!", Stages(diacritize=False)) == [
-            ["a", "b", "-", "c"], ["d", "é"]]
+        assert graphemes.phonemize("Pô-lo. Dé!", Stages(diacritize=False)) == [
+            ["p", "ô", "-", "l", "o"], ["d", "é"]]
         codepoints = TextFrontend(FrontendConfig("xx-Test", Phonemizer.UNICODE))
         assert codepoints.phonemize("Dé", Stages(diacritize=False)) == [["D", "e", "́"]]
 
@@ -1009,8 +1051,8 @@ class TestBackends:
     def test_identity_names_the_backend_and_the_language(self):
         frontend = TextFrontend(FrontendConfig("pt-PT", Phonemizer.UNICODE))
         identity = frontend.identity()
-        assert identity.revision.startswith("sc1:")
-        assert identity.revision != UnicodeCodepointPhonemizer().identity("pt-PT").revision
+        assert identity.revision == f"scriptconv=={metadata_version('scriptconv')}"
+        assert identity.revision == UnicodeCodepointPhonemizer().identity("pt-PT").revision
         assert identity == PhonemizerIdentity(
             "unicode", "scriptconv", VERSION_STR, "pt-PT", identity.revision, frontend_module.FRONTEND_VERSION)
         reference = TextFrontend(FrontendConfig("pt-PT", Phonemizer.UNICODE, stages=Stages(lang="es")))

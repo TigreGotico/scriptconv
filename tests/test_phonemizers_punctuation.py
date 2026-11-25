@@ -11,6 +11,8 @@ The espeak tests that read the phonemes are in scriptconv-copyleft, with the
 espeak wrapper. The one here checks that the registry sets the flag on it.
 """
 import re
+import subprocess
+import sys
 import unicodedata
 
 import pytest
@@ -269,6 +271,9 @@ class TestWordsStayApart:
         # every mark that the clause table reads as "?" counts
         ("graphemes", "نعم؟لا", "نعم لا"),
         ("unicode", "نعم؟لا", "نعم لا"),
+        # whitespace after a full-width mark keeps a space
+        ("graphemes", "你好！ 我们走。", "你好 我们走"),
+        ("unicode", "你好！ 我们走。", "你好 我们走"),
     ])
     def test_words_stay_apart(self, backend, text, expected):
         phonemizer = self.kept(backend)
@@ -331,3 +336,35 @@ class TestSplitClauses:
     def test_split(self, sentence, clauses):
         from scriptconv.phonemizers.base import split_clauses
         assert split_clauses(sentence) == clauses
+
+    @staticmethod
+    def _run_within(code, seconds=60):
+        # A child process, because a timeout cannot stop the regex engine inside the
+        # test process. One million marks take milliseconds in linear time, and
+        # minutes in quadratic time.
+        result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
+                                timeout=seconds)
+        assert result.returncode == 0, result.stderr
+        return result.stdout.strip()
+
+    def test_a_long_run_of_dots_with_no_space_after_it_is_one_clause(self):
+        code = ("from scriptconv.phonemizers.base import split_clauses\n"
+                "s = 'a' + '.' * 1_000_000 + 'b'\n"
+                "print(split_clauses(s) == [(s, None)])")
+        assert self._run_within(code) == "True"
+
+    def test_a_long_run_of_dots_before_a_space_ends_a_clause(self):
+        code = ("from scriptconv.phonemizers.base import split_clauses\n"
+                "print(split_clauses('a' + '.' * 1_000_000 + ' b') == [('a', None), (' b', None)])")
+        assert self._run_within(code) == "True"
+
+    def test_a_long_run_of_marks_that_only_ends_with_a_break_ends_a_clause(self):
+        code = ("from scriptconv.phonemizers.base import split_clauses\n"
+                "s = 'a' + '\"' * 1_000_000 + ', b'\n"
+                "print(split_clauses(s) == [('a' + '\"' * 1_000_000, ','), (' b', None)])")
+        assert self._run_within(code) == "True"
+
+    def test_many_clause_breaks_split_in_linear_time(self):
+        code = ("from scriptconv.frontend import _clauses\n"
+                "print(len(_clauses('a, ' * 300_000)))")
+        assert self._run_within(code) == "300001"

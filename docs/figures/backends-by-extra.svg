@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 754" width="720" height="754" role="img" aria-labelledby="t d">
+<title id="t">Phonemizer backends by extra and package</title>
+<desc id="d">59 backends in 26 extras. By package: scriptconv 35, scriptconv-copyleft 18, scriptconv-nonfree 6. The largest extras are zh-phonemizers 7, en-phonemizers 6, misaki 6, phonemizers 5, ar-phonemizers 4.</desc>
+<rect x="16" y="14" width="16" height="16" fill="#4C8DD6"/>
+<text x="40" y="28" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">scriptconv (35)</text>
+<rect x="231" y="14" width="16" height="16" fill="#E0883A"/>
+<text x="255" y="28" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">scriptconv-copyleft (18)</text>
+<rect x="446" y="14" width="16" height="16" fill="#A66CC9"/>
+<text x="470" y="28" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">scriptconv-nonfree (6)</text>
+<line x1="190" y1="44" x2="190" y2="732" stroke="#80808055"/>
+<text x="190" y="746" text-anchor="middle" fill="#808080" font-family="sans-serif" font-size="15">0</text>
+<line x1="242" y1="44" x2="242" y2="732" stroke="#80808055"/>
+<text x="242" y="746" text-anchor="middle" fill="#808080" font-family="sans-serif" font-size="15">1</text>
+<line x1="294" y1="44" x2="294" y2="732" stroke="#80808055"/>
+<text x="294" y="746" text-anchor="middle" fill="#808080" font-family="sans-serif" font-size="15">2</text>
+<line x1="346" y1="44" x2="346" y2="732" stroke="#80808055"/>
+<text x="346" y="746" text-anchor="middle" fill="#808080" font-family="sans-serif" font-size="15">3</text>
+<line x1="398" y1="44" x2="398" y2="732" stroke="#80808055"/>
+<text x="398" y="746" text-anchor="middle" fill="#808080" font-family="sans-serif" font-size="15">4</text>
+<line x1="450" y1="44" x2="450" y2="732" stroke="#80808055"/>
+<text x="450" y="746" text-anchor="middle" fill="#808080" font-family="sans-serif" font-size="15">5</text>
+<line x1="502" y1="44" x2="502" y2="732" stroke="#80808055"/>
+<text x="502" y="746" text-anchor="middle" fill="#808080" font-family="sans-serif" font-size="15">6</text>
+<line x1="554" y1="44" x2="554" y2="732" stroke="#80808055"/>
+<text x="554" y="746" text-anchor="middle" fill="#808080" font-family="sans-serif" font-size="15">7</text>
+<text x="180" y="69" text-anchor="end" fill="#808080" font-family="sans-serif" font-size="15">zh-phonemizers</text>
+<rect x="190" y="52" width="364" height="20" fill="#4C8DD6"/>
+<text x="562" y="69" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">7</text>
+<text x="180" y="95" text-anchor="end" fill="#808080" font-family="sans-serif" font-size="15">en-phonemizers</text>
+<rect x="190" y="78" width="312" height="20" fill="#4C8DD6"/>
+<text x="510" y="95" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">6</text>
+<text x="180" y="121" text-anchor="end" fill="#808080" font-family="sans-serif" font-size="15">misaki</text>
+<rect x="190" y="104" width="312" height="20" fill="#E0883A"/>
+<text x="510" y="121" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">6</text>
+<text x="180" y="147" text-anchor="end" fill="#808080" font-family="sans-serif" font-size="15">phonemizers</text>
+<rect x="190" y="130" width="260" height="20" fill="#4C8DD6"/>
+<text x="458" y="147" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">5</text>
+<text x="180" y="173" text-anchor="end" fill="#808080" font-family="sans-serif" font-size="15">ar-phonemizers</text>
+<rect x="190" y="156" width="52" height="20" fill="#4C8DD6"/>
+<rect x="242" y="156" width="156" height="20" fill="#A66CC9"/>
+<text x="406" y="173" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">4</text>
+<text x="180" y="199" text-anchor="end" fill="#808080" font-family="sans-serif" font-size="15">ja-phonemizers</text>
+<rect x="190" y="182" width="104" height="20" fill="#4C8DD6"/>
+<rect x="294" y="182" width="104" height="20" fill="#E0883A"/>
+<text x="406" y="199" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">4</text>
+<text x="180" y="225" text-anchor="end" fill="#808080" font-family="sans-serif" font-size="15">o2i</text>
+<rect x="190" y="208" width="156" height="20" fill="#4C8DD6"/>
+<text x="354" y="225" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">3</text>
+<text x="180" y="251" text-anchor="end" fill="#808080" font-family="sans-serif" font-size="15">byt5</text>
+<rect x="190" y="234" width="104" height="20" fill="#4C8DD6"/>
+<text x="302" y="251" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">2</text>
+<text x="180" y="277" text-anchor="end" fill="#808080" font-family="sans-serif" font-size="15">espeak</text>
+<rect x="190" y="260" width="104" height="20" fill="#E0883A"/>
+<text x="302" y="277" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">2</text>
+<text x="180" y="303" text-anchor="end" fill="#808080" font-family="sans-serif" font-size="15">eu</text>
+<rect x="190" y="286" width="52" height="20" fill="#4C8DD6"/>
+<rect x="242" y="286" width="52" height="20" fill="#E0883A"/>
+<text x="302" y="303" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">2</text>
+<text x="180" y="329" text-anchor="end" fill="#808080" font-family="sans-serif" font-size="15">he</text>
+<rect x="190" y="312" width="52" height="20" fill="#4C8DD6"/>
+<rect x="242" y="312" width="52" height="20" fill="#E0883A"/>
+<text x="302" y="329" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">2</text>
+<text x="180" y="355" text-anchor="end" fill="#808080" font-family="sans-serif" font-size="15">ko</text>
+<rect x="190" y="338" width="104" height="20" fill="#E0883A"/>
+<text x="302" y="355" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">2</text>
+<text x="180" y="381" text-anchor="end" fill="#808080" font-family="sans-serif" font-size="15">africa</text>
+<rect x="190" y="364" width="52" height="20" fill="#A66CC9"/>
+<text x="250" y="381" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">1</text>
+<text x="180" y="407" text-anchor="end" fill="#808080" font-family="sans-serif" font-size="15">epitran</text>
+<rect x="190" y="390" width="52" height="20" fill="#4C8DD6"/>
+<text x="250" y="407" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">1</text>
+<text x="180" y="433" text-anchor="end" fill="#808080" font-family="sans-serif" font-size="15">fa</text>
+<rect x="190" y="416" width="52" height="20" fill="#E0883A"/>
+<text x="250" y="433" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">1</text>
+<text x="180" y="459" text-anchor="end" fill="#808080" font-family="sans-serif" font-size="15">ghana</text>
+<rect x="190" y="442" width="52" height="20" fill="#A66CC9"/>
+<text x="250" y="459" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">1</text>
+<text x="180" y="485" text-anchor="end" fill="#808080" font-family="sans-serif" font-size="15">gl</text>
+<rect x="190" y="468" width="52" height="20" fill="#E0883A"/>
+<text x="250" y="485" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">1</text>
+<text x="180" y="511" text-anchor="end" fill="#808080" font-family="sans-serif" font-size="15">goruut</text>
+<rect x="190" y="494" width="52" height="20" fill="#4C8DD6"/>
+<text x="250" y="511" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">1</text>
+<text x="180" y="537" text-anchor="end" fill="#808080" font-family="sans-serif" font-size="15">gruut</text>
+<rect x="190" y="520" width="52" height="20" fill="#4C8DD6"/>
+<text x="250" y="537" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">1</text>
+<text x="180" y="563" text-anchor="end" fill="#808080" font-family="sans-serif" font-size="15">lir</text>
+<rect x="190" y="546" width="52" height="20" fill="#4C8DD6"/>
+<text x="250" y="563" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">1</text>
+<text x="180" y="589" text-anchor="end" fill="#808080" font-family="sans-serif" font-size="15">phonetisaurus</text>
+<rect x="190" y="572" width="52" height="20" fill="#4C8DD6"/>
+<text x="250" y="589" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">1</text>
+<text x="180" y="615" text-anchor="end" fill="#808080" font-family="sans-serif" font-size="15">pt-phonemizers</text>
+<rect x="190" y="598" width="52" height="20" fill="#4C8DD6"/>
+<text x="250" y="615" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">1</text>
+<text x="180" y="641" text-anchor="end" fill="#808080" font-family="sans-serif" font-size="15">shami</text>
+<rect x="190" y="624" width="52" height="20" fill="#4C8DD6"/>
+<text x="250" y="641" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">1</text>
+<text x="180" y="667" text-anchor="end" fill="#808080" font-family="sans-serif" font-size="15">th</text>
+<rect x="190" y="650" width="52" height="20" fill="#E0883A"/>
+<text x="250" y="667" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">1</text>
+<text x="180" y="693" text-anchor="end" fill="#808080" font-family="sans-serif" font-size="15">transphone</text>
+<rect x="190" y="676" width="52" height="20" fill="#E0883A"/>
+<text x="250" y="693" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">1</text>
+<text x="180" y="719" text-anchor="end" fill="#808080" font-family="sans-serif" font-size="15">vi</text>
+<rect x="190" y="702" width="52" height="20" fill="#A66CC9"/>
+<text x="250" y="719" text-anchor="start" fill="#808080" font-family="sans-serif" font-size="15">1</text>
+</svg>

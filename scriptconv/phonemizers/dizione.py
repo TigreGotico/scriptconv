@@ -15,13 +15,18 @@ engine as written. It reads whole text (``reads_whole_text``):
 cuts its own output at its own sentence and clause marks, so an abbreviation
 such as ``Mrs.`` ends no sentence.
 """
-import dataclasses
-import hashlib
-import json
 import re
 from functools import cached_property
 from pathlib import Path
 from typing import ClassVar, Dict, Iterator, List, Optional, Set, Tuple, Union
+
+try:
+    import numpy  # noqa: F401  # the vendored model imports it at module level
+except ImportError as e:
+    raise ImportError(
+        "numpy is required for the dizione phonemizer, whose model guesses the words that its dictionary "
+        "lacks. Install it with 'pip install numpy' (or 'pip install scriptconv[en-phonemizers]')."
+    ) from e
 
 from scriptconv.phonemizers._thirdparty import dizione
 from scriptconv.phonemizers._thirdparty.dizione.engine import Phonemizer as DizioneEngine
@@ -43,7 +48,6 @@ from scriptconv.phonemizers.base import (
     CLAUSE_PUNCTUATION,
     BasePhonemizer,
     MissingLanguageError,
-    PhonemizerIdentity,
     Segment,
     UnsupportedLanguageError,
     _check_alphabet,
@@ -79,19 +83,12 @@ _MAX_WORD_LENGTH = 28
 
 
 class _BoundedEngine(DizioneEngine):
-    """dizione's engine, reading a spelling longer than any word in pieces.
+    """dizione's engine, reading a spelling longer than :data:`_MAX_WORD_LENGTH` in pieces.
 
-    :meth:`word` is where dizione forms the pronunciation of one spelling: it
-    looks the spelling up, derives it from a shorter word, builds it from two
-    words, and else hands the whole spelling to the unknown-word model, whose
-    phones the aligner matches to the letters. A spelling longer than
-    :data:`_MAX_WORD_LENGTH` is none of those words, so it is cut into pieces
-    of at most that many characters, and each piece is read as :meth:`word`
-    reads a word now. The phonemes of the pieces are joined as dizione joins
-    the parts of a hyphenated word, which is no space between them
-    (``sentence.groups``). A spelling that a table holds whole, such as one of
-    the user's overrides, is read whole, and so is every spelling of that
-    length or less.
+    Each piece is read as :meth:`word` reads a word, and the phonemes of the
+    pieces join with no space, as dizione joins the parts of a hyphenated word
+    (``sentence.groups``). A spelling that a table holds whole, such as a user
+    override, is read whole.
     """
 
     def word(self, word):
@@ -213,29 +210,6 @@ class DizionePhonemizer(BasePhonemizer):
                 sentences.append(_join_tokens(clauses))
                 clauses = []
         return sentences
-
-    @cached_property
-    def fingerprint(self) -> str:
-        """dizione's build fingerprint: its version, data, tables and code."""
-        return dizione.identity(self.data_dir)["fingerprint"]
-
-    def identity(self, lang: str) -> PhonemizerIdentity:
-        """What phonemizes *lang*.
-
-        ``revision`` is dizione's build fingerprint. When overrides take effect,
-        from ``overrides=`` or from the file that ``DIZIONE_OVERRIDES`` names,
-        ``revision`` is the sha256 of the fingerprint and of the overrides, so
-        phonemes read with two sets of overrides never mix.
-        """
-        engine = self.engine
-        names = {" ".join(key): engine.names[key] for key in engine.user_names}
-        revision = self.fingerprint
-        if engine.overrides or names:
-            overrides = json.dumps({"words": engine.overrides, "names": names},
-                                   sort_keys=True, ensure_ascii=False)
-            digest = hashlib.sha256(overrides.encode()).hexdigest()
-            revision = hashlib.sha256(f"{revision}\n{digest}".encode()).hexdigest()
-        return dataclasses.replace(super().identity(lang), revision=revision)
 
     def _clauses(self, text: str, tokens: bool = False) -> Iterator[Segment]:
         """Each clause of *text*, as :func:`_clause_spans` cuts dizione's tokens.
@@ -487,12 +461,14 @@ def _token_clauses(whole: Phonemized, closes: Optional[List[bool]] = None) -> Li
 
 def _join_tokens(parts: List[Phonemized]) -> Phonemized:
     """*parts* as one sequence: each inner ``<eos>`` ``<bos>`` pair goes, with its ids and stress."""
-    def inner(field: str) -> tuple:
-        return tuple(value for index, part in enumerate(parts)
-                     for value in getattr(part, field)[0 if index == 0 else 1:
-                                                       None if index == len(parts) - 1 else -1])
+    last = len(parts) - 1
 
-    return Phonemized(inner("symbols"), inner("ids"), inner("stress"),
+    def inner(sequences: Iterator[tuple]) -> tuple:
+        return tuple(value for index, sequence in enumerate(sequences)
+                     for value in sequence[0 if index == 0 else 1:None if index == last else -1])
+
+    return Phonemized(inner(part.symbols for part in parts), inner(part.ids for part in parts),
+                      inner(part.stress for part in parts),
                       tuple(phone for part in parts for phone in part.unknown))
 
 

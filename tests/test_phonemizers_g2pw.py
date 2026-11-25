@@ -286,7 +286,9 @@ def test_another_language_is_refused(g2pw):
 
 
 def test_the_identity_names_scriptconv(g2pw):
-    assert g2pw.identity("zh-CN") == PhonemizerIdentity("g2pw", "scriptconv", VERSION_STR, "zh")
+    identity = g2pw.identity("zh-CN")
+    assert identity == PhonemizerIdentity("g2pw", "scriptconv", VERSION_STR, "zh", revision=identity.revision)
+    assert identity.revision == f"scriptconv=={VERSION_STR}"
 
 
 def test_a_missing_package_names_the_extra():

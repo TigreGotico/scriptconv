@@ -1,6 +1,15 @@
 # scriptconv.scripts
 
-Writing-system identification and metadata.
+<!-- agent-hint
+covers: script detection, mixed-script runs, text direction and the language-to-script map
+source: scriptconv/scripts.py
+generated: no
+verify: python scripts/check_doc_page.py docs/scripts.md
+see: docs/notation.md, docs/conventions.md
+-->
+
+This page shows how to find the writing system of a text, split mixed-script
+text into runs, and map a language code to its script.
 
 ```python
 from scriptconv.scripts import (
@@ -23,6 +32,7 @@ class Script:
     name: str                              # English name, e.g. "Latin"
     direction: str                         # "ltr" or "rtl"
     char_ranges: Tuple[Tuple[int, int], ...]  # Inclusive Unicode codepoint ranges
+    script_type: str = "other"             # "alphabet", "abjad", "abugida", "syllabary", "logographic", "featural" or "other"
 ```
 
 `Script` instances are **frozen** (immutable). Any attempt to assign an attribute raises
@@ -273,9 +283,9 @@ Returns the languages whose default script is `code`. This is the reverse of
 `lang_to_script`. Returns an empty list for unknown scripts.
 
 ```python
-script_to_langs("Cyrl")   # ['av', 'ba', 'be', 'bg', 'bxr', 'ce', 'cv', ...]
-script_to_langs("Latn")   # ['af', 'ast', 'az', 'br', 'ca', ...]
-script_to_langs("Zzzz")   # []
+script_to_langs("Cyrl")[:7]   # ['av', 'ba', 'be', 'bg', 'bxr', 'ce', 'cv']
+script_to_langs("Latn")[:5]   # ['af', 'ast', 'az', 'br', 'ca']
+script_to_langs("Zzzz")       # []
 ```
 
 ---
@@ -343,6 +353,8 @@ characters (spaces, punctuation, combining marks) attach to the preceding run,
 following the resolution model of Unicode UAX #24.
 
 ```python
+from scriptconv.scripts import script_runs
+
 script_runs("привет hello")
 # [('Cyrl', 'привет '), ('Latn', 'hello')]
 ```
@@ -363,4 +375,4 @@ authoritative script subtag (`sr-Latn`), and the widespread informal
 `_cyr`/`_lat` variant suffixes (`uzb_cyr`).
 
 ---
-[Home](../README.md) · [notation →](notation.md)
+[Index](index.md) · [← stack](stack.md) · [notation →](notation.md)

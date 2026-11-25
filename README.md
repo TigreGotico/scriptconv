@@ -10,478 +10,73 @@
 
 </div>
 
-Text arrives in many representations: scripts (Cyrillic, Hangul, kana),
-romanizations (pinyin, Buckwalter), phoneme notations (IPA, ARPABET, X-SAMPA),
-input codes (Cangjie), and decorated or undecorated spellings (Arabic with or
-without vowel marks, pinyin with tone marks or with digits).
+<!-- agent-hint
+covers: what scriptconv does, the quickstart, and the documentation pages
+source: `__all__` in scriptconv/__init__.py, scriptconv/phonemizers/registry.py, scriptconv/phonemizers/_moved.py, pyproject.toml
+generated: no
+verify: python scripts/check_doc_page.py README.md
+see: docs/index.md, docs/stack.md, docs/reference.md, AGENTS.md
+-->
 
-scriptconv identifies which representation a piece of text is in. It
-converts between them, and it reports *programmatically* how faithful each
-conversion is.
+scriptconv tells you which representation a text is in, converts it to
+another representation, and phonemizes it. It covers scripts (Cyrillic,
+Hangul, kana), romanizations (pinyin, Buckwalter), phoneme notations (IPA,
+ARPABET, X-SAMPA), input codes (Cangjie) and decorated spellings (Arabic with
+or without vowel marks). Each conversion reports how faithful it is, as data
+that code can read.
 
-scriptconv is the one stop for text conversion, phonemizer integrations
-included. It gives every language one interface.
+The core is pure Python with no dependencies. The `phonemizers` subpackage
+gives one interface to many grapheme-to-phoneme backends: espeak, gruut,
+orthography2ipa, tugaphone, arbtok and more, each behind an optional extra.
+`TextFrontend` joins the text stages and a backend in one fixed order for a
+voice.
 
-The core is pure Python with zero dependencies. Heavier capabilities, such as
-dictionary-backed readings and phonemizer engines, live behind optional
-extras and never load unless asked for.
+## Quickstart
 
 ```bash
-pip install scriptconv
+uv pip install --prerelease=allow "scriptconv[pt-phonemizers]"
 ```
-
-## Five lines to get the idea
 
 ```python
-from scriptconv import detect_script, convert, strip, restyle, to_pinyin
+from scriptconv import detect_script, convert, strip
+from scriptconv.phonemizers import phonemize
 
-detect_script("Здравствуйте")                    # 'Cyrl'
-convert("HH AH0 L OW1", "arpa", "ipa")           # 'həloʊ'
-strip("مُحَمَّد", "tashkeel")                        # 'محمد'
-restyle("zhong1 guo2", "pinyin-tone", "mark")    # 'zhōng guó'
-to_pinyin("中国人")                               # 'zhōng guó rén'  (zh extra)
+detect_script("Здравствуйте")             # 'Cyrl'
+convert("HH AH0 L OW1", "arpa", "ipa")    # 'həloʊ'
+strip("مُحَمَّد", "tashkeel")               # 'محمد'
+phonemize("Olá mundo", "pt")              # 'ɔˈla ˈmũdu'
 ```
 
-Everything is also a command:
+The first three calls need no extra. The last one needs the extra of its
+backend, here `pt-phonemizers` for tugaphone. Every call is also a command:
 
 ```bash
 python -m scriptconv detect "안녕하세요"           # Hang
 python -m scriptconv convert arpa ipa "K AE1 T"   # kæt
 python -m scriptconv strip tashkeel "مُحَمَّد"       # محمد
+python -m scriptconv phonemize pt "Olá mundo"     # ɔˈla ˈmũdu
 python -m scriptconv route halabi x-sampa         # the conversion path, hop by hop
 ```
 
-## The mental model
-
-scriptconv is organized around four ideas, layered from identity to sound.
-
-1. **Scripts are identity.** A character belongs to a writing system
-   (ISO 15924: `Latn`, `Cyrl`, `Arab`, and so on), detectable from the text
-   itself, and identity never changes what the text *means*.
-
-2. **Representations are nodes. Conversions are edges.** IPA, ARPABET,
-   hiragana, pinyin, and Cangjie codes are each a node in one conversion
-   graph, and asking for `halabi → x-sampa` finds the cheapest path
-   (`halabi → ipa → x-sampa`), preferring lossless edges by construction.
-
-3. **Conventions are decorations, not identities.** Arabic vowel marks,
-   Hebrew points, Japanese word spacing, and pinyin tone spelling are
-   parameters a script's text can carry or omit (`strip`, `restyle`,
-   `apply`), never graph nodes.
-
-4. **Fidelity is data.** Whether a conversion round-trips, and what happens
-   to a symbol a table does not know, is queryable (`NOTATION_INFO`, the
-   `errors=` policy), not folklore buried in docstrings.
-
-The core never invents pronunciation. Grapheme-to-phoneme inference needs
-language knowledge beyond symbol tables. When you need it, the
-`phonemizers` subpackage wraps real G2P engines behind extras: the same
-graph, one more kind of edge, explicitly opted into.
-
-## A guided tour
-
-### What script is this? The `scripts` module
-
-```python
-from scriptconv import detect_script, script_runs, lang_to_script, base_direction
-
-detect_script("Здравствуйте")        # 'Cyrl'
-script_runs("привет hello")          # [('Cyrl', 'привет '), ('Latn', 'hello')]
-base_direction("مرحبا hello")        # 'mixed'
-lang_to_script("uzb_cyr")            # 'Cyrl'  (639-1/2/3 codes, BCP-47 tags,
-                                     #           informal _cyr/_lat variants
-```
-
-The returned ISO 15924 tags are **stable API**: downstream code compares
-against them directly. `script_runs` follows the UAX #24 model, so combining
-marks and neutral characters attach to the run they qualify, and accented
-Cyrillic never splits. Details: [docs/scripts.md](docs/scripts.md).
-
-### Same sounds, different symbols: the `notation` module
-
-Nine phoneme notations transcode through an IPA hub: ARPABET, X-SAMPA,
-Kirshenbaum, Lexique, Cotovía, RFE, Buckwalter to Arabic, and Halabi (the Nawar Halabi Arabic-Phonetiser notation, popularized by the mantoq package).
-
-```python
-from scriptconv import convert, arpa_to_ipa, ipa_to_arpa
-
-convert("HH AH0 L OW1", "arpa", "ipa")        # 'həloʊ'
-convert("kˈæt", "ipa", "x-sampa")             # 'k"{t'
-arpa_to_ipa("HH AH0 L OW1", stress=True)      # 'həlˈoʊ'
-ipa_to_arpa("həlˈoʊ", stress=True)            # 'HH AH0 L OW1'  (exact round-trip)
-```
-
-Two contracts make this trustworthy:
-
-- **`errors=`, codecs-style.** Every converter takes
-  `errors="pass" | "replace" | "strict" | "ignore"` for symbols outside its
-  table. `"strict"` raises `UnknownSymbolError(symbol, position, notation)`.
-  Strict drops no mark and accepts spaces, the Unicode White_Space
-  characters. The defaults preserve each converter's long-standing behavior.
-
-- **Stress is preserved, not discarded.** With `stress=True`, ARPABET stress
-  digits become IPA `ˈ`/`ˌ` placed before the stressed vowel. This is
-  reversible by construction, with no syllabification involved. Round-trips
-  are exact up to IPA-equivalence. The
-  [fidelity table](#fidelity-guarantees) states every residue.
-
-Buckwalter is an independent implementation of the published transliteration
-scheme, including alef wasla and the dagger alef (رحمٰن transliterates as
-*rHm`n*). The Halabi notation
-is the phonetic alphabet of the Halabi Arabic-Phonetiser. Text in it
-converts one way to IPA (`halabi_to_ipa("mrHbaa")` → `'mrħbaː'`) and onward
-through the graph. Details: [docs/notation.md](docs/notation.md).
-
-### Rewriting the writing: `translit`, `readings`, `cangjie`
-
-Deterministic, table-driven operations on the writing system itself:
-
-```python
-from scriptconv import decompose_hangul, hira_to_kana
-
-decompose_hangul("한국")     # 'ㅎㅏㄴㄱㅜㄱ'
-hira_to_kana("こんにちは")    # 'コンニチハ'
-```
-
-Where a respelling needs a *dictionary*, because the answer is lexical and
-not mechanical, it lives behind an extra and raises a clear `ImportError`
-when the dictionary is not installed:
-
-```python
-from scriptconv import to_hiragana, to_katakana, to_pinyin, to_bopomofo, to_cangjie
-
-to_hiragana("東京タワー")    # 'とうきょうたわー'          pip install scriptconv[ja]
-to_katakana("日本語")        # 'ニホンゴ'
-to_pinyin("中国人")          # 'zhōng guó rén'           pip install scriptconv[zh]
-to_bopomofo("中国")          # 'ㄓㄨㄥ ㄍㄨㄛˊ'
-to_cangjie("倉頡")           # 'oiar grmbc'              vendored table, no extra
-```
-
-`readings.tokens()` exposes the per-token stream underneath, for consumers
-that need word boundaries. The Cangjie table (103,601 glyphs) ships inside
-the wheel, so shape-code conversion needs no download and no dependency.
-Details: [docs/translit.md](docs/translit.md),
-[docs/readings.md](docs/readings.md).
-
-### Marked or unmarked: the `conventions` module
-
-A convention is a decoration a script's orthography can carry or omit. Each
-one declares its *styles* and the transitions between them. `strip`/`apply`
-are sugar for transitions to and from `"none"`.
-
-```python
-from scriptconv import strip, restyle, detect_convention, conventions_for
-
-strip("مُحَمَّد", "tashkeel")                       # 'محمد'
-strip("שָׁלוֹם", "niqqud")                          # 'שלום'
-strip("わたし は がくせい です", "wakachigaki")      # 'わたしはがくせいです'
-restyle("zhōng guó", "pinyin-tone", "number", frm="mark")   # 'zhong1 guo2'
-detect_convention("مُحَمَّد", "tashkeel")           # 'marked'
-[c.id for c in conventions_for("Arab")]          # ['tashkeel', 'kashida', 'quranic-marks']
-```
-
-The registered set covers Arabic `tashkeel`, `kashida`, and `quranic-marks`;
-Hebrew `niqqud` and `teamim` (vocalization and cantillation are separate
-layers); Japanese `wakachigaki` (spacing is stripped only between Japanese
-characters, so "きょうは good day" keeps its space); `pinyin-tone` (mark,
-number, or none, deterministic both ways for standard apostrophized
-pinyin); and `jamo-form` (compatibility or conjoining repertoires).
-
-Which transitions exist follows one criterion. Stripping and deterministic
-re-spelling are always available. Transitions that need a dictionary lookup
-(applying wakachigaki means word segmentation) sit behind an extra.
-
-Transitions that need contextual *prediction* (restoring tashkeel) are out
-of scope entirely, because that is diacritization, a modelling problem. Their
-absence is queryable data rather than a runtime surprise.
-
-The codepoint sets are curated, not naive. Stripping tashkeel **excludes**
-U+0653 to U+0655, because in decomposed text those combining marks *are* the
-letters آ/أ/إ. A blanket strip would corrupt the consonantal skeleton.
-Details: [docs/conventions.md](docs/conventions.md).
-
-### One graph over everything: the `graph` module
-
-Every notation and orthography is a node. Every converter is an edge.
-Routing finds the cheapest path and prefers lossless edges, so a lossless
-two-hop route beats a lossy shortcut:
-
-```python
-from scriptconv import DEFAULT_GRAPH
-
-DEFAULT_GRAPH.convert("こんにちは", "hira", "kana")       # 'コンニチハ'
-[f"{e.src}->{e.dst}" for e in DEFAULT_GRAPH.route("arpa", "x-sampa")]
-# ['arpa->ipa', 'ipa->x-sampa']
-```
-
-Edges are `fn(text, **context)`. Routing context such as `lang=` passes
-through opaquely.
-
-Extension is explicit: `graph.extend(register_fn)` returns an extended copy,
-and a graph's contents never depend on what happens to be installed.
-`DEFAULT_GRAPH` itself contains only orthographic and notation edges.
-Details: [docs/graph.md](docs/graph.md).
-
-### From spelling to sound: the `phonemizers` module
-
-Wrappers over real G2P engines, such as espeak, gruut, epitran, and ByT5,
-and specialized per-language engines, sit behind per-capability extras,
-with a default per language and a full override:
-
-```python
-from scriptconv.phonemizers import phonemize, Phonemizer
-
-phonemize("kaixo mundua", "eu")        # 'kai̯ʃo mundua'   (euskaphone)
-phonemize("hello", "en", override=Phonemizer.GRUUT)
-```
-
-Defaults resolve in-house engines first: an explicit per-language chain
-(Arabic to arbtok, Basque to euskaphone, Mirandese to its orthography2ipa
-specs, Portuguese to tugaphone, Hebrew to phonikud, Galician to Cotovía, and
-Russian to vosk for their own notations), then orthography2ipa wherever it has a language spec,
-then espeak as the last resort.
-
-Arabic never falls back past arbtok. A missing engine raises an error
-rather than degrading silently. Every backend resolves lazily, and a
-missing package raises an `ImportError` naming the extra to install.
-
-Phonemization joins the graph only on request:
-
-```python
-from scriptconv import DEFAULT_GRAPH
-from scriptconv import phonemizers
-
-g = DEFAULT_GRAPH.extend(phonemizers.register)
-g.convert("bom dia", "text", "ipa", lang="pt")     # 'ˈbõ ˈdʒiɐ'
-g.can_convert("text", "arpa")                      # True (chains through IPA)
-```
-
-Three design points worth knowing:
-
-- **Normalization is injectable.** TTS stacks expand numbers and dates
-  before phonemizing, and that needs language resources scriptconv does
-  not ship. Pass `normalizer=` (a `(text, lang) -> str` callable) to run
-  yours inside the pipeline. Without it, text is phonemized as-is.
-
-- **Large or licensed model-backed engines never download on their own.**
-  ByT5/Charsiu require an explicit local `model=` path, and caching those
-  model files is the caller's concern. Small, known-good, unencumbered
-  models are the exception: the Hebrew phonikud diacritizer auto-provisions
-  its ONNX model to a cache dir on first use (`phonikud_model=` still
-  overrides it with a path or callable; the cache location is set via
-  `SCRIPTCONV_CACHE` or `XDG_CACHE_HOME`).
-
-- **The orthography2ipa phonemizer uses the packaged lexicons.** The `o2i`
-  extra installs [o2i-lexicons](https://github.com/TigreGotico/o2i-lexicons),
-  which holds the words that the orthography2ipa rules get wrong, such as
-  en-GB ⟨yacht⟩. The key `packaged_lexicons` (default `True`) gives the
-  engine of each language its packaged lexicon, when a package serves that
-  language: the exceptions, and the patches when the package ships them. Set
-  it to `False` to use the rules only:
-  `get_phonemizer(Phonemizer.ORTHOGRAPHY2IPA, packaged_lexicons=False)`.
-  The lexicon belongs to the phonemizer's own engine. Another
-  orthography2ipa engine in the process does not see it.
-
-**Pre-G2P disambiguation.** `add_diacritics(text, lang, model=None)`
-restores information ordinary orthography omits but a G2P needs, before
-phonemization. It covers Hebrew niqqud (phonikud), Arabic tashkeel
-(text2tashkeel), word stress across 26 stressonnx language tags (East
-Slavic; Bulgarian, Macedonian, and Slovene; Latvian; Armenian; Georgian;
-and Turkic/Caucasian languages, via `scriptconv[stress]`), and
-European-Portuguese heterophonic-homograph sense diacritics (bifonia, via
-`scriptconv[pt]`, never applied to `pt-BR`, whose vowel system differs):
-
-```python
-from scriptconv.phonemizers import GraphemePhonemizer
-
-p = GraphemePhonemizer()
-p.add_diacritics("Tenho muita sede hoje.", "pt")   # 'Tenho muita sêde hoje.' (thirst)
-```
-
-Diacritization also joins the graph, like phonemization does, through
-`scriptconv.diacritics.register`: a `text -> text-diacritized` edge, opt-in,
-with `text -> ipa` routing unchanged:
-
-```python
-from scriptconv import diacritics
-g = DEFAULT_GRAPH.extend(diacritics.register).extend(phonemizers.register)
-g.convert("Tenho muita sede hoje.", "text", "text-diacritized", lang="pt")
-# 'Tenho muita sêde hoje.'
-```
-
-A voice reads text through `scriptconv.frontend.TextFrontend`. It runs
-inline `[[phoneme]]` blocks, sentences, an optional normalisation hook,
-diacritics and the backend in one fixed order, and a backend that diacritizes
-by itself is not diacritized twice:
-
-```python
-from scriptconv.frontend import FrontendConfig, Stages, TextFrontend
-
-frontend = TextFrontend(FrontendConfig("pt-PT", Phonemizer.ESPEAK))
-frontend.phonemize("Tenho sede [[ˈsedɨ]]. Olá!", Stages(diacritize=True))
-```
-
-Details: [docs/frontend.md](docs/frontend.md).
-
-Stress is unwritten or under-marked in all 26 covered languages. East
-Slavic is the clearest case, where unstressed vowels also reduce (for
-example, Russian о becomes [ɐ] or [ə]), so a missing mark corrupts more
-than prosody there. stressonnx is optional (not yet on PyPI) and emits the
-standard combining acute (U+0301) after the stressed vowel.
-
-Details: [docs/phonemizers.md](docs/phonemizers.md).
-
-## Fidelity guarantees
-
-Transcoding faithfulness depends on the target notation's inventory. IPA is
-the hub, so notation-to-notation conversion goes through IPA. The table
-below states, for each notation, whether a round-trip is exact and what
-happens to a symbol the table does not know.
-
-Every converter (and `convert()`) accepts a codecs-style `errors=` policy
-for symbols outside its table. `"pass"` keeps the symbol (the default
-everywhere except `ipa_to_arpa`). `"replace"` substitutes the notation's
-placeholder (`?`, the historical `ipa_to_arpa` default, tunable via
-`unknown=`). `"ignore"` drops the symbol. `"strict"` raises
-`UnknownSymbolError` naming the symbol, its position, and the notation. The
-"Unknown-token behaviour" column below describes the per-converter default.
-
-| Notation | `to_ipa` → `from_ipa` round-trip | `from_ipa` → `to_ipa` round-trip | Unknown-token behaviour |
-|----------|----------------------------------|----------------------------------|-------------------------|
-| **ARPABET** | **Exact with `stress=True`** (digits map to IPA `ˈ`/`ˌ` before the stressed vowel; residues: extended-ARPABET `AX` and `AXR` normalise to CMUdict's `AH0` and `ER0` spellings, stable from the IPA side). Default `stress=False` drops digits, and merges `AH0` with `AX` and `ER0` with `AXR` | **Lossy** (ARPABET is an English-only inventory, so any IPA symbol outside it becomes the *unknown* placeholder) | `arpa_to_ipa`: passed through unchanged. `ipa_to_arpa`: diacritics, suprasegmentals and word gaps are dropped. Other out-of-inventory symbols follow `errors=` (default `"replace"` → `?`) |
-| **X-SAMPA** | Exact for every spelling Wells lists; a second spelling (`v\`, `_=`, `_~`) returns as the first (`P`, `=`, `~`) | Exact for every symbol Wells lists, each taken alone, including diacritics and tones | Passed through unchanged |
-| **Buckwalter ↔ Arabic** | Exact | Exact. An Arabic presentation form, such as the lam-alef ligature `ﻻ`, returns as the letters it stands for | Follows `errors=` (default: passed through) |
-| **Halabi → IPA** | One-directional (gemination and word markers are consumed; there is no IPA to Halabi) | Not applicable | Follows `errors=` (default: passed through) |
-| **Lexique ↔ IPA** | Exact except the `°`/`3` schwa pair (both map to `ə`; the reverse always produces `°`) | **Lossy** (French inventory; IPA outside it passes through) | Passed through unchanged |
-| **Kirshenbaum ↔ IPA** | **Lossy** (keys such as `F`, `K` and `P`, the digits and punctuation give output that is not IPA) | **Lossy** (restricted ASCII inventory; IPA outside it passes through) | Passed through unchanged |
-| **Cotovía ↔ IPA** | Exact except the three `L`/`Z`/`jj` symbols for `ʎ` normalise to `L` | **Lossy** (Galician/Spanish inventory; IPA outside it passes through) | Passed through unchanged |
-| **RFE ↔ IPA** | Exact except `ñ`/`n̮` for `ɲ` normalise to `ñ` | **Lossy** (core Spanish/Romance inventory; IPA outside it passes through) | Passed through unchanged |
-
-Every row is backed by a test. `NOTATION_INFO` exposes the same facts to
-code, so a program can branch on whether a conversion is safe before making
-it. Its flags follow one definition of lossless, which
-[docs/notation.md](docs/notation.md#queryable-fidelity-notation_info) states. A
-conversion with `stress=True` or another option can be exact where the flag is
-`False`, because the flag measures the defaults.
-
-## Extras
-
-The core installs with zero dependencies. Capabilities opt in. Some extras
-install scriptconv-copyleft or scriptconv-nonfree: see [Licensing](#licensing).
-
-| Extra | Enables |
-|---|---|
-| `ja` / `zh` | Dictionary readings: kanji to kana (pykakasi, through scriptconv-copyleft), hanzi to pinyin/bopomofo (pypinyin) |
-| `phonemizers` | The phonemizer base layer (sentence chunking, language matching) |
-| `espeak`, `gruut`, `goruut`, `epitran`, `transphone`, `misaki`, `byt5` | Multilingual phonemizer backends |
-| `en-phonemizers`, `ja-phonemizers`, `zh-phonemizers`, `ko`, `ar-phonemizers`, `eu`, `pt-phonemizers`, `gl`, `he`, `fa`, `vi`, `shami`, `o2i`, `africa`, `ghana` | Per-language phonemizer backends. `o2i` also gives Mirandese and Barranquenho |
-| `mwl` | The same packages as `o2i` |
-| `tashkeel` | Arabic diacritization for the phonemizer pipeline (text2tashkeel) |
-| `stress` | Word-stress restoration for 26 stressonnx language tags: East Slavic; Bulgarian, Macedonian, and Slovene; Latvian; Armenian; Georgian; and Turkic/Caucasian, for the phonemizer pipeline (stressonnx; not yet on PyPI) |
-| `pt` | European-Portuguese heterophonic-homograph sense diacritics for the phonemizer pipeline (bifonia) |
-| `phonetisaurus` | WFST grapheme-to-phoneme through a trained FST the caller supplies (phonetisaurus). Training also needs `libquadmath0` on the host: see below |
-
-### The `phonetisaurus` extra and its libraries
-
-`pip install scriptconv[phonetisaurus]` completes, and the `phonetisaurus`
-0.3.0 wheel bundles its own executables and most of its own shared objects
-(`libfst.so.13`, `libmitlm.so.1`, `libgfortran.so.3` and the OpenFST
-companions) under `phonetisaurus/lib/<machine>`. The binaries find them only
-through the `PATH` and `LD_LIBRARY_PATH` that `phonetisaurus.guess_environment()`
-builds, which is the environment `phonetisaurus.predict` and
-`phonetisaurus.train` pass to every call. A binary started with the plain
-shell environment exits 127 from the dynamic loader; that is a report about
-the caller, not about the box.
-
-The apply path therefore runs out of the box, and this wrapper only applies a
-model. One object is NOT bundled:
-
-| Missing object | Needed by | Where it comes from |
-|---|---|---|
-| `libquadmath.so.0` | `estimate-ngram`, and so `phonetisaurus.train` | the GCC runtime: package `libquadmath0` on Debian and Ubuntu |
-
-So a box without `libquadmath0` can phonemize with a model it is given, and
-cannot train one.
-
-`model=` is required and scriptconv never downloads: see `MODEL_SOURCES` on
-the class, or train a model with `phonetisaurus.train` from a lexicon such as
-CMUdict.
-
-`tests/test_phonemizers_phonetisaurus_engine.py` is the real-engine cell. It
-runs the same word through the engine at `nbest=1` and `nbest=2` and checks
-the wrapper returns the engine's own best-ranked line both times. It skips,
-and names the loader error or the missing model, when the engine cannot run.
-Set `SCRIPTCONV_PHONETISAURUS_MODEL` to a trained FST to run it.
-
-## Licensing
-
-The scriptconv wheel is `Apache-2.0 AND MIT AND LicenseRef-CMUdict`. The code of
-scriptconv is Apache-2.0. Two vendored tables are MIT, and the wheel carries
-their notices: the Cangjie5 code table (`scriptconv/data/LICENSE.cangjie5`) and
-the Hangul-to-IPA converter of stannam/hangul_to_ipa with its tables
-(`scriptconv/phonemizers/_thirdparty/LICENSE.hangul_to_ipa`). The dizione
-English phonemizer is Apache-2.0, and its built data ships in
-`scriptconv/phonemizers/_thirdparty/dizione/built/`. The dictionary,
-alignment table and model of that data come from CMUdict, under the CMUdict
-licence (`LICENSE.cmudict`). That licence is BSD-2-Clause with one added
-sentence and an acknowledgement, so it has no SPDX identifier and the wheel
-names it `LicenseRef-CMUdict`. The homograph weights come from the Wikipedia
-Homograph Data, Apache-2.0 (`LICENSE.homograph-data`), and most of their
-pronunciations come from CMUdict.
-
-The phonemizer wrappers whose code, engine or dependencies are under a
-copyleft or a non-commercial licence are in two sister packages:
-
-| Package | Holds | Installed by the extras |
-|---|---|---|
-| [scriptconv-copyleft](https://github.com/TigreGotico/scriptconv-copyleft) | the espeak, Cotovía, AhoTTS, transphone, misaki, g2pfa, g2pk and KoG2P wrappers, the pykakasi wrapper and the Japanese functions of `readings` | `espeak`, `transphone`, `misaki`, `gl`, `eu`, `fa`, `ko`, `ja`, `ja-phonemizers` |
-| [scriptconv-nonfree](https://github.com/TigreGotico/scriptconv-nonfree) | the Mantoq, Halabi and Iqra wrappers with the vendored mantoq and iqra_phonetiser, the viphoneme wrapper, and the africa-g2p and ghana-g2p wrappers | `ar-phonemizers`, `vi`, `africa`, `ghana` |
-
-Each sister package states its own licence. scriptconv-nonfree holds code
-under CC BY-NC 4.0, which forbids commercial use. The registry resolves these
-wrappers from the sister package, so an install of the extra gives the same
-backend as before. Without the package, `get_phonemizer` raises an
-`ImportError` that names the extra. The `ar-phonemizers` extra installs
-scriptconv-nonfree. To use only arbtok, the Arabic default, install
-`scriptconv[phonemizers]` and `arbtok`.
-
-Two dependencies under the LGPL or the GPL stay in the extras of this
-package: `distance` and `num2words`. g2p_en declares `distance` and never
-imports it. num2words only turns digits into words, and text2spoken does that
-work in its normalise stage before the phonemizer runs. gruut, misaki,
-openphonemizer and phonikud call it for numbers. Neither of the two makes a
-wrapper move to a sister package. `scripts/check_extra_licences.py` resolves
-every extra and fails on any other copyleft or non-commercial distribution,
-and `tests/test_wheel_licences.py` fails when the wheel holds a file under a
-licence other than Apache-2.0 or MIT.
-
-## Related projects
-
-scriptconv is the text interface of a family of text and speech libraries.
-phoonnx consumes it, and it wraps the language frontends behind optional
-extras:
-
-- [phoonnx](https://github.com/TigreGotico/phoonnx): multilingual ONNX
-  text-to-speech; consumes scriptconv for scripts, notation, conventions,
-  and the whole phonemizer layer.
-- [orthography2ipa](https://github.com/TigreGotico/orthography2ipa): a
-  data-driven orthography-to-IPA engine, and the usual per-language
-  phonemizer default. Its specs give the Mirandese and Barranquenho
-  phonemizers.
-- [arbtok](https://github.com/TigreGotico/arbtok): Arabic phonemizer (dialect-aware).
-- [euskaphone](https://github.com/TigreGotico/euskaphone): Basque phonemizer (dialect-aware).
-- [tugaphone](https://github.com/TigreGotico/tugaphone): Portuguese phonemizer (dialect-aware).
-- [pycotovia](https://github.com/TigreGotico/pycotovia): a pure-Python
-  phonemizer port of the Cotovía Galician TTS engine, whose notation
-  scriptconv transcodes.
-- [espyak](https://github.com/TigreGotico/espyak): a pure-Python port of
-  espeak-ng's G2P, and the espeak fallback when the binary is absent.
-
-## Development
-
-```bash
-uv venv && uv pip install -e '.[test]'
-pytest tests/
-```
-
-The documentation lives in [`docs/`](docs/index.md), one page per module.
+## Where this fits
+
+Alone: detect, convert and phonemize text with `from scriptconv import convert` and `from scriptconv.phonemizers import phonemize`.
+In the stack: the one stop for text conversion. The phoonnx voices take their text path from scriptconv alone, through `TextFrontend`. It calls the stage libraries and phonemizer engines as optional backends.
+Through scriptconv: `uv pip install --prerelease=allow "scriptconv[<extra>]"`.
+
+[docs/stack.md](docs/stack.md) shows which library runs each stage,
+[docs/backends.md](docs/backends.md) lists every backend with its extra, and
+[docs/reference.md](docs/reference.md) gives the signature of each name that a voice imports.
+
+## Documentation
+
+| Page | Read it for |
+| --- | --- |
+| [docs/overview.md](docs/overview.md) | the model, a tour of each module, related projects |
+| [docs/stack.md](docs/stack.md) | where scriptconv sits in the speech stack |
+| [docs/install.md](docs/install.md) | the extras and the licences |
+| [docs/backends.md](docs/backends.md) | every phonemizer backend and its extra |
+| [docs/reference.md](docs/reference.md) | the signature of each public name |
+| [docs/index.md](docs/index.md) | every page in reading order |
+
+[AGENTS.md](AGENTS.md) holds the contributor rules.

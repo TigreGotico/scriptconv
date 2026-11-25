@@ -2,9 +2,8 @@
 
 Kabyle (``kab``) through the rule set that ``agbalu/Matoub-82M`` was fitted on.
 
-This is deliberately a separate route from :class:`AfricaG2PPhonemizer`, which
-also answers ``kab``. The two are different phonemizers and their output
-differs, so they are not interchangeable:
+:class:`AfricaG2PPhonemizer` also answers ``kab``, but its output differs,
+so the two routes are not interchangeable:
 
 ===============  ===========================  ==============
 text             africa-g2p                   Matoub
@@ -19,23 +18,18 @@ doubled symbol rather than length, and does not back ``/a/`` beside a backing
 consonant. A caller driving Matoub-82M needs the Matoub string: the other one
 carries symbols that model has no embedding row for.
 """
-import dataclasses
 from typing import List
 
-from scriptconv.phonemizers.base import BasePhonemizer, PhonemizerIdentity
+from scriptconv.phonemizers.base import BasePhonemizer
 from scriptconv.phonemizers.enums import Alphabet
 
 
 class MatoubKabylePhonemizer(BasePhonemizer):
     """Kabyle Latin orthography to the IPA string ``agbalu/Matoub-82M`` reads.
 
-    The rules are vendored under ``_vendored/matoub_kab`` (Apache-2.0, the same
-    licence as this repository) and need nothing outside the standard library.
-
-    The rules raise on a character they have no rule for, and that is kept on
-    purpose. The upstream file records that silent deletion already cost three
-    Kabyle consonants once, so an unknown symbol is reported rather than
-    dropped.
+    The rules are vendored under ``_vendored/matoub_kab`` (Apache-2.0) and need
+    only the standard library. They raise on a character they have no rule for:
+    upstream records that a silent deletion once lost three Kabyle consonants.
     """
 
     _LANGS: List[str] = ["kab"]
@@ -49,20 +43,12 @@ class MatoubKabylePhonemizer(BasePhonemizer):
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
-        """Validate *target_lang* against the one language these rules cover.
+        """``kab`` when *target_lang* matches Kabyle.
 
         Raises:
             ValueError: if the language code is not Kabyle.
         """
         return cls.match_lang(target_lang, cls._LANGS)
-
-    def identity(self, lang: str) -> PhonemizerIdentity:
-        """The base identity, with ``revision`` the hash of the code and data
-        on the path of this backend, the vendored rules among them, as
-        :func:`~scriptconv.phonemizers._revision.code_revision` gives it."""
-        from scriptconv.phonemizers._revision import code_revision
-        revision = code_revision(self, lang, {})
-        return dataclasses.replace(super().identity(lang), revision=revision)
 
     def phonemize_string(self, text: str, lang: str = "kab") -> str:
         self.get_lang(lang)

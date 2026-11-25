@@ -32,8 +32,12 @@ frontend cannot cut it for that backend:
   appends the clause symbols and groups the segments. Above
   :attr:`FrontendConfig.whole_text_limit` characters, the frontend first cuts
   the text at its paragraph breaks.
-- Any other owner of ``normalize`` gets the text cut into sentences before
-  casing, as written.
+- Any other owner of ``normalize`` gets the text cut into sentences as
+  written.
+
+A backend that owns ``normalize`` gets no casing. Casing would change the
+text before the backend normalises it, and ``15H30`` in capitals is no longer
+a time to tugaphone.
 
 With ``strict=False`` a failed stage logs a warning and the text continues
 without that stage. With ``strict=True`` it raises :class:`StageError`.
@@ -49,20 +53,18 @@ differences stay:
   only digits to nothing without a normaliser.
 - A block gives one space symbol for a run of whitespace, but the unicode
   backend copies each tab and space.
-- A mark directly before a block gives no symbol and no space, but plain
-  text reads ``!`` or ``?`` between two words as a space.
+- A hyphen directly before or after a block stands at the edge of a word, so
+  it gives a space, but plain text keeps a hyphen between two letters.
 """
 import copy
 import dataclasses
 import enum
-import hashlib
 import importlib.util
 import itertools
-import json
 import logging
 import re
-import sys
 import unicodedata
+from importlib import metadata
 from typing import Callable, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Tuple
 
 from scriptconv.diacritics import _DIACRITIZER_PACKAGES, _diacritizer_family, diacritize
@@ -70,8 +72,11 @@ from scriptconv.graph import ConversionGraph, Edge
 from scriptconv.phonemizers.base import (
     _CLAUSE_BREAK,
     _CLAUSE_TOKENS,
+    _HYPHENS,
     _PARAGRAPH_BREAK,
     _PAUSE_PUNCTUATION,
+    _WHITESPACE,
+    _WORDLESS_START,
     BasePhonemizer,
     PhonemizerIdentity,
     Segment,
@@ -92,24 +97,38 @@ FRONTEND_VERSION = 2
 to the stages raises it. Version 1 cut the raw text into sentences before
 normalisation."""
 
-# scripts/time_owner_backends.py, output in scripts/time_owner_backends.txt: one dizione call on English text
-# dense in dates and prices, also with a blank line and quotes after each sentence, stays under 100 ms up to
-# 1,750 characters, both with a new backend per call (at most 61.9 ms in two runs) and with one backend read
-# again and again (at most 79.3 ms in 11 runs). At 2,000 characters one run of the second kind took 100.5 ms.
-# Prose reads faster. The limit bounds the read; a full garbage collection of the process can add to one call.
+# One dizione call on English text dense in dates and prices stays under 100 ms up to this size
+# (scripts/time_owner_backends.py, output in scripts/time_owner_backends.txt); at 2,000 characters
+# one run took 100.5 ms.
 WHOLE_TEXT_LIMIT = 1_750
 """The default of :attr:`FrontendConfig.whole_text_limit`."""
 
 # The word that stands for a block when the frontend reads the mark after it.
-_BLOCK_WORD = "a"
-# Text that ends in whitespace and then only marks. The marks join the block
-# after them as they join a plain word, and the whitespace stays.
-_SPACE_BEFORE_BLOCK = re.compile(r"\s\W*$")
+_BLOCK_WORD = "casa"
+
+
+def _space_before_block(text):
+    """Whether whitespace stands at or before the trailing marks of *text*.
+
+    A mark run after the last word stays with the block after it, and the
+    whitespace before that run stays as a word break. Reading backwards gives
+    the same answer as ``r"\\s\\W*$"``: the first whitespace in the run of
+    non-word characters at the end answers yes, and a word character before
+    that run answers no. A long run of whitespace therefore costs linear work
+    instead of quadratic work.
+    """
+    for char in reversed(text):
+        if char.isspace():
+            return True
+        if char.isalnum() or char == "_":
+            return False
+    return False
+
+
 # The quotes and apostrophes that can open a word besides the categories of
 # opening and closing quotes (Pi, Pf).
 _OPENING_MARKS = frozenset("\"'\u2019\u2018\u201a\u201e\u00ab\u00bb\u2039\u203a\u00a1\u00bf")
-# The text before the first letter or digit: whitespace and marks.
-_WORDLESS_START = re.compile(r"[\W_]*")
+_SPACES = re.compile(r"\s*")
 # The text after the closing marks that follow a block, up to the end of the next word.
 _FOLLOWING = re.compile(r"\S*\s*\S*")
 
@@ -171,7 +190,8 @@ class Stages:
     lang: Optional[str] = None
     """The language of the text. A cloning reference has its own language."""
     casing: Optional[Callable[[str], str]] = None
-    """Runs after normalisation. Only training sets one."""
+    """Runs after normalisation. Only training sets one. A backend that owns
+    ``normalize`` gets no casing."""
     chunk: Optional[Chunk] = None
     """The chunk size, a :class:`Chunk` or its value such as ``"clause"``.
     ``None`` takes the frontend's value, and when that is ``None`` too, a
@@ -183,7 +203,12 @@ class Stages:
 
     def __post_init__(self):
         if self.chunk is not None:
-            object.__setattr__(self, "chunk", Chunk(self.chunk))
+            try:
+                chunk = Chunk(self.chunk)
+            except ValueError:
+                values = ", ".join(repr(c.value) for c in Chunk)
+                raise ValueError(f"chunk {self.chunk!r} is not one of {values}") from None
+            object.__setattr__(self, "chunk", chunk)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -192,12 +217,17 @@ class FrontendConfig:
 
     lang: str
     phonemizer: Optional[Phonemizer] = None
-    """``None`` takes the default backend for :attr:`lang`."""
+    """``None`` takes the default backend for :attr:`phonemizer_lang`, else for :attr:`lang`."""
     alphabet: Alphabet = Alphabet.IPA
     model: Optional[str] = None
     stages: Stages = Stages()
     normalizer: Optional[Callable[[str, str], str]] = None
     """A ``(text, lang) -> str`` hook. ``None`` means no normalisation."""
+    phonemizer_lang: Optional[str] = None
+    """The language the backend reads when it differs from :attr:`lang`, the
+    text language: a voice trained with the espeak voice ``lfn`` for Twi text.
+    Normalisation, diacritization and casing keep :attr:`lang`. A call with
+    another :attr:`Stages.lang` phonemizes in that language."""
     keep_punctuation: bool = False
     strict: bool = False
     whole_text_limit: Optional[int] = WHOLE_TEXT_LIMIT
@@ -252,7 +282,7 @@ def _clauses(sentence: str) -> List[str]:
     clauses = []
     start = 0
     for match in _CLAUSE_BREAK.finditer(sentence):
-        end = match.end() + len(sentence[match.end():]) - len(sentence[match.end():].lstrip())
+        end = _SPACES.match(sentence, match.end()).end()
         clauses.append(sentence[start:end])
         start = end
     clauses.append(sentence[start:])
@@ -290,6 +320,9 @@ class _Piece:
     """The staged source text of the piece, or ``None`` where the frontend
     cannot say. The first piece of a part holds the part's text, and each
     later piece of that part holds ``""``."""
+    spaced: bool = True
+    """Whether the text writes whitespace between the piece before and the
+    first word of this one. The first piece of a text part counts as spaced."""
 
     @classmethod
     def of(cls, segment: Segment) -> "_Piece":
@@ -422,7 +455,9 @@ def _join(pieces: Iterable[_Piece], space: Segment) -> _Piece:
     A piece that ends in a clause symbol or in the word break *space* joins
     the next piece with no space, and any other piece takes *space* before
     the next, as :func:`~scriptconv.phonemizers.base.join_sentences` joins
-    sentences. The start and end symbols of bounded pieces stay out of the
+    sentences, where the text writes whitespace between the two pieces
+    (:attr:`_Piece.spaced`). The texts of the pieces join in the same way.
+    The start and end symbols of bounded pieces stay out of the
     join, so where two of them join, the inner end and start symbols go with
     their stream values. Every :class:`Chunk` size and
     :meth:`TextFrontend.phonemize_flat` join by this function.
@@ -432,16 +467,23 @@ def _join(pieces: Iterable[_Piece], space: Segment) -> _Piece:
     for piece in pieces:
         if not piece.phonemes:
             continue
-        if joined.phonemes and not (joined.ends_in_token or joined.phonemes[-1] == space.phonemes[0]):
+        if joined.phonemes and piece.spaced and not (
+                joined.ends_in_token or joined.phonemes[-1] == space.phonemes[0]):
             joined.add(space.phonemes, space.streams)
         joined.add(piece.phonemes, piece.streams)
         joined.bounds = joined.bounds or piece.bounds
         joined.ends_in_token = piece.ends_in_token
         joined.ends_sentence = piece.ends_sentence
         joined.ends_paragraph = piece.ends_paragraph
-        texts.append(piece.text)
-    if texts and all(text is not None for text in texts):
-        joined.text = " ".join(t for t in texts if t)
+        texts.append((piece.spaced, piece.text))
+    if texts and all(text is not None for _, text in texts):
+        parts = []
+        for spaced, text in texts:
+            if text:
+                if parts and spaced:
+                    parts.append(" ")
+                parts.append(text)
+        joined.text = "".join(parts)
     return joined
 
 
@@ -507,7 +549,8 @@ class TextFrontend:
     def __init__(self, config: FrontendConfig, backend: Optional[BasePhonemizer] = None):
         if backend is None:
             if config.phonemizer is None:
-                backend = phonemizer_for_lang(config.lang, config.alphabet, model=config.model)
+                backend = phonemizer_for_lang(config.phonemizer_lang or config.lang, config.alphabet,
+                                              model=config.model)
             else:
                 backend = get_phonemizer(config.phonemizer, config.alphabet, config.model)
         if (backend.keep_punctuation, backend.strict) != (config.keep_punctuation, config.strict):
@@ -517,10 +560,11 @@ class TextFrontend:
         self.config = config
         self.backend = backend
         self._space = backend.word_break()
+        self._casing_skipped = False
         stages = self._resolve(None)
         # The Grapheme and Unicode backends take any language and have no get_lang.
         if hasattr(backend, "get_lang"):
-            backend.get_lang(stages.lang)
+            backend.get_lang(self._backend_lang(stages.lang))
         if config.strict and stages.diacritize:
             package, extra = _DIACRITIZER_PACKAGES.get(
                 _diacritizer_family(stages.lang), (None, None))
@@ -529,6 +573,13 @@ class TextFrontend:
                     f"diacritization for {stages.lang!r} needs {package} — install "
                     f"with `pip install scriptconv[{extra}]`")
 
+    def _backend_lang(self, lang: str) -> str:
+        """The language the backend reads for text in *lang*. Tag case has no
+        meaning (RFC 5646 section 2.1.1), and ``_`` reads as ``-``."""
+        from linguatag import standardize_lang
+        same = standardize_lang(lang) == standardize_lang(self.config.lang)
+        return self.config.phonemizer_lang if self.config.phonemizer_lang and same else lang
+
     def with_backend(self, backend: BasePhonemizer) -> "TextFrontend":
         """A frontend with this configuration and another backend instance."""
         return TextFrontend(self.config, backend)
@@ -536,33 +587,20 @@ class TextFrontend:
     def phonemize_lazy(self, text: str, stages: Optional[Stages] = None) -> Iterator[List[str]]:
         """Phonemes of *text*, one list per chunk, as each chunk is read.
 
-        :attr:`Stages.chunk` sets the size of a chunk. At every size the
-        stages read the text in the same order, the frontend cuts the read
-        text into sentences, and a chunk is a sentence, a clause, the
-        sentences of a paragraph, or every sentence. The sentences of a chunk
-        join by the rule of :meth:`phonemize_flat`. A clause that ends in a
-        clause symbol, with another clause after it in its sentence, takes a
-        space after the symbol, as inside the sentence. The frontend cuts the
-        read text at its paragraph breaks before it cuts sentences, so a
-        paragraph break also ends a sentence, as after a title with no full
-        stop or after a ``!``. A ``reads_whole_text`` backend reports its own
-        paragraph ends.
+        :attr:`Stages.chunk` sets the chunk: a sentence, a clause, the
+        sentences of a paragraph, or every sentence. The stages run in the same
+        order at every size, and the sentences of a chunk join by the rule of
+        :meth:`phonemize_flat`. A clause symbol with another clause after it in
+        its sentence takes a space after it. A paragraph break also ends a
+        sentence.
 
         A block's symbols join the chunk before the block, and the text after
-        a block starts a new sentence, but a new paragraph only after a
-        paragraph break. A closing mark after a block, right after it or
-        after whitespace, closes the block's sentence, so it goes with the
-        block's chunk, and no chunk starts with such a mark. A symbol that the
-        backend reads as a word, such as ``%``, is no such mark, and a quote
-        after whitespace that opens the next word stays with that word (see
-        :func:`_marks_after`). A backend with a mark table gets the marks from
-        it, also where no word follows them (see :meth:`_take_marks`). A
-        block that starts a sentence after a sentence that ends in a clause
-        symbol follows that symbol with no space. A block before the first
-        text is a chunk of its own at ``sentence`` and ``clause`` size, with the marks right after it, and
-        it starts the chunk after it at ``paragraph`` and ``none`` size. A
-        chunk of bounded segments has one start and one end symbol, with the
-        block's symbols between them. A chunk that gives no phonemes is not
+        it starts a new sentence. A closing mark after a block goes with the
+        block's chunk, so no chunk starts with one (:func:`_marks_after`,
+        :meth:`_take_marks`). A block before the first text is a chunk of its
+        own at ``sentence`` and ``clause`` size, and starts the next chunk at
+        ``paragraph`` and ``none`` size. A chunk of bounded segments has one
+        start and one end symbol. A chunk that gives no phonemes is not
         yielded.
         """
         for chunk in self._chunk_pieces(text, self._resolve(stages)):
@@ -573,21 +611,15 @@ class TextFrontend:
         return list(self.phonemize_lazy(text, stages))
 
     def segments(self, text: str, stages: Optional[Stages] = None) -> Iterator[Segment]:
-        """The chunks of :meth:`phonemize_lazy`, each with the backend's side streams.
+        """The chunks of :meth:`phonemize_lazy` as :class:`~scriptconv.phonemizers.base.Segment`, with the backend's side streams.
 
-        The streams of the backend, such as dizione's stress or Shami's
-        language ids, stay in step with the symbols at every size. A word
-        break that the frontend adds takes the values of the backend's
+        The streams stay in step with the symbols at every size: a word break
+        that the frontend adds takes the values of the backend's
         :meth:`~scriptconv.phonemizers.base.BasePhonemizer.word_break`, and a
-        clause symbol or a block's symbol takes 0 in every stream. Where two
-        bounded segments of the backend join, the inner end and start symbols
-        go with their stream values. Each chunk is a :class:`~scriptconv.phonemizers.base.Segment`
-        whose symbols hold the clause symbols, so its ``mark`` is ``None``.
-        The segment's ``text`` is the staged source text of its chunk, joined
-        with one space for a chunk of several sentences, or ``None`` where the
-        frontend cannot say. The first piece of a part holds the part's text,
-        and each later piece of that part holds ``""``, so it drops out of the
-        join.
+        clause symbol or a block's symbol takes 0. The symbols hold the clause
+        symbols, so ``mark`` is ``None``. ``text`` is the staged source text of
+        the chunk, with one space between two sentences where the text writes
+        whitespace between them, or ``None`` where the frontend cannot say.
         """
         for chunk in self._chunk_pieces(text, self._resolve(stages)):
             yield Segment(tuple(chunk.phonemes), None, chunk.ends_sentence,
@@ -595,15 +627,12 @@ class TextFrontend:
                           chunk.ends_paragraph, chunk.bounds is not None, text=chunk.text)
 
     def phonemize_flat(self, text: str, stages: Optional[Stages] = None) -> List[str]:
-        """Phonemes of *text* as one list, for training.
+        """Phonemes of *text* as one list, for training: the ``none`` chunk.
 
-        The list is the sentence chunks of :meth:`phonemize` joined by the
-        rule of tts-punctuation, for every backend. A sentence that ends in a
-        clause symbol, or in a space, joins the next one with no space, and
-        any other sentence takes one space before the next, as
-        :func:`~scriptconv.phonemizers.base.join_sentences` joins them. Where
-        two bounded segments join, the inner end and start symbols go. So the
-        ``none`` size gives this list as its one chunk.
+        The sentences join by the rule of tts-punctuation, as
+        :func:`~scriptconv.phonemizers.base.join_sentences` joins them, with a space only
+        where the text writes whitespace between two sentences. Where two
+        bounded segments join, the inner end and start symbols go.
         """
         stages = dataclasses.replace(self._resolve(stages), chunk=Chunk.SENTENCE)
         return _join(self._pieces(text, stages, clauses=False), self._space).closed(self._space).phonemes
@@ -653,72 +682,46 @@ class TextFrontend:
     def identity(self) -> PhonemizerIdentity:
         """What phonemizes this frontend's language, with :data:`FRONTEND_VERSION`.
 
-        ``revision`` is ``sc1:`` and a hash of the backend's revision, of the
-        code of the scriptconv modules that the frontend loads, of the stage
-        settings and of ``text2spoken.revision`` when the normaliser is
-        :func:`spoken_normalizer`. It is ``None``, so a ``version`` difference
-        shows, when scriptconv cannot vouch for a stage: the backend has no
-        revision, the normaliser is another callable or a text2spoken with no
-        ``revision``, the frontend diacritizes, or a casing runs.
-
-        An identity with a ``revision`` is kept on disk, as
-        :mod:`scriptconv.phonemizers._identity_cache` describes, so a later
-        process reads it back with no probe and no call into the backend.
+        ``revision`` is the revision of the backend, then ``;keep_punctuation``
+        when the frontend keeps punctuation, then ``;text2spoken==V``
+        when the normaliser is :func:`spoken_normalizer` and normalisation is
+        on, then ``;<diacritizer>==V`` when the frontend diacritizes with the
+        default model. It is ``None``, so a ``version`` difference shows, when
+        scriptconv cannot vouch for a stage: another normaliser, a casing, a
+        diacritizer model, or a diacritizer that is not installed.
         """
-        from scriptconv.phonemizers import _identity_cache
         stages = self._resolve(None)
-        entry_key = _identity_cache.key(self.backend, self._identity_settings(stages))
-        kept = _identity_cache.load(entry_key)
-        if kept is not None:
-            return kept
-        state = _identity_cache.snapshot(self.backend)
-        identity = dataclasses.replace(self.backend.identity(stages.lang), frontend=FRONTEND_VERSION)
-        identity = dataclasses.replace(identity, revision=self._revision(identity.revision, stages))
-        _identity_cache.store(entry_key, identity, state)
-        return identity
-
-    def _revision_settings(self, stages: Stages) -> Dict[str, object]:
-        """The frontend settings that change the output and join the revision."""
-        return {"keep_punctuation": self.config.keep_punctuation, "strict": self.config.strict,
-                "whole_text_limit": self.config.whole_text_limit,
-                "alphabet": Alphabet(self.config.alphabet).value, "normalize": stages.normalize,
-                "lang": stages.lang, "chunk": stages.chunk.value}
-
-    def _identity_settings(self, stages: Stages) -> Dict[str, object]:
-        """The frontend settings that change :meth:`identity`: those of the
-        revision, and the stages that decide whether there is one."""
-        normalizer = None
-        if stages.normalize and self.config.normalizer is not None:
-            text2spoken = sys.modules.get("text2spoken")
-            normalizer = ("text2spoken" if text2spoken is not None
-                          and self.config.normalizer is getattr(text2spoken, "normalize", None) else "other")
-        return {**self._revision_settings(stages), "diacritize": stages.diacritize,
-                "casing": stages.casing is not None, "normalizer": normalizer}
+        identity = dataclasses.replace(self.backend.identity(self._backend_lang(stages.lang)),
+                                       frontend=FRONTEND_VERSION)
+        return dataclasses.replace(identity, revision=self._revision(identity.revision, stages))
 
     def _revision(self, backend_revision: Optional[str], stages: Stages) -> Optional[str]:
         """The revision of :meth:`identity`, from the backend's revision and the resolved *stages*."""
-        if backend_revision is None or stages.diacritize or stages.casing is not None:
+        if backend_revision is None or stages.casing is not None:
             return None
-        normalizer = None
+        revision = backend_revision
+        if self.config.keep_punctuation:
+            revision += ";keep_punctuation"
         if stages.normalize and self.config.normalizer is not None:
             try:
-                from text2spoken import normalize, revision
+                from text2spoken import normalize
             except ImportError:
                 return None
             if self.config.normalizer is not normalize:
                 return None
-            try:
-                normalizer = revision(stages.lang)
-            except (ValueError, RuntimeError, OSError) as exc:
-                LOG.warning("text2spoken gives no revision for %r, so the frontend has none: %s",
-                            stages.lang, exc)
+            revision += f";text2spoken=={metadata.version('text2spoken')}"
+        if stages.diacritize:
+            if stages.diacritizer_model is not None:
                 return None
-        from scriptconv.phonemizers._revision import FORMAT, code_revision
-        code = code_revision(self.backend, stages.lang, self._revision_settings(stages), frontend=True)
-        if code is None:
-            return None
-        digest = hashlib.sha256(json.dumps([FORMAT, backend_revision, code, normalizer]).encode())
-        return f"{FORMAT}:{digest.hexdigest()}"
+            package = _DIACRITIZER_PACKAGES.get(_diacritizer_family(stages.lang), (None,))[0]
+            if package is None:
+                return None
+            distribution = package.replace("_", "-")
+            try:
+                revision += f";{distribution}=={metadata.version(distribution)}"
+            except metadata.PackageNotFoundError:
+                return None
+        return revision
 
     def register(self, graph: ConversionGraph) -> None:
         """Add a ``text -> <alphabet>`` edge that runs :meth:`phonemize_lazy`.
@@ -734,7 +737,8 @@ class TextFrontend:
 
         An explicit value of the call wins, then the frontend's own. The
         resolved ``normalize`` and ``diacritize`` are ``False`` when the
-        backend owns the stage.
+        backend owns the stage, and ``casing`` is ``None`` when it owns
+        ``normalize``.
         """
         own = self.config.stages
         if stages is None:
@@ -745,12 +749,19 @@ class TextFrontend:
         if enabled is None:
             from linguatag import lang_distance
             enabled = lang_distance(lang, "ar") <= _ARABIC_DISTANCE
+        casing = stages.casing or own.casing
+        if casing is not None and "normalize" in self.backend.owned_stages:
+            if not self._casing_skipped:
+                LOG.warning("%s normalises its own text, so the frontend applies no casing",
+                            type(self.backend).__name__)
+                self._casing_skipped = True
+            casing = None
         return Stages(
             normalize=normalize is not False and "normalize" not in self.backend.owned_stages,
             diacritize=enabled and "diacritize" not in self.backend.owned_stages,
             diacritizer_model=stages.diacritizer_model or own.diacritizer_model,
             lang=lang,
-            casing=stages.casing or own.casing,
+            casing=casing,
             chunk=stages.chunk or own.chunk or Chunk.SENTENCE,
         )
 
@@ -830,36 +841,28 @@ class TextFrontend:
             yield held
 
     def _take_marks(self, held: _Piece, piece: Optional[_Piece], marks: str, following: str) -> None:
-        """Move the symbols at the start of *piece* that write *marks* to the end of *held*.
+        """Move the symbols at the start of *piece* that write *marks* to the end of *held*, in place of its word break.
 
-        *held* ends in a block, and *marks* are the closing marks after the
-        block in the text (see :func:`_marks_after`). Such a mark closes the
-        block's sentence, so it goes with the block, in place of the word
-        break before it, as tts-punctuation puts a closing mark with the
-        sentence that it ends. A backend with a mark table
-        (:meth:`~scriptconv.phonemizers.base.BasePhonemizer.mark_symbols`)
-        writes the symbols of its table for the marks after a word. The table
-        is the backend's read of the marks at the end of a text, and the
-        backend can read them in another way where a word follows. So the
-        frontend writes the mark symbols at the start of the table's read of
-        the marks with *following*, the text after them up to the end of the
-        next word. It removes from *piece* the symbols at its start that the
-        backend writes for one of the marks, also where that read drops them.
-        dizione drops ``);`` at the end of a text as an emoticon, but reads
-        ``x.);5`` with ``. ) ;``. It reads ``;* go`` alone with no mark, but
-        ``x;* go`` with ``;``, and it drops all of ``:'))`` in ``x:')) go``.
-        It reads ``x .5``, ``x != y`` and ``x:( go`` with no mark, as the
-        decimal point, the operator and the emoticon belong to the text after
-        the block. *piece* is ``None`` where no word follows the marks before
-        the next block or the end of the text. A backend with no table writes symbols whose characters are
-        all in *marks*. A backend that drops the marks writes no such symbols,
-        and then *held* keeps its word break.
+        *held* ends in a block, and *marks* are the closing marks after it
+        (:func:`_marks_after`), which close the block's sentence, as
+        tts-punctuation puts a closing mark with the sentence that it ends. A backend
+        with a mark table
+        (:meth:`~scriptconv.phonemizers.base.BasePhonemizer.mark_symbols`) can
+        read marks in another way where a word follows, so the symbols are
+        the start of the table's read of *marks* plus *following*, the text up
+        to the end of the next word: dizione drops ``);`` at the end of a text
+        as an emoticon, but reads ``x.);5`` with ``. ) ;``. The symbols at the
+        start of *piece* that the backend writes for a mark leave *piece*,
+        also where that read drops them. A backend with no table gives the
+        symbols of *piece* whose characters are all in *marks*. *piece* is
+        ``None`` where no word follows the marks. Where the backend writes no
+        symbol for the marks, *held* keeps its word break.
         """
         phonemes = piece.phonemes if piece is not None else []
         table = self.backend.mark_symbols(marks)
         if table is None:
-            count = next((i for i, symbol in enumerate(phonemes) if not set(symbol) <= set(marks.lstrip())),
-                         len(phonemes))
+            allowed = set(marks.lstrip())
+            count = next((i for i, symbol in enumerate(phonemes) if not set(symbol) <= allowed), len(phonemes))
             # whitespace between two runs of marks stays, and whitespace after them goes
             while count and not phonemes[count - 1].strip():
                 count -= 1
@@ -930,20 +933,29 @@ class TextFrontend:
         if self.backend.reads_whole_text:
             yield from self._whole_text_read(text, stages, clauses)
             return
-        if "normalize" in self.backend.owned_stages:
-            # The backend reads the text with its own rules, so it gets the
-            # sentences as written, cut before casing.
-            paragraphs = [[self._read(sentence, stages) for sentence in sentences]
-                          for sentences in _paragraph_sentences(text)]
-        else:
-            paragraphs = _paragraph_sentences(self._read(text, stages))
+        # A backend that owns normalize reads the text with its own rules, so
+        # it gets the sentences as written.
+        text = self._read(text, stages)
         # A backend that overrides its output appends no clause symbol, so
         # its marks join as any other symbol.
         tokens = self.backend._keeps_punctuation()
-        for sentences in paragraphs:
+        # where the last sentence that gave pieces ends in the text
+        end: Optional[int] = None
+        cursor = 0
+        for sentences in _paragraph_sentences(text):
             for number, sentence in enumerate(sentences, 1):
-                yield from self._sentence_pieces(sentence, stages, clauses, tokens,
-                                                 ends_paragraph=number == len(sentences))
+                start = text.find(sentence, cursor)
+                cursor = start + len(sentence)
+                for piece in self._sentence_pieces(sentence, stages, clauses, tokens,
+                                                   ends_paragraph=number == len(sentences)):
+                    # Only the first piece of a sentence follows the gap
+                    # before it. The gap is read only for a sentence that
+                    # gives pieces, so each character is read once.
+                    if end != cursor:
+                        word = start + _WORDLESS_START.match(sentence).end()
+                        piece.spaced = end is None or bool(_WHITESPACE.search(text, end, word))
+                        end = cursor
+                    yield piece
 
     def _sentence_pieces(self, sentence: str, stages: Stages, clauses: bool, tokens: bool,
                          ends_paragraph: bool) -> Iterator[_Piece]:
@@ -958,8 +970,8 @@ class TextFrontend:
             # A chunk never starts with a space, also for a backend that
             # keeps the spaces it reads.
             part = self._diacritize(part, stages).lstrip()
-            read = [piece for piece in map(_Piece.of, self.backend.phonemize_segments(part, stages.lang))
-                    if piece.phonemes]
+            segments = self.backend.phonemize_segments(part, self._backend_lang(stages.lang))
+            read = [piece for piece in map(_Piece.of, segments) if piece.phonemes]
             self._check_read(part, [p for piece in read for p in piece.phonemes], stages)
             words_follow = clauses and any(c.isalnum() for c in "".join(texts[index + 1:]))
             for count, piece in enumerate(read, 1):
@@ -977,11 +989,7 @@ class TextFrontend:
 
         Above :attr:`FrontendConfig.whole_text_limit` characters, the text is
         first cut at its paragraph breaks, and each cut ends a sentence and a
-        paragraph. Each piece is diacritized and read whole, and the backend
-        reports its segments. A segment's clause symbol follows it, with a
-        space after ``, : ;``. A segment that ends in a clause symbol, with
-        another segment after it in its sentence, takes a space after the
-        symbol, and the pieces of a sentence join by :func:`_join`.
+        paragraph. The backend reads each cut whole and reports its segments.
         """
         text = self._read(text, stages)
         cuts = self._whole_text_pieces(text)
@@ -991,7 +999,7 @@ class TextFrontend:
             cut = self._diacritize(cut, stages)
             pieces: List[_Piece] = []
             sentence: List[_Piece] = []
-            for segment in self.backend.phonemize_segments(cut, stages.lang):
+            for segment in self.backend.phonemize_segments(cut, self._backend_lang(stages.lang)):
                 if segment.phonemes:
                     if sentence:
                         self._continue_sentence(sentence[-1])
@@ -1056,33 +1064,29 @@ class TextFrontend:
     def _add_block(self, piece: _Piece, parts: List[str], index: int, stages: Stages) -> None:
         """Append the symbols of the inline block at *index* of a split text to *piece*.
 
-        A space, tab or line break before the block in the text, also with
-        marks between it and the block, or a space after the block, becomes
-        the backend's word break, unless *piece* is empty or already ends in
-        one. :meth:`_before_block` reads what comes before the block, and
-        :meth:`_mark_after` reads the clause symbol after it. A block whose
-        symbols end in a character that is also a clause symbol, with no
-        clause symbol after it, takes a word break before the next word,
-        because that character ends no sentence. The piece then ends in a
-        clause symbol that joins the next sentence with no space only when a
-        mark follows the block.
+        Whitespace before the block (also with marks between), a hyphen,
+        ``!`` or ``?`` between a word and the block, or a space after it,
+        becomes the backend's word break, unless *piece* is empty or already
+        ends in one. A block whose symbols end in a clause-symbol character,
+        with no mark after it, takes a word break before the next word, as
+        that character ends no sentence.
 
-        The block's symbols go inside the start and end symbols of a bounded
-        piece. A block before the first text takes the bounds of the text
-        after it. The backend writes the marks of a bounded piece itself, so
-        the frontend reads no mark around the block: a word break comes
-        before the block where the text has whitespace and the piece does not
-        end in a mark, and after it where the text has whitespace or a mark.
-        :meth:`_take_marks` replaces that word break with the symbols that the
-        backend writes for the mark.
+        In a bounded piece the block goes inside the start and end symbols, and
+        the frontend reads no mark around it, as the backend writes the marks:
+        a word break comes before the block where the text has whitespace and
+        the piece does not end in a mark, and after it where the text has
+        whitespace or a mark, for :meth:`_take_marks` to replace.
         """
         text, after = parts[index - 1], parts[index + 1]
         symbols = parts[index][2:-2].strip()
         piece.text = " ".join(filter(None, (piece.text, parts[index])))
         phonemes = piece.phonemes
         space, space_streams = self._space.phonemes, self._space.streams
+        tail = text.rsplit(None, 1)[-1] if text[-1:].strip() else ""
+        separated = (_space_before_block(text) or tail[-1:] in _HYPHENS
+                     or self.backend.remove_punctuation(tail + _BLOCK_WORD).endswith(" " + _BLOCK_WORD))
         if piece.bounds is not None:
-            if _SPACE_BEFORE_BLOCK.search(text) and phonemes and phonemes[-1] != space[0] and not piece.ends_in_token:
+            if separated and phonemes and phonemes[-1] != space[0] and not piece.ends_in_token:
                 piece.add(space, space_streams)
             piece.add(symbols)
             piece.ends_in_token = not after[:1].isspace() and not _leading_marks(after)
@@ -1092,7 +1096,7 @@ class TextFrontend:
         before = self._before_block(phonemes, text, index > 1)
         if before is False:
             piece.pop()
-        if _SPACE_BEFORE_BLOCK.search(text) and phonemes and phonemes[-1] != space[0] and not before:
+        if separated and phonemes and phonemes[-1] != space[0] and not before:
             piece.add(space, space_streams)
         piece.add(symbols)
         mark = self._mark_after(after, index + 2 < len(parts), stages)
@@ -1142,22 +1146,14 @@ class TextFrontend:
         return mark
 
     def _before_block(self, phonemes: List[str], text: str, after_block: bool) -> Optional[bool]:
-        """How a block follows *phonemes* and the *text* before it, read as in the plain text.
-
-        *text* reads with a plain word in place of the block, and in front of
-        it when *after_block*, for the block before it.
+        """How a block follows *phonemes* and the *text* before it, read with a plain word in place of each block.
 
         ``True``: the block starts a sentence after one that ends in a clause
-        symbol, so no space comes before it, by the rule of
-        :func:`~scriptconv.phonemizers.base.join_sentences`. ``False``: the
-        clause symbol at the end of *phonemes* ends no clause in the plain
-        text, as after ``Tudo."``, after ``Dr.`` or directly before the block.
-        The block continues the clause, so the symbol goes. ``None``: neither.
+        symbol, so no space comes before it. ``False``: the clause symbol at
+        the end of *phonemes* is the mark of the last clause of *text* but ends
+        no clause in the plain text, as after ``Dr.``, so it goes. ``None``:
+        neither, also when the symbol is a phoneme such as an X-SAMPA ``:``.
         Only a backend that keeps punctuation gives ``True`` or ``False``.
-
-        The symbol goes only when it is the mark of the last clause of
-        *text*, which the backend writes after that clause. Any other symbol
-        is a phoneme, such as an X-SAMPA ``:`` for length, and it stays.
         """
         if not (self._keeps_punctuation() and phonemes
                 and phonemes[-1] in _CLAUSE_TOKENS):

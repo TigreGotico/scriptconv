@@ -45,6 +45,8 @@ CMUDICT = "scriptconv/phonemizers/_thirdparty/dizione/built/LICENSE.cmudict"
 HOMOGRAPH_DATA = "scriptconv/phonemizers/_thirdparty/dizione/built/LICENSE.homograph-data"
 G2PW = "scriptconv/phonemizers/_thirdparty/g2pw/LICENSE"
 NAKDIMON = "scriptconv/phonemizers/_thirdparty/nakdimon/LICENSE"
+LEOKANI = "scriptconv/phonemizers/_thirdparty/leokani/LICENSE"
+NEMO = "scriptconv/phonemizers/_thirdparty/nemo/NOTICE"
 # path prefix -> (licences, the notice the wheel carries for each licence). The
 # first prefix that matches a file gives its licences. homographs.json takes
 # CMUdict pronunciations for most of its senses.
@@ -58,8 +60,10 @@ THIRD_PARTY = {
     "scriptconv/phonemizers/_thirdparty/f5tts.py": (("MIT", F5TTS),),
     "scriptconv/phonemizers/_thirdparty/g2pw/": (("Apache-2.0", G2PW),),
     "scriptconv/phonemizers/_thirdparty/hangul2ipa.py": (("MIT", HANGUL_TO_IPA),),
+    "scriptconv/phonemizers/_thirdparty/leokani/": (("MIT", LEOKANI),),
     "scriptconv/phonemizers/_thirdparty/ko_tables/": (("MIT", HANGUL_TO_IPA),),
     "scriptconv/phonemizers/_thirdparty/nakdimon/": (("MIT", NAKDIMON),),
+    "scriptconv/phonemizers/_thirdparty/nemo/": (("Apache-2.0", NEMO),),
     "scriptconv/phonemizers/_thirdparty/shami/": (("Apache-2.0", None),),
     "scriptconv/phonemizers/_thirdparty/vosk_g2p.py": (("Apache-2.0", None),),
     "scriptconv/phonemizers/_thirdparty/zh_num.py": (("Apache-2.0", None),),

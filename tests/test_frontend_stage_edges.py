@@ -72,7 +72,9 @@ PATHS = {
 def test_no_stage_input_starts_or_ends_with_whitespace(monkeypatch, backend, path):
     frontend, received = _recording_frontend(monkeypatch, BACKENDS[backend]())
     PATHS[path](frontend, TEXT)
-    assert {stage for stage, _ in received} >= {"casing", "diacritize"}
+    # a backend that owns normalize gets no casing
+    stages = {"diacritize"} if "normalize" in frontend.backend.owned_stages else {"casing", "diacritize"}
+    assert {stage for stage, _ in received} >= stages
     assert [(stage, text) for stage, text in received if text != text.strip()] == []
 
 

@@ -37,6 +37,22 @@ class _RecordingSession:
         return [logits]
 
 
+class _NeverEndingSession:
+    """An ONNX session stand-in that always predicts byte id 56 and counts calls."""
+
+    def __init__(self):
+        self.calls = 0
+
+    def get_outputs(self):
+        return [mock.Mock(name="logits")]
+
+    def run(self, output_names, inputs):
+        self.calls += 1
+        logits = np.zeros((1, 1, 64), dtype=np.float32)
+        logits[0, -1, 56] = 1.0
+        return [logits]
+
+
 class TestByT5LangPrefix(unittest.TestCase):
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()
@@ -82,6 +98,21 @@ class TestByT5LangPrefix(unittest.TestCase):
             "en-US": "<en-US>: w".encode(),
             "zh-CN": "<zh-CN>: w".encode(),
         })
+
+    def test_decode_phones_skips_added_tokens_and_subtracts_three(self):
+        session = _RecordingSession()
+        with mock.patch("scriptconv.phonemizers.mul.make_session", return_value=session):
+            phonemizer = ByT5Phonemizer(model=self.model, tokenizer_config=self.tokenizer)
+        # 56 is byte '5' (ids 0-2 are added tokens); id 1 is </s>.
+        self.assertEqual(phonemizer._decode_phones([56, 1]), "5")
+
+    def test_greedy_decode_stops_after_512_steps(self):
+        session = _NeverEndingSession()
+        with mock.patch("scriptconv.phonemizers.mul.make_session", return_value=session):
+            phonemizer = ByT5Phonemizer(model=self.model, tokenizer_config=self.tokenizer)
+        out = phonemizer.phonemize_string("a", "en-US")
+        self.assertEqual(session.calls, 512)
+        self.assertEqual(out, "5" * 512)
 
 
 if __name__ == "__main__":

@@ -6,23 +6,15 @@ from scriptconv.phonemizers.enums import Alphabet
 
 
 class ArbtokPhonemizer(BasePhonemizer):
-    """
-    Arabic phonemizer backed by ``arbtok``, an engine built on the
-    orthography2ipa lattice.  Its edge over bare orthography2ipa is
-    **undiacritized** Arabic: ``arbtok`` restores the tashkeel with a bundled
-    diacritizer before transcribing, so it reads the unvocalized text people
-    actually type.  Output is always IPA.
+    """Arabic to IPA through ``arbtok``, which restores the tashkeel before it transcribes.
 
-    The variety is any orthography2ipa Arabic spec code (``ar``, ``arb``,
-    ``ar-EG``, ``ar-SA-x-najd``, ...), taken from the per-call ``lang`` argument.
+    So it reads undiacritized Arabic, which bare orthography2ipa does not. The
+    per-call ``lang`` is any orthography2ipa Arabic spec code (``ar``, ``arb``,
+    ``ar-EG``, ``ar-SA-x-najd``, ...).
 
-    Register: arbtok's own default is the pausal (spoken) register, which is the
-    right choice for the dialects; the full iʿrāb register is only phonologically
-    apt for ``ar``/``arb`` (MSA/Classical).  The default here defers to arbtok's
-    register default rather than overriding it, so this convention lives in the
-    engine; pass ``model`` of ``"i'rab"`` to force the full register.
-
-    ``arbtok`` is imported lazily so importing ``scriptconv`` does not hard-require it.
+    ``register=None`` keeps arbtok's default, the pausal register, which suits
+    the dialects. ``"i'rab"`` (or ``"irab"``, ``"iʿrab"``, ``"full"``) forces the
+    full case-ending register, apt only for ``ar`` and ``arb``.
     """
 
     owned_stages = frozenset({"diacritize"})
@@ -32,10 +24,7 @@ class ArbtokPhonemizer(BasePhonemizer):
                  alphabet: Alphabet = Alphabet.IPA):
         if alphabet != Alphabet.IPA:
             raise ValueError("arbtok only outputs IPA")
-        # register: None -> defer to arbtok's own default (pausal). The iʿrab
-        # aliases force arbtok's full case-ending register, which the plugin
-        # spells "full" (apt only for ar/arb); pass any other value through so a
-        # caller can still say "pausal"/"full" directly.
+        # arbtok spells the iʿrab register "full"; any other value passes through.
         self.register = None
         if register:
             self.register = ("full" if register.lower() in ("irab", "i'rab", "iʿrab", "full")
@@ -63,8 +52,7 @@ class ArbtokPhonemizer(BasePhonemizer):
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:
-        """
-        Resolve *target_lang* to an arbtok/orthography2ipa Arabic spec code.
+        """*target_lang* as an arbtok (orthography2ipa) Arabic spec code.
 
         Raises:
             ValueError: If arbtok has no Arabic variety for *target_lang*.

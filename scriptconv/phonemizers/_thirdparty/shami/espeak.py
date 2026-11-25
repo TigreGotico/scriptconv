@@ -17,6 +17,12 @@ _ESPEAK = shutil.which("espeak-ng") or shutil.which("espeak")
 _PAREN = re.compile(r"\([^)]*\)")
 _ZW = dict.fromkeys(map(ord, "‍‌​﻿"), None)
 
+# espeak-ng time grows with the text: about 150 microseconds per UTF-8 byte at
+# load 35 on an 8-core laptop. The allowance is four times that rate, for a box
+# at load 50 and above. The base bounds a binary that hangs on a short text.
+_TIMEOUT_BASE = 30
+_TIMEOUT_PER_BYTE = 4 * 150e-6
+
 
 def available() -> bool:
     return _ESPEAK is not None
@@ -33,13 +39,17 @@ def phonemize(text: str, voice: str = "en-us") -> str:
         raise RuntimeError("espeak-ng not found on PATH")
     if not text.strip():
         return ""
+    # The text goes on stdin, because Linux refuses one argument longer than
+    # 128 KiB. Without the final newline, espeak-ng drops the end of the last word.
+    data = text + "\n"
     proc = subprocess.run(
-        [_ESPEAK, "-v", voice, "--ipa=1", "-q", "--", text],
+        [_ESPEAK, "-v", voice, "--ipa=1", "-q", "--stdin"],
+        input=data,
         capture_output=True,
         text=True,
         encoding="utf-8",
         errors="replace",
-        timeout=30,
+        timeout=_TIMEOUT_BASE + _TIMEOUT_PER_BYTE * len(data.encode("utf-8", "replace")),
     )
     raw = proc.stdout or ""
     raw = _PAREN.sub(" ", raw).translate(_ZW)

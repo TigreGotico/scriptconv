@@ -1,6 +1,15 @@
 # scriptconv.translit
 
-Script-level decomposition utilities.
+<!-- agent-hint
+covers: Hangul decomposition, kana transliteration and Cangjie codes
+source: scriptconv/translit.py, scriptconv/cangjie.py
+generated: no
+verify: python scripts/check_doc_page.py docs/translit.md
+see: docs/readings.md for the respellings that need a dictionary
+-->
+
+This page shows the table-driven rewrites of a script: Hangul to jamo,
+hiragana to katakana, and hanzi to Cangjie input codes.
 
 ```python
 from scriptconv.translit import decompose_hangul
@@ -11,7 +20,7 @@ from scriptconv.translit import decompose_hangul
 ## decompose_hangul
 
 ```python
-def decompose_hangul(text: str) -> str
+def decompose_hangul(text: str, form: str = "compatibility", drop_silent_initial: bool = False) -> str
 ```
 
 Decomposes Hangul syllable block characters into their constituent jamo letters.
@@ -90,6 +99,8 @@ them, the katakana-only long-vowel mark `ー` (U+30FC) has no hiragana form and
 passes through unchanged.
 
 ```python
+from scriptconv import hira_to_kana, kana_to_hira
+
 hira_to_kana("ひらがな")   # "ヒラガナ"
 kana_to_hira("カタカナ")   # "かたかな"
 ```
@@ -115,4 +126,4 @@ Where the upstream table lists alternative codes for a glyph, the primary
 code is kept, `cangjie_code` returns `None` for unmapped characters.
 
 ---
-[← notation](notation.md) · [Home](../README.md) · [readings →](readings.md)
+[Index](index.md) · [← notation](notation.md) · [readings →](readings.md)
