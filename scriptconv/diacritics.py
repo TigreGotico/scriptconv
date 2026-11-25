@@ -499,15 +499,21 @@ def strip_diacritics(text: str, lang: str = "und", **_) -> str:
     A mark that composes with the letter before it into a letter of the
     language's alphabet, as U+0301 after г in NFD ѓ, is kept and written
     composed. Raises :class:`ValueError` where the diacritics are spelling, as
-    in European Portuguese.
+    in European Portuguese, or where the language has no overlay diacritics.
     """
     marks = _overlay_marks(lang)
     if marks is None:
+        if _diacritizer_family(lang) == "pt":
+            raise ValueError(
+                f"cannot strip diacritics for lang={lang!r}: its diacritics are "
+                "part of the native orthography, so removal would corrupt the "
+                "spelling. strip is defined only for overlay diacritics "
+                "(Arabic/Hebrew vocalization, East-Slavic/Turkic stress).")
         raise ValueError(
-            f"cannot strip diacritics for lang={lang!r}: its diacritics are "
-            "part of the native orthography, so removal would corrupt the "
-            "spelling. strip is defined only for overlay diacritics "
-            "(Arabic/Hebrew vocalization, East-Slavic/Turkic stress).")
+            f"cannot strip diacritics for lang={lang!r}: scriptconv has no "
+            "overlay diacritics for this language. strip is defined only for "
+            "overlay diacritics (Arabic/Hebrew vocalization, "
+            "East-Slavic/Turkic stress).")
     native = _NATIVE_ACCENTED_LETTERS.get(_primary_subtag(lang), frozenset())
     kept = []
     for c in text:
