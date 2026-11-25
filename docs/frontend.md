@@ -445,4 +445,4 @@ takes from under a millisecond to a few tens of milliseconds; the first call
 can take longer, because it resolves the language through the engine.
 
 ---
-[Index](index.md) · [← phonemizers](phonemizers.md) · [ovos →](ovos.md)
+[← Prev](phonemizers.md) · [Home](index.md) · [Next →](ovos.md)

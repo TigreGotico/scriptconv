@@ -126,4 +126,4 @@ Where the upstream table lists alternative codes for a glyph, the primary
 code is kept, `cangjie_code` returns `None` for unmapped characters.
 
 ---
-[Index](index.md) · [← notation](notation.md) · [readings →](readings.md)
+[← Prev](notation.md) · [Home](index.md) · [Next →](readings.md)

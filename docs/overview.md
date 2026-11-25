@@ -290,4 +290,4 @@ exception: its `alphabets` module imports scriptconv to convert its notation.
 
 
 ---
-[Index](index.md) · [install →](install.md)
+[Home](index.md) · [Next →](install.md)

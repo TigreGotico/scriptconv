@@ -3,7 +3,7 @@
 <!-- agent-hint
 covers: every phonemizer backend, its class, its extra, its package and its language default, and the models that download
 source: scriptconv/phonemizers/enums.py, registry.py and _moved.py for the table, through scripts/backend_table.py. The download code in scriptconv/diacritics.py and scriptconv/phonemizers/g2pw.py, en.py, leokani.py, lir.py, mul.py and nemo_ipa.py
-generated: yes for the table between the backends markers, by scripts/backend_table.py, and for docs/figures/backends-by-extra.svg, by scripts/docs_figures.py. Edit the registry and run the script, not the output
+generated: yes for the table between the backends markers, by scripts/backend_table.py, and for docs/img/backends-by-extra.svg, by docs/img/plot_backends_by_extra.py. Edit the registry and run the script, not the output
 verify: python scripts/docs_figures.py --check && python scripts/backend_table.py --check && python scripts/check_doc_page.py docs/backends.md
 see: docs/phonemizers.md, docs/stack.md
 -->
@@ -36,7 +36,12 @@ code. scriptconv-copyleft and scriptconv-nonfree are the sister packages that
 hold the restricted wrappers. The Licensing section of the
 [install.md](install.md#licensing) states the terms of each.
 
-![Horizontal bars of the backends per extra: 59 backends in 26 extras. Package counts: scriptconv 35, scriptconv-copyleft 18, scriptconv-nonfree 6. The largest extras are zh-phonemizers 7, en-phonemizers 6, misaki 6, phonemizers 5 and ar-phonemizers 4.](figures/backends-by-extra.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="img/backends-by-extra-dark.svg">
+  <img alt="59 backends in 26 extras: scriptconv holds 35, scriptconv-copyleft 18 and scriptconv-nonfree 6. The largest extras are zh-phonemizers 7, en-phonemizers 6, misaki 6, phonemizers 5 and ar-phonemizers 4." src="img/backends-by-extra.svg">
+</picture>
+
+`img/plot_backends_by_extra.py` makes this figure from the phonemizer registry.
 
 *Figure: the 59 backends by extra. Read the colour: the `misaki`, `espeak`,
 `ko`, `th`, `gl`, `fa` and `transphone` extras install copyleft wrappers only, and `ar-phonemizers`,
@@ -214,4 +219,4 @@ one, run `phonetisaurus.train` on a lexicon such as CMUdict.
 loader error or the missing model otherwise.
 
 ---
-[Index](index.md) · [← ovos](ovos.md) · [performance →](performance.md)
+[← Prev](ovos.md) · [Home](index.md) · [Next →](performance.md)

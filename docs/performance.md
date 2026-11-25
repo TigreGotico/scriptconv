@@ -2,8 +2,8 @@
 
 <!-- agent-hint
 covers: what a first call and a warm call cost, how time grows with text length, the timing of the backend that reads whole text (dizione), and how to measure
-source: scripts/time_owner_backends.py and scripts/time_owner_backends.txt, WHOLE_TEXT_LIMIT in scriptconv/frontend.py, scripts/docs_figures.py
-generated: no, but docs/figures/owner-backend-timing.svg comes from scripts/docs_figures.py. Edit the script, not the SVG
+source: scripts/time_owner_backends.py and scripts/time_owner_backends.txt, WHOLE_TEXT_LIMIT in scriptconv/frontend.py, docs/img/plot_owner_backend_timing.py
+generated: no, but docs/img/owner-backend-timing.svg comes from docs/img/plot_owner_backend_timing.py. Edit the script, not the SVG
 verify: python scripts/docs_figures.py --check && python scripts/check_doc_page.py docs/performance.md
 see: docs/frontend.md, docs/backends.md
 -->
@@ -66,7 +66,12 @@ prose with each backend that reads text with its own rules, in five runs,
 and reports the median. The figure shows the medians of two runs of the
 script.
 
-![Horizontal bars on a log scale of the milliseconds to read 10,000 characters, run 1 and run 2: shami 87 and 76, dizione 297 and 179, euskaphone 406 and 426, tugaphone 637 and 674, arbtok 9,399 and 8,001.](figures/owner-backend-timing.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="img/owner-backend-timing-dark.svg">
+  <img alt="Milliseconds to read 10,000 characters, run 1 and run 2: shami 87 and 76, the fastest; arbtok 9,399 and 8,001, the slowest. dizione 297 and 179, euskaphone 406 and 426, tugaphone 637 and 674." src="img/owner-backend-timing.svg">
+</picture>
+
+`img/plot_owner_backend_timing.py` makes this figure from `scripts/time_owner_backends.txt`.
 
 *Figure: milliseconds for one read of 10,000 characters, on a log scale. Read
 the spread: arbtok, which restores the tashkeel before it transcribes, takes about 9 s where
@@ -105,4 +110,4 @@ python scripts/time_owner_backends.py PROSE_DIR
 ```
 
 ---
-[Index](index.md) · [← backends](backends.md) · [extending →](extending.md)
+[← Prev](backends.md) · [Home](index.md) · [Next →](extending.md)

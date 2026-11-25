@@ -91,4 +91,4 @@ licence other than Apache-2.0 or MIT.
 
 
 ---
-[Index](index.md) · [← overview](overview.md) · [stack →](stack.md)
+[← Prev](overview.md) · [Home](index.md) · [Next →](stack.md)

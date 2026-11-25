@@ -195,4 +195,4 @@ python -m scriptconv route halabi x-sampa              # show the chosen path
 ```
 
 ---
-[Index](index.md) · [← conventions](conventions.md) · [phonemizers →](phonemizers.md)
+[← Prev](conventions.md) · [Home](index.md) · [Next →](phonemizers.md)

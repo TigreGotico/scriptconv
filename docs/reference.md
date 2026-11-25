@@ -408,4 +408,4 @@ sorted(CONVENTION_REGISTRY)[:3]   # ['jamo-form', 'kashida', 'niqqud']
 ```
 
 ---
-[Index](index.md) · [← extending](extending.md)
+[← Prev](extending.md) · [Home](index.md)

@@ -111,4 +111,4 @@ fits the concept but is already modelled correctly by `str.lower` /
 `str.casefold`, so it is deliberately not duplicated.
 
 ---
-[Index](index.md) · [← readings](readings.md) · [graph →](graph.md)
+[← Prev](readings.md) · [Home](index.md) · [Next →](graph.md)
