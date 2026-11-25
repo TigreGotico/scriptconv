@@ -32,10 +32,10 @@ every scriptconv phonemizer has. A backend that can switch a stage off also has
 reports the stage as not ablatable. The gate fails when a gold stage has no
 verdict.
 
-Command line::
+Build a TSV with the header above, then pass its path::
 
     python -m scriptconv.testing.compare --lang pt-PT \\
-        --tsv tests/data/sentences/pt-PT.tsv --backend tugaphone \\
+        --tsv /path/to/sentences.tsv --backend tugaphone \\
         --stages homographs:homograph,numbers:number
 """
 from __future__ import annotations
