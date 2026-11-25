@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.0.4a171](https://github.com/TigreGotico/scriptconv/tree/0.0.4a171) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a170...0.0.4a171)
+
+**Merged pull requests:**
+
+- docs\(compare\): use a caller-supplied TSV path [\#451](https://github.com/TigreGotico/scriptconv/pull/451) ([JarbasAl](https://github.com/JarbasAl))
+- fix\(registry\): reject an unused model path [\#450](https://github.com/TigreGotico/scriptconv/pull/450) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.0.4a170](https://github.com/TigreGotico/scriptconv/tree/0.0.4a170) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a169...0.0.4a170)
+
+## [0.0.4a169](https://github.com/TigreGotico/scriptconv/tree/0.0.4a169) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a168...0.0.4a169)
+
+## [0.0.4a168](https://github.com/TigreGotico/scriptconv/tree/0.0.4a168) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a167...0.0.4a168)
+
+**Merged pull requests:**
+
+- fix\(diacritics\): name the missing overlay marks [\#449](https://github.com/TigreGotico/scriptconv/pull/449) ([JarbasAl](https://github.com/JarbasAl))
+- fix\(phonemizers\): treat ell and gre as Greek for ; [\#448](https://github.com/TigreGotico/scriptconv/pull/448) ([JarbasAl](https://github.com/JarbasAl))
+- fix\(notation\): read tied and non-syllabic əʊ as OW [\#447](https://github.com/TigreGotico/scriptconv/pull/447) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a167](https://github.com/TigreGotico/scriptconv/tree/0.0.4a167) (2026-11-25)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a166...0.0.4a167)
@@ -338,25 +365,13 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a122...0.0.4a123)
 
-**Merged pull requests:**
-
-- fix: dizione reads a spelling over 28 letters in pieces instead of exhausting memory [\#342](https://github.com/TigreGotico/scriptconv/pull/342) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a122](https://github.com/TigreGotico/scriptconv/tree/0.0.4a122) (2026-11-18)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a121...0.0.4a122)
 
-**Merged pull requests:**
-
-- fix: Segment.text keeps the words before an inline block and the mark after it [\#336](https://github.com/TigreGotico/scriptconv/pull/336) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a121](https://github.com/TigreGotico/scriptconv/tree/0.0.4a121) (2026-11-18)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a120...0.0.4a121)
-
-**Merged pull requests:**
-
-- feat: tugaphone owns normalize; owners read their text with its punctuation [\#338](https://github.com/TigreGotico/scriptconv/pull/338) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a120](https://github.com/TigreGotico/scriptconv/tree/0.0.4a120) (2026-11-18)
 
