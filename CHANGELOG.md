@@ -1,12 +1,28 @@
 # Changelog
 
+## [0.0.4a178](https://github.com/TigreGotico/scriptconv/tree/0.0.4a178) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a177...0.0.4a178)
+
+**Merged pull requests:**
+
+- refactor: import resolve\_lang from the stressonnx public API [\#477](https://github.com/TigreGotico/scriptconv/pull/477) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- docs: move the README model, tour, extras and licences into docs [\#475](https://github.com/TigreGotico/scriptconv/pull/475) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a177](https://github.com/TigreGotico/scriptconv/tree/0.0.4a177) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a176...0.0.4a177)
+
+**Merged pull requests:**
+
+- test: keep the stress tables standalone of stressonnx internals [\#474](https://github.com/TigreGotico/scriptconv/pull/474) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a176](https://github.com/TigreGotico/scriptconv/tree/0.0.4a176) (2026-11-25)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a175...0.0.4a176)
 
 **Merged pull requests:**
 
-- test: keep the stress tables standalone of stressonnx internals [\#474](https://github.com/TigreGotico/scriptconv/pull/474) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 - refactor: identity revision is a version string [\#472](https://github.com/TigreGotico/scriptconv/pull/472) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a175](https://github.com/TigreGotico/scriptconv/tree/0.0.4a175) (2026-11-25)
@@ -330,18 +346,9 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a132...0.0.4a133)
 
-**Merged pull requests:**
-
-- fix: the dizione revision covers the scriptconv wrapper code [\#357](https://github.com/TigreGotico/scriptconv/pull/357) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a132](https://github.com/TigreGotico/scriptconv/tree/0.0.4a132) (2026-11-19)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a131...0.0.4a132)
-
-**Merged pull requests:**
-
-- fix: a module loaded before the revision probe counts when the backend imports it [\#358](https://github.com/TigreGotico/scriptconv/pull/358) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-- fix: keep\_punctuation and the whitespace pattern join the backend revision [\#356](https://github.com/TigreGotico/scriptconv/pull/356) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a131](https://github.com/TigreGotico/scriptconv/tree/0.0.4a131) (2026-11-19)
 
