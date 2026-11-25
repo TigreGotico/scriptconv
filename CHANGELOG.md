@@ -1,8 +1,20 @@
 # Changelog
 
+## [0.0.4a180](https://github.com/TigreGotico/scriptconv/tree/0.0.4a180) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a179...0.0.4a180)
+
+**Merged pull requests:**
+
+- docs: plots through the shared plot style, and the index head [\#479](https://github.com/TigreGotico/scriptconv/pull/479) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a179](https://github.com/TigreGotico/scriptconv/tree/0.0.4a179) (2026-11-25)
 
-[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a177...0.0.4a179)
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a178...0.0.4a179)
+
+## [0.0.4a178](https://github.com/TigreGotico/scriptconv/tree/0.0.4a178) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a177...0.0.4a178)
 
 **Merged pull requests:**
 
@@ -338,10 +350,6 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a133...0.0.4a134)
 
-**Merged pull requests:**
-
-- feat: euskaphone owns normalize [\#360](https://github.com/TigreGotico/scriptconv/pull/360) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a133](https://github.com/TigreGotico/scriptconv/tree/0.0.4a133) (2026-11-19)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a132...0.0.4a133)
@@ -361,11 +369,6 @@
 ## [0.0.4a129](https://github.com/TigreGotico/scriptconv/tree/0.0.4a129) (2026-11-19)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a128...0.0.4a129)
-
-**Merged pull requests:**
-
-- fix: a mark after a digit separates two words, and a colon inside a word stays in it [\#362](https://github.com/TigreGotico/scriptconv/pull/362) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-- fix\(frontend\): a hyphen or dash next to a word, and a mark before a block, separate two words [\#361](https://github.com/TigreGotico/scriptconv/pull/361) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a128](https://github.com/TigreGotico/scriptconv/tree/0.0.4a128) (2026-11-19)
 
