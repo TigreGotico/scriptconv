@@ -3,8 +3,8 @@
 <!-- agent-hint
 covers: every phonemizer backend, its class, its extra, its package and its language default, and the models that download
 source: scriptconv/phonemizers/enums.py, registry.py and _moved.py for the table, through scripts/backend_table.py. The download code in scriptconv/diacritics.py and scriptconv/phonemizers/g2pw.py, en.py, leokani.py, lir.py, mul.py and nemo_ipa.py
-generated: yes for the table between the backends markers, by scripts/backend_table.py. Edit the registry and run `python scripts/backend_table.py --write`, not the table
-verify: python scripts/backend_table.py --check && python scripts/check_doc_page.py docs/backends.md
+generated: yes for the table between the backends markers, by scripts/backend_table.py, and for docs/figures/backends-by-extra.svg, by scripts/docs_figures.py. Edit the registry and run the script, not the output
+verify: python scripts/docs_figures.py --check && python scripts/backend_table.py --check && python scripts/check_doc_page.py docs/backends.md
 see: docs/phonemizers.md, docs/stack.md
 -->
 
@@ -27,6 +27,20 @@ The table has one row per `Phonemizer` member, in the order of the enum.
 root, `python scripts/backend_table.py` prints the table, `--write` rewrites it
 in this page, and `--check` exits 1 when the page differs from the registry.
 `tests/test_backend_table.py` runs `--check`.
+
+## Backends by extra
+
+Most extras install one or two backends. The figure counts the backends of
+each extra, and colours each count by the package that holds the wrapper
+code. scriptconv-copyleft and scriptconv-nonfree are the sister packages that
+hold the restricted wrappers. The Licensing section of the
+[README](../README.md#licensing) states the terms of each.
+
+![Horizontal bars of the backends per extra: 59 backends in 26 extras. Package counts: scriptconv 35, scriptconv-copyleft 18, scriptconv-nonfree 6. The largest extras are zh-phonemizers 7, en-phonemizers 6, misaki 6, phonemizers 5 and ar-phonemizers 4.](figures/backends-by-extra.svg)
+
+*Figure: the 59 backends by extra. Read the colour: the `misaki`, `espeak`,
+`ko` and `th` extras install copyleft wrappers only, and `ar-phonemizers`,
+`ja-phonemizers`, `eu` and `he` mix two packages.*
 
 ## The table
 
@@ -200,4 +214,4 @@ one, run `phonetisaurus.train` on a lexicon such as CMUdict.
 loader error or the missing model otherwise.
 
 ---
-[Index](index.md) · [← ovos](ovos.md)
+[Index](index.md) · [← ovos](ovos.md) · [performance →](performance.md)
