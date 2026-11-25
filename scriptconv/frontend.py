@@ -59,14 +59,12 @@ differences stay:
 import copy
 import dataclasses
 import enum
-import hashlib
 import importlib.util
 import itertools
-import json
 import logging
 import re
-import sys
 import unicodedata
+from importlib import metadata
 from typing import Callable, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Tuple
 
 from scriptconv.diacritics import _DIACRITIZER_PACKAGES, _diacritizer_family, diacritize
@@ -684,75 +682,46 @@ class TextFrontend:
     def identity(self) -> PhonemizerIdentity:
         """What phonemizes this frontend's language, with :data:`FRONTEND_VERSION`.
 
-        ``revision`` is ``sc2:`` and a hash of the backend's revision, of the
-        code of the scriptconv modules that the frontend loads, of the stage
-        settings and of ``text2spoken.revision`` when the normaliser is
-        :func:`spoken_normalizer`. It is ``None``, so a ``version`` difference
-        shows, when scriptconv cannot vouch for a stage: the backend has no
-        revision, the normaliser is another callable or a text2spoken with no
-        ``revision``, the frontend diacritizes, or a casing runs.
-
-        An identity with a ``revision`` is kept on disk, as
-        :mod:`scriptconv.phonemizers._identity_cache` describes, so a later
-        process reads it back with no hash and no call into the backend.
+        ``revision`` is the revision of the backend, then ``;keep_punctuation``
+        when the frontend keeps punctuation, then ``;text2spoken==V``
+        when the normaliser is :func:`spoken_normalizer` and normalisation is
+        on, then ``;<diacritizer>==V`` when the frontend diacritizes with the
+        default model. It is ``None``, so a ``version`` difference shows, when
+        scriptconv cannot vouch for a stage: another normaliser, a casing, a
+        diacritizer model, or a diacritizer that is not installed.
         """
-        from scriptconv.phonemizers import _identity_cache
         stages = self._resolve(None)
-        entry_key = _identity_cache.key(self.backend, self._identity_settings(stages))
-        kept = _identity_cache.load(entry_key)
-        if kept is not None:
-            return kept
-        state = _identity_cache.snapshot(self.backend)
         identity = dataclasses.replace(self.backend.identity(self._backend_lang(stages.lang)),
                                        frontend=FRONTEND_VERSION)
-        identity = dataclasses.replace(identity, revision=self._revision(identity.revision, stages))
-        _identity_cache.store(entry_key, identity, state)
-        return identity
-
-    def _revision_settings(self, stages: Stages) -> Dict[str, object]:
-        """The frontend settings that change the output and join the revision."""
-        return {"keep_punctuation": self.config.keep_punctuation, "strict": self.config.strict,
-                "whole_text_limit": self.config.whole_text_limit,
-                "alphabet": Alphabet(self.config.alphabet).value, "normalize": stages.normalize,
-                "lang": stages.lang, "phonemizer_lang": self._backend_lang(stages.lang),
-                "chunk": stages.chunk.value}
-
-    def _identity_settings(self, stages: Stages) -> Dict[str, object]:
-        """The frontend settings that change :meth:`identity`: those of the
-        revision, and the stages that decide whether there is one."""
-        normalizer = None
-        if stages.normalize and self.config.normalizer is not None:
-            text2spoken = sys.modules.get("text2spoken")
-            normalizer = ("text2spoken" if text2spoken is not None
-                          and self.config.normalizer is getattr(text2spoken, "normalize", None) else "other")
-        return {**self._revision_settings(stages), "diacritize": stages.diacritize,
-                "casing": stages.casing is not None, "normalizer": normalizer}
+        return dataclasses.replace(identity, revision=self._revision(identity.revision, stages))
 
     def _revision(self, backend_revision: Optional[str], stages: Stages) -> Optional[str]:
         """The revision of :meth:`identity`, from the backend's revision and the resolved *stages*."""
-        if backend_revision is None or stages.diacritize or stages.casing is not None:
+        if backend_revision is None or stages.casing is not None:
             return None
-        normalizer = None
+        revision = backend_revision
+        if self.config.keep_punctuation:
+            revision += ";keep_punctuation"
         if stages.normalize and self.config.normalizer is not None:
             try:
-                from text2spoken import normalize, revision
+                from text2spoken import normalize
             except ImportError:
                 return None
             if self.config.normalizer is not normalize:
                 return None
-            try:
-                normalizer = revision(stages.lang)
-            except (ValueError, RuntimeError, OSError) as exc:
-                LOG.warning("text2spoken gives no revision for %r, so the frontend has none: %s",
-                            stages.lang, exc)
+            revision += f";text2spoken=={metadata.version('text2spoken')}"
+        if stages.diacritize:
+            if stages.diacritizer_model is not None:
                 return None
-        from scriptconv.phonemizers._revision import FORMAT, code_revision
-        code = code_revision(self.backend, self._backend_lang(stages.lang), self._revision_settings(stages),
-                             frontend=True)
-        if code is None:
-            return None
-        digest = hashlib.sha256(json.dumps([FORMAT, backend_revision, code, normalizer]).encode())
-        return f"{FORMAT}:{digest.hexdigest()}"
+            package = _DIACRITIZER_PACKAGES.get(_diacritizer_family(stages.lang), (None,))[0]
+            if package is None:
+                return None
+            distribution = package.replace("_", "-")
+            try:
+                revision += f";{distribution}=={metadata.version(distribution)}"
+            except metadata.PackageNotFoundError:
+                return None
+        return revision
 
     def register(self, graph: ConversionGraph) -> None:
         """Add a ``text -> <alphabet>`` edge that runs :meth:`phonemize_lazy`.

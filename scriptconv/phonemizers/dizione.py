@@ -15,8 +15,6 @@ engine as written. It reads whole text (``reads_whole_text``):
 cuts its own output at its own sentence and clause marks, so an abbreviation
 such as ``Mrs.`` ends no sentence.
 """
-import hashlib
-import json
 import re
 from functools import cached_property
 from pathlib import Path
@@ -212,29 +210,6 @@ class DizionePhonemizer(BasePhonemizer):
                 sentences.append(_join_tokens(clauses))
                 clauses = []
         return sentences
-
-    @cached_property
-    def fingerprint(self) -> str:
-        """dizione's build fingerprint: its version, data, tables and code."""
-        return dizione.identity(self.data_dir)["fingerprint"]
-
-    def _revision_arguments(self) -> Dict[str, object]:
-        return {"tokens": self.tokens_mode}
-
-    def _identity_settings(self) -> Dict[str, object]:
-        """dizione's build fingerprint, hashed with the overrides when they take effect.
-
-        The overrides come from ``overrides=`` or from the file that ``DIZIONE_OVERRIDES`` names.
-        """
-        engine = self.engine
-        names = {" ".join(key): engine.names[key] for key in engine.user_names}
-        build = self.fingerprint
-        if engine.overrides or names:
-            overrides = json.dumps({"words": engine.overrides, "names": names},
-                                   sort_keys=True, ensure_ascii=False)
-            digest = hashlib.sha256(overrides.encode()).hexdigest()
-            build = hashlib.sha256(f"{build}\n{digest}".encode()).hexdigest()
-        return {"dizione": build}
 
     def _clauses(self, text: str, tokens: bool = False) -> Iterator[Segment]:
         """Each clause of *text*, as :func:`_clause_spans` cuts dizione's tokens.

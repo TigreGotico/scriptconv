@@ -19,7 +19,7 @@ import string
 import unicodedata
 from importlib import metadata
 from types import MappingProxyType
-from typing import Callable, ClassVar, Dict, FrozenSet, Iterable, Iterator, List, Mapping, Optional, Tuple, Literal, Union
+from typing import Callable, ClassVar, Iterable, Iterator, List, Mapping, Optional, Tuple, Literal, Union
 
 from scriptconv.phonemizers.enums import Alphabet
 from scriptconv.version import VERSION_STR
@@ -195,29 +195,17 @@ class PhonemizerIdentity:
     lang: str
     """The resolved lect, ``"pt-PT-x-porto"``."""
     revision: Optional[str] = None
-    """A hash of the spec, code and data that give the phonemes, when the
-    backend has one: the orthography2ipa spec revision, dizione's build
-    fingerprint, or the hash of the code and data on the path of an in-tree
-    backend. For any other engine, the hash holds the engine version in place
-    of the engine's files.
-
-    Its meaning depends on :attr:`frontend`. With ``frontend`` ``None``, a
-    backend called directly, it is the backend's own revision. With
-    ``frontend`` set, it is the frontend revision with the ``sc2:`` prefix.
-    That revision covers the backend revision plus the frontend stage modules
-    and output settings, and text2spoken's revision when the normaliser is
-    :func:`~scriptconv.frontend.spoken_normalizer`. It is ``None`` when the
-    backend has no revision or scriptconv cannot vouch for a stage.
-
-    Two identities compare by ``revision`` only when both have ``frontend``
-    ``None`` or both have it set. A consumer that recorded a backend identity
-    compares it with ``backend.identity(lang)``, not with
-    :meth:`~scriptconv.frontend.TextFrontend.identity`."""
+    """The distributions that give the phonemes, each with its installed
+    version: ``scriptconv==X;<engine>==Y;<data>==Z``. A backend lists scriptconv
+    first, then the sister package that holds it (scriptconv-copyleft or
+    scriptconv-nonfree), then the engine, then the data distributions that
+    change its output. With ``frontend`` set, the string ends with
+    ``;text2spoken==V`` when text2spoken normalises the text. It is ``None`` for
+    a frontend whose stages scriptconv cannot vouch for: another normaliser, a
+    casing, or a diacritizer of an unknown distribution or model."""
     frontend: Optional[int] = None
     """The version of the stage order of :class:`~scriptconv.frontend.TextFrontend`.
-    ``None`` for a backend called directly; it tells what :attr:`revision`
-    holds, the backend's own revision when ``None`` and the frontend revision
-    when set."""
+    ``None`` for a backend called directly."""
 
     def differs_from(self, other: "PhonemizerIdentity") -> Tuple[str, ...]:
         """Names of the fields that differ from *other*, ``revision`` first.
@@ -346,6 +334,10 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
     engine_distribution: ClassVar[Optional[str]] = None
     """The distribution that holds the engine; ``None`` for code inside the
     package that holds the wrapper (scriptconv, scriptconv-copyleft or scriptconv-nonfree)."""
+
+    revision_distributions: ClassVar[Tuple[str, ...]] = ()
+    """The distributions besides the engine whose data changes the phonemes, in
+    the order that :meth:`identity` lists them."""
 
     stress_mark_langs: ClassVar[frozenset[str]] = frozenset()
     """Languages in which this backend reads the stress mark (U+0301 after a vowel) as stress.
@@ -574,43 +566,39 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
             return sister, metadata.version(sister)
         return "scriptconv", VERSION_STR
 
-    def _revision_arguments(self) -> Dict[str, object]:
-        """The constructor arguments, as JSON values, that change the output. They join the revision."""
-        return {}
+    def _revision_distributions(self, lang: str) -> Tuple[str, ...]:
+        """The data distributions that change the phonemes of *lang*: :attr:`revision_distributions`."""
+        return self.revision_distributions
 
-    def _identity_settings(self) -> Dict[str, object]:
-        """The settings on the instance, as JSON values, that change
-        :meth:`identity` besides the constructor arguments. They join the key
-        of the identity cache."""
-        return {}
-
-    def _covered_distributions(self, lang: str) -> FrozenSet[str]:
-        """The distributions whose own revision, or version, the identity of
-        this backend holds for *lang*.
-        :func:`~scriptconv.phonemizers._revision.code_revision` leaves their
-        versions out of the hash. For an engine outside scriptconv it is the
-        engine's distribution, whose version :meth:`identity` puts in the settings."""
-        if self.engine_distribution is None:
-            return frozenset()
-        return frozenset({self._engine_release()[0]})
+    def _engine_revision(self, lang: str) -> str:
+        """The engine part of the revision for *lang*: ``engine==version``, then
+        ``;name==version`` for each installed distribution of
+        :meth:`_revision_distributions`. Empty for code inside scriptconv."""
+        releases = {}
+        if self.engine_distribution is not None:
+            name, version = self._engine_release()
+            releases[name] = version
+        for name in self._revision_distributions(lang):
+            try:
+                releases.setdefault(name, metadata.version(name))
+            except metadata.PackageNotFoundError:
+                pass
+        return ";".join(f"{name}=={release}" for name, release in releases.items())
 
     def identity(self, lang: str) -> PhonemizerIdentity:
         """What phonemizes *lang* here: the engine, its version, the lect and the revision.
 
-        ``revision`` is the hash of the code and data on the path of this
-        backend, as :func:`~scriptconv.phonemizers._revision.code_revision`
-        gives it, with :meth:`_identity_settings` in the settings. For an
-        engine outside scriptconv, the settings also hold the engine's
-        distribution and version. So a change of the scriptconv code on the
-        path, as ``base.py`` or ``diacritics.py``, changes the revision, and
-        so does a release of the engine or of a distribution under it, as the
-        sentence splitter.
+        ``revision`` is ``scriptconv==X``, then ``;name==version`` for the
+        sister package that holds the backend (scriptconv-copyleft or
+        scriptconv-nonfree), then ``;`` and :meth:`_engine_revision`: the
+        engine distribution and :attr:`revision_distributions`, or the value
+        that the engine itself gives. A data distribution that is not
+        installed stays out of the string.
 
         Raises:
             ImportError: If the engine is not installed.
             UnsupportedLanguageError: If the backend does not support *lang*.
         """
-        from scriptconv.phonemizers._revision import code_revision
         from scriptconv.phonemizers.registry import PHONEMIZER_REGISTRY
         names = {cls_name: member.value
                  for member, (_, cls_name, _) in PHONEMIZER_REGISTRY.items()}
@@ -619,11 +607,13 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         distribution, version = self._engine_release()
         # Grapheme, Unicode and Phonetisaurus backends take any language.
         resolved = self.get_lang(lang) if hasattr(self, "get_lang") else lang
-        settings = self._identity_settings()
-        if self.engine_distribution is not None:
-            settings = {**settings, distribution: version}
-        return PhonemizerIdentity(backend, distribution, version, resolved,
-                                  code_revision(self, resolved, settings))
+        parts = [f"scriptconv=={VERSION_STR}"]
+        if sister := _SISTER_DISTRIBUTIONS.get(type(self).__module__.partition(".")[0]):
+            parts.append(f"{sister}=={metadata.version(sister)}")
+        if engine := self._engine_revision(resolved):
+            parts.append(engine)
+        revision = ";".join(parts)
+        return PhonemizerIdentity(backend, distribution, version, resolved, revision)
 
     @staticmethod
     def remove_punctuation(text):
@@ -775,9 +765,6 @@ class GraphemePhonemizer(BasePhonemizer):
         """The output writes the mark, in every language, unless the notation is ``"none"``."""
         return self.stress_notation != "none"
 
-    def _revision_arguments(self) -> Dict[str, object]:
-        return {"stress_notation": self.stress_notation}
-
     def phonemize_string(self, text: str, lang: str) -> str:
         """*text* after the character rules; *lang* matters only for the ``"plus"`` stress notation."""
         if self.lowercase:
@@ -792,17 +779,6 @@ class GraphemePhonemizer(BasePhonemizer):
             text = replace_stress_mark(text, lang, before="+")
         return text
 
-    def _identity_settings(self) -> Dict[str, object]:
-        """Each character rule and the whitespace pattern, when set on the
-        instance to a value other than the class default."""
-        settings = {name: getattr(self, name) for name in self._RULES
-                    if name in vars(self) and getattr(self, name) != getattr(type(self), name)}
-        if "replace_chars" in settings:
-            settings["replace_chars"] = dict(settings["replace_chars"])
-        if "whitespace_re" in settings:
-            settings["whitespace_re"] = [settings["whitespace_re"].pattern, settings["whitespace_re"].flags]
-        return settings
-
 
 class UnicodeCodepointPhonemizer(BasePhonemizer):
     """The codepoints of the text in a Unicode normal form; NFD splits accents into their own codepoints."""
@@ -814,9 +790,6 @@ class UnicodeCodepointPhonemizer(BasePhonemizer):
     def reads_stress_mark(self, lang: str) -> bool:
         """The output is the text's codepoints, so the mark is one of them in every language."""
         return True
-
-    def _revision_arguments(self) -> Dict[str, object]:
-        return {"form": self.form}
 
     def phonemize_string(self, text: str, lang: str) -> str:
         """*text* in the normal form :attr:`form`; *lang* is ignored."""
