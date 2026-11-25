@@ -120,6 +120,40 @@ because the caller asked for ARPABET with no stress digits.
 
 ---
 
+## Fidelity of each notation
+
+Transcoding faithfulness depends on the target notation's inventory. IPA is
+the hub, so notation-to-notation conversion goes through IPA. The table
+below states, for each notation, whether a round-trip is exact and what
+happens to a symbol the table does not know.
+
+Every converter (and `convert()`) accepts a codecs-style `errors=` policy
+for symbols outside its table. `"pass"` keeps the symbol (the default
+everywhere except `ipa_to_arpa`). `"replace"` substitutes the notation's
+placeholder (`?`, the historical `ipa_to_arpa` default, tunable via
+`unknown=`). `"ignore"` drops the symbol. `"strict"` raises
+`UnknownSymbolError` naming the symbol, its position, and the notation. The
+"Unknown-token behaviour" column below describes the per-converter default.
+
+| Notation | `to_ipa` → `from_ipa` round-trip | `from_ipa` → `to_ipa` round-trip | Unknown-token behaviour |
+|----------|----------------------------------|----------------------------------|-------------------------|
+| **ARPABET** | **Exact with `stress=True`** (digits map to IPA `ˈ`/`ˌ` before the stressed vowel; residues: extended-ARPABET `AX` and `AXR` normalise to CMUdict's `AH0` and `ER0` spellings, stable from the IPA side). Default `stress=False` drops digits, and merges `AH0` with `AX` and `ER0` with `AXR` | **Lossy** (ARPABET is an English-only inventory, so any IPA symbol outside it becomes the *unknown* placeholder) | `arpa_to_ipa`: passed through unchanged. `ipa_to_arpa`: diacritics, suprasegmentals and word gaps are dropped. Other out-of-inventory symbols follow `errors=` (default `"replace"` → `?`) |
+| **X-SAMPA** | Exact for every spelling Wells lists; a second spelling (`v\`, `_=`, `_~`) returns as the first (`P`, `=`, `~`) | Exact for every symbol Wells lists, each taken alone, including diacritics and tones | Passed through unchanged |
+| **Buckwalter ↔ Arabic** | Exact | Exact. An Arabic presentation form, such as the lam-alef ligature `ﻻ`, returns as the letters it stands for | Follows `errors=` (default: passed through) |
+| **Halabi → IPA** | One-directional (gemination and word markers are consumed; there is no IPA to Halabi) | Not applicable | Follows `errors=` (default: passed through) |
+| **Lexique ↔ IPA** | Exact except the `°`/`3` schwa pair (both map to `ə`; the reverse always produces `°`) | **Lossy** (French inventory; IPA outside it passes through) | Passed through unchanged |
+| **Kirshenbaum ↔ IPA** | **Lossy** (keys such as `F`, `K` and `P`, the digits and punctuation give output that is not IPA) | **Lossy** (restricted ASCII inventory; IPA outside it passes through) | Passed through unchanged |
+| **Cotovía ↔ IPA** | Exact except the three `L`/`Z`/`jj` symbols for `ʎ` normalise to `L` | **Lossy** (Galician/Spanish inventory; IPA outside it passes through) | Passed through unchanged |
+| **RFE ↔ IPA** | Exact except `ñ`/`n̮` for `ɲ` normalise to `ñ` | **Lossy** (core Spanish/Romance inventory; IPA outside it passes through) | Passed through unchanged |
+
+A test backs every row. `NOTATION_INFO` exposes the same facts to
+code, so a program can branch on whether a conversion is safe before making
+it. Its flags follow one definition of lossless, which
+[docs/notation.md](#queryable-fidelity-notation_info) states. A
+conversion with `stress=True` or another option can be exact where the flag is
+`False`, because the flag measures the defaults.
+
+
 ## ARPABET ↔ IPA
 
 Table derived from [chorusai/arpa2ipa](https://github.com/chorusai/arpa2ipa) (Apache-2.0).

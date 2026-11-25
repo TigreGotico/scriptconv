@@ -34,7 +34,7 @@ Most extras install one or two backends. The figure counts the backends of
 each extra, and colours each count by the package that holds the wrapper
 code. scriptconv-copyleft and scriptconv-nonfree are the sister packages that
 hold the restricted wrappers. The Licensing section of the
-[README](../README.md#licensing) states the terms of each.
+[install.md](install.md#licensing) states the terms of each.
 
 ![Horizontal bars of the backends per extra: 59 backends in 26 extras. Package counts: scriptconv 35, scriptconv-copyleft 18, scriptconv-nonfree 6. The largest extras are zh-phonemizers 7, en-phonemizers 6, misaki 6, phonemizers 5 and ar-phonemizers 4.](figures/backends-by-extra.svg)
 
