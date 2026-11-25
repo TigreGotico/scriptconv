@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.0.4a167](https://github.com/TigreGotico/scriptconv/tree/0.0.4a167) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a165...0.0.4a167)
+
+## [0.0.4a165](https://github.com/TigreGotico/scriptconv/tree/0.0.4a165) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a164...0.0.4a165)
+
+**Merged pull requests:**
+
+- perf\(frontend\): read only the end before a block [\#446](https://github.com/TigreGotico/scriptconv/pull/446) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.0.4a164](https://github.com/TigreGotico/scriptconv/tree/0.0.4a164) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a163...0.0.4a164)
+
+**Merged pull requests:**
+
+- fix\(frontend\): keep a word break at a run of dashes [\#444](https://github.com/TigreGotico/scriptconv/pull/444) ([JarbasAl](https://github.com/JarbasAl))
+- fix\(en\): read g2pen NLTK data from disk without downloading [\#439](https://github.com/TigreGotico/scriptconv/pull/439) ([JarbasAl](https://github.com/JarbasAl))
+- test: pin seven rules that mutants could break [\#432](https://github.com/TigreGotico/scriptconv/pull/432) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a163](https://github.com/TigreGotico/scriptconv/tree/0.0.4a163) (2026-11-25)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a162...0.0.4a163)
@@ -343,10 +365,6 @@
 ## [0.0.4a119](https://github.com/TigreGotico/scriptconv/tree/0.0.4a119) (2026-11-18)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a118...0.0.4a119)
-
-**Merged pull requests:**
-
-- docs: say what PhonemizerIdentity.revision holds, and the cache hit cost [\#332](https://github.com/TigreGotico/scriptconv/pull/332) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a118](https://github.com/TigreGotico/scriptconv/tree/0.0.4a118) (2026-11-18)
 
