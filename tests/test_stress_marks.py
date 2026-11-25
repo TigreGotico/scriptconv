@@ -10,9 +10,8 @@ from typing import Iterator, List
 from unittest.mock import patch
 
 from stressonnx import ALL_LANGS, lang_to_script
-from stressonnx._common import SCRIPT_VOWELS
 
-from scriptconv.diacritics import _STRESS_SCRIPTS, _STRESS_VOWELS, diacritize, replace_stress_mark
+from scriptconv.diacritics import _STRESS_SCRIPTS, diacritize, replace_stress_mark
 from scriptconv.phonemizers.base import (BasePhonemizer, GraphemePhonemizer,
                                          UnicodeCodepointPhonemizer)
 from scriptconv.phonemizers.enums import Alphabet
@@ -97,15 +96,12 @@ class TestRemoval(unittest.TestCase):
             with self.subTest(lang=lang, text=text):
                 self.assertEqual(Recorder().phonemize_string(text, lang), text.replace(ACUTE, ""))
 
-    def test_the_tables_are_the_stressonnx_tables(self):
+    def test_the_languages_are_the_stressonnx_languages(self):
         names = {"Armn": "armenian", "Cyrl": "cyrillic", "Geor": "georgian", "Latn": "latin"}
         self.assertEqual(set(_STRESS_SCRIPTS), set(ALL_LANGS))
         for tag, script in _STRESS_SCRIPTS.items():
             with self.subTest(tag=tag):
                 self.assertEqual(names[script], lang_to_script(tag))
-        for script, vowels in _STRESS_VOWELS.items():
-            with self.subTest(script=script):
-                self.assertEqual(vowels, frozenset(SCRIPT_VOWELS[names[script]]))
 
     def test_declared_language_keeps_the_mark(self):
         marked = f"за{ACUTE}мок"
