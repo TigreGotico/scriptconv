@@ -1,26 +1,13 @@
 """Frontend errors, ``PhonemizerIdentity`` and the ``owned_stages`` table."""
 import dataclasses
-import hashlib
-import importlib
-import json
 import logging
-import os
 import re
-import shutil
-import subprocess
-import sys
 import tomllib
-import unicodedata
-import zipfile
 from importlib import metadata
 from pathlib import Path
-from types import MappingProxyType, SimpleNamespace
 
-import orthography2ipa
 import pytest
-import quebra_frases
 import tugaphone.version
-from orthography2ipa.exceptions import EngineSourceUnavailable
 
 from scriptconv.phonemizers import (
     BasePhonemizer,
@@ -37,7 +24,6 @@ from scriptconv.phonemizers import (
     get_phonemizer_class,
 )
 from scriptconv.frontend import FrontendConfig, Stages, TextFrontend, spoken_normalizer
-from scriptconv.phonemizers.ber import MatoubKabylePhonemizer
 from scriptconv.phonemizers.eu import EuskaphonePhonemizer
 from scriptconv.phonemizers.mul import EpitranPhonemizer
 from scriptconv.phonemizers.o2ipa import Orthography2IPAPhonemizer
@@ -151,7 +137,7 @@ class TestIdentity:
         assert identity == PhonemizerIdentity(
             backend="tugaphone", distribution="tugaphone",
             version=tugaphone.version.__version__, lang="pt-PT-x-porto", revision=identity.revision)
-        assert identity.revision.startswith("sc2:")
+        assert identity.revision.startswith(f"scriptconv=={metadata.version('scriptconv')};tugaphone==")
 
     @pytest.mark.parametrize("member, lang, distribution", [
         (Phonemizer.MANTOQ, "ar", "scriptconv-nonfree"),
@@ -183,995 +169,124 @@ class TestIdentity:
         assert Custom().identity("pt").backend == "Custom"
 
 
-class TestOrthography2IPARevision:
-    def test_the_revision_holds_the_spec_revision(self, monkeypatch):
-        first = Orthography2IPAPhonemizer().identity("gl")
-        monkeypatch.setattr(orthography2ipa, "spec_revision", lambda code: "sha256:other")
-        second = Orthography2IPAPhonemizer().identity("gl")
-        assert first.lang == "gl-ES" and first.revision.startswith("sc2:")
-        assert second.revision.startswith("sc2:") and second.revision != first.revision
-
-    def test_a_packaged_lexicon_changes_the_revision(self, monkeypatch):
-        assert "pt-PT" in orthography2ipa.packaged_lexicon_sources()
-        with_lexicon = Orthography2IPAPhonemizer().identity("pt-PT").revision
-        rules_only = Orthography2IPAPhonemizer(packaged_lexicons=False).identity("pt-PT").revision
-        monkeypatch.setattr(orthography2ipa, "lexicon_revision", lambda code, patches: "other")
-        other_lexicon = Orthography2IPAPhonemizer().identity("pt-PT").revision
-        assert None not in (with_lexicon, rules_only, other_lexicon)
-        assert len({with_lexicon, rules_only, other_lexicon}) == 3
-
-    def test_the_engine_files_leave_the_hash(self):
-        assert Orthography2IPAPhonemizer()._covered_distributions("pt-PT") == \
-            {"orthography2ipa", "o2i-lexicons"}
-        assert Orthography2IPAPhonemizer(packaged_lexicons=False)._covered_distributions("pt-PT") == \
-            {"orthography2ipa"}
-        assert Orthography2IPAPhonemizer()._covered_distributions("gl") == {"orthography2ipa"}
-
-    def test_two_calls_give_equal_identities(self):
-        phonemizer = Orthography2IPAPhonemizer()
-        first = phonemizer.identity("pt-PT")
-        phonemizer.phonemize_string("olá", "pt-PT")
-        second = phonemizer.identity("pt-PT")
-        assert first == second
-        assert second.revision.startswith("sc2:")
-
-    def test_a_missing_engine_source_gives_the_base_revision_and_a_warning(self, monkeypatch, caplog):
-        def unavailable(code):
-            raise EngineSourceUnavailable("engine source of g2p.py is missing")
-        spec = Orthography2IPAPhonemizer().identity("gl")
-        monkeypatch.setattr(orthography2ipa, "spec_revision", unavailable)
-        with caplog.at_level(logging.WARNING, logger="scriptconv.phonemizers.o2ipa"):
-            identity = Orthography2IPAPhonemizer().identity("gl")
-        assert identity == BasePhonemizer.identity(Orthography2IPAPhonemizer(), "gl")
-        assert identity.revision.startswith("sc2:") and identity.revision != spec.revision
-        warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
-        assert len(warnings) == 1
-        assert "engine source" in warnings[0] and "g2p.py is missing" in warnings[0]
-
-    def test_an_equal_revision_hides_an_engine_upgrade(self):
-        current = Orthography2IPAPhonemizer().identity("gl")
-        upgraded = dataclasses.replace(current, version="99.0.0")
-        assert current.revision is not None
-        assert current.differs_from(upgraded) == ()
-
-
-@pytest.fixture
-def fresh_tugaphone():
-    """No ``tugaphone.revision`` kept by an earlier test, and none kept after this one."""
-    from scriptconv.phonemizers import pt
-    cache = getattr(pt, "_tugaphone_revision", None)
-    if cache is not None:
-        cache.cache_clear()
-    yield
-    if cache is not None:
-        cache.cache_clear()
-
-
-@pytest.mark.usefixtures("fresh_tugaphone")
-class TestTugaphoneRevision:
-    def test_the_revision_holds_the_tugaphone_revision(self, monkeypatch):
-        from scriptconv.phonemizers import pt
-        monkeypatch.setattr(tugaphone, "revision", lambda lang: "tp1:one")
-        first = TugaphonePhonemizer().identity("pt-PT").revision
-        pt._tugaphone_revision.cache_clear()
-        monkeypatch.setattr(tugaphone, "revision", lambda lang: "tp1:two")
-        second = TugaphonePhonemizer().identity("pt-PT").revision
-        assert first.startswith("sc2:") and second.startswith("sc2:")
-        assert first != second
-
-    def test_the_lect_changes_the_revision(self):
-        revisions = {TugaphonePhonemizer().identity(lect).revision
-                     for lect in ("pt-PT", "pt-BR", "pt-PT-x-porto")}
-        assert None not in revisions and len(revisions) == 3
-
-    def test_an_equal_revision_hides_a_tugaphone_upgrade(self, monkeypatch):
-        from scriptconv.phonemizers import base
-        current = TugaphonePhonemizer().identity("pt-PT")
-        installed = metadata.version
-        monkeypatch.setattr(base.metadata, "version",
-                            lambda name: "99.0.0" if name == "tugaphone" else installed(name))
-        upgraded = TugaphonePhonemizer().identity("pt-PT")
-        assert current.revision is not None and upgraded.version == "99.0.0"
-        assert current.revision == upgraded.revision
-        assert current.differs_from(upgraded) == ()
-
-    def test_a_release_that_the_tugaphone_revision_covers_keeps_the_revision(self, monkeypatch):
-        current = TugaphonePhonemizer().identity("pt-PT").revision
-        assert "orthography2ipa" in TugaphonePhonemizer()._covered_distributions("pt-PT")
-        released(monkeypatch, "orthography2ipa", "99.0.0")
-        assert current is not None
-        assert TugaphonePhonemizer().identity("pt-PT").revision == current
-
-    def test_a_tugaphone_revision_error_gives_the_base_revision_and_one_warning(self, monkeypatch, caplog):
-        def fails(lang):
-            raise tugaphone.RevisionError("the revision probe for 'pt-PT' did not finish in 120 s")
-        monkeypatch.setattr(tugaphone, "revision", fails)
-        with caplog.at_level(logging.WARNING, logger="scriptconv.phonemizers.pt"):
-            identities = [TugaphonePhonemizer().identity("pt-PT") for _ in range(3)]
-        assert identities == [BasePhonemizer.identity(TugaphonePhonemizer(), "pt-PT")] * 3
-        assert identities[0].revision.startswith("sc2:")
-        warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
-        assert len(warnings) == 1
-        assert "RevisionError" in warnings[0] and "did not finish in 120 s" in warnings[0]
-
-    def test_a_contact_other_than_none_gives_the_base_revision(self):
-        mixed = TugaphonePhonemizer()
-        mixed.contact = "en"
-        default = TugaphonePhonemizer().identity("pt-PT").revision
-        assert mixed.identity("pt-PT") == BasePhonemizer.identity(mixed, "pt-PT")
-        assert mixed.identity("pt-PT").revision.startswith("sc2:") and mixed.identity("pt-PT").revision != default
-        # the policy reaches tugaphone and changes the output
-        assert mixed.phonemize_string("o weekend", "pt-PT") == \
-            tugaphone.TugaPhonemizer().phonemize_sentence("o weekend", "pt-PT", contact="en")
-        assert mixed.phonemize_string("o weekend", "pt-PT") != \
-            TugaphonePhonemizer().phonemize_string("o weekend", "pt-PT")
-
-
-# Each backend whose revision hashes the code and data on its path, as source
-# text for a fresh process, with a language it reads.
-CODE_BACKENDS = {
-    "graphemes": ("GraphemePhonemizer()", "ru"),
-    "graphemes-plus": ("GraphemePhonemizer(stress_notation='plus')", "ru"),
-    "graphemes-none": ("GraphemePhonemizer(stress_notation='none')", "uk"),
-    "unicode": ("UnicodeCodepointPhonemizer()", "xx"),
-    "unicode-nfkc": ("UnicodeCodepointPhonemizer('NFKC')", "xx"),
-    "matoub_kab": ("MatoubKabylePhonemizer()", "kab"),
-}
-# Each frontend whose revision hashes the code on its path, with its backend.
-CODE_FRONTENDS = {
-    "frontend-graphemes": ("GraphemePhonemizer()", "pt-PT"),
-    "frontend-unicode": ("UnicodeCodepointPhonemizer()", "pt-PT"),
-}
-# Each backend that wraps an engine with a revision of its own, and a frontend
-# that reads through one.
-WRAPPER_BACKENDS = {
-    "tugaphone": ("TugaphonePhonemizer()", "pt-PT"),
-    "orthography2ipa": ("Orthography2IPAPhonemizer()", "pt-PT"),
-    "barranquenho": ("BarranquenhoPhonemizer()", "ext-PT-x-barrancos"),
-    "mirandese": ("MirandesePhonemizer()", "mwl-x-sendim"),
-    "dizione": ("DizionePhonemizer()", "en-US"),
-}
-WRAPPER_FRONTENDS = {"frontend-tugaphone": ("TugaphonePhonemizer()", "pt-PT")}
-
-
-def revisions_script(backends, frontends, imports=""):
-    """Python source that prints the revision of each of *backends* and *frontends*. *imports* holds the import
-    lines that only these backends need, so a mutant of another module cannot break their import."""
-    return f"""
-import json, scriptconv
-from scriptconv.frontend import FrontendConfig, TextFrontend
-from scriptconv.phonemizers import GraphemePhonemizer, UnicodeCodepointPhonemizer
-from scriptconv.phonemizers.ber import MatoubKabylePhonemizer
-from scriptconv.phonemizers.mwl import MirandesePhonemizer
-from scriptconv.phonemizers.o2ipa import Orthography2IPAPhonemizer
-from scriptconv.phonemizers.pt import BarranquenhoPhonemizer, TugaphonePhonemizer
-{imports}
-revisions = {{name: eval(source).identity(lang).revision for name, (source, lang) in {backends!r}.items()}}
-revisions.update({{name: TextFrontend(FrontendConfig(lang), eval(source)).identity().revision
-                  for name, (source, lang) in {frontends!r}.items()}})
-print(json.dumps({{"scriptconv": scriptconv.__file__, **revisions}}))
-"""
-
-
-REVISIONS = revisions_script(CODE_BACKENDS, CODE_FRONTENDS)
-WRAPPER_REVISIONS = revisions_script(WRAPPER_BACKENDS, WRAPPER_FRONTENDS,
-                                     "from scriptconv.phonemizers.dizione import DizionePhonemizer")
-SCRIPTCONV = Path(sys.modules["scriptconv"].__file__).parent
-QUEBRA_FRASES = Path(quebra_frases.__file__).parent
-
-# Edits of the scriptconv source, (file, old text, new text), on the path of the
-# named backend or frontend. Each edit but F4 and I1 changes its output for some input.
-# F4 edits a module that the frontend loads and calls only when it diacritizes. I1
-# adds code to a parent package, which runs on each import of the backend.
-CODE_MUTANTS = {
-    "G1 the letter test before a hyphen skips no combining mark": (
-        "graphemes", "phonemizers/base.py",
-        '    while letter > 0 and unicodedata.category(text[letter]).startswith("M"):',
-        "    while False:"),
-    "G2 the whitespace pattern takes re.ASCII": (
-        "graphemes", "phonemizers/base.py",
-        'whitespace_re = re.compile(r"\\s+")', 'whitespace_re = re.compile(r"\\s+", re.ASCII)'),
-    "G3 the plus notation writes the sign after the vowel": (
-        "graphemes-plus", "diacritics.py",
-        "out.insert(base, before)\n            base += 1\n            out.append(after)",
-        "out.insert(base, after)\n            base += 1\n            out.append(before)"),
-    "P1 no mark separates two words": (
-        "graphemes", "phonemizers/base.py",
-        "_SEPARATING_MARKS = frozenset(mark", "_SEPARATING_MARKS = frozenset() and frozenset(mark"),
-    "P2 a colon between digits is punctuation": (
-        "unicode", "phonemizers/base.py",
-        "and chars[i - 1].isdigit() and chars[i + 1].isdigit():", "and False:"),
-    "P3 a semicolon is kept as a comma": (
-        "unicode", "phonemizers/base.py", '":": ":", ";": ";",', '":": ":", ";": ",",'),
-    "P4 a semicolon is kept as a comma, Kabyle": (
-        "matoub_kab", "phonemizers/base.py", '":": ":", ";": ";",', '":": ":", ";": ",",'),
-    "P5 no mark separates two words, Kabyle": (
-        "matoub_kab", "phonemizers/base.py",
-        "_SEPARATING_MARKS = frozenset(mark", "_SEPARATING_MARKS = frozenset() and frozenset(mark"),
-    "K1 a doubled vowel is long": (
-        "matoub_kab", "phonemizers/_vendored/matoub_kab/__init__.py",
-        "word[index + 1] == char and char not in VOWELS", "word[index + 1] == char"),
-    "F3 a block of whitespace cuts the text": (
-        "frontend-graphemes", "frontend.py", "if block[2:-2].strip():", "if block[2:-2]:"),
-    "F4 a diacritics change on the frontend path": (
-        "frontend-unicode", "diacritics.py",
-        '**dict.fromkeys(("lv", "sl", "az-Latn", "uz-Latn"), "Latn"),',
-        '**dict.fromkeys(("lv", "sl", "az-Latn", "uz-Latn", "pt"), "Latn"),'),
-    "K2 Kabyle carries stress marks": (
-        "matoub_kab", "diacritics.py",
-        '**dict.fromkeys(("lv", "sl", "az-Latn", "uz-Latn"), "Latn"),',
-        '**dict.fromkeys(("lv", "sl", "az-Latn", "uz-Latn", "kab"), "Latn"),'),
-    "I1 code in a parent package of the backend": (
-        "graphemes", "phonemizers/__init__.py",
-        "from scriptconv.phonemizers.enums import Alphabet, Phonemizer\n",
-        "from scriptconv.phonemizers.enums import Alphabet, Phonemizer\nANSWER = 42\n"),
-}
-# Edits that change no output: a docstring and a comment, the version, and
-# the code of another backend.
-NEUTRAL_EDITS = {
-    "a docstring and a comment": (
-        "phonemizers/base.py",
-        '    """Whether the character at *index* of *text* stands between two letters.\n',
-        '    """Whether the character at *index* of *text* stands between two letters, or not.\n'
-        "    # a comment\n"),
-    "version.py": ("version.py", "VERSION_ALPHA = ", "VERSION_ALPHA = 999 + "),
-    "the code of another backend": (
-        "phonemizers/zh.py", "\nclass JiebaPhonemizer(", "\nANSWER = 42\n\n\nclass JiebaPhonemizer("),
-    # the Korean tables sit in the package of nakdimon, which diacritics imports
-    "the data of another backend": ("phonemizers/_thirdparty/ko_tables/ipa.csv", "ㅂ,p,ㅏ,ä", "ㅂ,b,ㅏ,ä"),
-}
-
-
-def revisions_in_a_copy(directory, edit=None, script=REVISIONS):
-    """The revisions that *script* prints, in a fresh process, from a copy of
-    the scriptconv and quebra-frases packages with *edit* ``(file, old, new)``
-    applied. *file* is relative to the scriptconv package."""
-    tree = directory / "tree"
-    for package in (SCRIPTCONV, QUEBRA_FRASES):
-        shutil.copytree(package, tree / package.name, ignore=shutil.ignore_patterns("__pycache__"))
-    if edit is not None:
-        target, old, new = edit
-        path = tree / "scriptconv" / target
-        source = path.read_text(encoding="utf-8")
-        assert source.count(old) == 1, f"{old!r} is not in {target} once"
-        path.write_text(source.replace(old, new), encoding="utf-8")
-    done = subprocess.run([sys.executable, "-c", script], cwd=tree, check=True,
-                          capture_output=True, text=True,
-                          env={**os.environ, "PYTHONPATH": str(tree), "PYTHONDONTWRITEBYTECODE": "1",
-                               "XDG_CACHE_HOME": str(directory / "cache")})
-    revisions = json.loads(done.stdout.splitlines()[-1])
-    assert Path(revisions.pop("scriptconv")).is_relative_to(tree)
-    return revisions
-
-
-GRAPHEMES_REVISION = """
-import json, scriptconv
-from scriptconv.frontend import FrontendConfig, TextFrontend
-from scriptconv.phonemizers import GraphemePhonemizer
-revision = TextFrontend(FrontendConfig("pt-PT"), GraphemePhonemizer()).identity().revision
-print(json.dumps({"scriptconv": scriptconv.__file__, "graphemes": revision}))
-"""
-
-
-def test_a_fresh_process_of_the_tests_keeps_its_identities_out_of_the_user_cache(tmp_path, monkeypatch):
-    user = tmp_path / "user-cache"
-    monkeypatch.setenv("XDG_CACHE_HOME", str(user))
-    assert revisions_in_a_copy(tmp_path, script=GRAPHEMES_REVISION)["graphemes"].startswith("sc2:")
-    assert not (user / "scriptconv" / "identity").exists()
-    assert list((tmp_path / "cache" / "scriptconv" / "identity").glob("*.json"))
-
-
-@pytest.fixture(scope="module")
-def pristine(tmp_path_factory):
-    return revisions_in_a_copy(tmp_path_factory.mktemp("pristine"))
-
-
-class LongVowel(GraphemePhonemizer):
-    """Graphemes, with ":" after each "a"."""
-
-    def phonemize_string(self, text, lang):
-        return super().phonemize_string(text, lang).replace("a", "a:")
-
-
-class OwnLazy(GraphemePhonemizer):
-    """Graphemes, with a ``phonemize_lazy`` of its own, so ``keep_punctuation`` changes nothing."""
-
-    def phonemize_lazy(self, text, lang):
-        yield list(self.phonemize_string(text, lang))
-
-
-# The revision of a grapheme backend with instance settings, in a fresh process.
-INSTANCE_SETTINGS_REVISION = """
-import json, re
-from scriptconv.phonemizers import GraphemePhonemizer
-backend = GraphemePhonemizer()
-backend.keep_punctuation = True
-backend.whitespace_re = re.compile(r"\\s+", re.ASCII)
-print(json.dumps(backend.identity("ru").revision))
-"""
-
-
-class TestCodeRevision:
-    def test_the_revision_is_the_same_in_every_process(self, tmp_path):
-        runs = [subprocess.run([sys.executable, "-c", REVISIONS], cwd=ROOT, check=True,
-                               capture_output=True, text=True,
-                               env={**os.environ, "PYTHONHASHSEED": seed,
-                                    "XDG_CACHE_HOME": str(tmp_path / seed)}).stdout.splitlines()[-1]
-                for seed in ("0", "1", "4242")]
-        revisions = json.loads(runs[0])
-        revisions.pop("scriptconv")
-        assert all(revision.startswith("sc2:") for revision in revisions.values())
-        assert runs[0] == runs[1] == runs[2]
-        assert len(set(revisions.values())) == len(CODE_BACKENDS) + len(CODE_FRONTENDS)
-
-    @pytest.mark.parametrize("source, lang", CODE_BACKENDS.values(), ids=CODE_BACKENDS)
-    def test_an_equal_revision_hides_a_scriptconv_upgrade(self, source, lang):
-        current = eval(source).identity(lang)
-        upgraded = dataclasses.replace(eval(source).identity(lang), version="0.0.4a999")
-        assert current.revision is not None
-        assert current.differs_from(upgraded) == ()
-
-    @pytest.mark.parametrize("mutant", CODE_MUTANTS)
-    def test_a_code_change_on_the_path_changes_the_revision(self, mutant, pristine, tmp_path):
-        backend, *edit = CODE_MUTANTS[mutant]
-        assert pristine[backend] is not None
-        assert revisions_in_a_copy(tmp_path, edit)[backend] != pristine[backend]
-
-    @pytest.mark.parametrize("edit", NEUTRAL_EDITS)
-    def test_an_edit_that_changes_no_output_keeps_every_revision(self, edit, pristine, tmp_path):
-        assert None not in pristine.values()
-        assert revisions_in_a_copy(tmp_path, NEUTRAL_EDITS[edit]) == pristine
-
-    def test_a_subclass_with_its_own_method_has_its_own_revision(self):
-        assert LongVowel().phonemize_string("casa", "en") != GraphemePhonemizer().phonemize_string("casa", "en")
-        assert GraphemePhonemizer().identity("en").revision is not None
-        assert LongVowel().identity("en").revision != GraphemePhonemizer().identity("en").revision
-
-    def test_an_edit_of_a_subclass_outside_scriptconv_changes_the_revision(self, tmp_path):
-        module = tmp_path / "own_backend.py"
-        script = ("import json\nfrom own_backend import Own\nprint(json.dumps(Own().identity('en').revision))\n")
-
-        def revision():
-            done = subprocess.run([sys.executable, "-c", script], cwd=tmp_path, check=True, capture_output=True,
-                                  text=True, env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1",
-                                                  "PYTHONPATH": os.pathsep.join([str(tmp_path), str(ROOT)])})
-            return json.loads(done.stdout.splitlines()[-1])
-        source = ("from scriptconv.phonemizers import GraphemePhonemizer\n\n\n"
-                  "class Own(GraphemePhonemizer):\n    def phonemize_string(self, text, lang):\n"
-                  "        return super().phonemize_string(text, lang).replace('a', 'a:')\n")
-        module.write_text(source)
-        before = revision()
-        module.write_text(source.replace("'a:'", "'a::'"))
-        assert before is not None
-        assert revision() not in (None, before)
-
-    @pytest.mark.parametrize("name, value, text, before, after", [
-        ("replace_chars", MappingProxyType({";": ".", "-": " ", ":": ","}), "a;b", "a,b", "a.b"),
-        ("drop_chars", "<>()[]", 'say "hi"', "say hi", 'say "hi"'),
-        ("in_word_chars", "", "motse-moholo", "motse-moholo", "motse moholo"),
-        ("lowercase", False, "Ab", "ab", "Ab"),
-    ])
-    def test_a_character_rule_set_on_the_instance_changes_the_revision(self, name, value, text,
-                                                                       before, after):
-        original, changed = GraphemePhonemizer(), GraphemePhonemizer()
-        setattr(changed, name, value)
-        assert (original.phonemize_string(text, "en"), changed.phonemize_string(text, "en")) == \
-            (before, after)
-        assert original.identity("en").revision is not None
-        assert changed.identity("en").revision != original.identity("en").revision
-
-    def test_a_rule_set_on_the_instance_to_its_default_keeps_the_revision(self):
-        changed = GraphemePhonemizer()
-        changed.drop_chars = '<>()[]"'
-        changed.replace_chars = {";": ",", "-": " ", ":": ","}
-        assert GraphemePhonemizer().identity("en").revision is not None
-        assert changed.identity("en").revision == GraphemePhonemizer().identity("en").revision
-
-    # keep_punctuation: a clause symbol comes before its space, and a symbol
-    # that ends the text stays (BasePhonemizer.phonemize_to_list).
-    @pytest.mark.parametrize("source, lang, plain, kept", [
-        ("GraphemePhonemizer()", "ru", "a b", "a, b."),
-        ("UnicodeCodepointPhonemizer()", "xx", "a b", "a, b."),
-    ])
-    def test_keep_punctuation_set_on_the_instance_changes_the_revision(self, source, lang, plain, kept):
-        original, keeping = eval(source), eval(source)
-        keeping.keep_punctuation = True
-        assert ("".join(original.phonemize_to_list("a, b.", lang)),
-                "".join(keeping.phonemize_to_list("a, b.", lang))) == (plain, kept)
-        assert original.identity(lang).revision is not None
-        assert keeping.identity(lang).revision != original.identity(lang).revision
-
-    def test_keep_punctuation_that_the_backend_ignores_keeps_the_revision(self):
-        original, keeping = OwnLazy(), OwnLazy()
-        keeping.keep_punctuation = True
-        assert keeping.phonemize_to_list("a, b.", "ru") == original.phonemize_to_list("a, b.", "ru")
-        assert original.identity("ru").revision is not None
-        assert keeping.identity("ru").revision == original.identity("ru").revision
-
-    def test_a_whitespace_pattern_set_on_the_instance_changes_the_revision(self):
-        original, ascii_only = GraphemePhonemizer(), GraphemePhonemizer()
-        ascii_only.whitespace_re = re.compile(r"\s+", re.ASCII)
-        # U+00A0 is whitespace to str patterns, and not to ASCII ones
-        assert (original.phonemize_string("a\xa0b", "ru"), ascii_only.phonemize_string("a\xa0b", "ru")) == \
-            ("a b", "a\xa0b")
-        assert original.identity("ru").revision is not None
-        assert ascii_only.identity("ru").revision != original.identity("ru").revision
-
-    def test_settings_set_on_the_instance_to_their_defaults_keep_the_revision(self):
-        changed = GraphemePhonemizer()
-        changed.keep_punctuation = False
-        changed.whitespace_re = re.compile(r"\s+")
-        assert GraphemePhonemizer().identity("ru").revision is not None
-        assert changed.identity("ru").revision == GraphemePhonemizer().identity("ru").revision
-
-    def test_instance_settings_give_the_same_revision_in_every_process(self, tmp_path):
-        runs = [subprocess.run([sys.executable, "-c", INSTANCE_SETTINGS_REVISION], cwd=ROOT, check=True,
-                               capture_output=True, text=True,
-                               env={**os.environ, "PYTHONHASHSEED": seed,
-                                    "XDG_CACHE_HOME": str(tmp_path / seed)}).stdout.splitlines()[-1]
-                for seed in ("0", "1")]
-        assert json.loads(runs[0]).startswith("sc2:")
-        assert runs[0] == runs[1]
-        assert json.loads(runs[0]) != GraphemePhonemizer().identity("ru").revision
-
-    def test_the_normaliser_hook_stays_out_of_the_revision(self):
-        import text2spoken
-        hooked = GraphemePhonemizer(normalizer=text2spoken.normalize)
-        assert hooked.phonemize("2 gatos", "pt-PT") != GraphemePhonemizer().phonemize("2 gatos", "pt-PT")
-        assert GraphemePhonemizer().identity("pt-PT").revision is not None
-        assert hooked.identity("pt-PT").revision == GraphemePhonemizer().identity("pt-PT").revision
-
-    def test_the_stress_notation_changes_the_revision(self):
-        revisions = {GraphemePhonemizer(stress_notation=notation).identity("ru").revision
-                     for notation in GraphemePhonemizer.STRESS_NOTATIONS}
-        assert None not in revisions and len(revisions) == 3
-
-    def test_the_normalisation_form_changes_the_revision(self):
-        revisions = {UnicodeCodepointPhonemizer(form).identity("xx").revision
-                     for form in ("NFC", "NFD", "NFKC", "NFKD")}
-        assert None not in revisions and len(revisions) == 4
-
-    @staticmethod
-    def zipped_package(tmp_path, monkeypatch):
-        """A package ``zipped_backend`` that loads from a zip archive, with a grapheme subclass."""
-        archive = tmp_path / "backends.zip"
-        with zipfile.ZipFile(archive, "w") as zipped:
-            zipped.writestr("zipped_backend/__init__.py",
-                            "from scriptconv.phonemizers import GraphemePhonemizer\n\n\n"
-                            "class Zipped(GraphemePhonemizer):\n    pass\n")
-        monkeypatch.syspath_prepend(str(archive))
-        monkeypatch.delitem(sys.modules, "zipped_backend", raising=False)
-        return importlib.import_module("zipped_backend")
-
-    def test_a_package_in_a_zip_raises_a_named_error(self, tmp_path, monkeypatch):
-        from scriptconv.phonemizers._revision import RevisionSourceUnavailable, _module_file
-        self.zipped_package(tmp_path, monkeypatch)
-        with pytest.raises(RevisionSourceUnavailable, match="zipped_backend"):
-            _module_file("zipped_backend.engine")
-
-    def test_each_language_has_its_own_revision(self):
-        revisions = {lang: GraphemePhonemizer().identity(lang).revision for lang in ("pt", "ru")}
-        assert None not in revisions.values()
-        assert revisions["pt"] != revisions["ru"]
-
-    def test_a_class_from_a_zip_gives_no_revision_and_a_warning(self, tmp_path, monkeypatch, caplog):
-        zipped = self.zipped_package(tmp_path, monkeypatch)
-        with caplog.at_level(logging.WARNING, logger="scriptconv.phonemizers._revision"):
-            identity = zipped.Zipped().identity("en")
-        assert GraphemePhonemizer().identity("en").revision is not None
-        assert identity.revision is None
-        warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
-        assert len(warnings) == 1
-        assert "RevisionSourceUnavailable" in warnings[0] and "Zipped" in warnings[0]
-
-    def test_a_data_file_on_the_path_changes_the_revision(self, tmp_path):
-        # kog2p reads the Korean tables of scriptconv through hangul2ipa
-        script = revisions_script({"kog2p": ("KoG2PPhonemizer()", "ko")}, {},
-                                  "from scriptconv_copyleft.phonemizers.ko import KoG2PPhonemizer")
-        edit = ("phonemizers/_thirdparty/ko_tables/ipa.csv", "ㅂ,p,ㅏ,ä", "ㅂ,b,ㅏ,ä")
-        pristine = revisions_in_a_copy(tmp_path / "pristine", script=script)["kog2p"]
-        assert pristine is not None
-        assert revisions_in_a_copy(tmp_path / "changed", edit, script)["kog2p"] != pristine
-
-    @pytest.mark.parametrize("source, lang", CODE_BACKENDS.values(), ids=CODE_BACKENDS)
-    def test_another_unicode_version_changes_the_revision(self, source, lang, monkeypatch):
-        current = eval(source).identity(lang).revision
-        monkeypatch.setattr(unicodedata, "unidata_version", "1.1.0")
-        assert current is not None
-        assert eval(source).identity(lang).revision != current
-
-
-# Edits of the wrapper code, (backend, file, old text, new text). Each changes
-# the output of the named backend for some input.
-WRAPPER_MUTANTS = {
-    "T1 the tugaphone wrapper drops the stress mark": (
-        "tugaphone", "phonemizers/pt.py",
-        "return self.tuga.phonemize_sentence(text, lang, contact=self.contact)",
-        'return self.tuga.phonemize_sentence(text, lang, contact=self.contact).replace("ˈ", "")'),
-    "T2 a semicolon is kept as a comma, tugaphone": (
-        "tugaphone", "phonemizers/base.py", '":": ":", ";": ";",', '":": ":", ";": ",",'),
-    "T3 the tugaphone frontend keeps a block of whitespace": (
-        "frontend-tugaphone", "frontend.py", "if block[2:-2].strip():", "if block[2:-2]:"),
-    "O1 the orthography2ipa wrapper drops the stress mark": (
-        "orthography2ipa", "phonemizers/o2ipa.py",
-        "return self._engine(resolved).transcribe(text)",
-        'return self._engine(resolved).transcribe(text).replace("ˈ", "")'),
-    "B1 the Barranquenho wrapper drops the stress mark": (
-        "barranquenho", "phonemizers/pt.py",
-        "return self._o2i.phonemize_string(text, self._SPEC)",
-        'return self._o2i.phonemize_string(text, self._SPEC).replace("ˈ", "")'),
-    "M1 the Mirandese wrapper drops the stress mark": (
-        "mirandese", "phonemizers/mwl.py",
-        "return self._o2i.phonemize_string(text, DIALECTS[self.get_lang(lang)])",
-        'return self._o2i.phonemize_string(text, DIALECTS[self.get_lang(lang)]).replace("ˈ", "")'),
-    "D1 the dizione wrapper joins two sentences with a bar": (
-        "dizione", "phonemizers/dizione.py",
-        'return " ".join(self._ipa_sentences(text))', 'return " | ".join(self._ipa_sentences(text))'),
-}
-
-
-@pytest.fixture(scope="module")
-def wrapped_pristine(tmp_path_factory):
-    return revisions_in_a_copy(tmp_path_factory.mktemp("wrapped"), script=WRAPPER_REVISIONS)
-
-
-# Each copy runs the tugaphone revision in a fresh process.
-@pytest.mark.timeout(900)
-class TestWrapperRevision:
-    def test_each_wrapper_has_its_own_revision(self, wrapped_pristine):
-        assert all(revision.startswith("sc2:") for revision in wrapped_pristine.values())
-        assert len(set(wrapped_pristine.values())) == len(WRAPPER_BACKENDS) + len(WRAPPER_FRONTENDS)
-
-    @pytest.mark.parametrize("mutant", WRAPPER_MUTANTS)
-    def test_a_wrapper_code_change_changes_the_revision(self, mutant, wrapped_pristine, tmp_path):
-        backend, *edit = WRAPPER_MUTANTS[mutant]
-        assert wrapped_pristine[backend] is not None
-        changed = revisions_in_a_copy(tmp_path, edit, WRAPPER_REVISIONS)
-        assert changed[backend] != wrapped_pristine[backend]
-
-    @pytest.mark.parametrize("edit", NEUTRAL_EDITS)
-    def test_an_edit_that_changes_no_output_keeps_every_wrapper_revision(self, edit, wrapped_pristine,
-                                                                         tmp_path):
-        assert None not in wrapped_pristine.values()
-        assert revisions_in_a_copy(tmp_path, NEUTRAL_EDITS[edit], WRAPPER_REVISIONS) == wrapped_pristine
-
-
-# An engine backend, whose revision holds the engine version in place of the
-# engine's files, and a frontend that reads through it.
-ENGINE_BACKENDS = {"epitran": ("EpitranPhonemizer()", "rus-Cyrl")}
-ENGINE_FRONTENDS = {"frontend-epitran": ("EpitranPhonemizer()", "rus-Cyrl")}
-ENGINE_REVISIONS = revisions_script(ENGINE_BACKENDS, ENGINE_FRONTENDS,
-                                    "from scriptconv.phonemizers.mul import EpitranPhonemizer")
-# Edits on the path of the engine backend that change its output for some input.
-ENGINE_MUTANTS = {
-    "E1 a stress mark stays in the text that epitran reads": (
-        "epitran", "diacritics.py",
-        "    if STRESS_MARK not in text:\n        return text\n    vowels = _stress_vowels(lang)",
-        "    if True:\n        return text\n    vowels = _stress_vowels(lang)"),
-    "E3 the epitran frontend keeps a block of whitespace": (
-        "frontend-epitran", "frontend.py", "if block[2:-2].strip():", "if block[2:-2]:"),
-}
-
-
-@pytest.fixture(scope="module")
-def engine_pristine(tmp_path_factory):
-    return revisions_in_a_copy(tmp_path_factory.mktemp("engine"), script=ENGINE_REVISIONS)
-
-
-# Each copy loads epitran in a fresh process.
-@pytest.mark.timeout(900)
-class TestEngineRevision:
-    @pytest.mark.parametrize("member, lang", [
-        (Phonemizer.EPITRAN, "rus-Cyrl"), (Phonemizer.GRUUT, "ru"), (Phonemizer.ESPEAK, "pt"),
-        (Phonemizer.KOG2PK, "ko"), (Phonemizer.MANTOQ, "ar"),
-    ])
-    def test_an_engine_backend_has_a_revision(self, member, lang):
-        assert get_phonemizer(member).identity(lang).revision.startswith("sc2:")
-
-    @pytest.mark.parametrize("member, lang", [(Phonemizer.EPITRAN, "rus-Cyrl"), (Phonemizer.ESPEAK, "pt")])
-    def test_an_engine_release_changes_the_revision(self, member, lang, monkeypatch):
-        backend = get_phonemizer(member)
-        current = backend.identity(lang)
-        distribution, version = backend._engine_release()
-        monkeypatch.setattr(type(backend), "_engine_release", lambda self: (distribution, f"{version}.post1"))
-        released = backend.identity(lang)
-        assert None not in (current.revision, released.revision)
-        assert released.differs_from(current) == ("revision", "version")
-
-    @pytest.mark.parametrize("mutant", ENGINE_MUTANTS)
-    def test_a_code_change_on_the_path_changes_the_revision(self, mutant, engine_pristine, tmp_path):
-        backend, *edit = ENGINE_MUTANTS[mutant]
-        assert engine_pristine[backend] is not None
-        assert revisions_in_a_copy(tmp_path, edit, ENGINE_REVISIONS)[backend] != engine_pristine[backend]
-
-    @pytest.mark.parametrize("edit", NEUTRAL_EDITS)
-    def test_an_edit_that_changes_no_output_keeps_every_engine_revision(self, edit, engine_pristine, tmp_path):
-        assert None not in engine_pristine.values()
-        assert revisions_in_a_copy(tmp_path, NEUTRAL_EDITS[edit], ENGINE_REVISIONS) == engine_pristine
-
-    def test_a_backend_on_the_base_class_itself_gives_no_revision_and_no_warning(self, caplog):
-        class Custom(BasePhonemizer):
-            def phonemize_string(self, text, lang):
-                return text
+def installed(*names):
+    """The ``;name==version`` string of each distribution, as ``importlib.metadata`` reads it."""
+    return "".join(f";{name}=={metadata.version(name)}" for name in names)
+
+
+class TestRevision:
+    @pytest.mark.parametrize("backend", [GraphemePhonemizer(), UnicodeCodepointPhonemizer()])
+    def test_code_inside_scriptconv_gives_the_scriptconv_version(self, backend):
+        assert backend.identity("pt").revision == f"scriptconv=={metadata.version('scriptconv')}"
+
+    def test_a_sister_package_follows_scriptconv_and_the_engine_comes_last(self):
+        identity = get_phonemizer(Phonemizer.ESPEAK).identity("pt")
+        assert identity.revision == (f"scriptconv=={metadata.version('scriptconv')}"
+                                     + installed("scriptconv-copyleft") + f";espeak-ng=={identity.version}")
+
+    def test_code_in_a_sister_package_names_it_once(self):
+        revision = get_phonemizer(Phonemizer.MANTOQ).identity("ar").revision
+        assert revision == f"scriptconv=={metadata.version('scriptconv')}" + installed("scriptconv-nonfree")
+
+    def test_an_engine_distribution_follows_scriptconv(self):
+        assert get_phonemizer(Phonemizer.EPITRAN).identity("rus-Cyrl").revision == \
+            f"scriptconv=={metadata.version('scriptconv')}" + installed("epitran")
+
+    def test_the_orthography2ipa_wrappers_name_the_lexicon_package(self):
+        expected = f"scriptconv=={metadata.version('scriptconv')}" + installed("orthography2ipa", "o2i-lexicons")
+        assert Orthography2IPAPhonemizer().identity("pt-PT").revision == expected
+        assert get_phonemizer(Phonemizer.BARRANQUENHO).identity("ext-PT-x-barrancos").revision == expected
+        assert get_phonemizer(Phonemizer.MIRANDESE).identity("mwl").revision == expected
+
+    def test_tugaphone_names_the_packages_that_give_its_phonemes(self):
+        assert TugaphonePhonemizer().identity("pt-PT").revision == (
+            f"scriptconv=={metadata.version('scriptconv')}" + installed(
+                "tugaphone", "orthography2ipa", "o2i-lexicons", "tugalex", "bifonia",
+                "desacordo-ortografico", "text2spoken"))
+
+    @pytest.mark.parametrize("lang, pack", [("fr", "gruut-lang-fr"), ("ru", "gruut-lang-ru")])
+    def test_gruut_names_the_language_pack_of_the_lect(self, lang, pack):
+        assert get_phonemizer(Phonemizer.GRUUT).identity(lang).revision == \
+            f"scriptconv=={metadata.version('scriptconv')}" + installed("gruut", pack)
+
+    def test_a_data_distribution_that_is_not_installed_stays_out(self, monkeypatch):
+        real = metadata.version
+
+        def version(name):
+            if name == "o2i-lexicons":
+                raise metadata.PackageNotFoundError(name)
+            return real(name)
+        monkeypatch.setattr(metadata, "version", version)
+        assert Orthography2IPAPhonemizer().identity("pt-PT").revision == \
+            f"scriptconv=={real('scriptconv')}" + installed("orthography2ipa")
+
+    def test_an_engine_that_is_not_installed_raises_import_error(self, monkeypatch):
+        monkeypatch.setattr(Orthography2IPAPhonemizer, "engine_distribution", "no-such-distribution")
+        with pytest.raises(ImportError):
+            Orthography2IPAPhonemizer().identity("pt-PT")
+
+    def test_a_release_of_a_data_distribution_changes_the_revision(self, monkeypatch):
+        backend = Orthography2IPAPhonemizer()
+        current = backend.identity("pt-PT")
+        real = metadata.version
+        monkeypatch.setattr(metadata, "version",
+                            lambda name: "99.0" if name == "o2i-lexicons" else real(name))
+        assert backend.identity("pt-PT").differs_from(current) == ("revision",)
+
+    def test_a_release_of_the_engine_changes_the_revision_and_the_version(self, monkeypatch):
+        backend = get_phonemizer(Phonemizer.EPITRAN)
+        current = backend.identity("rus-Cyrl")
+        monkeypatch.setattr(type(backend), "_engine_release",
+                            lambda self: ("epitran", f"{current.version}.post1"))
+        assert backend.identity("rus-Cyrl").differs_from(current) == ("revision", "version")
+
+    def test_two_tugaphone_identities_log_no_missing_revision(self, caplog):
+        backend = TugaphonePhonemizer()
         with caplog.at_level(logging.WARNING):
-            assert Custom().identity("pt").revision is None
-        assert not caplog.records
+            first, second = backend.identity("pt-PT"), backend.identity("pt-BR")
+        assert first.revision == second.revision
+        assert "gives no revision" not in caplog.text
 
 
-def frontend(backend=None, **config):
-    return TextFrontend(FrontendConfig("pt-PT", **config), backend or GraphemePhonemizer())
+def frontend(backend=None, lang="pt-PT", **config):
+    return TextFrontend(FrontendConfig(lang, **config), backend or GraphemePhonemizer())
 
 
 class TestFrontendRevision:
-    def test_the_frontend_revision_covers_the_backend_and_the_frontend(self):
-        identity, backend = frontend().identity(), GraphemePhonemizer().identity("pt-PT")
-        assert backend.revision is not None and identity.revision.startswith("sc2:")
-        assert identity.revision != backend.revision
+    def test_the_frontend_keeps_the_backend_revision_when_no_stage_adds_one(self):
+        assert frontend().identity().revision == GraphemePhonemizer().identity("pt-PT").revision
 
-    def test_keep_punctuation_changes_the_revision(self):
-        assert frontend().identity().revision is not None
-        assert frontend(keep_punctuation=True).identity().revision != frontend().identity().revision
+    def test_text2spoken_follows_the_backend_when_it_normalises(self):
+        revision = frontend(normalizer=spoken_normalizer()).identity().revision
+        assert revision == (f"scriptconv=={metadata.version('scriptconv')}" + installed("text2spoken"))
 
-    def test_a_normaliser_that_scriptconv_cannot_vouch_for_gives_no_revision(self):
-        assert frontend().identity().revision is not None
+    def test_normalisation_switched_off_leaves_text2spoken_out(self):
+        identity = frontend(normalizer=spoken_normalizer(), stages=Stages(normalize=False)).identity()
+        assert identity.revision == f"scriptconv=={metadata.version('scriptconv')}"
+
+    def test_a_backend_that_owns_normalisation_adds_no_second_text2spoken(self):
+        identity = frontend(TugaphonePhonemizer(), normalizer=spoken_normalizer()).identity()
+        assert identity.revision == TugaphonePhonemizer().identity("pt-PT").revision
+
+    def test_another_normaliser_gives_no_revision(self):
         assert frontend(normalizer=lambda text, lang: text.upper()).identity().revision is None
 
-    def test_the_text2spoken_hook_folds_in_the_text2spoken_revision(self, monkeypatch):
-        import text2spoken
-        monkeypatch.setattr(text2spoken, "revision", lambda lang: f"t2s1:{lang}:1", raising=False)
-        first = frontend(normalizer=spoken_normalizer()).identity().revision
-        monkeypatch.setattr(text2spoken, "revision", lambda lang: f"t2s1:{lang}:2")
-        second = frontend(normalizer=spoken_normalizer()).identity().revision
-        assert None not in (first, second) and first != second
-        assert first != frontend().identity().revision
-
-    def test_a_text2spoken_without_a_revision_gives_no_revision(self, monkeypatch):
-        import text2spoken
-        monkeypatch.delattr(text2spoken, "revision", raising=False)
-        assert frontend().identity().revision is not None
-        assert frontend(normalizer=spoken_normalizer()).identity().revision is None
-
-    def test_a_text2spoken_revision_error_gives_no_revision_and_a_warning(self, monkeypatch, caplog):
-        import text2spoken
-
-        def fails(lang):
-            raise ValueError("a module loads from a zip file")
-        monkeypatch.setattr(text2spoken, "revision", fails, raising=False)
-        with caplog.at_level(logging.WARNING, logger="scriptconv.frontend"):
-            assert frontend(normalizer=spoken_normalizer()).identity().revision is None
-        assert [r.levelno for r in caplog.records if r.name == "scriptconv.frontend"] == [logging.WARNING]
-
-    def test_a_diacritizing_frontend_gives_no_revision(self):
-        assert TextFrontend(FrontendConfig("es"), GraphemePhonemizer()).identity().revision is not None
-        assert TextFrontend(FrontendConfig("ar"), GraphemePhonemizer()).identity().revision is None
-
     def test_a_casing_gives_no_revision(self):
-        assert frontend().identity().revision is not None
         assert frontend(stages=Stages(casing=str.upper)).identity().revision is None
 
-    def test_a_backend_with_no_revision_gives_no_revision(self):
-        class Custom(BasePhonemizer):
-            def phonemize_string(self, text, lang):
-                return text
-        assert frontend(Custom()).identity().revision is None
+    def test_a_diacritizer_follows_the_backend(self):
+        identity = frontend(lang="ar").identity()
+        assert identity.revision == f"scriptconv=={metadata.version('scriptconv')}" + installed("text2tashkeel")
 
+    def test_a_diacritizer_model_gives_no_revision(self):
+        assert frontend(lang="ar", stages=Stages(diacritizer_model="rawi-ensemble")).identity().revision is None
 
-GRAPHEMES_EN_REVISION = """
-import json
-from scriptconv.phonemizers import GraphemePhonemizer
-print(json.dumps(GraphemePhonemizer().identity("en").revision))
-"""
-
-
-@pytest.fixture
-def fresh_revisions():
-    """File digests and warnings kept by no earlier test, and none kept after this one."""
-    from scriptconv.phonemizers import _revision
-    caches = (_revision._path, _revision._top_level_distributions, _revision.file_digest, _revision._warn_once)
-    for cache in caches:
-        cache.cache_clear()
-    yield
-    for cache in caches:
-        cache.cache_clear()
-
-
-def released(monkeypatch, name, version):
-    """The installed metadata as after a release of *name* as *version* that changes no file on the path."""
-    from scriptconv.phonemizers import _revision
-    installed = metadata.distribution
-
-    def distribution(asked):
-        if _revision._canonical(asked) != name:
-            return installed(asked)
-        try:
-            requires = installed(asked).requires
-        except metadata.PackageNotFoundError:
-            requires = None
-        return SimpleNamespace(version=version, requires=requires)
-    monkeypatch.setattr(metadata, "distribution", distribution)
-
-
-def uninstalled(monkeypatch, name):
-    """The installed metadata as after an uninstall of *name*."""
-    from scriptconv.phonemizers import _revision
-    installed = metadata.distribution
-
-    def distribution(asked):
-        if _revision._canonical(asked) == name:
-            raise metadata.PackageNotFoundError(asked)
-        return installed(asked)
-    monkeypatch.setattr(metadata, "distribution", distribution)
-
-
-def fake_release(site, name, version):
-    """A copy of the installed metadata of *name* in the directory *site*, with another version."""
-    installed = metadata.distribution(name)
-    info = site / f"{installed.metadata['Name'].replace('-', '_')}-{version}.dist-info"
-    info.mkdir(parents=True)
-    (info / "METADATA").write_text(re.sub(r"(?m)^Version: .*$", f"Version: {version}", installed.read_text("METADATA")),
-                                   encoding="utf-8")
-
-
-class TestFailures:
-    def test_a_scriptconv_with_no_metadata_gives_no_revision_and_warns_once(self, fresh_revisions, monkeypatch,
-                                                                            caplog):
-        assert GraphemePhonemizer().identity("en").revision is not None
-        installed = metadata.distribution
-
-        def distribution(name):
-            if name == "scriptconv":
-                raise metadata.PackageNotFoundError(name)
-            return installed(name)
-        monkeypatch.setattr(metadata, "distribution", distribution)
-        with caplog.at_level(logging.WARNING, logger="scriptconv.phonemizers._revision"):
-            revisions = [GraphemePhonemizer().identity("en").revision for _ in range(5)]
-        assert revisions == [None] * 5
-        warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
-        assert len(warnings) == 1 and "PackageNotFoundError" in warnings[0] and "GraphemePhonemizer" in warnings[0]
-
-
-class TestReleases:
-    """A release of a distribution under the backend changes the revision, and other installs keep it."""
-
-    def test_a_release_of_a_dependency_changes_the_revision(self, monkeypatch):
-        current = GraphemePhonemizer().identity("en").revision
-        released(monkeypatch, "quebra-frases", "99.0.0")
-        assert current is not None
-        assert GraphemePhonemizer().identity("en").revision not in (None, current)
-
-    def test_a_release_of_a_dependency_of_a_dependency_changes_the_revision(self, monkeypatch):
-        # quebra-frases requires regex
-        current = GraphemePhonemizer().identity("en").revision
-        released(monkeypatch, "regex", "2099.1.1")
-        assert current is not None
-        assert GraphemePhonemizer().identity("en").revision not in (None, current)
-
-    def test_a_release_of_an_engine_dependency_changes_the_revision(self, monkeypatch):
-        # epitran requires panphon
-        current = EpitranPhonemizer().identity("rus-Cyrl").revision
-        released(monkeypatch, "panphon", "99.0.0")
-        assert current is not None
-        assert EpitranPhonemizer().identity("rus-Cyrl").revision not in (None, current)
-
-    def test_a_release_that_only_the_backend_extra_requires_changes_the_revision(self, monkeypatch):
-        # the ar-phonemizers extra requires numtag through scriptconv-nonfree, and the phonemizers extra does not
-        current = get_phonemizer(Phonemizer.MANTOQ).identity("ar").revision
-        graphemes = GraphemePhonemizer().identity("en").revision
-        released(monkeypatch, "numtag", "99.0.0")
-        assert None not in (current, graphemes)
-        assert get_phonemizer(Phonemizer.MANTOQ).identity("ar").revision not in (None, current)
-        assert GraphemePhonemizer().identity("en").revision == graphemes
-
-    def test_a_requirement_under_an_extra_nobody_asks_for_keeps_the_revision(self, monkeypatch):
-        # quebra-frases requires pytest under its extra "test"
-        assert any("pytest" in line and "extra" in line for line in metadata.distribution("quebra-frases").requires)
-        current = GraphemePhonemizer().identity("en").revision
-        released(monkeypatch, "pytest", "99.0.0")
-        assert current is not None
-        assert GraphemePhonemizer().identity("en").revision == current
-
-    def test_a_requirement_for_another_platform_keeps_the_revision(self, monkeypatch):
-        # pandas, which epitran requires through panphon, requires tzdata only on win32 and emscripten
-        assert any(line.startswith("tzdata") and "win32" in line for line in metadata.distribution("pandas").requires)
-        current = EpitranPhonemizer().identity("rus-Cyrl").revision
-        released(monkeypatch, "tzdata", "2099.1")
-        assert current is not None
-        assert EpitranPhonemizer().identity("rus-Cyrl").revision == current
-
-    def test_an_install_of_a_module_that_the_path_imports_changes_the_revision(self, monkeypatch):
-        # the Shami normaliser reads numbers through num2words when it is installed, and no extra requires it
-        assert metadata.distribution("num2words")
-        installed = get_phonemizer(Phonemizer.SHAMI).identity("apc").revision
-        uninstalled(monkeypatch, "num2words")
-        assert installed is not None
-        assert get_phonemizer(Phonemizer.SHAMI).identity("apc").revision not in (None, installed)
-
-    def test_a_release_of_a_module_that_the_path_imports_changes_the_revision(self, monkeypatch):
-        current = get_phonemizer(Phonemizer.SHAMI).identity("apc").revision
-        released(monkeypatch, "num2words", "99.0.0")
-        assert current is not None
-        assert get_phonemizer(Phonemizer.SHAMI).identity("apc").revision not in (None, current)
-
-    def test_a_release_of_a_module_imported_only_inside_a_function_keeps_the_revision(self, monkeypatch):
-        # scriptconv.diacritics imports bifonia inside a function, and the phonemizers extra does not require it
-        assert metadata.distribution("bifonia")
-        current = GraphemePhonemizer().identity("en").revision
-        released(monkeypatch, "bifonia", "99.0.0")
-        assert current is not None
-        assert GraphemePhonemizer().identity("en").revision == current
-
-    def test_a_release_of_a_language_pack_of_the_engine_changes_that_language_only(self, monkeypatch):
-        # gruut requires gruut_lang_fr under its extra "fr"
-        gruut = get_phonemizer(Phonemizer.GRUUT)
-        current = {lang: gruut.identity(lang).revision for lang in ("fr", "ru", "en-us")}
-        released(monkeypatch, "gruut-lang-fr", "99.0.0")
-        assert None not in current.values()
-        after = {lang: gruut.identity(lang).revision for lang in current}
-        assert after["fr"] not in (None, current["fr"])
-        assert (after["ru"], after["en-us"]) == (current["ru"], current["en-us"])
-
-    def test_an_unrelated_release_keeps_the_revision(self, monkeypatch):
-        current = GraphemePhonemizer().identity("en").revision
-        released(monkeypatch, "panphon", "99.0.0")
-        assert current is not None
-        assert GraphemePhonemizer().identity("en").revision == current
-
-    @pytest.mark.parametrize("marker, expected", [
-        ('sys_platform == "win32"', sys.platform == "win32"),
-        (f'python_version >= "{sys.version_info[0]}.{sys.version_info[1] + 1}"', False),
-        (f'python_version < "{sys.version_info[0]}.{sys.version_info[1] + 1}"', True),
-        (f'python_full_version ~= "{sys.version_info[0]}.{sys.version_info[1]}.0"', True),
-        ('os_name in "nt posix"', True),
-        ('(python_version < "3.0" or os_name != "nt") and extra == "Test_It"', os.name != "nt"),
-        ('extra == "other"', False),
-        ('"win" not in sys_platform', "win" not in sys.platform),
-        ('"linux" in sys_platform', "linux" in sys.platform),
-        ('python_version >= "3.9"', sys.version_info >= (3, 9)),
-    ])
-    def test_a_marker_holds_as_pep_508_reads_it(self, marker, expected):
-        from scriptconv.phonemizers._revision import _marker_holds
-        assert _marker_holds(marker, "test-it") is expected
-
-
-class TestPreloadedPackages:
-    """A package that loads at startup, as from a ``sitecustomize.py`` or a ``.pth`` file, keeps the revision."""
-
-    @staticmethod
-    def preloaded_revision(directory, sitecustomize=None):
-        """The GRAPHEMES en revision in a process whose path starts at *directory*."""
-        if sitecustomize is not None:
-            (directory / "sitecustomize.py").write_text(sitecustomize)
-        done = subprocess.run([sys.executable, "-c", GRAPHEMES_EN_REVISION], cwd=ROOT, check=True,
-                              capture_output=True, text=True,
-                              env={**os.environ, "PYTHONPATH": os.pathsep.join([str(directory), str(ROOT)]),
-                                   "PYTHONDONTWRITEBYTECODE": "1"})
-        return json.loads(done.stdout.splitlines()[-1])
-
-    @pytest.mark.parametrize("sitecustomize", [
-        "import scriptconv.phonemizers.base\n",
-        "import quebra_frases\n",
-        "import pytest\n",
-        "import sys, quebra_frases\nsys.modules['quebra_frases.blocked'] = None\n",
-    ], ids=["scriptconv", "a dependency", "another distribution", "a blocked import"])
-    def test_a_package_loaded_at_startup_keeps_the_revision(self, sitecustomize, tmp_path):
-        (tmp_path / "empty").mkdir()
-        expected = self.preloaded_revision(tmp_path / "empty")
-        assert expected is not None
-        assert self.preloaded_revision(tmp_path, sitecustomize) == expected
-
-    def test_a_release_of_a_preloaded_dependency_changes_the_revision(self, tmp_path):
-        (tmp_path / "empty").mkdir()
-        before = self.preloaded_revision(tmp_path / "empty")
-        fake_release(tmp_path, "quebra-frases", "99.0.0")
-        assert before is not None
-        assert self.preloaded_revision(tmp_path, "import quebra_frases\n") not in (None, before)
-
-    def test_a_hook_from_an_unrelated_package_keeps_the_revision(self, tmp_path):
-        (tmp_path / "hookpkg").mkdir()
-        (tmp_path / "hookpkg" / "__init__.py").write_text("def hook(*args):\n    return None\n")
-        (tmp_path / "empty").mkdir()
-        expected = self.preloaded_revision(tmp_path / "empty")
-        hooked = self.preloaded_revision(
-            tmp_path, "import sys, hookpkg\nsys.excepthook = hookpkg.hook\n")
-        assert expected is not None
-        assert hooked == expected
-
-    def test_a_hook_on_a_standard_library_module_a_used_package_holds_keeps_the_revision(self, tmp_path):
-        (tmp_path / "hookpkg").mkdir()
-        (tmp_path / "hookpkg" / "__init__.py").write_text("def hook(*args):\n    return None\n")
-        (tmp_path / "empty").mkdir()
-        expected = self.preloaded_revision(tmp_path / "empty")
-        hooked = self.preloaded_revision(
-            tmp_path, "import quebra_frases, hookpkg, xml.dom\n"
-                      "quebra_frases.held = xml.dom\nxml.dom.hook = hookpkg.hook\n")
-        assert expected is not None
-        assert hooked == expected
-
-
-def sloppy_site(tmp_path):
-    """A site directory with ``sloppy``, a distribution that holds ``quebra_frases``,
-    which the grapheme backend imports, and ships a top-level ``tests`` package, as gruut-ipa does."""
-    site = tmp_path / "site"
-    (site / "tests").mkdir(parents=True)
-    (site / "tests" / "__init__.py").write_text("SLOPPY = 1\n")
-    info = site / "sloppy-1.0.dist-info"
-    info.mkdir()
-    (info / "METADATA").write_text("Metadata-Version: 2.1\nName: sloppy\nVersion: 1.0\n")
-    (info / "top_level.txt").write_text("quebra_frases\ntests\n")
-    (info / "RECORD").write_text("tests/__init__.py,,\nsloppy-1.0.dist-info/METADATA,,\n")
-    return site
-
-
-def revision_from(cwd, site):
-    """The grapheme revision for ``en`` in a ``python -c`` process in *cwd*, which puts *cwd* first on its path."""
-    done = subprocess.run([sys.executable, "-c", GRAPHEMES_EN_REVISION], cwd=cwd, check=True,
-                          capture_output=True, text=True,
-                          env={**os.environ, "PYTHONPATH": os.pathsep.join([str(site), str(ROOT)]),
-                               "PYTHONDONTWRITEBYTECODE": "1"})
-    return json.loads(done.stdout.splitlines()[-1])
-
-
-class TestStableRevision:
-    """Two machines with the same packages, or two working directories, give one revision."""
-
-    def test_the_hash_holds_files_of_the_scriptconv_packages_on_the_path_only(self):
-        from scriptconv.phonemizers import _revision
-        files = {path for path, _ in _revision._path(frozenset({"scriptconv.phonemizers.base"}))[0]}
-        assert {"scriptconv/phonemizers/base.py", "scriptconv/diacritics.py"} <= files
-        assert not {"scriptconv/version.py", "scriptconv/phonemizers/zh.py"} & files
-        # neither the interpreter's own modules, which differ between two builds of one Python, nor a dependency
-        assert {path.split("/")[0] for path in files} <= {"scriptconv", "scriptconv_copyleft", "scriptconv_nonfree"}
-
-    def test_a_tests_package_in_the_working_directory_keeps_the_revision(self, tmp_path):
-        site = sloppy_site(tmp_path)
-        plain, checkout = tmp_path / "plain", tmp_path / "checkout"
-        plain.mkdir()
-        (checkout / "tests").mkdir(parents=True)
-        (checkout / "tests" / "__init__.py").write_text("CHECKOUT = 1\n")
-        revision = revision_from(plain, site)
-        assert revision is not None
-        assert revision_from(checkout, site) == revision
-
-    def test_another_distribution_with_a_tests_package_keeps_the_revision(self, tmp_path):
-        site = sloppy_site(tmp_path)
-        (tmp_path / "plain").mkdir()
-        revision = revision_from(tmp_path / "plain", site)
-        info = site / "unrelated-1.0.dist-info"
-        info.mkdir()
-        (info / "METADATA").write_text("Metadata-Version: 2.1\nName: unrelated\nVersion: 1.0\n")
-        (info / "RECORD").write_text("tests/test_unrelated.py,,\nunrelated-1.0.dist-info/METADATA,,\n")
-        (site / "tests" / "test_unrelated.py").write_text("UNRELATED = 1\n")
-        assert revision is not None
-        assert revision_from(tmp_path / "plain", site) == revision
-
-    def test_a_shared_tests_package_overwritten_or_removed_keeps_the_revision(self, tmp_path):
-        site = sloppy_site(tmp_path)
-        (tmp_path / "plain").mkdir()
-        revision = revision_from(tmp_path / "plain", site)
-        # each distribution with a top-level tests package writes this file, and its uninstall removes it
-        shared = site / "tests" / "__init__.py"
-        shared.write_text("from .helpers import *\n")
-        overwritten = revision_from(tmp_path / "plain", site)
-        shared.unlink()
-        assert revision is not None
-        assert overwritten == revision
-        assert revision_from(tmp_path / "plain", site) == revision
-
-    def test_a_module_under_a_bare_alias_keeps_the_revision(self, tmp_path, monkeypatch):
-        # as pandas puts pandas._libs._cyutility in sys.modules as _cyutility when epitran loads it
-        site = tmp_path / "site"
-        shutil.copytree(Path(quebra_frases.__file__).parent, site / "quebra_frases",
-                        ignore=shutil.ignore_patterns("__pycache__"))
-        (site / "quebra_frases" / "_shared.py").write_text("VALUE = 1\n")
-        init = site / "quebra_frases" / "__init__.py"
-        init.write_text("import os, sys\nfrom quebra_frases import _shared\n"
-                        "if os.environ.get('QUEBRA_FRASES_ALIAS'):\n    sys.modules['_qf_shared'] = _shared\n"
-                        + init.read_text(encoding="utf-8"), encoding="utf-8")
-        (tmp_path / "plain").mkdir()
-        revision = revision_from(tmp_path / "plain", site)
-        monkeypatch.setenv("QUEBRA_FRASES_ALIAS", "1")
-        assert revision is not None
-        assert revision_from(tmp_path / "plain", site) == revision
+    def test_a_release_of_text2spoken_changes_the_frontend_revision(self, monkeypatch):
+        backend, config = GraphemePhonemizer(), FrontendConfig("pt-PT", normalizer=spoken_normalizer())
+        current = TextFrontend(config, backend).identity()
+        real = metadata.version
+        monkeypatch.setattr(metadata, "version", lambda name: "99.0" if name == "text2spoken" else real(name))
+        assert TextFrontend(config, backend).identity().differs_from(current) == ("revision",)
 
 
 class TestDeclarations:

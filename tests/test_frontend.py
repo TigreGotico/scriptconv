@@ -10,7 +10,7 @@ import re
 import sys
 import time
 import tomllib
-from importlib.metadata import metadata
+from importlib.metadata import metadata, version as metadata_version
 from pathlib import Path
 
 import pytest
@@ -1051,8 +1051,8 @@ class TestBackends:
     def test_identity_names_the_backend_and_the_language(self):
         frontend = TextFrontend(FrontendConfig("pt-PT", Phonemizer.UNICODE))
         identity = frontend.identity()
-        assert identity.revision.startswith("sc2:")
-        assert identity.revision != UnicodeCodepointPhonemizer().identity("pt-PT").revision
+        assert identity.revision == f"scriptconv=={metadata_version('scriptconv')}"
+        assert identity.revision == UnicodeCodepointPhonemizer().identity("pt-PT").revision
         assert identity == PhonemizerIdentity(
             "unicode", "scriptconv", VERSION_STR, "pt-PT", identity.revision, frontend_module.FRONTEND_VERSION)
         reference = TextFrontend(FrontendConfig("pt-PT", Phonemizer.UNICODE, stages=Stages(lang="es")))

@@ -1,11 +1,8 @@
-import dataclasses
-import functools
 import logging
-from typing import Dict, FrozenSet, Optional, Tuple
 
 from linguatag import standardize_lang
 
-from scriptconv.phonemizers.base import BasePhonemizer, PhonemizerIdentity, _check_alphabet
+from scriptconv.phonemizers.base import BasePhonemizer, _check_alphabet
 from scriptconv.phonemizers.enums import Alphabet
 from scriptconv.phonemizers.o2ipa import Orthography2IPAPhonemizer
 
@@ -15,11 +12,11 @@ LOG = logging.getLogger(__name__)
 class TugaphonePhonemizer(BasePhonemizer):
     owned_stages = frozenset({"normalize", "diacritize"})
     engine_distribution = "tugaphone"
+    revision_distributions = ("orthography2ipa", "o2i-lexicons", "tugalex", "bifonia",
+                              "desacordo-ortografico", "text2spoken")
 
     contact = "none"
-    """The embedded-language policy that this backend passes to tugaphone.
-    ``tugaphone.revision`` covers ``"none"`` only, so any other value gives
-    no ``revision``."""
+    """The embedded-language policy that this backend passes to tugaphone."""
 
     def __init__(self):
         try:
@@ -50,69 +47,9 @@ class TugaphonePhonemizer(BasePhonemizer):
             return dialects[tag]
         return cls.match_lang(target_lang, ["pt-PT", "pt-BR", "pt-AO", "pt-MZ", "pt-TL"])
 
-    def _identity_settings(self) -> Dict[str, object]:
-        return {"contact": self.contact}
-
-    def _covered_distributions(self, lang: str) -> FrozenSet[str]:
-        """The distributions that ``tugaphone.revision`` covers for the lect of *lang*."""
-        engine = _tugaphone_revision(self.get_lang(lang))
-        return frozenset() if engine is None else engine[1]
-
-    def identity(self, lang: str) -> PhonemizerIdentity:
-        """The base identity, with ``revision`` the code revision of this
-        backend that holds ``tugaphone.revision`` of the resolved lect.
-
-        ``tugaphone.revision`` covers tugaphone and each distribution that its
-        output path loads, for ``contact="none"``. The code revision of
-        :func:`~scriptconv.phonemizers._revision.code_revision` adds the
-        scriptconv code on the path of this backend, and the distributions
-        that tugaphone does not cover. So a tugaphone release that keeps its
-        revision keeps this revision. When :attr:`contact` is not ``"none"``,
-        and, with one warning, when tugaphone gives no revision, ``revision``
-        is that of :meth:`BasePhonemizer.identity`, which holds the tugaphone
-        version.
-        """
-        from scriptconv.phonemizers._revision import code_revision
-        identity = super().identity(lang)
-        if self.contact != "none":
-            return identity
-        engine = _tugaphone_revision(identity.lang)
-        if engine is None:
-            return identity
-        return dataclasses.replace(
-            identity, revision=code_revision(self, identity.lang, {"tugaphone": engine[0]}))
-
     def phonemize_string(self, text: str, lang: str) -> str:
         lang = self.get_lang(lang)
         return self.tuga.phonemize_sentence(text, lang, contact=self.contact)
-
-
-@functools.lru_cache(maxsize=None)
-def _tugaphone_revision(lect: str) -> Optional[Tuple[str, FrozenSet[str]]]:
-    """``tugaphone.revision`` of *lect* and the distributions it covers, or
-    ``None`` and one warning for each lect when tugaphone gives no revision.
-
-    Each ImportError from the two guarded imports gives ``None``: a tugaphone
-    with no ``content_revision`` module, as 1.7.1, or an orthography2ipa with
-    no ``EngineSourceUnavailable``, as each release before 7.123.0a1. A
-    ``RevisionError`` or an ``EngineSourceUnavailable`` from the revision call
-    gives ``None`` too, as for an orthography2ipa installed as byte code. An
-    ImportError that ``tugaphone.revision`` raises is a bug in that install,
-    so it propagates."""
-    import tugaphone
-    try:
-        from orthography2ipa.exceptions import EngineSourceUnavailable
-        from tugaphone.content_revision import distributions
-    except ImportError as exc:
-        failure = exc
-    else:
-        try:
-            return tugaphone.revision(lect), frozenset(distributions(tugaphone.resolve_lect(lect)))
-        except (tugaphone.RevisionError, EngineSourceUnavailable) as exc:
-            failure = exc
-    LOG.warning("tugaphone gives no revision for %r, so the identity holds the tugaphone version: %s: %s",
-                lect, type(failure).__name__, failure)
-    return None
 
 
 class BarranquenhoPhonemizer(BasePhonemizer):
@@ -125,6 +62,7 @@ class BarranquenhoPhonemizer(BasePhonemizer):
     """
 
     engine_distribution = Orthography2IPAPhonemizer.engine_distribution
+    revision_distributions = Orthography2IPAPhonemizer.revision_distributions
 
     _LANGS = ["ext-PT-x-barrancos"]
     _SPEC = "ext-PT-x-barranco"
@@ -142,22 +80,6 @@ class BarranquenhoPhonemizer(BasePhonemizer):
             ValueError: If the language code is unsupported.
         """
         return cls.match_lang(target_lang, cls._LANGS)
-
-    def _covered_distributions(self, lang: str) -> FrozenSet[str]:
-        return self._o2i._covered_distributions(self._SPEC)
-
-    def identity(self, lang: str) -> PhonemizerIdentity:
-        """The base identity, with ``revision`` the code revision of this
-        backend that holds the orthography2ipa revision of ``ext-PT-x-barranco``,
-        as :meth:`Orthography2IPAPhonemizer.identity
-        <scriptconv.phonemizers.o2ipa.Orthography2IPAPhonemizer.identity>` gives it."""
-        from scriptconv.phonemizers._revision import code_revision
-        identity = super().identity(lang)
-        engine = self._o2i._spec_revision(self._SPEC)
-        if engine is None:
-            return identity
-        return dataclasses.replace(
-            identity, revision=code_revision(self, identity.lang, {"orthography2ipa": engine}))
 
     def phonemize_string(self, text: str, lang: str = "ext-PT-x-barrancos") -> str:
         self.get_lang(lang)

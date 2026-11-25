@@ -44,7 +44,6 @@ gives an empty string. In a span between two ``|`` marks, which NeMo keeps
 unchanged, the tokens ``<pad>`` and ``<oov>`` give the id of the special token
 in NeMo and nothing here.
 """
-import dataclasses
 import re
 import unicodedata
 from pathlib import Path
@@ -53,7 +52,6 @@ from typing import Dict, List, Optional, Set, Tuple, Union
 from scriptconv.phonemizers.base import (
     BasePhonemizer,
     MissingLanguageError,
-    PhonemizerIdentity,
     UnsupportedLanguageError,
     _check_alphabet,
 )
@@ -234,12 +232,3 @@ class NemoIpaPhonemizer(BasePhonemizer):
             stem = word[:-1]
             return pronunciations[stem][0] + ["s" if stem[-1] == "T" else "z"], True
         return list(word), False
-
-    def identity(self, lang: str) -> PhonemizerIdentity:
-        """The base identity, with ``revision`` the hash of the code on the
-        path of this backend, as
-        :func:`~scriptconv.phonemizers._revision.code_revision` gives it, and
-        of the sha256 of the dictionary and of the heteronyms file."""
-        from scriptconv.phonemizers._revision import code_revision
-        identity = super().identity(lang)
-        return dataclasses.replace(identity, revision=code_revision(self, identity.lang, self.sha256))

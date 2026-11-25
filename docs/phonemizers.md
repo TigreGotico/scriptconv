@@ -2,7 +2,7 @@
 
 <!-- agent-hint
 covers: the BasePhonemizer contract, the registry and the language defaults, identity and revision, diacritize, stress marks, the model-backed engines, the sister packages and the sentence gate
-source: scriptconv/phonemizers/base.py, registry.py, _revision.py, g2pw.py, lir.py, dizione.py, leokani.py, nemo_ipa.py, shami.py, f5tts.py; scriptconv/diacritics.py; scriptconv/testing/compare.py
+source: scriptconv/phonemizers/base.py, registry.py, g2pw.py, lir.py, dizione.py, leokani.py, nemo_ipa.py, shami.py, f5tts.py; scriptconv/diacritics.py; scriptconv/testing/compare.py
 generated: no
 verify: python scripts/check_doc_page.py docs/phonemizers.md
 see: docs/backends.md, docs/frontend.md, docs/graph.md
@@ -64,91 +64,41 @@ spec that gives the phonemes did not change. The class attribute
 `engine_distribution` names the package that supplies the engine, and `None`
 means the code is in this repository.
 
-**Each backend holds a `revision`.** For `graphemes`, `unicode` and
-`matoub_kab`, the `revision` is `sc2:` and a hash of the code and data on the
-path of the backend. `dizione` takes it from its engine.
+**The `revision` is a version string.** It lists each distribution that gives
+the phonemes, with its installed version, in this form:
 
-For `tugaphone`, `orthography2ipa`, `mwl_phonemizer` and `barranquenho`, the
-`revision` is `sc2:` and a hash of the revision that the engine gives and of
-the code on the path of the backend. The engine revision is
-`tugaphone.revision(lect)` or the orthography2ipa spec revision of the lect,
-with its packaged lexicon. The files of the distributions that the engine
-revision covers leave the hash. So an engine release that keeps its revision
-keeps the `revision` of the backend, and a change of the scriptconv code on
-the path changes it. When the engine gives no revision, with one warning, or
-when the tugaphone `contact` is not `none`, the `revision` holds the engine
-version in place of the engine revision, as for the other engines below.
+```text
+scriptconv==X;<sister package>==S;<engine>==Y;<data>==Z
+```
 
-For a backend that calls any other engine, such as `epitran`, `espeak` or
-`gruut`, the `revision` is `sc2:` and a hash of the engine name and version and
-of the code on the path of the backend. For `espeak` the version is the version
-of the espeak-ng binary. So an engine release changes the `revision`, and so
-does a change of the scriptconv code on the path or a release of quebra-frases.
-The wrappers in scriptconv-copyleft and scriptconv-nonfree are code on the path.
+`scriptconv` comes first, then the sister package that holds the backend
+(`scriptconv-copyleft` or `scriptconv-nonfree`), then the engine distribution
+(`engine_distribution`), then the data distributions of the class attribute
+`revision_distributions`. A name appears once. For `espeak` the engine version
+is the version of the espeak-ng binary. A backend written in scriptconv has
+the string `scriptconv==X`.
 
-The hash covers these inputs:
+`revision_distributions` names the packages besides the engine whose data
+changes the phonemes:
 
-- each module of scriptconv, scriptconv-copyleft and scriptconv-nonfree that
-  the backend class imports, directly or through another such module. The
-  imports are read from the source, so a module counts whether or not a call
-  reaches it.
-- each other file in the directory of such a module, and in each directory
-  under it that is not a package, such as the tables of a vendored engine. A
-  package that loads only as the parent of such a module adds no files.
-- the name and version of each installed distribution that the `phonemizers`
-  extra and the extra of the backend require, at any depth, and those of the
-  engine. A requirement under an extra counts only when that extra is asked
-  for. The engine counts with its extra named by the language, when it has
-  one, so `gruut` for `fr` counts `gruut-lang-fr`. A requirement for another
-  platform or Python version does not count. The engine, and each
-  distribution that an engine revision covers, count only once, in the
-  settings.
-- the name and version of each installed distribution that provides a module
-  that the scriptconv modules above import at module level, in a `try` block
-  or not, such as `num2words`, which the Shami normaliser uses when it is
-  installed. The requirements of such a distribution do not count. A
-  distribution that these modules import only inside a function does not
-  count, unless an extra above requires it. So an optional tool that a backend
-  loads inside a function is not in the `revision`. An example is the
-  camel-tools diacritizer of the Shami backend: its install can change the
-  phonemes of undiacritized Arabic and keep the `revision`.
-- the source file of each class of the backend outside scriptconv, so a
-  subclass counts
-- the arguments of the backend, a character rule set on the instance, whether
-  the backend keeps clause punctuation, the language and the Unicode version
-  of Python
+| Backend | Data distributions |
+| --- | --- |
+| `orthography2ipa`, `mwl_phonemizer`, `barranquenho` | `o2i-lexicons` |
+| `tugaphone` | `orthography2ipa`, `o2i-lexicons`, `tugalex`, `bifonia`, `desacordo-ortografico`, `text2spoken` |
+| `gruut` | the language pack of the lect, `gruut-lang-fr` for `fr` |
 
-The code of a module counts as its tokens. Comments, blank lines, docstrings
-and `version.py` do not count. A release of scriptconv that changes code or
-data on the path of the backend changes the `revision`. A release that changes
-only other backends, docs or `version.py` keeps it, and `differs_from` then
-reports nothing. A release of a distribution in the list above changes the
-`revision`, also when the phonemes stay the same, and a voice then warns once.
-A release of any other distribution keeps the `revision`. This includes a
-distribution that scriptconv imports only inside a function, and a
-distribution that the engine loads at run time by a name that is not in the
-scriptconv source, such as a model package, unless an extra of the backend
-or of the engine requires it.
+A data distribution that is not installed stays out of the string. An engine
+that is not installed raises `ImportError`.
 
-The hash reads no state of the running process: not the modules that it
-loaded, not its working directory and not a package that loads at startup from
-a `sitecustomize.py` or a `.pth` file. So two machines with the same packages
-give the same `revision`. An edit of the files of a dependency that keeps its
-version, as in an editable install, does not change the `revision`.
+So a release of any listed distribution changes the `revision`, and
+`differs_from` reports it first. A release of scriptconv changes it too, also
+when the phonemes of the backend stay the same. A constructor argument or a
+setting on the instance, such as a character rule, does not change it. A
+backend class that subclasses `BasePhonemizer` directly, outside scriptconv and
+its sister packages, reports `scriptconv==X`.
 
-The code hash runs no process. It reads the source files on the path and the
-installed metadata, and later calls in the process reuse the file digests.
-`identity()` also reads the release of the engine, and the espeak backend
-reads it from `espeak-ng --version` when it uses the binary. A
-module of these packages that does not load from a file in a directory, such
-as from a zip archive, gives no `revision`. So does a scriptconv with no
-installed metadata. Each gives one warning per backend and language in a
-process. A backend class that subclasses `BasePhonemizer` directly, outside
-scriptconv and its sister packages, has no `revision`, because nothing names
-the code on its path.
-
-A `TextFrontend` has its own `revision`, which covers the frontend stages too.
-See [frontend](frontend.md).
+A `TextFrontend` adds the stage libraries that it runs to the `revision`. See
+[frontend](frontend.md).
 
 **Failures have types.** Each error below is a `FrontendError`, which is a
 `ValueError`. `UnsupportedLanguageError` means the backend has no reading for

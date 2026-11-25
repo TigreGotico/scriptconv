@@ -2,7 +2,7 @@
 import pytest
 
 from scriptconv.frontend import FrontendConfig, Stages, TextFrontend
-from scriptconv.phonemizers import Alphabet, BasePhonemizer, GraphemePhonemizer, Segment
+from scriptconv.phonemizers import Alphabet, BasePhonemizer, Segment
 
 
 class Recorder(BasePhonemizer):
@@ -89,16 +89,6 @@ def test_without_phonemizer_lang_the_backend_reads_the_text_language():
 def test_the_identity_names_the_backend_language():
     frontend, _, _ = recording_frontend(lang="tw", phonemizer_lang="lfn")
     assert frontend.identity().lang == Recorder().identity("lfn").lang
-
-
-def test_the_kept_identity_of_one_backend_language_is_not_read_for_another(identity_cache):
-    plain = TextFrontend(FrontendConfig(lang="tw"), backend=GraphemePhonemizer())
-    mapped = TextFrontend(FrontendConfig(lang="tw", phonemizer_lang="lfn"), backend=GraphemePhonemizer())
-    kept = plain.identity()
-    assert kept.revision is not None
-    identity = mapped.identity()
-    assert identity.lang == GraphemePhonemizer().identity("lfn").lang
-    assert identity.revision not in (None, kept.revision)
 
 
 def test_an_en_us_date_with_the_en_espeak_voice():

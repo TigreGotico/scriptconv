@@ -209,7 +209,7 @@ class TestWholeTextBackends:
         identity = TextFrontend(FrontendConfig("en-US"), DizionePhonemizer()).identity()
         assert identity.frontend == FRONTEND_VERSION == 2
         assert DizionePhonemizer().identity("en-US").frontend is None
-        assert identity.differs_from(DizionePhonemizer().identity("en-US")) == ("revision", "frontend")
+        assert identity.differs_from(DizionePhonemizer().identity("en-US")) == ("frontend",)
 
 
 class TestClauseBreakWithPunctuationOff:

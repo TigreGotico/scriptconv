@@ -12,6 +12,8 @@ import subprocess
 import sys
 from unittest.mock import patch
 
+from importlib import metadata
+
 import pytest
 from huggingface_hub import hf_hub_download
 
@@ -111,13 +113,10 @@ def test_other_english_and_other_languages_are_refused(lang):
         LeokaniPhonemizer.get_lang(lang)
 
 
-def test_the_identity_has_a_revision_per_variant(leokani):
-    micro = leokani.identity("en-US")
-    mini = LeokaniPhonemizer(model="mini").identity("en-US")
-    assert (micro.backend, micro.distribution, micro.lang) == ("leokani", "scriptconv", "en-US")
-    assert micro.revision.startswith("sc2:")
-    assert mini.revision.startswith("sc2:")
-    assert micro.revision != mini.revision
+def test_the_identity_names_scriptconv(leokani):
+    identity = leokani.identity("en-US")
+    assert (identity.backend, identity.distribution, identity.lang) == ("leokani", "scriptconv", "en-US")
+    assert identity.revision == f"scriptconv=={metadata.version('scriptconv')}"
 
 
 def test_a_missing_package_names_the_extra():

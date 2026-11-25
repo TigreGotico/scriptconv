@@ -2,7 +2,7 @@
 
 <!-- agent-hint
 covers: every option of TextFrontend: the stage order, whole-text backends, chunk sizes, inline blocks, configuration, stages, methods, failures and the identity
-source: scriptconv/frontend.py, scriptconv/phonemizers/base.py (Segment, join_sentences), scriptconv/phonemizers/_identity_cache.py
+source: scriptconv/frontend.py, scriptconv/phonemizers/base.py (Segment, join_sentences)
 generated: no
 verify: python scripts/check_doc_page.py docs/frontend.md
 see: docs/stack.md, docs/phonemizers.md, docs/ovos.md
@@ -417,66 +417,31 @@ Build a `TextFrontend` to get the phonemes that a voice reads.
 stage order. A change to the steps raises it, so a dataset phonemized under
 older steps is detectable. A backend called directly has `frontend=None`.
 
-The `revision` of a frontend is not the `revision` of its backend. It is `sc2:`
-and a hash of these inputs:
+The `revision` of a frontend is the `revision` of its backend, then one
+`;name==version` for each stage library that the frontend runs:
 
-- the `revision` of the backend
-- each scriptconv module that `scriptconv.frontend` imports, such as
-  `diacritics`
-- the settings that change the output: `keep_punctuation`, `strict`,
-  `whole_text_limit`, the alphabet, the resolved language, the language that
-  the backend reads, the chunk size and whether the normaliser runs
-- `text2spoken.revision(lang)` when the normaliser is `spoken_normalizer()`
+- `text2spoken` when the normaliser is `spoken_normalizer()` and normalisation
+  is on. A backend that owns `normalize` adds nothing.
+- the diacritizer distribution of the language, when the frontend diacritizes
+  with the default model: `text2tashkeel` for Arabic, `stressonnx` for the
+  stress languages, `bifonia` for European Portuguese and `phonikud-onnx` for
+  Hebrew. A backend that owns `diacritize` adds nothing.
+
+```text
+scriptconv==X;text2tashkeel==Y
+```
 
 The `revision` is `None` when scriptconv cannot vouch for a stage, so a
 `version` difference shows. These cases give `None`:
 
 - the backend has no `revision`
-- the normaliser is another callable
-- the installed text2spoken has no `revision`
-- the frontend diacritizes
+- the normaliser is another callable, or text2spoken is not installed
+- the frontend diacritizes with a model that the stages name
+- the diacritizer is not installed
 - a casing runs
 
-**The identity is kept on disk.** The first `identity()` of a frontend hashes
-the code on its path and asks the engine for its revision. An identity with a `revision` is then
-written to `~/.cache/scriptconv/identity/` (`$XDG_CACHE_HOME` when it is set,
-`~/Library/Caches` on macOS, `%LOCALAPPDATA%` on Windows). A later process
-reads it back with no hash and no call into the backend. In an install with
-no editable installs, a hit takes about a millisecond. Each checkout on the
-path and each editable install adds the time to read the state of its files,
-so in a development venv with hundreds of editable installs a hit takes about
-60 to 75 ms. phoonnx runs this check in a background thread, so a voice load
-does not wait for it.
-
-An entry is found by the Python interpreter and version, the `sys.path`
-entries, the Unicode version, the backend class with its arguments and
-instance settings, and the frontend settings. A hit also needs the state of
-these files and directories to stay as it was before the identity was
-computed:
-
-- the names in each `sys.path` directory, so an installed or removed
-  distribution gives a miss
-- the size and modification time of the `RECORD` of each distribution, so a
-  reinstalled one gives a miss
-- each package and module of each checkout on the path and of each editable
-  install, whether or not the process imports it. A file counts by its size
-  and modification time, and a directory by its names, so new bytecode in
-  `__pycache__` changes nothing
-- the source file of each class of the backend outside scriptconv
-
-A checkout is a `sys.path` directory that is not a site or standard library
-directory, such as an entry of `PYTHONPATH` or the target of a `.pth` file. An
-editable install is found by its `direct_url.json` or its setuptools finder.
-The state is taken before the identity is computed, so a change that lands
-during the computation gives a miss at the next call.
-
-Two edits are not seen: an edit of an installed file that keeps the `RECORD`
-as it is, and an edit that keeps the size of a file and puts its old
-modification time back.
-
-An entry that cannot be read is a miss, and a cache directory that cannot be
-written gives no entry and no error. Two processes can write one entry at
-once: each writes a temporary file and renames it into place.
+`identity()` reads installed versions only, so it takes no more than a few
+milliseconds after the engine imports.
 
 ---
 [Index](index.md) · [← phonemizers](phonemizers.md) · [ovos →](ovos.md)
