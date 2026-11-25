@@ -1041,6 +1041,28 @@ def test_looks_like_ipa_false(text):
     assert looks_like_ipa(text) is False
 
 
+# The 388 code points of the distinctive-IPA table in notation.py: the IPA
+# Extensions, Spacing Modifier Letters, Combining Diacritical Marks for IPA,
+# Phonetic Extensions and Supplement, and seven individual combining marks.
+# The list is written out here so that removing one entry from the production
+# table fails a test; reading it back from the table would hide the mutation.
+_IPA_DISTINCTIVE_POINTS = [
+    *range(0x0250, 0x0300),
+    *range(0x0363, 0x0370),
+    *range(0x1D00, 0x1DC0),
+    *map(ord, "\u0303\u0329\u032a\u0325\u030a\u0361\u035c"),
+]
+
+
+def test_ipa_distinctive_table_has_388_code_points():
+    assert len(_IPA_DISTINCTIVE_POINTS) == 388
+
+
+@pytest.mark.parametrize("codepoint", _IPA_DISTINCTIVE_POINTS)
+def test_every_distinctive_ipa_codepoint_is_recognised(codepoint):
+    assert looks_like_ipa(chr(codepoint)) is True, f"U+{codepoint:04X}"
+
+
 # ---------------------------------------------------------------------------
 # Cotovía ↔ IPA
 # ---------------------------------------------------------------------------
