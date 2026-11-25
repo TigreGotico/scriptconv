@@ -360,25 +360,13 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a116...0.0.4a117)
 
-**Merged pull requests:**
-
-- feat: tugaphone revision, wrapper code in the o2i-family revisions, and probe failure fixes [\#328](https://github.com/TigreGotico/scriptconv/pull/328) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a116](https://github.com/TigreGotico/scriptconv/tree/0.0.4a116) (2026-11-18)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a115...0.0.4a116)
 
-**Merged pull requests:**
-
-- feat: identity revision for the grapheme, unicode and matoub\_kab backends [\#322](https://github.com/TigreGotico/scriptconv/pull/322) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a115](https://github.com/TigreGotico/scriptconv/tree/0.0.4a115) (2026-11-17)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a114...0.0.4a115)
-
-**Merged pull requests:**
-
-- feat: TextFrontend.say\_as reads a run in the form that SSML names [\#317](https://github.com/TigreGotico/scriptconv/pull/317) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a114](https://github.com/TigreGotico/scriptconv/tree/0.0.4a114) (2026-11-17)
 
