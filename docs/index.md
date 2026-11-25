@@ -41,8 +41,15 @@ representation, how to add or remove its optional marks, and how it sounds.
 10. **[ovos.md](ovos.md)**: scriptconv phonemizers in OVOS through
     `ovos-scriptconv-g2p-plugin`.
 11. **[backends.md](backends.md)**: every phonemizer backend with its class,
-    extra, package and language default, and the models that download on
-    first use.
+    extra, package and language default, the backends by extra in a figure,
+    and the models that download on first use.
+12. **[performance.md](performance.md)**: what the first call and a warm call
+    cost, how time grows with text length, and the timing of the backend
+    that reads whole text (dizione).
+13. **[extending.md](extending.md)**: run your own backend in `TextFrontend`,
+    and the steps that add a backend to the registry.
+14. **[reference.md](reference.md)**: the signature and an example of each name
+    that a voice engine imports, and the page of every other public name.
 
 The command line, `python -m scriptconv`, has these subcommands: `convert`,
 `detect`, `distribution`, `direction`, `decompose`, `lang`, `strip`,

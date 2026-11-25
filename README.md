@@ -15,7 +15,7 @@ covers: what scriptconv does, the quickstart, the extras and the licences
 source: `__all__` in scriptconv/__init__.py, scriptconv/phonemizers/registry.py, scriptconv/phonemizers/_moved.py, pyproject.toml
 generated: no
 verify: python scripts/check_doc_page.py README.md
-see: docs/index.md, docs/stack.md, AGENTS.md
+see: docs/index.md, docs/stack.md, docs/reference.md, AGENTS.md
 -->
 
 scriptconv tells you which representation a text is in, converts it to
@@ -64,8 +64,9 @@ Alone: detect, convert and phonemize text with `from scriptconv import convert` 
 In the stack: the one stop for text conversion. The phoonnx voices take their text path from scriptconv alone, through `TextFrontend`. It calls the stage libraries and phonemizer engines as optional backends.
 Through scriptconv: `uv pip install --prerelease=allow "scriptconv[<extra>]"`.
 
-[docs/stack.md](docs/stack.md) shows which library runs each stage, and
-[docs/backends.md](docs/backends.md) lists every backend with its extra.
+[docs/stack.md](docs/stack.md) shows which library runs each stage,
+[docs/backends.md](docs/backends.md) lists every backend with its extra, and
+[docs/reference.md](docs/reference.md) gives the signature of each name that a voice imports.
 
 ## The mental model
 
@@ -465,7 +466,9 @@ exception: its `alphabets` module imports scriptconv to convert its notation.
 ## Documentation and development
 
 [docs/index.md](docs/index.md) lists every page in reading order, and
-[docs/stack.md](docs/stack.md) is the place to start.
+[docs/stack.md](docs/stack.md) is the place to start. To time a backend, read
+[docs/performance.md](docs/performance.md). To write one, read
+[docs/extending.md](docs/extending.md).
 [AGENTS.md](AGENTS.md) holds the contributor rules.
 
 ```bash

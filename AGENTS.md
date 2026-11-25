@@ -15,7 +15,7 @@ core has no dependencies, and each phonemizer engine sits behind an extra.
 | `scriptconv/phonemizers/registry.py` | `PHONEMIZER_REGISTRY`, `LANG_DEFAULTS`, `get_phonemizer` |
 | `scriptconv/phonemizers/_moved.py` | The wrappers that live in scriptconv-copyleft and scriptconv-nonfree |
 | `scriptconv/phonemizers/_thirdparty/`, `_vendored/` | Vendored engines, each with its licence notice |
-| `scripts/` | The licence check, the backend table generator, the docs page check and measurement scripts |
+| `scripts/` | The licence check, the backend table generator, the docs page check, the figure generator `docs_figures.py` and measurement scripts |
 | `examples/` | Runnable examples, run by `tests/test_examples.py` |
 | `docs/` | The documentation. [docs/index.md](docs/index.md) gives the reading order |
 
@@ -42,6 +42,8 @@ installed (`.github/workflows/build-tests.yml`).
 - [docs/backends.md](docs/backends.md) holds one row per `Phonemizer`
   member, in enum order. `python scripts/backend_table.py --write` writes the
   rows, and `tests/test_backend_table.py` fails on a stale table.
+- `docs/figures/*.svg` and the Mermaid diagram of `docs/graph.md` come from the registry,
+  the graph and `scripts/time_owner_backends.txt`. `scripts/docs_figures.py --check` fails otherwise.
 - The python examples of each page with an agent hint give the results that
   the page shows. `tests/test_doc_pages.py` fails otherwise.
 - No extra installs a copyleft or non-commercial distribution, except the two
@@ -61,6 +63,7 @@ installed (`.github/workflows/build-tests.yml`).
 pytest tests/
 python scripts/check_extra_licences.py
 python scripts/backend_table.py --check
+python scripts/docs_figures.py --check          # the SVG figures and the graph diagram
 python scripts/check_doc_page.py docs/stack.md   # once for each changed page
 ```
 

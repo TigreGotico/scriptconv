@@ -60,6 +60,23 @@ Every method of `TextFrontend` runs one order:
 4. Cut the text into sentences, or into clauses at `clause` chunk size.
 5. For each sentence, diacritize, then run the backend.
 
+```mermaid
+flowchart LR
+    text["text"] --> blocks["split out<br/>[[phonemes]] blocks"]
+    blocks --> normalize["normalise<br/>(hook)"]
+    normalize --> casing["casing<br/>(if set)"]
+    casing --> cut["cut into sentences<br/>or clauses"]
+    cut --> diacritize["diacritize<br/>(per sentence)"]
+    diacritize --> backend["backend<br/>phonemize"]
+    backend --> join["group into chunks<br/>and join"]
+    join --> phonemes["phonemes"]
+    blocks -. "symbols as written" .-> join
+```
+
+*Figure: the stages of `TextFrontend`, left to right. The text inside an
+inline block skips every stage and joins the output at the end. A backend that
+owns a stage runs it itself, and the frontend skips that box.*
+
 The hook runs before the sentence split. A split of raw text cuts after
 `Prof.`, but `text2spoken` writes `Professor` and the split then sees one
 sentence.

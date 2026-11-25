@@ -3,8 +3,8 @@
 <!-- agent-hint
 covers: nodes, edges, routing, and the opt-in phonemizer and diacritics edges
 source: scriptconv/graph.py, `register` in scriptconv/phonemizers/registry.py and scriptconv/diacritics.py
-generated: no
-verify: python scripts/check_doc_page.py docs/graph.md
+generated: no, but the diagram under Every edge at a glance lists the edges of the graph, and `python scripts/docs_figures.py --check` compares them
+verify: python scripts/docs_figures.py --check && python scripts/check_doc_page.py docs/graph.md
 see: docs/phonemizers.md, docs/stack.md
 -->
 
@@ -26,6 +26,72 @@ DEFAULT_GRAPH.convert("mrHbaa", "halabi", "x-sampa")   # 'mrX\\ba:'  (through IP
 [f"{e.src}->{e.dst}" for e in DEFAULT_GRAPH.route("arpa", "x-sampa")]
 # ['arpa->ipa', 'ipa->x-sampa']
 ```
+
+## Every edge at a glance
+
+The diagram shows each node and each edge of `DEFAULT_GRAPH` extended with
+`diacritics.register` and `phonemizers.register`. A solid arrow is a lossless
+edge, and a dotted arrow is a lossy one. Routing takes lossless edges first.
+
+```mermaid
+flowchart LR
+    arabic["arabic"]
+    arpa["arpa"]
+    bopomofo["bopomofo"]
+    buckwalter["buckwalter"]
+    cangjie["cangjie"]
+    cotovia["cotovia"]
+    halabi["halabi"]
+    hangul["hangul"]
+    hanzi["hanzi"]
+    hira["hira"]
+    ipa["ipa"]
+    jamo["jamo"]
+    japanese["japanese"]
+    kana["kana"]
+    kirshenbaum["kirshenbaum"]
+    lexique["lexique"]
+    misaki["misaki"]
+    pinyin["pinyin"]
+    rfe["rfe"]
+    text["text"]
+    text_diacritized["text-diacritized"]
+    x_sampa["x-sampa"]
+    arabic --> buckwalter
+    arpa -.-> ipa
+    buckwalter --> arabic
+    cotovia -.-> ipa
+    halabi -.-> ipa
+    hangul -.-> jamo
+    hanzi -.-> bopomofo
+    hanzi -.-> cangjie
+    hanzi -.-> pinyin
+    hira -.-> kana
+    ipa -.-> arpa
+    ipa -.-> cotovia
+    ipa -.-> kirshenbaum
+    ipa -.-> lexique
+    ipa -.-> rfe
+    ipa --> x_sampa
+    japanese -.-> hira
+    japanese -.-> kana
+    kana -.-> hira
+    kirshenbaum -.-> ipa
+    lexique -.-> ipa
+    misaki -.-> ipa
+    rfe -.-> ipa
+    text -.-> ipa
+    text -.-> text_diacritized
+    text_diacritized -.-> ipa
+    text_diacritized -.-> text
+    x_sampa --> ipa
+```
+
+*Figure: 22 nodes and 28 edges. Of the 28, only the pair `arabic` and
+`buckwalter` and the pair `ipa` and `x-sampa` are lossless. Every other
+notation reaches another one through `ipa`, and the `text` and
+`text-diacritized` nodes exist only in a graph extended with the two
+`register` functions.*
 
 ## Nodes: representations
 
