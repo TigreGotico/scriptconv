@@ -168,9 +168,7 @@ def _is_stress_lang(lang: str) -> bool:
     ``stress`` extra, :func:`_is_stress_lang_fallback` gives the same answer.
     """
     try:
-        from stressonnx import ALL_LANGS
-        from stressonnx.langs import resolve_lang
-        from stressonnx.errors import UnsupportedLanguageError
+        from stressonnx import ALL_LANGS, UnsupportedLanguageError, resolve_lang
     except ImportError:
         return _is_stress_lang_fallback(lang)
     try:
@@ -535,7 +533,7 @@ _STRESS_SCRIPTS = {
     "ka": "Geor",
 }
 # The vowel letters of each script after which stressonnx writes the mark
-# (stressonnx _common.SCRIPT_VOWELS).
+# (stressonnx.SCRIPT_VOWELS).
 _STRESS_VOWELS = {
     "Cyrl": frozenset("\u0430\u0435\u0451\u0438\u043e\u0443\u044b\u044d\u044e\u044f"
                       "\u0456\u0457\u0454\u04d9\u04e9\u04af\u04b1\u04d1\u04d7\u04f3"
