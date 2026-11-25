@@ -352,10 +352,6 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a117...0.0.4a118)
 
-**Merged pull requests:**
-
-- feat: keep TextFrontend.identity on disk [\#329](https://github.com/TigreGotico/scriptconv/pull/329) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a117](https://github.com/TigreGotico/scriptconv/tree/0.0.4a117) (2026-11-18)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a116...0.0.4a117)
