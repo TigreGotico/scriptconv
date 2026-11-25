@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.0.4a173](https://github.com/TigreGotico/scriptconv/tree/0.0.4a173) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a171...0.0.4a173)
+
+**Merged pull requests:**
+
+- fix\(lir\): reject a spelling longer than the model buffer [\#452](https://github.com/TigreGotico/scriptconv/pull/452) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.0.4a171](https://github.com/TigreGotico/scriptconv/tree/0.0.4a171) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a170...0.0.4a171)
+
+**Merged pull requests:**
+
+- docs\(compare\): use a caller-supplied TSV path [\#451](https://github.com/TigreGotico/scriptconv/pull/451) ([JarbasAl](https://github.com/JarbasAl))
+- fix\(registry\): reject an unused model path [\#450](https://github.com/TigreGotico/scriptconv/pull/450) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [0.0.4a170](https://github.com/TigreGotico/scriptconv/tree/0.0.4a170) (2026-11-25)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a169...0.0.4a170)
@@ -347,10 +364,6 @@
 ## [0.0.4a124](https://github.com/TigreGotico/scriptconv/tree/0.0.4a124) (2026-11-18)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a123...0.0.4a124)
-
-**Merged pull requests:**
-
-- fix: the tugaphone identity has no revision, not an exception, where tugaphone gives none [\#345](https://github.com/TigreGotico/scriptconv/pull/345) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a123](https://github.com/TigreGotico/scriptconv/tree/0.0.4a123) (2026-11-18)
 
