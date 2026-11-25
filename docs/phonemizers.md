@@ -159,7 +159,8 @@ stayed unread, and its `unread` attribute lists that text.
 **Punctuation is opt-in.** By default no punctuation reaches the phonemes, and
 the voices trained on that output learned none. Each sentence is then one list
 of `phonemize(text)`: a `:`, `;`, `...` or `|` inside a sentence is a space, as
-a `,` is. In `el` a `;` is the question mark, so it ends the sentence.
+a `,` is. In Greek a `;` is the question mark, so it ends the sentence. The
+tags `el`, `ell` and `gre` name Greek.
 
 When punctuation is removed, a single hyphen between letters stays in the
 word, as `flew-slowly` does. The Armenian hyphen (U+058A) and the Hebrew maqaf
