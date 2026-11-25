@@ -8,6 +8,35 @@ verify: python scripts/check_doc_page.py docs/index.md
 see: README.md, AGENTS.md
 -->
 
+`scriptconv` finds the writing system of a text, rewrites it in another
+script or phoneme notation, adds or removes its optional marks, and turns it
+into phonemes through one of 59 backends.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="img/backends-by-extra-dark.svg">
+  <img alt="59 phonemizer backends in 26 extras: scriptconv holds 35, scriptconv-copyleft 18 and scriptconv-nonfree 6." src="img/backends-by-extra.svg">
+</picture>
+
+[backends.md](backends.md) lists each backend of this figure.
+
+## Quickstart
+
+```bash
+uv pip install --prerelease=allow scriptconv
+```
+
+```python
+from scriptconv import convert, detect_script, strip
+
+detect_script("Здравствуйте")           # 'Cyrl'
+convert("HH AH0 L OW1", "arpa", "ipa")  # 'həloʊ'
+strip("مُحَمَّد", "tashkeel")             # 'محمد'
+```
+
+[install.md](install.md) gives the extra of each phonemizer backend.
+
+## Pages
+
 This index lists every page in reading order. The pages answer, in order of
 depth: which writing system a text is in, how to rewrite it in another
 representation, how to add or remove its optional marks, and how it sounds.
