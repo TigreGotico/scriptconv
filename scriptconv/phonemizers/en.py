@@ -1,7 +1,16 @@
 """English phonemizers: DeepPhonemizer, OpenPhonemizer and g2p_en."""
 from scriptconv.notation import _ARPA_TO_IPA as arpa_to_ipa_lookup
-from scriptconv.phonemizers.base import BasePhonemizer
+from scriptconv.phonemizers.base import BasePhonemizer, ModelUnavailableError
 from scriptconv.phonemizers.enums import Alphabet
+
+
+def _nltk_resource_present(nltk, resource):
+    """True when NLTK finds *resource* on disk, without downloading it."""
+    try:
+        nltk.data.find(resource)
+    except LookupError:
+        return False
+    return True
 
 
 class DeepPhonemizer(BasePhonemizer):
@@ -111,8 +120,33 @@ class G2PEnPhonemizer(BasePhonemizer):
         assert alphabet in [Alphabet.IPA, Alphabet.ARPA]
         try:
             import nltk
-            nltk.download('averaged_perceptron_tagger_eng')
-            nltk.download('cmudict')
+            from nltk.tag import perceptron
+        except ImportError as e:
+            raise ImportError(
+                "g2p_en is required for the G2PEn phonemizer. "
+                "Install it with 'pip install g2p_en' "
+                "(or 'pip install scriptconv[en-phonemizers]')."
+            ) from e
+        # g2p_en checks the zip form of these two resources at import and calls
+        # nltk.download when either is absent. Check them first so a build
+        # never starts a download inside the engine.
+        packages = ["averaged_perceptron_tagger"]
+        resources = ["taggers/averaged_perceptron_tagger.zip"]
+        if hasattr(perceptron, "PICKLE"):
+            resources.append(f"taggers/averaged_perceptron_tagger/{perceptron.PICKLE}")
+        else:
+            packages.append("averaged_perceptron_tagger_eng")
+            resources.append("taggers/averaged_perceptron_tagger_eng/")
+        # NLTK reads cmudict from the zip; no bare directory is required.
+        resources.append("corpora/cmudict.zip")
+        packages.append("cmudict")
+        missing = [resource for resource in resources if not _nltk_resource_present(nltk, resource)]
+        if missing:
+            raise ModelUnavailableError(
+                f"g2pen needs NLTK data on disk: {', '.join(missing)}. "
+                f"Install it with 'python -m nltk.downloader {' '.join(packages)}'."
+            )
+        try:
             from g2p_en import G2p
         except ImportError as e:
             raise ImportError(
@@ -130,7 +164,7 @@ class G2PEnPhonemizer(BasePhonemizer):
 
     def phonemize_string(self, text: str, lang: str) -> str:
         self.get_lang(lang)
-        # g2p_en gives ARPAbet; IPA maps each symbol through the ARPAbet table.
+        # g2p_en gives ARPAbet; IPA maps each symbol through the ARPABet table.
         if self.alphabet == Alphabet.ARPA:
             return self.g2p(text)
         return "".join([arpa_to_ipa_lookup.get(pho, pho) for pho in self.g2p(text)])

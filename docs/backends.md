@@ -132,7 +132,6 @@ These models and data download on first use:
 | the NeMo IPA dictionary and the NeMo heteronyms file, in the copies of the Magpie TTS checkpoint, from `Phoonnx/magpietts-multi-357m-unicode` at a pinned revision, each pinned to a sha256 | the `nemo_ipa` backend | `NemoIpaPhonemizer.__init__` in `nemo_ipa.py` | the Hugging Face cache |
 | the kolokwa-g2p ONNX model and its tables, from `TigreGotico/kolokwa-g2p-onnx` at a pinned revision, each pinned to a sha256 | the `kolokwa` backend | `KolokwaPhonemizer.__init__` in `lir.py` | the Hugging Face cache |
 | a DeepPhonemizer checkpoint named in `DeepPhonemizer.MODELS` | the `deepphonemizer` backend | `DeepPhonemizer.__init__` in `en.py` | `~/.local/share/deepphonemizer` |
-| the NLTK data `averaged_perceptron_tagger_eng` and `cmudict` | the `g2pen` backend | `nltk.download` in `G2PEnPhonemizer.__init__` in `en.py` | the NLTK data directory |
 
 The default Arabic diacritizer, `rawi-ensemble`, and the INT8 text2tashkeel
 models ship in the text2tashkeel wheel, so `diacritize(text, "ar")` downloads
@@ -146,6 +145,12 @@ To skip a download, give a local file where the code accepts one:
 - Nakdimon: put the file with the pinned sha256 in its cache location.
 - NeMo IPA: pass the path of the dictionary through `dictionary=` and the path
   of the heteronyms file through `heteronyms=`.
+- g2pen: install the NLTK data with
+  `python -m nltk.downloader averaged_perceptron_tagger cmudict`. The installed
+  NLTK may also need `averaged_perceptron_tagger_eng`; the error names every
+  package that is missing. The backend reads the data from the NLTK data
+  directory and downloads nothing. It checks the zip files that g2p_en looks
+  for at import, then raises `ModelUnavailableError` when one is absent.
 
 The g2pW backend takes no model path. Its constructor has only an `alphabet`
 parameter, and `get_phonemizer` drops a `model=` value for it. The Leokani
