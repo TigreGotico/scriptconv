@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a161](https://github.com/TigreGotico/scriptconv/tree/0.0.4a161) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a160...0.0.4a161)
+
+**Merged pull requests:**
+
+- feat: misaki notation and alphabet, expanded to IPA before other notations [\#453](https://github.com/TigreGotico/scriptconv/pull/453) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a160](https://github.com/TigreGotico/scriptconv/tree/0.0.4a160) (2026-11-24)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a159...0.0.4a160)
@@ -375,10 +383,6 @@
 ## [0.0.4a111](https://github.com/TigreGotico/scriptconv/tree/0.0.4a111) (2026-11-17)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a110...0.0.4a111)
-
-**Merged pull requests:**
-
-- fix: normalize extra pulls text2spoken nl [\#294](https://github.com/TigreGotico/scriptconv/pull/294) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a110](https://github.com/TigreGotico/scriptconv/tree/0.0.4a110) (2026-11-17)
 
