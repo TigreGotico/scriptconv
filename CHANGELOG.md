@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.0.4a176](https://github.com/TigreGotico/scriptconv/tree/0.0.4a176) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a175...0.0.4a176)
+
+**Merged pull requests:**
+
+- test: keep the stress tables standalone of stressonnx internals [\#474](https://github.com/TigreGotico/scriptconv/pull/474) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- refactor: identity revision is a version string [\#472](https://github.com/TigreGotico/scriptconv/pull/472) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a175](https://github.com/TigreGotico/scriptconv/tree/0.0.4a175) (2026-11-25)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a174...0.0.4a175)
@@ -350,15 +359,10 @@
 
 - fix: a mark after a digit separates two words, and a colon inside a word stays in it [\#362](https://github.com/TigreGotico/scriptconv/pull/362) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 - fix\(frontend\): a hyphen or dash next to a word, and a mark before a block, separate two words [\#361](https://github.com/TigreGotico/scriptconv/pull/361) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-- fix: clause splitting takes linear time [\#353](https://github.com/TigreGotico/scriptconv/pull/353) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a128](https://github.com/TigreGotico/scriptconv/tree/0.0.4a128) (2026-11-19)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a127...0.0.4a128)
-
-**Merged pull requests:**
-
-- docs: state which import errors give the tugaphone identity no revision [\#354](https://github.com/TigreGotico/scriptconv/pull/354) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a127](https://github.com/TigreGotico/scriptconv/tree/0.0.4a127) (2026-11-18)
 
