@@ -6,7 +6,7 @@ import shutil
 import subprocess
 import threading
 import weakref
-from typing import List, Dict, Optional, Sequence, TYPE_CHECKING
+from typing import List, Dict, Optional, Sequence, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     import numpy as np
@@ -230,6 +230,10 @@ class GruutPhonemizer(BasePhonemizer):
 
     def __init__(self):
         super().__init__(Alphabet.IPA)
+
+    def _revision_distributions(self, lang: str) -> Tuple[str, ...]:
+        """The language pack of *lang*, ``gruut-lang-fr`` for ``fr``."""
+        return (f"gruut-lang-{lang}",)
 
     @classmethod
     def get_lang(cls, target_lang: str) -> str:

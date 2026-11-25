@@ -14,8 +14,6 @@ come from the Hugging Face Hub, from :data:`MODEL_REPO` at
 have its pinned sha256. Offline, with no cached copy that passes the check, the backend raises
 :class:`~scriptconv.phonemizers.base.ModelUnavailableError`.
 """
-import dataclasses
-from typing import Dict
 
 try:
     import huggingface_hub  # noqa: F401
@@ -30,7 +28,6 @@ except ImportError:
 from scriptconv.phonemizers.base import (
     BasePhonemizer,
     MissingLanguageError,
-    PhonemizerIdentity,
     UnsupportedLanguageError,
     _check_alphabet,
 )
@@ -110,16 +107,3 @@ class LeokaniPhonemizer(BasePhonemizer):
     def phonemize_string(self, text: str, lang: str) -> str:
         self.get_lang(lang)
         return self.engine.phonemize(text)
-
-    def _revision_arguments(self) -> Dict[str, object]:
-        return {"model": self.model}
-
-    def identity(self, lang: str) -> PhonemizerIdentity:
-        """The base identity, with ``revision`` the hash of the code on the
-        path of this backend, as
-        :func:`~scriptconv.phonemizers._revision.code_revision` gives it. That
-        code holds the vendored engine and the pinned model revision and
-        sha256 of each model file."""
-        from scriptconv.phonemizers._revision import code_revision
-        identity = super().identity(lang)
-        return dataclasses.replace(identity, revision=code_revision(self, identity.lang, {}))

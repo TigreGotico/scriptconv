@@ -15,6 +15,7 @@ class EuskaphonePhonemizer(BasePhonemizer):
 
     owned_stages = frozenset({"normalize"})
     engine_distribution = "euskaphone"
+    revision_distributions = ("orthography2ipa", "text2spoken")
 
     def __init__(self, alphabet: Alphabet = Alphabet.IPA):
         if alphabet != Alphabet.IPA:

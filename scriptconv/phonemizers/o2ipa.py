@@ -9,14 +9,11 @@ serves it: the exceptions, and the patches when the package ships them. No
 other orthography2ipa engine in the process sees that lexicon. With
 ``packaged_lexicons=False`` the engine runs on the rules alone.
 """
-import dataclasses
-import hashlib
 import logging
-from typing import Dict, FrozenSet, List, Optional
+from typing import Dict, List, Optional
 
 from scriptconv.phonemizers.base import (
     BasePhonemizer,
-    PhonemizerIdentity,
     UnsupportedLanguageError,
 )
 from scriptconv.phonemizers.enums import Alphabet
@@ -36,6 +33,7 @@ class Orthography2IPAPhonemizer(BasePhonemizer):
     """
 
     engine_distribution = "orthography2ipa"
+    revision_distributions = ("o2i-lexicons",)
 
     def __init__(self, packaged_lexicons: bool = True):
         super().__init__(alphabet=Alphabet.IPA)
@@ -61,58 +59,6 @@ class Orthography2IPAPhonemizer(BasePhonemizer):
             self._cache[resolved_lang] = orthography2ipa.G2P(
                 resolved_lang, pipeline=orthography2ipa.Pipeline(lexicon=lexicon))
         return self._cache[resolved_lang]
-
-    def _revision_arguments(self) -> Dict[str, object]:
-        return {"packaged_lexicons": self.packaged_lexicons}
-
-    def _spec_revision(self, resolved_lang: str) -> Optional[str]:
-        """The orthography2ipa revision of *resolved_lang*, or ``None`` and a
-        warning when orthography2ipa cannot read its engine source.
-
-        When the engine holds a packaged lexicon, it is the sha256 of the spec
-        revision and the lexicon revision, so a lexicon change also changes it.
-        """
-        import orthography2ipa
-        from orthography2ipa.exceptions import EngineSourceUnavailable
-        try:
-            revision = orthography2ipa.spec_revision(resolved_lang)
-        except EngineSourceUnavailable as exc:
-            LOG.warning("orthography2ipa cannot read its engine source, so the "
-                        "identity of %r holds the orthography2ipa version: %s", resolved_lang, exc)
-            return None
-        patches = self._lexicon_patches(resolved_lang)
-        if patches is not None:
-            lexicon = orthography2ipa.lexicon_revision(resolved_lang, patches=patches)
-            combined = f"{revision}\n{lexicon}".encode()
-            revision = "sha256:" + hashlib.sha256(combined).hexdigest()
-        return revision
-
-    def _covered_distributions(self, lang: str) -> FrozenSet[str]:
-        """orthography2ipa, and o2i-lexicons when the engine of *lang* holds a packaged lexicon."""
-        if self._lexicon_patches(self.get_lang(lang)) is None:
-            return frozenset({"orthography2ipa"})
-        return frozenset({"orthography2ipa", "o2i-lexicons"})
-
-    def identity(self, lang: str) -> PhonemizerIdentity:
-        """The base identity, with ``revision`` the code revision of this
-        backend that holds the orthography2ipa revision of the resolved lect.
-
-        :meth:`_spec_revision` gives the orthography2ipa revision. The code
-        revision of :func:`~scriptconv.phonemizers._revision.code_revision`
-        adds the scriptconv code on the path of this backend, and leaves out
-        the files of orthography2ipa and of a packaged lexicon. So an
-        orthography2ipa release that keeps the spec revision keeps the
-        revision. When orthography2ipa cannot read its engine source,
-        ``revision`` is that of :meth:`BasePhonemizer.identity`, which holds
-        the orthography2ipa version.
-        """
-        from scriptconv.phonemizers._revision import code_revision
-        identity = super().identity(lang)
-        engine = self._spec_revision(identity.lang)
-        if engine is None:
-            return identity
-        return dataclasses.replace(
-            identity, revision=code_revision(self, identity.lang, {"orthography2ipa": engine}))
 
     @classmethod
     def supported_langs(cls) -> List[str]:
