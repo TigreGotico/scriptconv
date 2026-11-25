@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a162](https://github.com/TigreGotico/scriptconv/tree/0.0.4a162) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a161...0.0.4a162)
+
+**Merged pull requests:**
+
+- fix: read language tags through linguatag in the phonemizer backends and the frontend [\#455](https://github.com/TigreGotico/scriptconv/pull/455) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a161](https://github.com/TigreGotico/scriptconv/tree/0.0.4a161) (2026-11-25)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a160...0.0.4a161)
