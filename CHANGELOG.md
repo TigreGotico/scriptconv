@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a163](https://github.com/TigreGotico/scriptconv/tree/0.0.4a163) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a162...0.0.4a163)
+
+**Merged pull requests:**
+
+- fix: give the Cantonese resources only to a Han-script tag [\#457](https://github.com/TigreGotico/scriptconv/pull/457) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a162](https://github.com/TigreGotico/scriptconv/tree/0.0.4a162) (2026-11-25)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a161...0.0.4a162)
@@ -375,10 +383,6 @@
 ## [0.0.4a114](https://github.com/TigreGotico/scriptconv/tree/0.0.4a114) (2026-11-17)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a113...0.0.4a114)
-
-**Merged pull requests:**
-
-- fix: the normalize extra takes text2spoken\[pt\] only [\#314](https://github.com/TigreGotico/scriptconv/pull/314) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a113](https://github.com/TigreGotico/scriptconv/tree/0.0.4a113) (2026-11-17)
 
