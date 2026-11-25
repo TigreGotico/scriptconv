@@ -323,6 +323,14 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
     A stage that runs only with an optional dependency is not owned.
     """
 
+    script_languages: ClassVar[Mapping[str, str]] = {}
+    """The language of each ISO 15924 script in a text of this backend, as ``{"Latn": "en"}``.
+
+    :class:`~scriptconv.frontend.TextFrontend` gives the map to
+    :func:`text2spoken.normalize` as ``NormalizationParams.script_languages``,
+    so each run of a mapped script reads in its own language.
+    """
+
     reads_whole_text: ClassVar[bool] = False
     """The backend reads the whole text and reports its own sentence and clause
     marks through :meth:`phonemize_segments`.
