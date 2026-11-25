@@ -116,7 +116,7 @@ for file in linked:
         if anchor not in anchors:
             fail(f"{file}: the link {target} names no heading of {dest.name}")
 
-if page.resolve() == ROOT / "README.md":
+if page.resolve() == ROOT / "docs" / "install.md":
     table = text.split("\n## Extras\n")[1].split("\n## ")[0]
     documented = set(re.findall(r"`([\w-]+)`", " ".join(row.split("|")[1] for row in table.splitlines()
                                                          if row.startswith("| `"))))

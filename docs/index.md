@@ -12,43 +12,47 @@ This index lists every page in reading order. The pages answer, in order of
 depth: which writing system a text is in, how to rewrite it in another
 representation, how to add or remove its optional marks, and how it sounds.
 
-1. **[stack.md](stack.md)**: where scriptconv sits in the speech stack. A
+1. **[overview.md](overview.md)**: the four ideas of scriptconv, a tour of
+   each module with examples, and the related projects.
+2. **[install.md](install.md)**: the extras, the licence of the wheel and of
+   each vendored part, and the sister packages.
+3. **[stack.md](stack.md)**: where scriptconv sits in the speech stack. A
    walk-through of `TextFrontend` with a normaliser, the order of the stages,
    and the library that runs each stage.
-2. **[scripts.md](scripts.md)**: writing-system identity. ISO 15924
+4. **[scripts.md](scripts.md)**: writing-system identity. ISO 15924
    detection (`detect_script`, `char_script`), mixed-script runs
    (`script_runs`), text direction, the language-to-script map and the
    script metadata. The returned tags are stable API.
-3. **[notation.md](notation.md)**: phoneme notations through the IPA hub:
+5. **[notation.md](notation.md)**: phoneme notations through the IPA hub:
    ARPABET with reversible stress, X-SAMPA, Kirshenbaum, Lexique, Cotovía,
    RFE, Buckwalter to Arabic and Halabi. The `errors=` policy and the
    `NOTATION_INFO` fidelity flags.
-4. **[translit.md](translit.md)**: table-driven script rewrites: Hangul to
+6. **[translit.md](translit.md)**: table-driven script rewrites: Hangul to
    jamo, hiragana to katakana, and hanzi to Cangjie codes.
-5. **[readings.md](readings.md)**: respellings that need a dictionary: kanji
+7. **[readings.md](readings.md)**: respellings that need a dictionary: kanji
    to kana with the token stream, and hanzi to pinyin or bopomofo.
-6. **[conventions.md](conventions.md)**: optional marks as data: tashkeel,
+8. **[conventions.md](conventions.md)**: optional marks as data: tashkeel,
    kashida, Quranic marks, niqqud, teamim, wakachigaki, pinyin tones and jamo
    form, with `strip`, `apply`, `restyle` and `detect_convention`.
-7. **[graph.md](graph.md)**: the conversion graph: nodes, edges, routing that
+9. **[graph.md](graph.md)**: the conversion graph: nodes, edges, routing that
    prefers lossless edges, and explicit extension.
-8. **[phonemizers.md](phonemizers.md)**: the phonemizer contract, the
+10. **[phonemizers.md](phonemizers.md)**: the phonemizer contract, the
    registry and the per-language defaults, identity, `diacritize` and the
    stress marks, the model-backed engines, the sister packages and the
    sentence gate.
-9. **[frontend.md](frontend.md)**: every option of `TextFrontend`: inline
+11. **[frontend.md](frontend.md)**: every option of `TextFrontend`: inline
    phoneme blocks, chunk sizes, strict mode and its identity.
-10. **[ovos.md](ovos.md)**: scriptconv phonemizers in OVOS through
+12. **[ovos.md](ovos.md)**: scriptconv phonemizers in OVOS through
     `ovos-scriptconv-g2p-plugin`.
-11. **[backends.md](backends.md)**: every phonemizer backend with its class,
+13. **[backends.md](backends.md)**: every phonemizer backend with its class,
     extra, package and language default, the backends by extra in a figure,
     and the models that download on first use.
-12. **[performance.md](performance.md)**: what the first call and a warm call
+14. **[performance.md](performance.md)**: what the first call and a warm call
     cost, how time grows with text length, and the timing of the backend
     that reads whole text (dizione).
-13. **[extending.md](extending.md)**: run your own backend in `TextFrontend`,
+15. **[extending.md](extending.md)**: run your own backend in `TextFrontend`,
     and the steps that add a backend to the registry.
-14. **[reference.md](reference.md)**: the signature and an example of each name
+16. **[reference.md](reference.md)**: the signature and an example of each name
     that a voice engine imports, and the page of every other public name.
 
 The command line, `python -m scriptconv`, has these subcommands: `convert`,
