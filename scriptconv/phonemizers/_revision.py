@@ -128,9 +128,10 @@ def code_revision(backend, lang: str, settings: Mapping, frontend: bool = False)
         imported = {name for top in outside for name in _top_level_distributions().get(top, ())}
         if backend.engine_distribution is not None:
             # an engine extra named by the language, as gruut[fr], holds the data of that language
+            from linguatag import standardize_lang
             language = _canonical(lang)
             roots_of_releases.append((backend.engine_distribution,
-                                      frozenset({language, language.partition("-")[0]})))
+                                      frozenset({language, standardize_lang(lang).partition("-")[0].lower()})))
         covered = {_canonical(name) for name in backend._covered_distributions(lang)}
         hashed = [FORMAT, "frontend" if frontend else "backend",
                   f"{type(backend).__module__}:{type(backend).__qualname__}", lang,

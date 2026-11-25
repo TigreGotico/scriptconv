@@ -561,7 +561,8 @@ class TextFrontend:
     def _backend_lang(self, lang: str) -> str:
         """The language the backend reads for text in *lang*. Tag case has no
         meaning (RFC 5646 section 2.1.1), and ``_`` reads as ``-``."""
-        same = lang.replace("_", "-").lower() == self.config.lang.replace("_", "-").lower()
+        from linguatag import standardize_lang
+        same = standardize_lang(lang) == standardize_lang(self.config.lang)
         return self.config.phonemizer_lang if self.config.phonemizer_lang and same else lang
 
     def with_backend(self, backend: BasePhonemizer) -> "TextFrontend":

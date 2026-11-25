@@ -3,6 +3,8 @@ import functools
 import logging
 from typing import Dict, FrozenSet, Optional, Tuple
 
+from linguatag import standardize_lang
+
 from scriptconv.phonemizers.base import BasePhonemizer, PhonemizerIdentity, _check_alphabet
 from scriptconv.phonemizers.enums import Alphabet
 from scriptconv.phonemizers.o2ipa import Orthography2IPAPhonemizer
@@ -43,8 +45,8 @@ class TugaphonePhonemizer(BasePhonemizer):
             ValueError: If the language code is unsupported.
         """
         import tugaphone
-        dialects = {d.lower(): d for d in tugaphone.list_dialects()}
-        if target_lang and (tag := target_lang.replace("_", "-").lower()) in dialects:
+        dialects = {standardize_lang(d): d for d in tugaphone.list_dialects()}
+        if target_lang and (tag := standardize_lang(target_lang)) in dialects:
             return dialects[tag]
         return cls.match_lang(target_lang, ["pt-PT", "pt-BR", "pt-AO", "pt-MZ", "pt-TL"])
 

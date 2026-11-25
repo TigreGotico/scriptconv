@@ -11,6 +11,9 @@ from typing import List, Dict, Optional, Sequence, TYPE_CHECKING
 if TYPE_CHECKING:
     import numpy as np
 
+from linguatag import standardize_lang
+from linguatag.bcp47 import LanguageTag, LanguageTagError, parse
+
 from scriptconv.diacritics import _diacritizer_family, strip_diacritics
 from scriptconv.phonemizers._moved import deprecated_getattr
 from scriptconv.phonemizers.enums import Alphabet
@@ -27,18 +30,18 @@ def make_session(model_path, providers=None, use_cuda=False):
     return onnxruntime.InferenceSession(model_path, providers=list(providers))
 
 
-# Hong Kong and Macau Cantonese. A bare "yue" means mainland Cantonese in
-# Simplified script, so these tags are far from it by language distance. The
-# Cantonese resources of Charsiu, Goruut and Transphone carry no region and are
-# written in Traditional script, so these tags resolve to them directly.
-_HK_CANTONESE = frozenset({
-    "yue-hk", "yue-mo", "yue-hant", "yue-hant-hk", "yue-hant-mo",
-    "zh-hk", "zh-mo", "zh-hant-hk", "zh-hant-mo",
-})
-
-
 def _is_hk_cantonese(lang: str) -> bool:
-    return lang.lower().replace("_", "-") in _HK_CANTONESE
+    """True for Cantonese, or Chinese in Hong Kong or Macau.
+
+    The Cantonese resources of Charsiu, Goruut and Transphone carry no region
+    and are written in Traditional script, so these tags resolve to them
+    directly, not by language distance.
+    """
+    try:
+        tag = parse(standardize_lang(lang))
+    except LanguageTagError:
+        return False
+    return tag.language == "yue" or (tag.language == "zh" and tag.region in ("HK", "MO"))
 
 
 class ByT5Phonemizer(BasePhonemizer):
@@ -461,9 +464,10 @@ class GoruutPhonemizer(BasePhonemizer):
         """The goruut language name closest to *target_lang*; raises ValueError when none is close."""
         if target_lang in cls.GORUUT_LANGS_NON_STD:
             return target_lang
-        if target_lang.lower() == "en-us":
+        english = standardize_lang(target_lang)
+        if english == "en-US":
             return 'EnglishAmerican'
-        if target_lang.lower() in ("en-gb", "en-uk"):
+        if english == "en-GB":
             return 'EnglishBritish'
         if _is_hk_cantonese(target_lang):
             return cls.ISO639["yue"]
@@ -531,8 +535,12 @@ class EpitranPhonemizer(BasePhonemizer):
         # Each epitran Japanese map converts one kana script. Kanji and the
         # other kana script pass through unchanged, so a request for Jpan or
         # Hrkt text would come back half converted.
-        subtags = (target_lang or "").replace("_", "-").lower().split("-")
-        if subtags[0] in ("ja", "jpn") and not {"kana", "hira"} & set(subtags[1:]):
+        try:
+            tag = parse(standardize_lang(target_lang or ""))
+        except LanguageTagError:
+            tag = LanguageTag()
+        language = tag.language
+        if language == "ja" and tag.script not in ("Kana", "Hira"):
             raise UnsupportedLanguageError(f"unsupported language code: {target_lang} "
                              "(epitran reads Japanese kana only; use ja-Kana or ja-Hira)")
         try:
@@ -541,7 +549,7 @@ class EpitranPhonemizer(BasePhonemizer):
             # The epitran Korean map converts Hangul only. A bare Korean tag
             # means the Kore script, Hangul plus Hanja, and Hanja passes
             # through unchanged, so the match refuses it.
-            if subtags[0] in ("ko", "kor"):
+            if language == "ko":
                 raise ValueError(f"{err} (epitran reads Korean in Hangul; "
                                  "use ko-Hang or kor-Hang)") from err
             raise
