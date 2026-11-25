@@ -35,6 +35,8 @@ MODEL_FILES = {
 PUNCTUATION = "().,:?!/–"
 _KEPT = set(PUNCTUATION + "- ")
 _SPLIT = re.compile(f"([{PUNCTUATION} ])")
+# The exported graph reuses a 5000-id buffer. Two ids bound the letters.
+_MAX_MODEL_IDS = 5000
 
 
 def _split_capitals(word: str) -> str:
@@ -105,6 +107,11 @@ class KolokwaPhonemizer(BasePhonemizer):
         letters = [self.text_tokens[c.lower()] for c in word if c.lower() in self.text_tokens]
         if not letters:
             return ""
+        max_letters = (_MAX_MODEL_IDS - 2) // self.char_repeats
+        if len(letters) > max_letters:
+            raise ValueError(
+                f"Kolokwa reads at most {max_letters} letters in one spelling, "
+                f"got {len(letters)}")
         ids = [self.text_start] + [i for i in letters for _ in range(self.char_repeats)] + [self.text_end]
         logits = self.session.run(None, {"text": np.array([ids], dtype=np.int64)})[0][0]
         best = [int(i) for i in logits.argmax(-1) if i != 0]
