@@ -1078,4 +1078,4 @@ See [ovos.md](ovos.md) for using this layer from OVOS through
 `ovos-scriptconv-g2p-plugin`.
 
 ---
-[Index](index.md) · [← graph](graph.md) · [frontend →](frontend.md)
+[← Prev](graph.md) · [Home](index.md) · [Next →](frontend.md)

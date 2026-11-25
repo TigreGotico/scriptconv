@@ -375,4 +375,4 @@ authoritative script subtag (`sr-Latn`), and the widespread informal
 `_cyr`/`_lat` variant suffixes (`uzb_cyr`).
 
 ---
-[Index](index.md) · [← stack](stack.md) · [notation →](notation.md)
+[← Prev](stack.md) · [Home](index.md) · [Next →](notation.md)

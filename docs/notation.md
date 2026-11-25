@@ -782,4 +782,4 @@ these codes. `Alphabet.IPA` gives the same codes, because the voices trained
 on them read them under that name.
 
 ---
-[Index](index.md) · [← scripts](scripts.md) · [translit →](translit.md)
+[← Prev](scripts.md) · [Home](index.md) · [Next →](translit.md)

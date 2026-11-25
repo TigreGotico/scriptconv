@@ -90,4 +90,4 @@ marks is a modelling problem. `scriptconv.diacritics.diacritize` calls a
 model for it behind the `tashkeel` extra, and this module does not.
 
 ---
-[Index](index.md) · [← translit](translit.md) · [conventions →](conventions.md)
+[← Prev](translit.md) · [Home](index.md) · [Next →](conventions.md)

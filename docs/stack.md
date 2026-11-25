@@ -105,4 +105,4 @@ then skips them. tugaphone owns `normalize` and `diacritize`, arbtok owns
 it.
 
 ---
-[Index](index.md) · [← install](install.md) · [scripts →](scripts.md)
+[← Prev](install.md) · [Home](index.md) · [Next →](scripts.md)

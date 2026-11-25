@@ -81,4 +81,4 @@ get_phonemizer_class(Phonemizer.UNICODE).__name__   # 'UnicodeCodepointPhonemize
 ```
 
 ---
-[Index](index.md) · [← performance](performance.md) · [reference →](reference.md)
+[← Prev](performance.md) · [Home](index.md) · [Next →](reference.md)

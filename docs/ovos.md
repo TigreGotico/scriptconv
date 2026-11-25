@@ -98,4 +98,4 @@ raises an `ImportError` unchanged.
   scores this plugin against other OVOS G2P engines.
 
 ---
-[Index](index.md) · [← frontend](frontend.md) · [backends →](backends.md)
+[← Prev](frontend.md) · [Home](index.md) · [Next →](backends.md)
