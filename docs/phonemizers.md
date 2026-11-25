@@ -84,8 +84,11 @@ changes the phonemes:
 | Backend | Data distributions |
 | --- | --- |
 | `orthography2ipa`, `mwl_phonemizer`, `barranquenho` | `o2i-lexicons` |
-| `tugaphone` | `orthography2ipa`, `o2i-lexicons`, `tugalex`, `bifonia`, `desacordo-ortografico`, `text2spoken` |
+| `euskaphone` | `orthography2ipa`, `text2spoken` |
 | `gruut` | the language pack of the lect, `gruut-lang-fr` for `fr` |
+
+`tugaphone` names its own distributions: its part of the string is the value
+of `tugaphone.revision(lect)`, so the string is `scriptconv==X;` and that value.
 
 A data distribution that is not installed stays out of the string. An engine
 that is not installed raises `ImportError`.

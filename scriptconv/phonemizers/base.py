@@ -570,14 +570,29 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         """The data distributions that change the phonemes of *lang*: :attr:`revision_distributions`."""
         return self.revision_distributions
 
+    def _engine_revision(self, lang: str) -> str:
+        """The engine part of the revision for *lang*: ``engine==version``, then
+        ``;name==version`` for each installed distribution of
+        :meth:`_revision_distributions`. Empty for code inside scriptconv."""
+        releases = {}
+        if self.engine_distribution is not None:
+            name, version = self._engine_release()
+            releases[name] = version
+        for name in self._revision_distributions(lang):
+            try:
+                releases.setdefault(name, metadata.version(name))
+            except metadata.PackageNotFoundError:
+                pass
+        return ";".join(f"{name}=={release}" for name, release in releases.items())
+
     def identity(self, lang: str) -> PhonemizerIdentity:
         """What phonemizes *lang* here: the engine, its version, the lect and the revision.
 
-        ``revision`` is ``scriptconv==X`` followed by one ``;name==version``
-        for each distribution that gives the phonemes, in this order: the
+        ``revision`` is ``scriptconv==X``, then ``;name==version`` for the
         sister package that holds the backend (scriptconv-copyleft or
-        scriptconv-nonfree), the engine distribution, then
-        :attr:`revision_distributions`. A data distribution that is not
+        scriptconv-nonfree), then ``;`` and :meth:`_engine_revision`: the
+        engine distribution and :attr:`revision_distributions`, or the value
+        that the engine itself gives. A data distribution that is not
         installed stays out of the string.
 
         Raises:
@@ -592,16 +607,12 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         distribution, version = self._engine_release()
         # Grapheme, Unicode and Phonetisaurus backends take any language.
         resolved = self.get_lang(lang) if hasattr(self, "get_lang") else lang
-        releases = {"scriptconv": VERSION_STR}
+        parts = [f"scriptconv=={VERSION_STR}"]
         if sister := _SISTER_DISTRIBUTIONS.get(type(self).__module__.partition(".")[0]):
-            releases[sister] = metadata.version(sister)
-        releases.setdefault(distribution, version)
-        for name in self._revision_distributions(resolved):
-            try:
-                releases.setdefault(name, metadata.version(name))
-            except metadata.PackageNotFoundError:
-                pass
-        revision = ";".join(f"{name}=={release}" for name, release in releases.items())
+            parts.append(f"{sister}=={metadata.version(sister)}")
+        if engine := self._engine_revision(resolved):
+            parts.append(engine)
+        revision = ";".join(parts)
         return PhonemizerIdentity(backend, distribution, version, resolved, revision)
 
     @staticmethod

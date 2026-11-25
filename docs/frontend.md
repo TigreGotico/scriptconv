@@ -440,8 +440,9 @@ The `revision` is `None` when scriptconv cannot vouch for a stage, so a
 - the diacritizer is not installed
 - a casing runs
 
-`identity()` reads installed versions only, so it takes no more than a few
-milliseconds after the engine imports.
+`identity()` reads installed versions only. After the engine imports, a call
+takes from under a millisecond to a few tens of milliseconds; the first call
+can take longer, because it resolves the language through the engine.
 
 ---
 [Index](index.md) · [← phonemizers](phonemizers.md) · [ovos →](ovos.md)

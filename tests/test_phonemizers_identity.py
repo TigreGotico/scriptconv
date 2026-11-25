@@ -137,7 +137,8 @@ class TestIdentity:
         assert identity == PhonemizerIdentity(
             backend="tugaphone", distribution="tugaphone",
             version=tugaphone.version.__version__, lang="pt-PT-x-porto", revision=identity.revision)
-        assert identity.revision.startswith(f"scriptconv=={metadata.version('scriptconv')};tugaphone==")
+        assert identity.revision == (
+            f"scriptconv=={metadata.version('scriptconv')};{tugaphone.revision('pt-PT-x-porto')}")
 
     @pytest.mark.parametrize("member, lang, distribution", [
         (Phonemizer.MANTOQ, "ar", "scriptconv-nonfree"),
@@ -198,11 +199,14 @@ class TestRevision:
         assert get_phonemizer(Phonemizer.BARRANQUENHO).identity("ext-PT-x-barrancos").revision == expected
         assert get_phonemizer(Phonemizer.MIRANDESE).identity("mwl").revision == expected
 
-    def test_tugaphone_names_the_packages_that_give_its_phonemes(self):
+    def test_tugaphone_takes_the_revision_that_tugaphone_gives(self):
         assert TugaphonePhonemizer().identity("pt-PT").revision == (
-            f"scriptconv=={metadata.version('scriptconv')}" + installed(
-                "tugaphone", "orthography2ipa", "o2i-lexicons", "tugalex", "bifonia",
-                "desacordo-ortografico", "text2spoken"))
+            f"scriptconv=={metadata.version('scriptconv')};{tugaphone.revision('pt-PT')}")
+
+    def test_euskaphone_names_orthography2ipa_and_text2spoken(self):
+        assert EuskaphonePhonemizer().identity("eu").revision == (
+            f"scriptconv=={metadata.version('scriptconv')}"
+            + installed("euskaphone", "orthography2ipa", "text2spoken"))
 
     @pytest.mark.parametrize("lang, pack", [("fr", "gruut-lang-fr"), ("ru", "gruut-lang-ru")])
     def test_gruut_names_the_language_pack_of_the_lect(self, lang, pack):
@@ -243,8 +247,9 @@ class TestRevision:
     def test_two_tugaphone_identities_log_no_missing_revision(self, caplog):
         backend = TugaphonePhonemizer()
         with caplog.at_level(logging.WARNING):
-            first, second = backend.identity("pt-PT"), backend.identity("pt-BR")
-        assert first.revision == second.revision
+            revisions = [backend.identity(lect).revision for lect in ("pt-PT", "pt-BR")]
+        assert revisions == [f"scriptconv=={metadata.version('scriptconv')};{tugaphone.revision(lect)}"
+                             for lect in ("pt-PT", "pt-BR")]
         assert "gives no revision" not in caplog.text
 
 

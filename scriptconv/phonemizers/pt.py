@@ -12,8 +12,6 @@ LOG = logging.getLogger(__name__)
 class TugaphonePhonemizer(BasePhonemizer):
     owned_stages = frozenset({"normalize", "diacritize"})
     engine_distribution = "tugaphone"
-    revision_distributions = ("orthography2ipa", "o2i-lexicons", "tugalex", "bifonia",
-                              "desacordo-ortografico", "text2spoken")
 
     contact = "none"
     """The embedded-language policy that this backend passes to tugaphone."""
@@ -50,6 +48,11 @@ class TugaphonePhonemizer(BasePhonemizer):
     def phonemize_string(self, text: str, lang: str) -> str:
         lang = self.get_lang(lang)
         return self.tuga.phonemize_sentence(text, lang, contact=self.contact)
+
+    def _engine_revision(self, lang: str) -> str:
+        """``tugaphone.revision(lang)``: tugaphone names the distributions that give its phonemes."""
+        import tugaphone
+        return tugaphone.revision(lang)
 
 
 class BarranquenhoPhonemizer(BasePhonemizer):
