@@ -1,14 +1,5 @@
 # Changelog
 
-## [0.0.4a171](https://github.com/TigreGotico/scriptconv/tree/0.0.4a171) (2026-11-25)
-
-[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a170...0.0.4a171)
-
-**Merged pull requests:**
-
-- docs\(compare\): use a caller-supplied TSV path [\#451](https://github.com/TigreGotico/scriptconv/pull/451) ([JarbasAl](https://github.com/JarbasAl))
-- fix\(registry\): reject an unused model path [\#450](https://github.com/TigreGotico/scriptconv/pull/450) ([JarbasAl](https://github.com/JarbasAl))
-
 ## [0.0.4a170](https://github.com/TigreGotico/scriptconv/tree/0.0.4a170) (2026-11-25)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a169...0.0.4a170)
