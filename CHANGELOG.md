@@ -2,7 +2,11 @@
 
 ## [0.0.4a167](https://github.com/TigreGotico/scriptconv/tree/0.0.4a167) (2026-11-25)
 
-[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a165...0.0.4a167)
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a166...0.0.4a167)
+
+## [0.0.4a166](https://github.com/TigreGotico/scriptconv/tree/0.0.4a166) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a165...0.0.4a166)
 
 ## [0.0.4a165](https://github.com/TigreGotico/scriptconv/tree/0.0.4a165) (2026-11-25)
 
@@ -357,10 +361,6 @@
 ## [0.0.4a120](https://github.com/TigreGotico/scriptconv/tree/0.0.4a120) (2026-11-18)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a119...0.0.4a120)
-
-**Merged pull requests:**
-
-- feat: Segment.text holds the staged source text of a chunk [\#334](https://github.com/TigreGotico/scriptconv/pull/334) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a119](https://github.com/TigreGotico/scriptconv/tree/0.0.4a119) (2026-11-18)
 
