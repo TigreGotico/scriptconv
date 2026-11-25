@@ -10,13 +10,14 @@ from scriptconv.phonemizers.pt import TugaphonePhonemizer
 
 @pytest.mark.parametrize("tag", [
     "yue", "yue-HK", "yue_MO", "yue-Hant", "YUE_hant_hk", "yue-Hant-MO", "yue-Hans", "zh-HK", "zh_MO", "zh-Hant-HK",
-    "zho-HK", "zh-Hans-HK",
+    "zho-HK", "zh-Hani-HK",
 ])
 def test_cantonese_and_chinese_in_hong_kong_or_macau_resolve_to_the_cantonese_resources(tag):
     assert _is_hk_cantonese(tag) is True
 
 
-@pytest.mark.parametrize("tag", ["zh", "zh-TW", "zh-Hant", "zh-CN", "cmn-HK", "en-HK", "ja"])
+@pytest.mark.parametrize("tag", ["zh", "zh-TW", "zh-Hant", "zh-CN", "cmn-HK", "en-HK", "ja", "zh-Hans-HK", "zh_hans_mo",
+                                 "yue-Latn", "yue-Arab-HK", "zh-Latn-HK"])
 def test_other_chinese_is_not_hong_kong_cantonese(tag):
     assert _is_hk_cantonese(tag) is False
 
@@ -28,6 +29,18 @@ def test_other_chinese_is_not_hong_kong_cantonese(tag):
 ])
 def test_goruut_reads_english_by_the_standardized_tag(tag, name):
     assert GoruutPhonemizer.get_lang(tag) == name
+
+
+@pytest.mark.parametrize("tag, name", [("zh-Hans-HK", "ChineseMandarin"), ("zh-Hans-MO", "ChineseMandarin"),
+                                       ("zh-Hant-HK", "Cantonese"), ("yue-Hans", "Cantonese")])
+def test_goruut_gives_cantonese_only_to_a_han_script_in_hong_kong_or_macau(tag, name):
+    assert GoruutPhonemizer.get_lang(tag) == name
+
+
+@pytest.mark.parametrize("tag", ["yue-Latn", "yue-Arab"])
+def test_goruut_has_no_cantonese_for_a_non_han_script(tag):
+    with pytest.raises(ValueError):
+        GoruutPhonemizer.get_lang(tag)
 
 
 @pytest.mark.parametrize("tag", ["ja", "jpn", "ja-JP", "ja_Jpan", "JA", "ja-Latn"])
