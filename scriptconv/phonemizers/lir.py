@@ -12,12 +12,11 @@ the characters that are neither alphanumeric nor punctuation, split at spaces
 and punctuation, look each word up in the dictionary, else split it at hyphens
 and before inner capitals, and predict each part that is not in the dictionary.
 """
-import dataclasses
 import json
 import re
 from typing import Optional
 
-from scriptconv.phonemizers.base import BasePhonemizer, PhonemizerIdentity
+from scriptconv.phonemizers.base import BasePhonemizer
 from scriptconv.phonemizers.enums import Alphabet
 from scriptconv.phonemizers.g2pw import _hub_file
 
@@ -123,12 +122,3 @@ class KolokwaPhonemizer(BasePhonemizer):
             if token == self.phoneme_end:
                 break
         return "".join(self.phonemes[t] for t in symbols if self.phonemes[t] not in self.special)
-
-    def identity(self, lang: str) -> PhonemizerIdentity:
-        """The base identity, with ``revision`` the hash of the code on the
-        path of this backend, as
-        :func:`~scriptconv.phonemizers._revision.code_revision` gives it. That
-        code holds the pinned model revision and the sha256 of each model file."""
-        from scriptconv.phonemizers._revision import code_revision
-        identity = super().identity(lang)
-        return dataclasses.replace(identity, revision=code_revision(self, identity.lang, {}))

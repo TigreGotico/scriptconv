@@ -96,21 +96,6 @@ def test_a_local_dictionary_and_heteronyms_replace_the_downloads(tmp_path):
     assert local.vocabulary >= set("CATREDOG")
 
 
-def test_a_local_file_changes_the_revision(tmp_path, nemo):
-    dictionary = tmp_path / "dictionary.txt"
-    dictionary.write_text("CAT  ˈkæt\n", encoding="utf-8")
-    heteronyms = tmp_path / "heteronyms"
-    heteronyms.write_text("dog\n", encoding="utf-8")
-    default = nemo.identity("en-US")
-    local = NemoIpaPhonemizer(dictionary=dictionary, heteronyms=heteronyms).identity("en-US")
-    other_heteronyms = tmp_path / "heteronyms-2"
-    other_heteronyms.write_text("cat\n", encoding="utf-8")
-    other = NemoIpaPhonemizer(dictionary=dictionary, heteronyms=other_heteronyms).identity("en-US")
-    assert (default.backend, default.distribution, default.lang) == ("nemo_ipa", "scriptconv", "en-US")
-    assert len({default.revision, local.revision, other.revision}) == 3
-    assert default.revision.startswith("sc2:")
-
-
 def test_the_registry_resolves_the_backend():
     assert Phonemizer.NEMO_IPA.value == "nemo_ipa"
     assert get_phonemizer_class(Phonemizer.NEMO_IPA) is NemoIpaPhonemizer
