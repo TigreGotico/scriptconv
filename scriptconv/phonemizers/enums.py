@@ -31,6 +31,7 @@ class Alphabet(str, Enum):
     HALABI = "halabi"  # ar — Halabi Arabic-Phonetiser phoneme notation
     CANGJIE = "cangjie"  # zh (Cangjie input method)
     VOSK = "vosk"  # ru — vosk-tts phoneme inventory (a0, bj, sch ...)
+    MISAKI = "misaki"  # en — misaki and Kokoro codes: IPA with A I O Q W Y for diphthongs
     GRAPHEMES = "graphemes"  # plain text / grapheme input (user-side)
     AFRICA_G2P = "africa_g2p"  # africa-g2p native-orthography phoneme units (400+ African languages)
 

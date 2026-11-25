@@ -22,6 +22,7 @@ from scriptconv.phonemizers import (
     get_phonemizer,
     get_phonemizer_class,
 )
+from scriptconv.phonemizers.enums import Alphabet
 from scriptconv.phonemizers.leokani import LeokaniPhonemizer
 
 UPSTREAM = ("milliwattlabs/leokani-g2p", "a819acc86471a04a01ba3d3f30f3765e4675c7ca")
@@ -75,6 +76,12 @@ def leokani():
 ])
 def test_the_registry_backend_reads_as_upstream(leokani, text, phonemes):
     assert leokani.phonemize_string(text, "en-US") == phonemes
+
+
+def test_the_misaki_alphabet_gives_the_codes_of_the_ipa_alphabet(leokani):
+    misaki = get_phonemizer(Phonemizer.LEOKANI, Alphabet.MISAKI)
+    text = "The wind was cold, so we read inside."
+    assert misaki.phonemize_string(text, "en-US") == leokani.phonemize_string(text, "en-US")
 
 
 def test_phonemize_reads_the_words_without_the_punctuation(leokani):

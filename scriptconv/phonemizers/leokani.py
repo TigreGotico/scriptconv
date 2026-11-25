@@ -70,13 +70,14 @@ class LeokaniPhonemizer(BasePhonemizer):
     the text holds.
 
     Args:
-        alphabet: must be :attr:`Alphabet.IPA`.
+        alphabet: :attr:`Alphabet.MISAKI`, or :attr:`Alphabet.IPA`, which
+            gives the same codes, as the voices trained on them expect.
         model: ``"micro"`` (the default) or ``"mini"``, which is larger and
             reads names and rare words better.
     """
 
     def __init__(self, alphabet: Alphabet = Alphabet.IPA, model: str = "micro"):
-        _check_alphabet(self, alphabet, [Alphabet.IPA])
+        _check_alphabet(self, alphabet, [Alphabet.IPA, Alphabet.MISAKI])
         if model not in MODEL_FILES:
             raise ValueError(f"unknown Leokani G2P model {model!r}; use one of {', '.join(MODEL_FILES)}")
         super().__init__(alphabet)
