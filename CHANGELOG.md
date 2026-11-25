@@ -1,12 +1,24 @@
 # Changelog
 
+## [0.0.4a174](https://github.com/TigreGotico/scriptconv/tree/0.0.4a174) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a173...0.0.4a174)
+
+**Merged pull requests:**
+
+- fix\(deps\): floor orthography2ipa at 7.126.2a2 [\#469](https://github.com/TigreGotico/scriptconv/pull/469) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a173](https://github.com/TigreGotico/scriptconv/tree/0.0.4a173) (2026-11-25)
 
-[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a171...0.0.4a173)
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a172...0.0.4a173)
 
 **Merged pull requests:**
 
 - fix\(lir\): reject a spelling longer than the model buffer [\#452](https://github.com/TigreGotico/scriptconv/pull/452) ([JarbasAl](https://github.com/JarbasAl))
+
+## [0.0.4a172](https://github.com/TigreGotico/scriptconv/tree/0.0.4a172) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a171...0.0.4a172)
 
 ## [0.0.4a171](https://github.com/TigreGotico/scriptconv/tree/0.0.4a171) (2026-11-25)
 
@@ -348,18 +360,9 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a125...0.0.4a126)
 
-**Merged pull requests:**
-
-- feat: GraphemePhonemizer takes its character rules as keyword arguments [\#347](https://github.com/TigreGotico/scriptconv/pull/347) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a125](https://github.com/TigreGotico/scriptconv/tree/0.0.4a125) (2026-11-18)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a124...0.0.4a125)
-
-**Merged pull requests:**
-
-- fix: only a missing module gives the tugaphone identity no revision [\#348](https://github.com/TigreGotico/scriptconv/pull/348) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-- fix\(dizione\): a missing numpy raises an ImportError that names the extra [\#346](https://github.com/TigreGotico/scriptconv/pull/346) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a124](https://github.com/TigreGotico/scriptconv/tree/0.0.4a124) (2026-11-18)
 
