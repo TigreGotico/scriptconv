@@ -61,6 +61,14 @@ euskaphone own `normalize`. The normalisation hook
 runs for every backend that does not own `normalize`, because the caller
 chooses it.
 
+A backend can name the language of each script in its text with
+`script_languages`, for example `{"Latn": "en"}`. When the hook is
+`spoken_normalizer()`, the frontend gives this map to
+`text2spoken.normalize` as `NormalizationParams.script_languages`. Each run of
+a mapped script then reads in its own language, and the rest reads in the
+frontend language. Shami declares `{"Latn": "en"}`, so in `apc` text an
+English run reads its numbers in English. Another hook gets no map.
+
 ## Backends that read whole text
 
 A backend that owns `normalize` reads the text with its own rules, so the

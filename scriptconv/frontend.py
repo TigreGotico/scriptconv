@@ -59,6 +59,7 @@ differences stay:
 import copy
 import dataclasses
 import enum
+import functools
 import importlib.util
 import itertools
 import logging
@@ -654,6 +655,20 @@ class TextFrontend:
                                 + part[start + len(core):])
         return "".join(parts)
 
+    @functools.cached_property
+    def _normalizer_params(self) -> dict:
+        """``params`` for :func:`spoken_normalizer` with the backend's
+        :attr:`~scriptconv.phonemizers.base.BasePhonemizer.script_languages`. Another hook takes no params."""
+        if not self.backend.script_languages:
+            return {}
+        try:
+            from text2spoken import FrozenMap, NormalizationParams, normalize
+        except ImportError:
+            return {}
+        if self.config.normalizer is not normalize:
+            return {}
+        return {"params": NormalizationParams(script_languages=FrozenMap(self.backend.script_languages))}
+
     def say_as(self, text: str, interpret_as: str, format: Optional[str] = None,
                detail: Optional[str] = None, lang: Optional[str] = None) -> str:
         """*text* in the form that an SSML ``say-as`` element names, as the normaliser hook reads it.
@@ -677,7 +692,8 @@ class TextFrontend:
                         interpret_as, stages.lang)
             return text
         return self._stage("normalize", stages, self.config.normalizer, text, stages.lang,
-                           say_as=SayAs(interpret_as=interpret_as, format=format, detail=detail))
+                           say_as=SayAs(interpret_as=interpret_as, format=format, detail=detail),
+                           **self._normalizer_params)
 
     def identity(self) -> PhonemizerIdentity:
         """What phonemizes this frontend's language, with :data:`FRONTEND_VERSION`.
@@ -1187,7 +1203,8 @@ class TextFrontend:
     def _read(self, text: str, stages: Stages) -> str:
         """Steps 2 and 3 on one piece of text: normalise, then apply casing."""
         if stages.normalize and self.config.normalizer is not None:
-            text = self._stage("normalize", stages, self.config.normalizer, text, stages.lang)
+            text = self._stage("normalize", stages, self.config.normalizer, text, stages.lang,
+                               **self._normalizer_params)
         if stages.casing is not None:
             text = self._stage("casing", stages, stages.casing, text)
         return text

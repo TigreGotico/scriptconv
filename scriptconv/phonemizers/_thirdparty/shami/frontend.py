@@ -15,7 +15,7 @@ from .codeswitch import Span, segment
 from .diacritize import get_diacritizer, is_already_diacritized
 from .english_g2p import english_g2p
 from .levantine_g2p import arabic_fallback_ipa, levantine_g2p
-from .normalize import normalize_unicode, verbalize
+from .normalize import normalize_unicode
 from .phoneme_inventory import (
     BOS,
     BRK,
@@ -115,10 +115,9 @@ class TextFrontend:
         return levantine_g2p(diac, self.back_emphatics, self.epenthesize)
 
     def _span_to_ipa(self, span: Span) -> str:
-        verbalized = verbalize(span.text, span.lang)
         if span.lang == "ar":
-            return self._arabic_to_ipa(verbalized)
-        return english_g2p(verbalized, self.inventory)
+            return self._arabic_to_ipa(span.text)
+        return english_g2p(span.text, self.inventory)
 
     def process(self, text: str) -> Utterance:
         normalized = normalize_unicode(text)
