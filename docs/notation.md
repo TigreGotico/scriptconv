@@ -38,6 +38,7 @@ class Notation(str, Enum):
     COTOVIA    = "cotovia"
     RFE        = "rfe"
     HALABI     = "halabi"
+    MISAKI     = "misaki"
 ```
 
 `Notation` is a `str` subclass. Its string values (`"ipa"`, `"arpa"`, etc.) are accepted
@@ -720,6 +721,30 @@ from scriptconv.notation import iqra_halabi_to_ipa
 
 iqra_halabi_to_ipa("f ii h i x A y r aa t")   # 'fiːhixɑjraːt'
 ```
+
+## Misaki → IPA (misaki and Kokoro codes)
+
+The `misaki_en` and `leokani` backends write the codes of the misaki G2P,
+which Kokoro voices are trained on. The codes are IPA with a few letters of
+their own: `A`, `I`, `O`, `Q`, `W` and `Y` for the diphthongs, `ʤ` and `ʧ`
+for the affricates, and `ᵊ` for a reduced schwa. `misaki_to_ipa` expands
+them as the misaki symbol page ([EN_PHONES.md](https://github.com/hexgrad/misaki/blob/main/EN_PHONES.md))
+gives them, so that another notation can read the result:
+
+```python
+from scriptconv.notation import misaki_to_ipa
+from scriptconv import convert, can_convert
+
+misaki_to_ipa("hˈA ʤˈʌmp")        # 'hˈeɪ dʒˈʌmp'
+convert("hˈI", "misaki", "arpa")   # 'HH AY'
+convert("ɡˈO", "misaki", "x-sampa")   # 'g"oU'
+can_convert("ipa", "misaki")       # False  (one-directional)
+```
+
+The page gives no IPA value for `ᵻ` ("somewhere in between `ə` and `ɪ`"),
+so it stays as written. `Alphabet.MISAKI` asks the `leokani` backend for
+these codes. `Alphabet.IPA` gives the same codes, because the voices trained
+on them read them under that name.
 
 ---
 [Index](index.md) · [← scripts](scripts.md) · [translit →](translit.md)

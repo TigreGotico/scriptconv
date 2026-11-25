@@ -10,6 +10,14 @@ ARPABET table derived from chorusai/arpa2ipa
 X-SAMPA table from J.C. Wells, "Computer-coding the IPA: a proposed extension
   of SAMPA" (https://www.phon.ucl.ac.uk/home/sampa/x-sampa.htm).
 Buckwalter ↔ Arabic table follows Tim Buckwalter's transliteration scheme.
+Misaki table from hexgrad/misaki, EN_PHONES.md
+  (https://github.com/hexgrad/misaki/blob/main/EN_PHONES.md): "`A`: [...]
+  Expands to `eɪ` in IPA.", "`I`: [...] Expands to `aɪ` in IPA.", "`W`: [...]
+  Expands to `aʊ` in IPA.", "`Y`: [...] Expands to `ɔɪ` in IPA.", "`O`: [...]
+  Expands to `oʊ` in IPA.", "`Q`: [...] Expands to `əʊ` in IPA.", "`ʤ`: [...]
+  merges `dʒ`", "`ʧ`: [...] merges `tʃ`", "`ᵊ`: Small schwa, muted version of
+  `ə`". For `ᵻ` the page gives no IPA value ("A sound somewhere in between `ə`
+  and `ɪ`"), so it passes through.
 Lexique phoneme-code table from:
   New, B. & Pallier, C. — Manuel de Lexique 3, v3.11, Tableau 2 (p. 12).
   Lexique383, https://github.com/chrplr/openlexicon, CC BY-SA 4.0.
@@ -46,6 +54,7 @@ __all__ = [
     "rfe_to_ipa",
     "ipa_to_rfe",
     "halabi_to_ipa",
+    "misaki_to_ipa",
     "iqra_halabi_to_ipa",
     "looks_like_ipa",
 ]
@@ -64,6 +73,7 @@ class Notation(str, Enum):
     COTOVIA = "cotovia"  # Universidade de Vigo Cotovía TTS notation (gl)
     RFE = "rfe"
     HALABI = "halabi"  # Halabi Arabic-Phonetiser phoneme notation (ar)
+    MISAKI = "misaki"  # misaki and Kokoro phoneme codes (en)
 
     def __repr__(self) -> str:
         return f"Notation.{self.name}"
@@ -1219,6 +1229,25 @@ _HALABI_MULTI = ("_dbl_", "_+_", "_sil_", "_eos_", "_pad_",
                  "aaaa", "aa", "ii", "uu", "AA", "II", "UU")
 
 
+_MISAKI_TO_IPA = str.maketrans({
+    "A": "eɪ", "I": "aɪ", "W": "aʊ", "Y": "ɔɪ", "O": "oʊ", "Q": "əʊ",
+    "ʤ": "dʒ", "ʧ": "tʃ", "ᵊ": "ə",
+})
+
+
+def misaki_to_ipa(misaki: str, errors: str = "pass") -> str:
+    """Expand the misaki codes of *misaki* to IPA; every other symbol is IPA
+    already and stays as it is.
+
+    >>> misaki_to_ipa("hˈA ʤˈʌmp")
+    'hˈeɪ dʒˈʌmp'
+
+    *errors* is accepted for the conversion graph and has no effect: misaki
+    has no symbol outside this table and IPA.
+    """
+    return misaki.translate(_MISAKI_TO_IPA)
+
+
 def _tokenize_halabi(text: str) -> list[str]:
     tokens = []
     i = 0
@@ -1397,6 +1426,7 @@ def convert(text: str, src: str | Notation, dst: str | Notation,
 
 _TO_IPA: dict[Notation, "callable"] = {
     Notation.HALABI: halabi_to_ipa,
+    Notation.MISAKI: misaki_to_ipa,
     Notation.ARPA: arpa_to_ipa,
     Notation.XSAMPA: xsampa_to_ipa,
     Notation.LEXIQUE: lexique_to_ipa,
@@ -1544,6 +1574,11 @@ NOTATION_INFO: dict[Notation, NotationInfo] = {
         token_separated=False,
         reference="Phonetic alphabet of Nawar Halabi's Arabic-Phonetiser "
                   "(mantoq G2P inventory); one-directional to IPA",
+    ),
+    Notation.MISAKI: NotationInfo(
+        Notation.MISAKI, lossless_to_ipa=False, lossless_from_ipa=False,
+        token_separated=False,
+        reference="hexgrad/misaki EN_PHONES.md; one-directional to IPA",
     ),
     Notation.BUCKWALTER: NotationInfo(
         Notation.BUCKWALTER, lossless_to_ipa=False, lossless_from_ipa=False,
