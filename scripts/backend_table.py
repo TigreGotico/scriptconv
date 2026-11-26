@@ -14,7 +14,6 @@ The rows come from ``Phonemizer`` (enums.py), ``PHONEMIZER_REGISTRY`` and
 import sys
 from pathlib import Path
 
-from scriptconv.phonemizers.base import _primary_subtag
 from scriptconv.phonemizers._moved import COPYLEFT, NONFREE
 from scriptconv.phonemizers.enums import Phonemizer
 from scriptconv.phonemizers.registry import LANG_DEFAULTS, PHONEMIZER_REGISTRY
@@ -24,9 +23,13 @@ DOC = Path(__file__).resolve().parent.parent / "docs" / "backends.md"
 START = "<!-- backends:start -->"
 END = "<!-- backends:end -->"
 LANG_DOC = DOC.parent / "languages.md"
-LEADERS = ("pt-PT", "pt-BR", "es-CO", "fr-FR", "it-IT", "de-DE", "nl-NL",
-           "da-DK", "kab", "hi-IN", "bn-IN", "mwr")
-FALLBACK = "none: `orthography2ipa` when it has a spec, else `espeak`"
+# leader tag -> a native word; a backend that returns no phonemes for it is "unsupported"
+LEADERS = {"pt-PT": "casa", "pt-BR": "casa", "es-CO": "casa", "fr-FR": "maison",
+           "it-IT": "casa", "de-DE": "Haus", "nl-NL": "huis", "da-DK": "hus",
+           "kab": "azul", "hi-IN": "नमस्ते", "bn-IN": "নমস্কার", "mwr": "राम"}
+SCORES = {"tugaphone": "[tugaphone scoreboard]"
+          "(https://github.com/TigreGotico/tugaphone/blob/dev/docs/benchmarking.md)"}
+NOTES = {"kab": " ([#494](https://github.com/TigreGotico/scriptconv/issues/494))"}
 PACKAGES = {COPYLEFT: "scriptconv-copyleft", NONFREE: "scriptconv-nonfree"}
 
 
@@ -49,18 +52,22 @@ def _extra(member) -> str:
 
 
 def language_table() -> str:
+    """Rows from the backend that ``phonemizer_for_lang`` returns in this environment."""
+    from scriptconv.phonemizers.registry import phonemizer_for_lang
+    by_class = {cls: member for member, (_, cls, _) in PHONEMIZER_REGISTRY.items()}
     rows = ["| Language | Default backend | Extra | Script | Measured score |",
             "|---|---|---|---|---|"]
-    for lang in LEADERS:
-        chain = LANG_DEFAULTS.get(_primary_subtag(lang))
-        if chain:
-            backend = " then ".join(f"`{m.value}`" for m in chain)
-        else:
-            backend, chain = FALLBACK, (Phonemizer.ORTHOGRAPHY2IPA, Phonemizer.ESPEAK)
-        extra = ", ".join(f"`{_extra(m)}`" for m in chain)
+    for lang, word in LEADERS.items():
+        backend = phonemizer_for_lang(lang)
+        member = by_class[type(backend).__name__]
         script = lang_to_script(lang)
-        rows.append(f"| `{lang}` | {backend} | {extra} | "
-                    f"{f'`{script}`' if script else 'not in the map'} | no score in this repo |")
+        script = f"`{script}`" if script else "not in the map" + NOTES.get(lang, "")
+        if backend.phonemize_string(word, lang).strip():
+            rows.append(f"| `{lang}` | `{member.value}` | `{_extra(member)}` | {script} "
+                        f"| {SCORES.get(member.value, 'none')} |")
+        else:
+            rows.append(f"| `{lang}` | unsupported: `{member.value}` returns no phonemes "
+                        f"| `{_extra(member)}` | {script} | none |")
     return "\n".join(rows) + "\n"
 
 

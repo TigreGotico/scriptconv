@@ -10,34 +10,39 @@ see: docs/backends.md, docs/phonemizers.md, docs/scripts.md
 
 This page tells what scriptconv does for each leader language.
 `phonemizer_for_lang` selects the backend. It uses the language subtag only,
-so `pt-PT` and `pt-BR` get the same backend.
+so `pt-PT` and `pt-BR` get the same backend. The table is for the IPA
+alphabet. For other alphabets, the code skips orthography2ipa: when the
+`LANG_DEFAULTS` chain has no backend for the alphabet, it uses `espeak`.
 
-- **Default backend**: the `LANG_DEFAULTS` chain of the language. The first
-  backend in the chain that emits the requested alphabet wins.
-- **none**: the language has no `LANG_DEFAULTS` entry. The code uses
-  `orthography2ipa` when that package is installed and has a spec for the
-  language. Otherwise it uses `espeak`.
-- **Extra**: the extra of `scriptconv` that installs each backend in the row.
+- **Default backend**: the backend that `phonemizer_for_lang` returns with
+  all extras installed. It is the `LANG_DEFAULTS` chain of the language when
+  there is one. Otherwise it is `orthography2ipa` when that package has a
+  spec for the language, else `espeak`.
+- **unsupported**: the selected backend returns no phonemes for a word of
+  the language.
+- **Extra**: the extra of `scriptconv` that installs the backend.
 - **Script**: the ISO 15924 code that `lang_to_script` returns. "not in the
   map" means that `lang_to_script` returns `None`.
-- **Measured score**: this repo holds no phoneme error rate for a language.
-  The scores of each backend are in the repo of that backend.
+- **Measured score**: a link to the scores of the backend, or "none" when no
+  published score is known.
+
+espeak-ng has no voice for `kab` or `mwr`.
 
 <!-- languages:start -->
 | Language | Default backend | Extra | Script | Measured score |
 |---|---|---|---|---|
-| `pt-PT` | `tugaphone` | `pt-phonemizers` | `Latn` | no score in this repo |
-| `pt-BR` | `tugaphone` | `pt-phonemizers` | `Latn` | no score in this repo |
-| `es-CO` | none: `orthography2ipa` when it has a spec, else `espeak` | `o2i`, `espeak` | `Latn` | no score in this repo |
-| `fr-FR` | none: `orthography2ipa` when it has a spec, else `espeak` | `o2i`, `espeak` | `Latn` | no score in this repo |
-| `it-IT` | none: `orthography2ipa` when it has a spec, else `espeak` | `o2i`, `espeak` | `Latn` | no score in this repo |
-| `de-DE` | none: `orthography2ipa` when it has a spec, else `espeak` | `o2i`, `espeak` | `Latn` | no score in this repo |
-| `nl-NL` | none: `orthography2ipa` when it has a spec, else `espeak` | `o2i`, `espeak` | `Latn` | no score in this repo |
-| `da-DK` | none: `orthography2ipa` when it has a spec, else `espeak` | `o2i`, `espeak` | `Latn` | no score in this repo |
-| `kab` | none: `orthography2ipa` when it has a spec, else `espeak` | `o2i`, `espeak` | not in the map | no score in this repo |
-| `hi-IN` | none: `orthography2ipa` when it has a spec, else `espeak` | `o2i`, `espeak` | `Deva` | no score in this repo |
-| `bn-IN` | none: `orthography2ipa` when it has a spec, else `espeak` | `o2i`, `espeak` | `Beng` | no score in this repo |
-| `mwr` | none: `orthography2ipa` when it has a spec, else `espeak` | `o2i`, `espeak` | not in the map | no score in this repo |
+| `pt-PT` | `tugaphone` | `pt-phonemizers` | `Latn` | [tugaphone scoreboard](https://github.com/TigreGotico/tugaphone/blob/dev/docs/benchmarking.md) |
+| `pt-BR` | `tugaphone` | `pt-phonemizers` | `Latn` | [tugaphone scoreboard](https://github.com/TigreGotico/tugaphone/blob/dev/docs/benchmarking.md) |
+| `es-CO` | `orthography2ipa` | `o2i` | `Latn` | none |
+| `fr-FR` | `orthography2ipa` | `o2i` | `Latn` | none |
+| `it-IT` | `orthography2ipa` | `o2i` | `Latn` | none |
+| `de-DE` | `orthography2ipa` | `o2i` | `Latn` | none |
+| `nl-NL` | `orthography2ipa` | `o2i` | `Latn` | none |
+| `da-DK` | `orthography2ipa` | `o2i` | `Latn` | none |
+| `kab` | `orthography2ipa` | `o2i` | not in the map ([#494](https://github.com/TigreGotico/scriptconv/issues/494)) | none |
+| `hi-IN` | `orthography2ipa` | `o2i` | `Deva` | none |
+| `bn-IN` | `orthography2ipa` | `o2i` | `Beng` | none |
+| `mwr` | unsupported: `orthography2ipa` returns no phonemes | `o2i` | not in the map | none |
 <!-- languages:end -->
 
 Run `python scripts/backend_table.py --write` to write the table again after
