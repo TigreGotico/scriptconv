@@ -563,9 +563,7 @@ class TextFrontend:
         self._space = backend.word_break()
         self._casing_skipped = False
         stages = self._resolve(None)
-        # The Grapheme and Unicode backends take any language and have no get_lang.
-        if hasattr(backend, "get_lang"):
-            backend.get_lang(self._backend_lang(stages.lang))
+        backend.get_lang(self._backend_lang(stages.lang))
         if config.strict and stages.diacritize:
             package, extra = _DIACRITIZER_PACKAGES.get(
                 _diacritizer_family(stages.lang), (None, None))
