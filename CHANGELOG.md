@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a183](https://github.com/TigreGotico/scriptconv/tree/0.0.4a183) (2026-11-26)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a182...0.0.4a183)
+
+**Merged pull requests:**
+
+- refactor: BasePhonemizer.get\_lang keeps the tag [\#486](https://github.com/TigreGotico/scriptconv/pull/486) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a182](https://github.com/TigreGotico/scriptconv/tree/0.0.4a182) (2026-11-26)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a181...0.0.4a182)
