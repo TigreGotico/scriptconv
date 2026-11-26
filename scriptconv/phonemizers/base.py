@@ -535,6 +535,11 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
                 yield phonemes, ends_in_token, bool(_WHITESPACE.search(text, end, word))
                 end = cursor
 
+    @classmethod
+    def get_lang(cls, target_lang: str) -> str:
+        """The tag that the backend reads for *target_lang*. A backend that takes any language keeps it."""
+        return target_lang
+
     @staticmethod
     def _match_lang(target_lang: str, valid_langs: Union[str, List[str]]):
         """Closest supported language and its distance (linguatag closest_lang)."""
@@ -613,8 +618,7 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
         backend = next((names[cls.__name__] for cls in type(self).__mro__
                         if cls.__name__ in names), type(self).__name__)
         distribution, version = self._engine_release()
-        # Grapheme, Unicode and Phonetisaurus backends take any language.
-        resolved = self.get_lang(lang) if hasattr(self, "get_lang") else lang
+        resolved = self.get_lang(lang)
         parts = [f"scriptconv=={VERSION_STR}"]
         if sister := _SISTER_DISTRIBUTIONS.get(type(self).__module__.partition(".")[0]):
             parts.append(f"{sister}=={metadata.version(sister)}")
