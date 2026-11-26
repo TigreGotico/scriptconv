@@ -31,18 +31,18 @@ espeak-ng has no voice for `kab` or `mwr`.
 <!-- languages:start -->
 | Language | Default backend | Extra | Script | Measured score |
 |---|---|---|---|---|
-| `pt-PT` | `tugaphone` | `pt-phonemizers` | `Latn` | [tugaphone scoreboard](https://github.com/TigreGotico/tugaphone/blob/dev/docs/benchmarking.md) |
-| `pt-BR` | `tugaphone` | `pt-phonemizers` | `Latn` | [tugaphone scoreboard](https://github.com/TigreGotico/tugaphone/blob/dev/docs/benchmarking.md) |
-| `es-CO` | `orthography2ipa` | `o2i` | `Latn` | none |
-| `fr-FR` | `orthography2ipa` | `o2i` | `Latn` | none |
-| `it-IT` | `orthography2ipa` | `o2i` | `Latn` | none |
-| `de-DE` | `orthography2ipa` | `o2i` | `Latn` | none |
-| `nl-NL` | `orthography2ipa` | `o2i` | `Latn` | none |
-| `da-DK` | `orthography2ipa` | `o2i` | `Latn` | none |
-| `kab` | `orthography2ipa` | `o2i` | not in the map ([#494](https://github.com/TigreGotico/scriptconv/issues/494)) | none |
-| `hi-IN` | `orthography2ipa` | `o2i` | `Deva` | none |
-| `bn-IN` | `orthography2ipa` | `o2i` | `Beng` | none |
-| `mwr` | unsupported: `orthography2ipa` returns no phonemes | `o2i` | not in the map | none |
+| `pt-PT` | `tugaphone` | `pt-phonemizers` | `Latn` | [tugaphone scoreboard](https://github.com/TigreGotico/tugaphone/blob/dev/docs/scoreboard.md) |
+| `pt-BR` | `tugaphone` | `pt-phonemizers` | `Latn` | [tugaphone scoreboard](https://github.com/TigreGotico/tugaphone/blob/dev/docs/scoreboard.md) |
+| `es-CO` | `orthography2ipa` | `o2i` | `Latn` | [o2i scoreboard](https://github.com/TigreGotico/orthography2ipa/blob/dev/docs/evaluation/generated/scoreboard.md) |
+| `fr-FR` | `orthography2ipa` | `o2i` | `Latn` | [o2i scoreboard](https://github.com/TigreGotico/orthography2ipa/blob/dev/docs/evaluation/generated/scoreboard.md) |
+| `it-IT` | `orthography2ipa` | `o2i` | `Latn` | [o2i scoreboard](https://github.com/TigreGotico/orthography2ipa/blob/dev/docs/evaluation/generated/scoreboard.md) |
+| `de-DE` | `orthography2ipa` | `o2i` | `Latn` | [o2i scoreboard](https://github.com/TigreGotico/orthography2ipa/blob/dev/docs/evaluation/generated/scoreboard.md) |
+| `nl-NL` | `orthography2ipa` | `o2i` | `Latn` | [o2i scoreboard](https://github.com/TigreGotico/orthography2ipa/blob/dev/docs/evaluation/generated/scoreboard.md) |
+| `da-DK` | `orthography2ipa` | `o2i` | `Latn` | [o2i scoreboard](https://github.com/TigreGotico/orthography2ipa/blob/dev/docs/evaluation/generated/scoreboard.md) |
+| `kab` | `orthography2ipa` | `o2i` | not in the map ([#494](https://github.com/TigreGotico/scriptconv/issues/494)) | [o2i scoreboard](https://github.com/TigreGotico/orthography2ipa/blob/dev/docs/evaluation/generated/scoreboard.md) |
+| `hi-IN` | `orthography2ipa` | `o2i` | `Deva` | [o2i scoreboard](https://github.com/TigreGotico/orthography2ipa/blob/dev/docs/evaluation/generated/scoreboard.md) |
+| `bn-IN` | `orthography2ipa` | `o2i` | `Beng` | [o2i scoreboard](https://github.com/TigreGotico/orthography2ipa/blob/dev/docs/evaluation/generated/scoreboard.md) |
+| `mwr` | unsupported: `orthography2ipa` returns no phonemes | `o2i` | not in the map ([#494](https://github.com/TigreGotico/scriptconv/issues/494)) | none |
 <!-- languages:end -->
 
 Run `python scripts/backend_table.py --write` to write the table again after

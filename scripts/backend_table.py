@@ -28,8 +28,11 @@ LEADERS = {"pt-PT": "casa", "pt-BR": "casa", "es-CO": "casa", "fr-FR": "maison",
            "it-IT": "casa", "de-DE": "Haus", "nl-NL": "huis", "da-DK": "hus",
            "kab": "azul", "hi-IN": "नमस्ते", "bn-IN": "নমস্কার", "mwr": "राम"}
 SCORES = {"tugaphone": "[tugaphone scoreboard]"
-          "(https://github.com/TigreGotico/tugaphone/blob/dev/docs/benchmarking.md)"}
-NOTES = {"kab": " ([#494](https://github.com/TigreGotico/scriptconv/issues/494))"}
+          "(https://github.com/TigreGotico/tugaphone/blob/dev/docs/scoreboard.md)",
+          "orthography2ipa": "[o2i scoreboard](https://github.com/TigreGotico/orthography2ipa"
+          "/blob/dev/docs/evaluation/generated/scoreboard.md)"}
+_ISSUE = " ([#494](https://github.com/TigreGotico/scriptconv/issues/494))"
+NOTES = {"kab": _ISSUE, "mwr": _ISSUE}
 PACKAGES = {COPYLEFT: "scriptconv-copyleft", NONFREE: "scriptconv-nonfree"}
 
 
