@@ -26,19 +26,12 @@ def decompose_hangul(text: str, form: str = "compatibility", drop_silent_initial
 Decomposes Hangul syllable block characters into their constituent jamo letters.
 Non-Hangul characters pass through unchanged.
 
-```pycon
->>> from scriptconv.translit import decompose_hangul
->>> decompose_hangul("한국어")
-'ㅎㅏㄴㄱㅜㄱㅇㅓ'
->>> decompose_hangul("값")  # (double coda preserved as written)
-'ㄱㅏㅄ'
->>> decompose_hangul("가")  # (no coda, empty string omitted)
-'ㄱㅏ'
->>> decompose_hangul("hello 한 world")
-'hello ㅎㅏㄴ world'
->>> decompose_hangul("")
-''
-
+```python
+decompose_hangul("한국어")   # "ㅎㅏㄴㄱㅜㄱㅇㅓ"
+decompose_hangul("값")      # "ㄱㅏㅄ"   (double coda preserved as written)
+decompose_hangul("가")      # "ㄱㅏ"     (no coda, empty string omitted)
+decompose_hangul("hello 한 world")  # "hello ㅎㅏㄴ world"
+decompose_hangul("")        # ""
 ```
 
 ### Unicode arithmetic
@@ -105,13 +98,11 @@ fixed `+0x60` codepoint offset. `hira_to_kana` and `kana_to_hira` swap between
 them, the katakana-only long-vowel mark `ー` (U+30FC) has no hiragana form and
 passes through unchanged.
 
-```pycon
->>> from scriptconv import hira_to_kana, kana_to_hira
->>> hira_to_kana("ひらがな")
-'ヒラガナ'
->>> kana_to_hira("カタカナ")
-'かたかな'
+```python
+from scriptconv import hira_to_kana, kana_to_hira
 
+hira_to_kana("ひらがな")   # "ヒラガナ"
+kana_to_hira("カタカナ")   # "かたかな"
 ```
 
 ## Hanzi → Cangjie input codes
@@ -123,15 +114,12 @@ like the rest of this page. The 103,601-glyph traditional-Chinese table
 (from the Cangjie5 project, MIT) ships gzipped inside the wheel and loads
 lazily on first use, so no download and no dependency are involved.
 
-```pycon
->>> from scriptconv import cangjie_code, to_cangjie
->>> cangjie_code("日")
-'a'
->>> to_cangjie("倉頡")
-'oiar grmbc'
->>> to_cangjie("我有ABC 123")  # (unmapped runs pass through)
-'hqi kb ABC 123'
+```python
+from scriptconv import cangjie_code, to_cangjie
 
+cangjie_code("日")            # 'a'
+to_cangjie("倉頡")            # 'oiar grmbc'
+to_cangjie("我有ABC 123")     # 'hqi kb ABC 123'   (unmapped runs pass through)
 ```
 
 Where the upstream table lists alternative codes for a glyph, the primary

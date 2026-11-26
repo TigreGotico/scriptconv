@@ -25,15 +25,12 @@ into phonemes through one of 59 backends.
 uv pip install --prerelease=allow scriptconv
 ```
 
-```pycon
->>> from scriptconv import convert, detect_script, strip
->>> detect_script("Здравствуйте")
-'Cyrl'
->>> convert("HH AH0 L OW1", "arpa", "ipa")
-'həloʊ'
->>> strip("مُحَمَّد", "tashkeel")
-'محمد'
+```python
+from scriptconv import convert, detect_script, strip
 
+detect_script("Здравствуйте")           # 'Cyrl'
+convert("HH AH0 L OW1", "arpa", "ipa")  # 'həloʊ'
+strip("مُحَمَّد", "tashkeel")             # 'محمد'
 ```
 
 [install.md](install.md) gives the extra of each phonemizer backend.

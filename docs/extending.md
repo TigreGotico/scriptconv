@@ -18,32 +18,31 @@ A backend is a subclass of `BasePhonemizer` with one method,
 `phonemize_string(text, lang)`. It returns the phonemes of one sentence as a
 string. This backend keeps the vowels:
 
-```pycon
->>> from scriptconv.phonemizers import Alphabet, BasePhonemizer
->>> class Vowels(BasePhonemizer):
-...     def phonemize_string(self, text, lang):
-...         return "".join(char for char in text.lower() if char in "aeiou ")
-...
->>> backend = Vowels(Alphabet.UNICODE)
->>> backend.phonemize_to_list("Hello", "en")
-['e', 'o']
->>> backend.phonemize("Hello. Bye", "en")
-[['e', 'o'], ['e']]
+```python
+from scriptconv.phonemizers import Alphabet, BasePhonemizer
 
+
+class Vowels(BasePhonemizer):
+    def phonemize_string(self, text, lang):
+        return "".join(char for char in text.lower() if char in "aeiou ")
+
+
+backend = Vowels(Alphabet.UNICODE)
+backend.phonemize_to_list("Hello", "en")        # ['e', 'o']
+backend.phonemize("Hello. Bye", "en")           # [['e', 'o'], ['e']]
 ```
 
 The base class cuts the text into sentences and calls `phonemize_string` on
 each one. Hand the instance to a `TextFrontend` to get the stage order, the
 chunk sizes and inline phoneme blocks:
 
-```pycon
->>> from scriptconv.frontend import FrontendConfig, TextFrontend
->>> frontend = TextFrontend(FrontendConfig("en", alphabet=Alphabet.UNICODE), backend=backend)
->>> frontend.phonemize("Hello world. Good day.")
-[['e', 'o', ' ', 'o'], ['o', 'o', ' ', 'a']]
->>> "".join(frontend.phonemize_flat("Hello world. Good day."))
-'eo o oo a'
+```python
+from scriptconv.frontend import FrontendConfig, TextFrontend
 
+frontend = TextFrontend(FrontendConfig("en", alphabet=Alphabet.UNICODE), backend=backend)
+frontend.phonemize("Hello world. Good day.")
+# [['e', 'o', ' ', 'o'], ['o', 'o', ' ', 'a']]
+"".join(frontend.phonemize_flat("Hello world. Good day."))   # 'eo o oo a'
 ```
 
 The frontend asks a backend that has a `get_lang` method whether it supports
@@ -75,11 +74,10 @@ steps add one to scriptconv:
 Run the suite and the checks of `AGENTS.md` before you push. The registry then
 resolves the name of your backend:
 
-```pycon
->>> from scriptconv.phonemizers import Phonemizer, get_phonemizer_class
->>> get_phonemizer_class(Phonemizer.UNICODE).__name__
-'UnicodeCodepointPhonemizer'
+```python
+from scriptconv.phonemizers import Phonemizer, get_phonemizer_class
 
+get_phonemizer_class(Phonemizer.UNICODE).__name__   # 'UnicodeCodepointPhonemizer'
 ```
 
 ---

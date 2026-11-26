@@ -76,19 +76,12 @@ language it has a spec for, then espeak. Arabic never falls back past
 The plugin passes each word to `scriptconv.phonemizers.phonemize`. These
 calls show the scriptconv behaviour that the plugin relies on:
 
-```pycon
->>> from scriptconv.phonemizers import Alphabet, LANG_DEFAULTS, Phonemizer, phonemize, phonemizer_for_lang
->>> [p.value for p in LANG_DEFAULTS["pt"]]
-['tugaphone']
->>> phonemize("привет", "ru", alphabet=Alphabet.IPA, override=Phonemizer.VOSK)
-Traceback (most recent call last):
-    ...
-ValueError: ...VoskPhonemizer emits the vosk-tts phoneme inventory, not 'ipa'...
->>> phonemizer_for_lang("ar", Alphabet.XSAMPA)
-Traceback (most recent call last):
-    ...
-ValueError: ...no eligible phonemizer for 'ar'...
+```python
+from scriptconv.phonemizers import Alphabet, LANG_DEFAULTS, Phonemizer, phonemize, phonemizer_for_lang
 
+[p.value for p in LANG_DEFAULTS["pt"]]   # ['tugaphone']
+phonemize("привет", "ru", alphabet=Alphabet.IPA, override=Phonemizer.VOSK)   # ValueError: VoskPhonemizer emits the vosk-tts phoneme inventory, not 'ipa'
+phonemizer_for_lang("ar", Alphabet.XSAMPA)   # ValueError: no eligible phonemizer for 'ar'
 ```
 
 The plugin turns a `ValueError` or a `KeyError` from scriptconv into

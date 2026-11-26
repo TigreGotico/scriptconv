@@ -184,12 +184,11 @@ and then set `HF_HUB_OFFLINE=1`:
 A backend that declares a `model` parameter still receives an empty string.
 That value reaches the backend and may name no model there.
 
-```pycon
->>> import inspect
->>> from scriptconv.phonemizers.g2pw import G2PWPhonemizer
->>> list(inspect.signature(G2PWPhonemizer).parameters)
-['alphabet']
+```python
+import inspect
+from scriptconv.phonemizers.g2pw import G2PWPhonemizer
 
+list(inspect.signature(G2PWPhonemizer).parameters)   # ['alphabet']
 ```
 
 Some engine packages download data of their own. For example, pygoruut

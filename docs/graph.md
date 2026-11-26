@@ -17,15 +17,14 @@ conversions are the ones nobody wrote a direct table for. The graph solves
 this once. Every representation is a **node**, every converter is an
 **edge**, a conversion request is a **routing problem**.
 
-```pycon
->>> from scriptconv import DEFAULT_GRAPH
->>> DEFAULT_GRAPH.convert("こんにちは", "hira", "kana")
-'コンニチハ'
->>> DEFAULT_GRAPH.convert("mrHbaa", "halabi", "x-sampa")  # (through IPA, two hops)
-'mrX\\ba:'
->>> [f"{e.src}->{e.dst}" for e in DEFAULT_GRAPH.route("arpa", "x-sampa")]
-['arpa->ipa', 'ipa->x-sampa']
+```python
+from scriptconv import DEFAULT_GRAPH
 
+DEFAULT_GRAPH.convert("こんにちは", "hira", "kana")     # 'コンニチハ'
+DEFAULT_GRAPH.convert("mrHbaa", "halabi", "x-sampa")   # 'mrX\\ba:'  (through IPA, two hops)
+
+[f"{e.src}->{e.dst}" for e in DEFAULT_GRAPH.route("arpa", "x-sampa")]
+# ['arpa->ipa', 'ipa->x-sampa']
 ```
 
 ## Every edge at a glance
@@ -126,14 +125,9 @@ is the classic failure mode of conversion graphs, here losing information is
 expensive by definition. Unroutable pairs raise a `ValueError` naming the
 targets that *are* reachable, so callers can self-diagnose:
 
-```pycon
->>> DEFAULT_GRAPH.can_convert("buckwalter", "ipa")  # (transliteration, not phonemes)
-False
->>> DEFAULT_GRAPH.route("ipa", "hangul")  # (the message lists the reachable targets)
-Traceback (most recent call last):
-    ...
-ValueError: ...no conversion path 'ipa' -> 'hangul'...
-
+```python
+DEFAULT_GRAPH.can_convert("buckwalter", "ipa")   # False  (transliteration, not phonemes)
+DEFAULT_GRAPH.route("ipa", "hangul")             # ValueError: no conversion path 'ipa' -> 'hangul'  (the message lists the reachable targets)
 ```
 
 ## Extension is explicit
@@ -143,14 +137,13 @@ the orthographic conversions. It never grows implicitly, a graph's contents
 must not depend on what happens to be installed, so there is no entry-point
 autoloading. Extension is a function call that returns a new graph:
 
-```pycon
->>> from scriptconv import DEFAULT_GRAPH, phonemizers
->>> g = DEFAULT_GRAPH.extend(phonemizers.register)   # DEFAULT_GRAPH is untouched
->>> g.convert("bom dia", "text", "ipa", lang="pt")
-'ˈbõ ˈdiɐ'
->>> g.can_convert("text", "arpa")  # (phonemize, then transcode)
-True
+```python
+from scriptconv import DEFAULT_GRAPH
+from scriptconv import phonemizers
 
+g = DEFAULT_GRAPH.extend(phonemizers.register)   # DEFAULT_GRAPH is untouched
+g.convert("bom dia", "text", "ipa", lang="pt")   # 'ˈbõ ˈdiɐ'
+g.can_convert("text", "arpa")                    # True  (phonemize, then transcode)
 ```
 
 `phonemizers.register` is the in-house example of the pattern: it adds the
@@ -177,16 +170,15 @@ and the edge raises `ValueError` for those languages instead. Routing `text -> i
 unchanged either way, the direct phonemization edge still wins, so stacking
 this extension is non-invasive:
 
-```pycon
->>> from scriptconv import DEFAULT_GRAPH, diacritics, phonemizers
->>> g = DEFAULT_GRAPH.extend(diacritics.register).extend(phonemizers.register)
->>> g.convert("Tenho muita sede hoje.", "text", "text-diacritized", lang="pt")
-'Tenho muita sêde hoje.'
->>> g.convert("за́мок", "text-diacritized", "text", lang="ru")  # (strip)
-'замок'
->>> [f"{e.src}->{e.dst}" for e in g.route("text", "ipa")]  # (the single direct edge, no detour)
-['text->ipa']
+```python
+from scriptconv import DEFAULT_GRAPH
+from scriptconv import diacritics, phonemizers
 
+g = DEFAULT_GRAPH.extend(diacritics.register).extend(phonemizers.register)
+g.convert("Tenho muita sede hoje.", "text", "text-diacritized", lang="pt")
+# 'Tenho muita sêde hoje.'
+g.convert("за́мок", "text-diacritized", "text", lang="ru")   # 'замок'  (strip)
+[f"{e.src}->{e.dst}" for e in g.route("text", "ipa")]   # ['text->ipa']  (the single direct edge, no detour)
 ```
 
 The same boundary in one sentence: **scriptconv's own edges are orthography
