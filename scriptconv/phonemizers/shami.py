@@ -51,8 +51,8 @@ class ShamiPhonemizer(BasePhonemizer):
         ValueError: If ``alphabet`` is not IPA, or ``inventory`` is not 88 or 90.
     """
 
-    #: A Latin span is English.
-    script_languages = {"Latn": "en"}
+    #: An Arabic span is Levantine whatever tag the caller gives, and a Latin span is English.
+    script_languages = {"Arab": "apc", "Latn": "en"}
 
     def __init__(self, alphabet: Alphabet = Alphabet.IPA,
                  diacritizer_backend: str = "auto",
