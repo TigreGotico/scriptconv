@@ -18,22 +18,22 @@ from scriptconv.phonemizers.registry import PHONEMIZER_REGISTRY  # noqa: E402
 PACKAGES = [("scriptconv", None), ("scriptconv-copyleft", COPYLEFT), ("scriptconv-nonfree", NONFREE)]
 
 
-def counts() -> list[tuple[str, Counter]]:
+def counts() -> list[list]:
     by_extra: dict[str, Counter] = {}
     for member in Phonemizer:
         module, _, extra = PHONEMIZER_REGISTRY[member]
         package = next((name for name, prefix in PACKAGES if prefix and module.startswith(prefix)), "scriptconv")
         by_extra.setdefault(extra or "phonemizers", Counter())[package] += 1
-    return sorted(by_extra.items(), key=lambda item: (sum(item[1].values()), item[0]))
+    rows = sorted(by_extra.items(), key=lambda item: (sum(item[1].values()), item[0]))
+    return [[extra, dict(sorted(by_package.items()))] for extra, by_package in rows]
 
 
-def draw(fig, theme):
-    rows = counts()
+def draw(fig, theme, rows):
     ax = fig.subplots()
     names = [extra for extra, _ in rows]
     left = [0] * len(rows)
     for (package, _), colour in zip(PACKAGES, theme["series"]):
-        values = [by_package[package] for _, by_package in rows]
+        values = [by_package.get(package, 0) for _, by_package in rows]
         total = sum(values)
         ax.barh(names, values, left=left, color=colour, label=f"{package} ({total})", height=0.7)
         left = [a + b for a, b in zip(left, values)]
@@ -46,4 +46,4 @@ def draw(fig, theme):
 
 
 if __name__ == "__main__":
-    save("docs/img/backends-by-extra", draw, height=6.4)
+    save("docs/img/backends-by-extra", draw, counts(), height=6.4)
