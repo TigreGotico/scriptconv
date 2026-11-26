@@ -1,0 +1,162 @@
+[
+ [
+  "africa",
+  {
+   "scriptconv-nonfree": 1
+  }
+ ],
+ [
+  "epitran",
+  {
+   "scriptconv": 1
+  }
+ ],
+ [
+  "fa",
+  {
+   "scriptconv-copyleft": 1
+  }
+ ],
+ [
+  "ghana",
+  {
+   "scriptconv-nonfree": 1
+  }
+ ],
+ [
+  "gl",
+  {
+   "scriptconv-copyleft": 1
+  }
+ ],
+ [
+  "goruut",
+  {
+   "scriptconv": 1
+  }
+ ],
+ [
+  "gruut",
+  {
+   "scriptconv": 1
+  }
+ ],
+ [
+  "lir",
+  {
+   "scriptconv": 1
+  }
+ ],
+ [
+  "phonetisaurus",
+  {
+   "scriptconv": 1
+  }
+ ],
+ [
+  "pt-phonemizers",
+  {
+   "scriptconv": 1
+  }
+ ],
+ [
+  "shami",
+  {
+   "scriptconv": 1
+  }
+ ],
+ [
+  "th",
+  {
+   "scriptconv-copyleft": 1
+  }
+ ],
+ [
+  "transphone",
+  {
+   "scriptconv-copyleft": 1
+  }
+ ],
+ [
+  "vi",
+  {
+   "scriptconv-nonfree": 1
+  }
+ ],
+ [
+  "byt5",
+  {
+   "scriptconv": 2
+  }
+ ],
+ [
+  "espeak",
+  {
+   "scriptconv-copyleft": 2
+  }
+ ],
+ [
+  "eu",
+  {
+   "scriptconv": 1,
+   "scriptconv-copyleft": 1
+  }
+ ],
+ [
+  "he",
+  {
+   "scriptconv": 1,
+   "scriptconv-copyleft": 1
+  }
+ ],
+ [
+  "ko",
+  {
+   "scriptconv-copyleft": 2
+  }
+ ],
+ [
+  "o2i",
+  {
+   "scriptconv": 3
+  }
+ ],
+ [
+  "ar-phonemizers",
+  {
+   "scriptconv": 1,
+   "scriptconv-nonfree": 3
+  }
+ ],
+ [
+  "ja-phonemizers",
+  {
+   "scriptconv": 2,
+   "scriptconv-copyleft": 2
+  }
+ ],
+ [
+  "phonemizers",
+  {
+   "scriptconv": 5
+  }
+ ],
+ [
+  "en-phonemizers",
+  {
+   "scriptconv": 6
+  }
+ ],
+ [
+  "misaki",
+  {
+   "scriptconv-copyleft": 6
+  }
+ ],
+ [
+  "zh-phonemizers",
+  {
+   "scriptconv": 7
+  }
+ ]
+]

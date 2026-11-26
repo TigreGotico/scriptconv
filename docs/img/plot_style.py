@@ -2,12 +2,12 @@
 
     from plot_style import save
 
-    def draw(fig, theme):
+    def draw(fig, theme, data):
         ax = fig.subplots()
-        ax.barh(names, values, color=theme["series"][0])
+        ax.barh(list(data), list(data.values()), color=theme["series"][0])
         ax.set_xlabel("PER (%)")
 
-    save("docs/img/per-by-language", draw)   # writes .svg and -dark.svg
+    save("docs/img/per-by-language", draw, per)   # writes .json, .svg and -dark.svg
 
 save() calls draw once for each theme. Embed both files with:
 
@@ -20,10 +20,8 @@ The categorical order is fixed: series 1 takes theme["series"][0], and so on.
 Fold a ninth series into "Other". Colours come from the reference palette of the
 dataviz skill; the light and dark steps are validated for colour-vision deficiency.
 """
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+import json
+import os
 
 LIGHT = {
     "surface": "#ffffff", "text": "#191919", "muted": "#666666", "grid": "#e6e6e6",
@@ -45,7 +43,7 @@ def style(theme):
         "xtick.color": theme["muted"], "ytick.color": theme["muted"], "axes.edgecolor": theme["muted"],
         "axes.grid": True, "axes.axisbelow": True, "grid.color": theme["grid"], "grid.linewidth": 0.8,
         "axes.spines.top": False, "axes.spines.right": False,
-        "axes.prop_cycle": matplotlib.cycler(color=theme["series"]),
+        "axes.prop_cycle": __import__("matplotlib").cycler(color=theme["series"]),
         "font.family": "sans-serif", "font.size": 10,
         "axes.titlesize": 11, "axes.titleweight": "bold", "axes.titlelocation": "left",
         "lines.linewidth": 2, "lines.markersize": 6,
@@ -53,11 +51,21 @@ def style(theme):
     }
 
 
-def save(stem, draw, width=7.0, height=3.6):
-    """Write <stem>.svg and <stem>-dark.svg. draw(fig, theme) builds the plot."""
+def save(stem, draw, data, width=7.0, height=3.6):
+    """Write <stem>.json, the values that the plot draws, then <stem>.svg and <stem>-dark.svg. draw(fig, theme,
+    data) builds the plot. With DOCS_FIGURES_DATA_ONLY set, only the JSON is written, and matplotlib is not needed:
+    the figure check compares the JSON, because the SVG bytes move between matplotlib versions."""
+    with open(f"{stem}.json", "w", encoding="utf-8") as handle:
+        json.dump(data, handle, indent=1, ensure_ascii=False)
+        handle.write("\n")
+    if os.environ.get("DOCS_FIGURES_DATA_ONLY"):
+        return
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
     for theme, suffix in ((LIGHT, ""), (DARK, "-dark")):
         with plt.rc_context(style(theme)):
             fig = plt.figure(figsize=(width, height), layout="constrained")
-            draw(fig, theme)
+            draw(fig, theme, data)
             fig.savefig(f"{stem}{suffix}.svg", metadata={"Date": None})
             plt.close(fig)

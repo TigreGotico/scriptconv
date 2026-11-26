@@ -20,8 +20,7 @@ def runs() -> list[dict[str, float]]:
             for block in blocks]
 
 
-def draw(fig, theme):
-    measured = runs()
+def draw(fig, theme, measured):
     names = sorted(measured[0], key=measured[0].get)
     ax = fig.subplots()
     height = 0.38
@@ -42,4 +41,4 @@ def draw(fig, theme):
 
 
 if __name__ == "__main__":
-    save("docs/img/owner-backend-timing", draw)
+    save("docs/img/owner-backend-timing", draw, runs())
