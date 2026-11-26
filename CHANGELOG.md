@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.0.4a182](https://github.com/TigreGotico/scriptconv/tree/0.0.4a182) (2026-11-26)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a181...0.0.4a182)
+
+**Merged pull requests:**
+
+- build: the figure check compares plotted data, not SVG bytes [\#484](https://github.com/TigreGotico/scriptconv/pull/484) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
+## [0.0.4a181](https://github.com/TigreGotico/scriptconv/tree/0.0.4a181) (2026-11-25)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a180...0.0.4a181)
+
 ## [0.0.4a180](https://github.com/TigreGotico/scriptconv/tree/0.0.4a180) (2026-11-25)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a179...0.0.4a180)
