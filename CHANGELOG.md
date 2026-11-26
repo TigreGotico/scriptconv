@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a185](https://github.com/TigreGotico/scriptconv/tree/0.0.4a185) (2026-11-26)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a184...0.0.4a185)
+
+**Merged pull requests:**
+
+- fix\(shami\): an Arabic run reads its numbers in Levantine under any tag [\#491](https://github.com/TigreGotico/scriptconv/pull/491) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a184](https://github.com/TigreGotico/scriptconv/tree/0.0.4a184) (2026-11-26)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a183...0.0.4a184)
@@ -308,10 +316,6 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a141...0.0.4a142)
 
-**Merged pull requests:**
-
-- feat: hebrew\_ipa, openjtalk\_prosody and tltk registry rows [\#371](https://github.com/TigreGotico/scriptconv/pull/371) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a141](https://github.com/TigreGotico/scriptconv/tree/0.0.4a141) (2026-11-22)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a140...0.0.4a141)
@@ -328,7 +332,6 @@
 **Merged pull requests:**
 
 - fix: cap tokenizers below 1.0 in the he extra [\#385](https://github.com/TigreGotico/scriptconv/pull/385) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-- feat: espeak\_lt\_accent, Lithuanian with the three pitch accents [\#370](https://github.com/TigreGotico/scriptconv/pull/370) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a139](https://github.com/TigreGotico/scriptconv/tree/0.0.4a139) (2026-11-22)
 
