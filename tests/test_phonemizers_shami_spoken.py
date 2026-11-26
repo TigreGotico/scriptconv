@@ -1,7 +1,7 @@
 """The frontend reads the numbers, money and times of Shami text through text2spoken.
 
-Shami declares ``script_languages = {"Latn": "en"}``, so an Arabic run reads in Levantine
-(``apc``) and a Latin run in English. Each expected value phonemizes text2spoken's own
+Shami declares ``script_languages = {"Arab": "apc", "Latn": "en"}``, so an Arabic run reads in
+Levantine (``apc``) and a Latin run in English, whatever tag the caller gives. Each expected value phonemizes text2spoken's own
 output, so the test checks the wiring, not a reading written here.
 """
 import time
@@ -15,7 +15,7 @@ from scriptconv.frontend import FrontendConfig, TextFrontend, spoken_normalizer
 from scriptconv.phonemizers.shami import ShamiPhonemizer
 
 SHAMI_DIR = Path(__file__).resolve().parents[1] / "scriptconv" / "phonemizers" / "_thirdparty" / "shami"
-LATIN_AS_EN = NormalizationParams(script_languages=FrozenMap({"Latn": "en"}))
+LATIN_AS_EN = NormalizationParams(script_languages=FrozenMap({"Arab": "apc", "Latn": "en"}))
 
 
 @pytest.fixture(scope="module")
@@ -65,3 +65,9 @@ def test_a_20000_digit_run_reads_with_no_error(shami):
 def test_no_shami_module_reads_numbers():
     sources = {path.name: path.read_text(encoding="utf-8") for path in SHAMI_DIR.glob("*.py")}
     assert not [name for name, source in sources.items() if "num2words" in source or "def verbalize" in source]
+
+
+def test_an_arabic_run_reads_in_levantine_under_the_tag_ar(shami):
+    """phoonnx calls the frontend with the voice tag "ar"; the numbers still read in Levantine."""
+    frontend = TextFrontend(FrontendConfig("ar", normalizer=spoken_normalizer()), shami)
+    assert frontend.phonemize("عندي 12 كتاب.") == TextFrontend(FrontendConfig("ar"), shami).phonemize("عندي تنعش كتاب.")
