@@ -16,6 +16,21 @@ def test_the_backend_table_matches_the_registry():
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_the_language_table_matches_the_registry(tmp_path):
+    spec = importlib.util.spec_from_file_location("backend_table", SCRIPT)
+    script = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(script)
+    text = (ROOT / "docs" / "languages.md").read_text(encoding="utf-8")
+    assert "| `pt-PT` | `tugaphone` | `pt-phonemizers` | `Latn` |" in text
+    page = tmp_path / "languages.md"
+    page.write_text(text, encoding="utf-8")
+    script.LANG_DOC = page
+
+    assert script.main(["--check"]) == 0
+    assert script.main(["--write"]) == 0
+    assert page.read_text(encoding="utf-8") == text
+
+
 @pytest.mark.parametrize("marker", ["<!-- backends:start -->", "<!-- backends:end -->"])
 def test_write_refuses_a_page_without_a_marker(tmp_path, marker):
     spec = importlib.util.spec_from_file_location("backend_table", SCRIPT)
