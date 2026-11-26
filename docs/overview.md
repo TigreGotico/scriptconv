@@ -39,13 +39,17 @@ only when the caller asks for it.
 
 ### What script is this? The `scripts` module
 
-```python
-from scriptconv import detect_script, script_runs, lang_to_script, base_direction
+```pycon
+>>> from scriptconv import detect_script, script_runs, lang_to_script, base_direction
+>>> detect_script("Здравствуйте")
+'Cyrl'
+>>> script_runs("привет hello")
+[('Cyrl', 'привет '), ('Latn', 'hello')]
+>>> base_direction("مرحبا hello")
+'mixed'
+>>> lang_to_script("uzb_cyr")  # (ISO 639 codes, BCP-47 tags, _cyr/_lat variants)
+'Cyrl'
 
-detect_script("Здравствуйте")        # 'Cyrl'
-script_runs("привет hello")          # [('Cyrl', 'привет '), ('Latn', 'hello')]
-base_direction("مرحبا hello")        # 'mixed'
-lang_to_script("uzb_cyr")            # 'Cyrl'  (ISO 639 codes, BCP-47 tags, _cyr/_lat variants)
 ```
 
 The returned ISO 15924 tags are **stable API**: downstream code compares
@@ -58,13 +62,17 @@ Cyrillic never splits. Details: [docs/scripts.md](scripts.md).
 Nine phoneme notations transcode through an IPA hub: ARPABET, X-SAMPA,
 Kirshenbaum, Lexique, Cotovía, RFE, Buckwalter to Arabic, and Halabi (the Nawar Halabi Arabic-Phonetiser notation, popularized by the mantoq package).
 
-```python
-from scriptconv import convert, arpa_to_ipa, ipa_to_arpa
+```pycon
+>>> from scriptconv import convert, arpa_to_ipa, ipa_to_arpa
+>>> convert("HH AH0 L OW1", "arpa", "ipa")
+'həloʊ'
+>>> convert("kˈæt", "ipa", "x-sampa")
+'k"{t'
+>>> arpa_to_ipa("HH AH0 L OW1", stress=True)
+'həlˈoʊ'
+>>> ipa_to_arpa("həlˈoʊ", stress=True)  # (exact round-trip)
+'HH AH0 L OW1'
 
-convert("HH AH0 L OW1", "arpa", "ipa")        # 'həloʊ'
-convert("kˈæt", "ipa", "x-sampa")             # 'k"{t'
-arpa_to_ipa("HH AH0 L OW1", stress=True)      # 'həlˈoʊ'
-ipa_to_arpa("həlˈoʊ", stress=True)            # 'HH AH0 L OW1'  (exact round-trip)
 ```
 
 Two contracts make this trustworthy:
@@ -92,25 +100,32 @@ through the graph. Details: [docs/notation.md](notation.md).
 
 Deterministic, table-driven operations on the writing system itself:
 
-```python
-from scriptconv import decompose_hangul, hira_to_kana
+```pycon
+>>> from scriptconv import decompose_hangul, hira_to_kana
+>>> decompose_hangul("한국")
+'ㅎㅏㄴㄱㅜㄱ'
+>>> hira_to_kana("こんにちは")
+'コンニチハ'
 
-decompose_hangul("한국")     # 'ㅎㅏㄴㄱㅜㄱ'
-hira_to_kana("こんにちは")    # 'コンニチハ'
 ```
 
 Where a respelling needs a *dictionary*, because the answer is lexical and
 not mechanical, it lives behind an extra and raises a clear `ImportError`
 when the dictionary is not installed:
 
-```python
-from scriptconv import to_hiragana, to_katakana, to_pinyin, to_bopomofo, to_cangjie
+```pycon
+>>> from scriptconv import to_hiragana, to_katakana, to_pinyin, to_bopomofo, to_cangjie
+>>> to_hiragana("東京タワー")  # pip install scriptconv[ja]
+'とうきょうたわー'
+>>> to_katakana("日本語")
+'ニホンゴ'
+>>> to_pinyin("中国人")  # pip install scriptconv[zh]
+'zhōng guó rén'
+>>> to_bopomofo("中国")
+'ㄓㄨㄥ ㄍㄨㄛˊ'
+>>> to_cangjie("倉頡")  # vendored table, no extra
+'oiar grmbc'
 
-to_hiragana("東京タワー")    # 'とうきょうたわー'          pip install scriptconv[ja]
-to_katakana("日本語")        # 'ニホンゴ'
-to_pinyin("中国人")          # 'zhōng guó rén'           pip install scriptconv[zh]
-to_bopomofo("中国")          # 'ㄓㄨㄥ ㄍㄨㄛˊ'
-to_cangjie("倉頡")           # 'oiar grmbc'              vendored table, no extra
 ```
 
 `readings.tokens()` exposes the per-token stream underneath, for consumers
@@ -125,15 +140,21 @@ A convention is a decoration a script's orthography can carry or omit. Each
 one declares its *styles* and the transitions between them. `strip`/`apply`
 are sugar for transitions to and from `"none"`.
 
-```python
-from scriptconv import strip, restyle, detect_convention, conventions_for
+```pycon
+>>> from scriptconv import strip, restyle, detect_convention, conventions_for
+>>> strip("مُحَمَّد", "tashkeel")
+'محمد'
+>>> strip("שָׁלוֹם", "niqqud")
+'שלום'
+>>> strip("わたし は がくせい です", "wakachigaki")
+'わたしはがくせいです'
+>>> restyle("zhōng guó", "pinyin-tone", "number", frm="mark")
+'zhong1 guo2'
+>>> detect_convention("مُحَمَّد", "tashkeel")
+'marked'
+>>> [c.id for c in conventions_for("Arab")]
+['tashkeel', 'kashida', 'quranic-marks']
 
-strip("مُحَمَّد", "tashkeel")                       # 'محمد'
-strip("שָׁלוֹם", "niqqud")                          # 'שלום'
-strip("わたし は がくせい です", "wakachigaki")      # 'わたしはがくせいです'
-restyle("zhōng guó", "pinyin-tone", "number", frm="mark")   # 'zhong1 guo2'
-detect_convention("مُحَمَّد", "tashkeel")           # 'marked'
-[c.id for c in conventions_for("Arab")]          # ['tashkeel', 'kashida', 'quranic-marks']
 ```
 
 The registered set covers Arabic `tashkeel`, `kashida`, and `quranic-marks`;
@@ -162,12 +183,13 @@ Every notation and orthography is a node. Every converter is an edge.
 Routing finds the cheapest path and prefers lossless edges, so a lossless
 two-hop route beats a lossy shortcut:
 
-```python
-from scriptconv import DEFAULT_GRAPH
+```pycon
+>>> from scriptconv import DEFAULT_GRAPH
+>>> DEFAULT_GRAPH.convert("こんにちは", "hira", "kana")
+'コンニチハ'
+>>> [f"{e.src}->{e.dst}" for e in DEFAULT_GRAPH.route("arpa", "x-sampa")]
+['arpa->ipa', 'ipa->x-sampa']
 
-DEFAULT_GRAPH.convert("こんにちは", "hira", "kana")       # 'コンニチハ'
-[f"{e.src}->{e.dst}" for e in DEFAULT_GRAPH.route("arpa", "x-sampa")]
-# ['arpa->ipa', 'ipa->x-sampa']
 ```
 
 Edges are `fn(text, **context)`. Routing context such as `lang=` passes
@@ -187,11 +209,13 @@ the kolokwa reader, the Vosk Russian rules, the Shami frontend and the Kabyle
 Matoub rules. Most others come from the package that an extra installs.
 Each language has a default backend, and `override=` picks another one:
 
-```python
-from scriptconv.phonemizers import phonemize, Phonemizer
+```pycon
+>>> from scriptconv.phonemizers import phonemize, Phonemizer
+>>> phonemize("kaixo mundua", "eu")  # (euskaphone)
+'kai̯ˈʃo munˈdua'
+>>> phonemize("hello", "en", override=Phonemizer.GRUUT)
+'hɛlˈoʊ'
 
-phonemize("kaixo mundua", "eu")                      # 'kai̯ˈʃo munˈdua'   (euskaphone)
-phonemize("hello", "en", override=Phonemizer.GRUUT)  # 'hɛlˈoʊ'
 ```
 
 The default for a language comes from an explicit chain first: Arabic to
@@ -208,13 +232,14 @@ backend, its class and its extra.
 
 Phonemization joins the graph only on request:
 
-```python
-from scriptconv import DEFAULT_GRAPH
-from scriptconv import phonemizers
+```pycon
+>>> from scriptconv import DEFAULT_GRAPH, phonemizers
+>>> g = DEFAULT_GRAPH.extend(phonemizers.register)
+>>> g.convert("bom dia", "text", "ipa", lang="pt")
+'ˈbõ ˈdiɐ'
+>>> g.can_convert("text", "arpa")  # (chains through IPA)
+True
 
-g = DEFAULT_GRAPH.extend(phonemizers.register)
-g.convert("bom dia", "text", "ipa", lang="pt")     # 'ˈbõ ˈdiɐ'
-g.can_convert("text", "arpa")                      # True  (chains through IPA)
 ```
 
 Diacritization restores marks that ordinary spelling leaves out but a
@@ -223,10 +248,11 @@ niqqud (phonikud, `he`), Arabic tashkeel (text2tashkeel, `tashkeel`), word
 stress for the languages stressonnx covers (`stress`) and European Portuguese
 homograph marks (bifonia, `pt`):
 
-```python
-from scriptconv.diacritics import diacritize
+```pycon
+>>> from scriptconv.diacritics import diacritize
+>>> diacritize("Tenho muita sede hoje.", "pt")
+'Tenho muita sêde hoje.'
 
-diacritize("Tenho muita sede hoje.", "pt")   # 'Tenho muita sêde hoje.'
 ```
 
 A voice reads text through `scriptconv.frontend.TextFrontend`. It splits out
@@ -234,12 +260,12 @@ inline `[[phoneme]]` blocks, runs the optional normalisation hook, cuts
 sentences, then diacritizes and runs the backend per sentence. A backend that
 runs a stage itself is not given that stage twice:
 
-```python
-from scriptconv.frontend import FrontendConfig, Stages, TextFrontend
+```pycon
+>>> from scriptconv.frontend import FrontendConfig, Stages, TextFrontend
+>>> frontend = TextFrontend(FrontendConfig("pt-PT", Phonemizer.ESPEAK))
+>>> frontend.phonemize("Tenho sede [[ˈsedɨ]]. Olá!", Stages(diacritize=True))
+[['t', 'ˌ', 'e', 'ɲ', 'ʊ', ' ', 's', 'ˈ', 'e', 'd', 'ɨ', ' ', 'ˈ', 's', 'e', 'd', 'ɨ'], ['ɔ', 'l', 'ˈ', 'a']]
 
-frontend = TextFrontend(FrontendConfig("pt-PT", Phonemizer.ESPEAK))
-frontend.phonemize("Tenho sede [[ˈsedɨ]]. Olá!", Stages(diacritize=True))
-# [['t', 'ˌ', 'e', 'ɲ', 'ʊ', ' ', 's', 'ˈ', 'e', 'd', 'ɨ', ' ', 'ˈ', 's', 'e', 'd', 'ɨ'], ['ɔ', 'l', 'ˈ', 'a']]
 ```
 
 Three rules hold for every backend:

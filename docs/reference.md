@@ -29,8 +29,6 @@ shows the order of the stages.
 from scriptconv.frontend import (FRONTEND_VERSION, WHOLE_TEXT_LIMIT, Chunk, FrontendConfig, Stages,
                                  TextFrontend, spoken_normalizer)
 from scriptconv.phonemizers import Alphabet, Phonemizer
-
-frontend = TextFrontend(FrontendConfig("en", Phonemizer.GRAPHEMES, Alphabet.GRAPHEMES))
 ```
 
 | Method | Returns | What it does |
@@ -45,11 +43,19 @@ frontend = TextFrontend(FrontendConfig("en", Phonemizer.GRAPHEMES, Alphabet.GRAP
 | `with_backend(backend)` | `TextFrontend` | A frontend with the same configuration and another backend |
 | `register(graph)` | `None` | Add a `text` to alphabet edge to a conversion graph |
 
-```python
-frontend.prepare("Hi there. Bye!")                  # 'Hi there. Bye!'
-frontend.phonemize("Hi there. Bye!")                # [['h', 'i', ' ', 't', 'h', 'e', 'r', 'e'], ['b', 'y', 'e']]
-frontend.phonemize_flat("Hi there. Bye!")           # ['h', 'i', ' ', 't', 'h', 'e', 'r', 'e', ' ', 'b', 'y', 'e']
-frontend.phonemize("Hi there. Bye!", Stages(chunk="none"))   # [['h', 'i', ' ', 't', 'h', 'e', 'r', 'e', ' ', 'b', 'y', 'e']]
+```pycon
+>>> from scriptconv.frontend import FrontendConfig, Stages, TextFrontend
+>>> from scriptconv.phonemizers import Alphabet, Phonemizer
+>>> frontend = TextFrontend(FrontendConfig("en", Phonemizer.GRAPHEMES, Alphabet.GRAPHEMES))
+>>> frontend.prepare("Hi there. Bye!")
+'Hi there. Bye!'
+>>> frontend.phonemize("Hi there. Bye!")
+[['h', 'i', ' ', 't', 'h', 'e', 'r', 'e'], ['b', 'y', 'e']]
+>>> frontend.phonemize_flat("Hi there. Bye!")
+['h', 'i', ' ', 't', 'h', 'e', 'r', 'e', ' ', 'b', 'y', 'e']
+>>> frontend.phonemize("Hi there. Bye!", Stages(chunk="none"))
+[['h', 'i', ' ', 't', 'h', 'e', 'r', 'e', ' ', 'b', 'y', 'e']]
+
 ```
 
 `prepare` leaves a text that has no normaliser as it is. `phonemize` cuts at
@@ -92,10 +98,17 @@ class FrontendConfig:
 `Stages.chunk` takes a `Chunk` or its value. Another value raises
 `ValueError`.
 
-```python
-[chunk.value for chunk in Chunk]   # ['sentence', 'clause', 'paragraph', 'none']
-Stages(chunk="clause").chunk.value   # 'clause'
-Stages(chunk="word")               # ValueError: chunk 'word' is not one of 'sentence', 'clause', 'paragraph', 'none'
+```pycon
+>>> from scriptconv.frontend import Chunk
+>>> [chunk.value for chunk in Chunk]
+['sentence', 'clause', 'paragraph', 'none']
+>>> Stages(chunk="clause").chunk.value
+'clause'
+>>> Stages(chunk="word")
+Traceback (most recent call last):
+    ...
+ValueError: ...chunk 'word' is not one of 'sentence', 'clause', 'paragraph', 'none'...
+
 ```
 
 `spoken_normalizer()` returns `text2spoken.normalize`, the hook for
@@ -106,16 +119,22 @@ is missing.
 def spoken_normalizer()
 ```
 
-```python
-spoken_normalizer()("Tenho 25 anos.", "pt-PT")   # 'Tenho vinte e cinco anos.'
+```pycon
+>>> from scriptconv.frontend import spoken_normalizer
+>>> spoken_normalizer()("Tenho 25 anos.", "pt-PT")
+'Tenho vinte e cinco anos.'
+
 ```
 
 The module also exports `FRONTEND_VERSION`, the version of the stage order
 that `identity()` records, and `WHOLE_TEXT_LIMIT`, the default of
 `FrontendConfig.whole_text_limit`. See [performance.md](performance.md).
 
-```python
-(FRONTEND_VERSION, WHOLE_TEXT_LIMIT)   # (2, 1750)
+```pycon
+>>> from scriptconv.frontend import FRONTEND_VERSION, WHOLE_TEXT_LIMIT
+>>> (FRONTEND_VERSION, WHOLE_TEXT_LIMIT)
+(2, 1750)
+
 ```
 
 ## scriptconv.phonemizers
@@ -164,12 +183,19 @@ def phonemize(text, lang, alphabet=Alphabet.IPA, override=None, model=None, **kw
 `phonemize` builds a backend and returns the phoneme string of one text. Keep
 the backend of `phonemizer_for_lang` to read many texts.
 
-```python
-get_phonemizer_class("graphemes").__name__                        # 'GraphemePhonemizer'
-get_phonemizer(Phonemizer.GRAPHEMES, Alphabet.GRAPHEMES).phonemize_string("Olá, Mundo!", "pt")   # 'olá, mundo!'
-PHONEMIZER_REGISTRY[Phonemizer.UNICODE]        # ('scriptconv.phonemizers.base', 'UnicodeCodepointPhonemizer', None)
-len(PHONEMIZER_REGISTRY) == len(Phonemizer)    # True
-sorted(LANG_DEFAULTS)                          # ['ar', 'eu', 'gl', 'he', 'lir', 'mwl', 'pt', 'ru']
+```pycon
+>>> from scriptconv.phonemizers import Alphabet, LANG_DEFAULTS, PHONEMIZER_REGISTRY, Phonemizer, get_phonemizer, get_phonemizer_class
+>>> get_phonemizer_class("graphemes").__name__
+'GraphemePhonemizer'
+>>> get_phonemizer(Phonemizer.GRAPHEMES, Alphabet.GRAPHEMES).phonemize_string("Olá, Mundo!", "pt")
+'olá, mundo!'
+>>> PHONEMIZER_REGISTRY[Phonemizer.UNICODE]
+('scriptconv.phonemizers.base', 'UnicodeCodepointPhonemizer', None)
+>>> len(PHONEMIZER_REGISTRY) == len(Phonemizer)
+True
+>>> sorted(LANG_DEFAULTS)
+['ar', 'eu', 'gl', 'he', 'lir', 'mwl', 'pt', 'ru']
+
 ```
 
 `PHONEMIZER_REGISTRY` maps each `Phonemizer` member to a tuple of module, class
@@ -187,10 +213,12 @@ configuration files store them, so a value never changes.
 [backends.md](backends.md) lists the members of `Phonemizer`. `Alphabet`
 has these members:
 
-```python
-[alphabet.value for alphabet in Alphabet][:8]
-# ['unicode', 'ipa', 'arpa', 'sampa', 'x-sampa', 'rfe', 'hangul', 'kana']
-len(Alphabet)   # 24
+```pycon
+>>> [alphabet.value for alphabet in Alphabet][:8]
+['unicode', 'ipa', 'arpa', 'sampa', 'x-sampa', 'rfe', 'hangul', 'kana']
+>>> len(Alphabet)
+24
+
 ```
 
 ### BasePhonemizer and its subclasses
@@ -214,19 +242,32 @@ len(Alphabet)   # 24
 `match_lang` raises `MissingLanguageError` when the target is `None`, `""` or
 `"und"`, and `UnsupportedLanguageError` when no supported language is close.
 
-```python
-BasePhonemizer.match_lang("pt-BR", ["pt-PT", "en-US"])   # 'pt-PT'
-BasePhonemizer.match_lang("und", ["en"])                 # MissingLanguageError: no language provided to phonemize: 'und'
-BasePhonemizer.match_lang("zh", ["en"])                  # UnsupportedLanguageError: unsupported language code: zh
+```pycon
+>>> from scriptconv.phonemizers import BasePhonemizer
+>>> BasePhonemizer.match_lang("pt-BR", ["pt-PT", "en-US"])
+'pt-PT'
+>>> BasePhonemizer.match_lang("und", ["en"])
+Traceback (most recent call last):
+    ...
+scriptconv.phonemizers.base.MissingLanguageError: ...no language provided to phonemize: 'und'...
+>>> BasePhonemizer.match_lang("zh", ["en"])
+Traceback (most recent call last):
+    ...
+scriptconv.phonemizers.base.UnsupportedLanguageError: ...unsupported language code: zh...
+
 ```
 
 `UnicodeCodepointPhonemizer(form="NFD")` returns the codepoints of the text in a
 Unicode normal form. `GraphemePhonemizer` returns the text itself after its
 character rules. Neither needs an engine, and each accepts any language.
 
-```python
-UnicodeCodepointPhonemizer().phonemize_to_list("é", "und")         # ['e', '́']
-UnicodeCodepointPhonemizer("NFC").phonemize_to_list("é", "und")    # ['é']
+```pycon
+>>> from scriptconv.phonemizers import UnicodeCodepointPhonemizer
+>>> UnicodeCodepointPhonemizer().phonemize_to_list("é", "und")
+['e', '́']
+>>> UnicodeCodepointPhonemizer("NFC").phonemize_to_list("é", "und")
+['é']
+
 ```
 
 ### PhonemizerIdentity and Segment
@@ -251,10 +292,13 @@ revision `revision` holds. Compare an identity from `backend.identity(lang)`
 with another from a backend, and one from `TextFrontend.identity()` with
 another from a frontend.
 
-```python
-first = PhonemizerIdentity("tugaphone", "tugaphone", "1.0", "pt-PT", revision="a")
-second = PhonemizerIdentity("tugaphone", "tugaphone", "1.1", "pt-PT", revision="b")
-first.differs_from(second)   # ('revision', 'version')
+```pycon
+>>> from scriptconv.phonemizers import PhonemizerIdentity
+>>> first = PhonemizerIdentity("tugaphone", "tugaphone", "1.0", "pt-PT", revision="a")
+>>> second = PhonemizerIdentity("tugaphone", "tugaphone", "1.1", "pt-PT", revision="b")
+>>> first.differs_from(second)
+('revision', 'version')
+
 ```
 
 `Segment` is one sentence or clause that a backend reads whole, with its
@@ -313,11 +357,17 @@ def strip_diacritics(text, lang="und", **_)
 `strip_diacritics` removes the overlay marks that `diacritize` adds, and it
 raises `ValueError` for a language whose marks are native spelling.
 
-```python
-diacritize("Tenho muita sede hoje.", "pt-PT")   # 'Tenho muita sêde hoje.'
-diacritize("Tenho muita sede hoje.", "en")      # 'Tenho muita sede hoje.'
-strip_diacritics("за́мок", "ru")                  # 'замок'
-DIACRITIZED                                     # 'text-diacritized'
+```pycon
+>>> from scriptconv.diacritics import DIACRITIZED, diacritize, strip_diacritics
+>>> diacritize("Tenho muita sede hoje.", "pt-PT")
+'Tenho muita sêde hoje.'
+>>> diacritize("Tenho muita sede hoje.", "en")
+'Tenho muita sede hoje.'
+>>> strip_diacritics("за́мок", "ru")
+'замок'
+>>> DIACRITIZED
+'text-diacritized'
+
 ```
 
 `DIACRITIZED` is the name of the graph node that `diacritics.register` adds.
@@ -358,11 +408,16 @@ takes the cheapest path.
 | `copy()` | An independent copy |
 | `nodes`, `edges` | The representation ids, and the edges |
 
-```python
-[f"{e.src}->{e.dst}" for e in DEFAULT_GRAPH.route("arpa", "x-sampa")]   # ['arpa->ipa', 'ipa->x-sampa']
-(len(DEFAULT_GRAPH.nodes), len(DEFAULT_GRAPH.edges), len(REPRESENTATIONS))   # (20, 24, 20)
-graph = ConversionGraph([Edge("a", "b", lambda text, **_: text.upper(), lossless=True)])
-graph.convert("abc", "a", "b")                                          # 'ABC'
+```pycon
+>>> from scriptconv import ConversionGraph, DEFAULT_GRAPH, Edge, REPRESENTATIONS
+>>> [f"{e.src}->{e.dst}" for e in DEFAULT_GRAPH.route("arpa", "x-sampa")]
+['arpa->ipa', 'ipa->x-sampa']
+>>> (len(DEFAULT_GRAPH.nodes), len(DEFAULT_GRAPH.edges), len(REPRESENTATIONS))
+(20, 24, 20)
+>>> graph = ConversionGraph([Edge("a", "b", lambda text, **_: text.upper(), lossless=True)])
+>>> graph.convert("abc", "a", "b")
+'ABC'
+
 ```
 
 ## scriptconv.scripts
@@ -379,12 +434,19 @@ def normalize_script_tag(label)
 `None`. It accepts English names, labels such as `syllabics`, and codes in any
 case.
 
-```python
-normalize_script_tag("latin")        # 'Latn'
-normalize_script_tag("Cyrillic")     # 'Cyrl'
-normalize_script_tag("latn")         # 'Latn'
-normalize_script_tag("syllabics")    # 'Cans'
-normalize_script_tag("klingon")      # None
+```pycon
+>>> from scriptconv import normalize_script_tag
+>>> normalize_script_tag("latin")
+'Latn'
+>>> normalize_script_tag("Cyrillic")
+'Cyrl'
+>>> normalize_script_tag("latn")
+'Latn'
+>>> normalize_script_tag("syllabics")
+'Cans'
+>>> print(normalize_script_tag("klingon"))
+None
+
 ```
 
 ## Every other public name
@@ -401,10 +463,11 @@ normalize_script_tag("klingon")      # None
 `CONVENTION_REGISTRY` maps a convention id to its `Convention`, and a
 `Transition` is one rewrite between two styles of a convention.
 
-```python
-from scriptconv import CONVENTION_REGISTRY
+```pycon
+>>> from scriptconv import CONVENTION_REGISTRY
+>>> sorted(CONVENTION_REGISTRY)[:3]
+['jamo-form', 'kashida', 'niqqud']
 
-sorted(CONVENTION_REGISTRY)[:3]   # ['jamo-form', 'kashida', 'niqqud']
 ```
 
 ---

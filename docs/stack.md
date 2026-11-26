@@ -24,30 +24,34 @@ uv pip install --prerelease=allow "scriptconv[normalize,espeak]"
 Build a frontend with `text2spoken` as its normalisation hook, and look at the
 text after the stages:
 
-```python
-from scriptconv.frontend import FrontendConfig, Stages, TextFrontend, spoken_normalizer
-from scriptconv.phonemizers import Phonemizer
+```pycon
+>>> from scriptconv.frontend import FrontendConfig, Stages, TextFrontend, spoken_normalizer
+>>> from scriptconv.phonemizers import Phonemizer
+>>> frontend = TextFrontend(FrontendConfig("pt-PT", Phonemizer.ESPEAK, normalizer=spoken_normalizer()))
+>>> frontend.prepare("O Prof. Silva tem 25 anos.")
+'O Professor Silva tem vinte e cinco anos.'
 
-frontend = TextFrontend(FrontendConfig("pt-PT", Phonemizer.ESPEAK, normalizer=spoken_normalizer()))
-frontend.prepare("O Prof. Silva tem 25 anos.")
-# 'O Professor Silva tem vinte e cinco anos.'
 ```
 
 Without the hook, the same call returns the text as written:
 
-```python
-plain = TextFrontend(FrontendConfig("pt-PT", Phonemizer.ESPEAK))
-plain.prepare("O Prof. Silva tem 25 anos.")
-# 'O Prof. Silva tem 25 anos.'
+```pycon
+>>> plain = TextFrontend(FrontendConfig("pt-PT", Phonemizer.ESPEAK))
+>>> plain.prepare("O Prof. Silva tem 25 anos.")
+'O Prof. Silva tem 25 anos.'
+
 ```
 
 `frontend.phonemize(text)` runs the same stages, then the backend, and returns
 one list of phonemes per sentence. The raw text splits after `Prof.`, and the
 normalised text does not:
 
-```python
-len(frontend.phonemize("O Prof. Silva tem 25 anos."))   # 1
-len(plain.phonemize("O Prof. Silva tem 25 anos."))      # 2
+```pycon
+>>> len(frontend.phonemize("O Prof. Silva tem 25 anos."))
+1
+>>> len(plain.phonemize("O Prof. Silva tem 25 anos."))
+2
+
 ```
 
 ## The order of the stages

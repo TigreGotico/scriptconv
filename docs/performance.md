@@ -86,11 +86,13 @@ line, and a blank line or a quotation mark adds more. The frontend therefore
 cuts a text of more than `WHOLE_TEXT_LIMIT` characters at its paragraph breaks
 before it passes the text to such a backend.
 
-```python
-from scriptconv.frontend import FrontendConfig, WHOLE_TEXT_LIMIT
+```pycon
+>>> from scriptconv.frontend import FrontendConfig, WHOLE_TEXT_LIMIT
+>>> WHOLE_TEXT_LIMIT
+1750
+>>> FrontendConfig("en-US").whole_text_limit
+1750
 
-WHOLE_TEXT_LIMIT                                    # 1750
-FrontendConfig("en-US").whole_text_limit            # 1750
 ```
 
 The limit comes from the steady-mode timing in

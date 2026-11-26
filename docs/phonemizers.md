@@ -19,11 +19,13 @@ grapheme-to-phoneme (G2P) rules. This subpackage wraps G2P **engines** behind
 optional extras, gives each language a default backend, and lets the caller
 choose another one.
 
-```python
-from scriptconv.phonemizers import phonemize, Phonemizer
+```pycon
+>>> from scriptconv.phonemizers import phonemize, Phonemizer
+>>> phonemize("kaixo mundua", "eu")
+'kai̯ˈʃo munˈdua'
+>>> phonemize("hello", "en", override=Phonemizer.GRUUT)
+'hɛlˈoʊ'
 
-phonemize("kaixo mundua", "eu")                      # 'kai̯ˈʃo munˈdua'
-phonemize("hello", "en", override=Phonemizer.GRUUT)  # 'hɛlˈoʊ'
 ```
 
 ## The contract
@@ -174,13 +176,14 @@ first of these that can write the requested alphabet:
 Phonemization enters the [conversion graph](graph.md) only when the caller
 adds it:
 
-```python
-from scriptconv import DEFAULT_GRAPH
-from scriptconv import phonemizers
+```pycon
+>>> from scriptconv import DEFAULT_GRAPH, phonemizers
+>>> g = DEFAULT_GRAPH.extend(phonemizers.register)
+>>> g.convert("bom dia", "text", "ipa", lang="pt")
+'ˈbõ ˈdiɐ'
+>>> g.convert("hello", "text", "arpa", lang="en", override=Phonemizer.GRUUT)
+'HH EH L OW'
 
-g = DEFAULT_GRAPH.extend(phonemizers.register)
-g.convert("bom dia", "text", "ipa", lang="pt")   # 'ˈbõ ˈdiɐ'
-g.convert("hello", "text", "arpa", lang="en", override=Phonemizer.GRUUT)  # 'HH EH L OW'
 ```
 
 `register` adds the `text` node, the ordinary written form of the language
@@ -263,15 +266,18 @@ English, it raises `ValueError` saying that scriptconv has no overlay
 diacritics. European Portuguese raises the same exception for a different
 reason: there the marks are spelling:
 
-```python
-from scriptconv import DEFAULT_GRAPH
-from scriptconv import diacritics
+```pycon
+>>> from scriptconv import DEFAULT_GRAPH, diacritics
+>>> g = DEFAULT_GRAPH.extend(diacritics.register)
+>>> g.convert("Tenho muita sede hoje.", "text", "text-diacritized", lang="pt")
+'Tenho muita sêde hoje.'
+>>> g.convert("за́мок", "text-diacritized", "text", lang="ru")
+'замок'
+>>> g.convert("sêde", "text-diacritized", "text", lang="pt")
+Traceback (most recent call last):
+    ...
+ValueError: ...cannot strip diacritics for lang='pt'...
 
-g = DEFAULT_GRAPH.extend(diacritics.register)
-g.convert("Tenho muita sede hoje.", "text", "text-diacritized", lang="pt")
-# 'Tenho muita sêde hoje.'
-g.convert("за́мок", "text-diacritized", "text", lang="ru")   # 'замок'
-g.convert("sêde", "text-diacritized", "text", lang="pt")     # ValueError: cannot strip diacritics for lang='pt'
 ```
 
 The graph edge calls `diacritize`. It is not a second implementation.
@@ -407,14 +413,14 @@ finals. A space and the marks
 `keep_punctuation`. A lowercase Latin letter that is also a symbol, such as
 `a` or `b`, stays too. `phonemize_string` joins the symbols with a space.
 
-```python
-from scriptconv.phonemizers import Alphabet, Phonemizer, get_phonemizer
+```pycon
+>>> from scriptconv.phonemizers import Alphabet, Phonemizer, get_phonemizer
+>>> g2pw = get_phonemizer(Phonemizer.G2PW, Alphabet.PINYIN)
+>>> g2pw.phonemize("银行在哪里？", "zh")
+[['y', 'in', '2', 'h', 'ang', '2', 'z', 'ai', '4', 'n', 'a', '3', 'l', 'i', '3', '？']]
+>>> g2pw.phonemize("我要去行走。", "zh")
+[['w', 'o', '3', 'y', 'ao', '4', 'q', 'u', '4', 'x', 'ing', '2', 'z', 'ou', '3', '。']]
 
-g2pw = get_phonemizer(Phonemizer.G2PW, Alphabet.PINYIN)
-g2pw.phonemize("银行在哪里？", "zh")
-# [['y', 'in', '2', 'h', 'ang', '2', 'z', 'ai', '4', 'n', 'a', '3', 'l', 'i', '3', '？']]
-g2pw.phonemize("我要去行走。", "zh")
-# [['w', 'o', '3', 'y', 'ao', '4', 'q', 'u', '4', 'x', 'ing', '2', 'z', 'ou', '3', '。']]
 ```
 
 The backend does not read digits, and a digit gives no symbol. Numbers,
@@ -425,9 +431,10 @@ does a letter that has no reading: a Latin letter of either case (`ibm` and
 each run of these characters, and adds the note on the normalisation stage
 when a run holds a number:
 
-```python
-g2pw.phonemize("他跑了3000米，花了15分钟。", "zh")
-# [['t', 'a', '1', 'p', 'ao', '3', 'l', 'e', '5', 'm', 'i', '3', '，', 'h', 'ua', '1', 'l', 'e', '5', 'f', 'en', '1', 'zh', 'ong', '1', '。']]
+```pycon
+>>> g2pw.phonemize("他跑了3000米，花了15分钟。", "zh")
+[['t', 'a', '1', 'p', 'ao', '3', 'l', 'e', '5', 'm', 'i', '3', '，', 'h', 'ua', '1', 'l', 'e', '5', 'f', 'en', '1', 'zh', 'ong', '1', '。']]
+
 ```
 
 The call logs this warning:
@@ -456,11 +463,11 @@ ONNX export of the model on onnxruntime, with no torch. It is the default for
 `lir`. It does not read `en` or `en-LR`, so the default for those tags does
 not change. Install it with `pip install scriptconv[lir]`.
 
-```python
-from scriptconv.phonemizers import phonemizer_for_lang
+```pycon
+>>> from scriptconv.phonemizers import phonemizer_for_lang
+>>> phonemizer_for_lang("lir").phonemize_string("da man dey go drink cold water", "lir")
+'ðæ mæ̃n de ko tɹɪ̃ŋk ko wɔtə˞'
 
-phonemizer_for_lang("lir").phonemize_string("da man dey go drink cold water", "lir")
-# 'ðæ mæ̃n de ko tɹɪ̃ŋk ko wɔtə˞'
 ```
 
 The text reads as `phonemize` 0.2.4 reads it, and the output is the same.
@@ -491,12 +498,14 @@ not have. Its own text rules read numbers, dates, money, units and
 abbreviations. Install the backend with `pip install scriptconv[en-phonemizers]`,
 which holds numpy for that model.
 
-```python
-from scriptconv.phonemizers.dizione import DizionePhonemizer
+```pycon
+>>> from scriptconv.phonemizers.dizione import DizionePhonemizer
+>>> dz = DizionePhonemizer()
+>>> dz.phonemize_string("You read it yesterday.", "en-US")
+'juː ɹˈɛd ɪt jˈɛstɚdˌeɪ'
+>>> dz.phonemize_string("It costs $12.", "en-US")
+'ɪt kˈɔsts twˈɛlv dˈɑːlɚz'
 
-dz = DizionePhonemizer()
-dz.phonemize_string("You read it yesterday.", "en-US")  # 'juː ɹˈɛd ɪt jˈɛstɚdˌeɪ'
-dz.phonemize_string("It costs $12.", "en-US")  # 'ɪt kˈɔsts twˈɛlv dˈɑːlɚz'
 ```
 
 The built data (the dictionary, the alignment table, the model and the
@@ -611,14 +620,14 @@ letter-to-sound model. A context model then picks how each word is said in
 its clause. Install the backend with `pip install scriptconv[en-phonemizers]`,
 which holds numpy, onnxruntime and huggingface_hub.
 
-```python
-from scriptconv.phonemizers import Phonemizer, get_phonemizer
+```pycon
+>>> from scriptconv.phonemizers import Phonemizer, get_phonemizer
+>>> leokani = get_phonemizer(Phonemizer.LEOKANI)
+>>> leokani.phonemize_string("The wind was cold, so we read inside.", "en-US")
+'ðə wˈɪnd wʌz kˈOld, sˌO wi ɹˈid ɪnsˈId.'
+>>> leokani.phonemize("The wind was cold, so we read inside.", "en-US")[0][:8]
+['ð', 'ə', ' ', 'w', 'ˈ', 'ɪ', 'n', 'd']
 
-leokani = get_phonemizer(Phonemizer.LEOKANI)
-leokani.phonemize_string("The wind was cold, so we read inside.", "en-US")
-# 'ðə wˈɪnd wʌz kˈOld, sˌO wi ɹˈid ɪnsˈId.'
-leokani.phonemize("The wind was cold, so we read inside.", "en-US")[0][:8]
-# ['ð', 'ə', ' ', 'w', 'ˈ', 'ɪ', 'n', 'd']
 ```
 
 The output alphabet is `Alphabet.IPA`, with the codes that the `misaki_en`
@@ -679,12 +688,12 @@ names the NeMo files, and `scriptconv/phonemizers/_thirdparty/nemo/NOTICE`
 holds the credit that the Apache License asks for. Install the backend with
 `pip install scriptconv[en-phonemizers]`.
 
-```python
-from scriptconv.phonemizers import Phonemizer, get_phonemizer
+```pycon
+>>> from scriptconv.phonemizers import Phonemizer, get_phonemizer
+>>> nemo = get_phonemizer(Phonemizer.NEMO_IPA)
+>>> nemo.phonemize_string("She read the lead sheet at the café.", "en-US")
+'ˈʃi READ ðə LEAD ˈʃit ˈæt ðə kəˈfeɪ.'
 
-nemo = get_phonemizer(Phonemizer.NEMO_IPA)
-nemo.phonemize_string("She read the lead sheet at the café.", "en-US")
-# 'ˈʃi READ ðə LEAD ˈʃit ˈæt ðə kəˈfeɪ.'
 ```
 
 A word of the dictionary gives its first pronunciation. A heteronym, such as
@@ -940,14 +949,19 @@ The espeak reduced vowel `ᵻ` becomes `ə` in the 90 inventory and `<unk>` in t
 match upstream. Any other value of `inventory` raises `ValueError`, also
 `88.0`, `True` and `"88"`.
 
-```python
-from scriptconv.phonemizers.shami import ShamiPhonemizer, SYMBOL_TO_ID_90
+```pycon
+>>> from scriptconv.phonemizers.shami import ShamiPhonemizer, SYMBOL_TO_ID_90
+>>> phonemizer = ShamiPhonemizer(inventory=90)
+>>> phonemes, lang_ids = phonemizer.phonemize_with_language_ids("شو، هلق.", "ar")
+>>> phonemes[0]
+['<bos>', 'ʃ', 'ˈ', 'uː', 'sil', ' ', 'h', 'l', 'ʔ', 'brk', '<eos>']
+>>> [SYMBOL_TO_ID_90[p] for p in phonemes[0]]
+[1, 35, 18, 77, 88, 4, 37, 43, 50, 89, 2]
+>>> ShamiPhonemizer(inventory="88")
+Traceback (most recent call last):
+    ...
+ValueError: ...no Shami inventory has '88' symbols...
 
-phonemizer = ShamiPhonemizer(inventory=90)
-phonemes, lang_ids = phonemizer.phonemize_with_language_ids("شو، هلق.", "ar")
-phonemes[0]  # ['<bos>', 'ʃ', 'ˈ', 'uː', 'sil', ' ', 'h', 'l', 'ʔ', 'brk', '<eos>']
-[SYMBOL_TO_ID_90[p] for p in phonemes[0]]  # [1, 35, 18, 77, 88, 4, 37, 43, 50, 89, 2]
-ShamiPhonemizer(inventory="88")  # ValueError: no Shami inventory has '88' symbols
 ```
 
 `ShamiPhonemizer.phonemize_segments` gives one segment per sentence, with its
@@ -984,12 +998,12 @@ with `pip install scriptconv[zh-phonemizers]`.
 `2816b5a`) pass the text to the model as it is, so their voices read these
 tokens.
 
-```python
-from scriptconv.phonemizers import Alphabet, Phonemizer, get_phonemizer
+```pycon
+>>> from scriptconv.phonemizers import Alphabet, Phonemizer, get_phonemizer
+>>> f5 = get_phonemizer(Phonemizer.F5TTS_PINYIN, Alphabet.UNICODE)
+>>> f5.phonemize_to_list("我们用iPhone打电话。", "zh")
+[' ', 'wo3', ' ', 'men', ' ', 'yong4', ' ', 'i', 'P', 'h', 'o', 'n', 'e', ' ', 'da3', ' ', 'dian4', ' ', 'hua4', '。']
 
-f5 = get_phonemizer(Phonemizer.F5TTS_PINYIN, Alphabet.UNICODE)
-f5.phonemize_to_list("我们用iPhone打电话。", "zh")
-# [' ', 'wo3', ' ', 'men', ' ', 'yong4', ' ', 'i', 'P', 'h', 'o', 'n', 'e', ' ', 'da3', ' ', 'dian4', ' ', 'hua4', '。']
 ```
 
 `tests/data/f5tts_parity.jsonl` holds the tokens of the upstream functions for
@@ -1029,11 +1043,13 @@ text it trained on. `lowercase`, `in_word_chars`, `replace_chars` and
 identity revision then holds them. A voice whose training text had no hyphen
 in a word sets `in_word_chars=""`, and every hyphen becomes a space:
 
-```python
-from scriptconv.phonemizers.base import GraphemePhonemizer
+```pycon
+>>> from scriptconv.phonemizers.base import GraphemePhonemizer
+>>> GraphemePhonemizer().phonemize_string("Ela mora em Vila-Real.", "pt")
+'ela mora em vila-real.'
+>>> GraphemePhonemizer(in_word_chars="").phonemize_string("Ela mora em Vila-Real.", "pt")
+'ela mora em vila real.'
 
-GraphemePhonemizer().phonemize_string("Ela mora em Vila-Real.", "pt")  # 'ela mora em vila-real.'
-GraphemePhonemizer(in_word_chars="").phonemize_string("Ela mora em Vila-Real.", "pt")  # 'ela mora em vila real.'
 ```
 
 The OpenJTalk backend runs on pyopenjtalk-plus with onnxruntime, which the
@@ -1047,10 +1063,11 @@ The pyopenjtalk-plus wheel holds the OpenJTalk dictionary, so the first use
 needs no network. The backend writes kana or Hepburn romaji, so it takes
 `Alphabet.KANA` or `Alphabet.HEPBURN`:
 
-```python
-from scriptconv.phonemizers import Alphabet, Phonemizer, get_phonemizer
+```pycon
+>>> from scriptconv.phonemizers import Alphabet, Phonemizer, get_phonemizer
+>>> get_phonemizer(Phonemizer.OPENJTALK, Alphabet.KANA).phonemize_string("何時ですか", "ja")
+'ナンジデスカ'
 
-get_phonemizer(Phonemizer.OPENJTALK, Alphabet.KANA).phonemize_string("何時ですか", "ja")  # 'ナンジデスカ'
 ```
 
 pyopenjtalk reads the variable `OPEN_JTALK_DICT_DIR` when it imports, and opens

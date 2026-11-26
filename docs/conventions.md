@@ -30,13 +30,17 @@ text can be in. Binary decorations have styles `("marked", "none")`, variant
 conventions name their spellings (`("mark", "number", "none")`). The one real
 operation is `restyle`, a transition between styles. Everything else is sugar:
 
-```python
-from scriptconv import strip, apply, restyle, detect_convention, conventions_for
+```pycon
+>>> from scriptconv import strip, apply, restyle, detect_convention, conventions_for
+>>> strip("مُحَمَّد", "tashkeel")  # restyle to "none"
+'محمد'
+>>> restyle("zhong1", "pinyin-tone", "mark")
+'zhōng'
+>>> detect_convention("مُحَمَّد", "tashkeel")
+'marked'
+>>> [c.id for c in conventions_for("Hebr")]
+['niqqud', 'teamim']
 
-strip("مُحَمَّد", "tashkeel")          # 'محمد'         restyle to "none"
-restyle("zhong1", "pinyin-tone", "mark")   # 'zhōng'
-detect_convention("مُحَمَّد", "tashkeel")   # 'marked'
-[c.id for c in conventions_for("Hebr")]   # ['niqqud', 'teamim']
 ```
 
 Which transitions exist follows one criterion, applied uniformly:
@@ -68,13 +72,20 @@ transition whose backing extra is missing raises `ImportError` naming it.
 
 Worked examples across the registry:
 
-```python
-strip("שָׁלוֹם", "niqqud")                          # 'שלום'
-strip("וַ֑יֹּאמֶר", "teamim")                        # 'וַיֹּאמֶר'  (cantillation gone, vowels kept)
-strip("わたし は がくせい です", "wakachigaki")      # 'わたしはがくせいです'
-strip("محمـــد", "kashida")                       # 'محمد'
-restyle("zhōng guó", "pinyin-tone", "number", frm="mark")   # 'zhong1 guo2'
-restyle("ㄱㅏㅁ", "jamo-form", "conjoining")        # '\u1100\u1161\u11b7'  (conjoining jamo, rendered as 감)
+```pycon
+>>> strip("שָׁלוֹם", "niqqud")
+'שלום'
+>>> strip("וַ֑יֹּאמֶר", "teamim")  # (cantillation gone, vowels kept)
+'וַיֹּאמֶר'
+>>> strip("わたし は がくせい です", "wakachigaki")
+'わたしはがくせいです'
+>>> strip("محمـــد", "kashida")
+'محمد'
+>>> restyle("zhōng guó", "pinyin-tone", "number", frm="mark")
+'zhong1 guo2'
+>>> restyle("ㄱㅏㅁ", "jamo-form", "conjoining")  # (conjoining jamo, rendered as 감)
+'감'
+
 ```
 
 ## Linguistic care baked into the tables

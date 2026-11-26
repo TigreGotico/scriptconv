@@ -31,13 +31,17 @@ The Japanese functions wrap pykakasi, which is GPL-3.0-or-later, so they are
 in the scriptconv-copyleft package. The `ja` extra installs it, and the names
 below import from it on first use.
 
-```python
-from scriptconv import to_hiragana, to_katakana
+```pycon
+>>> from scriptconv import to_hiragana, to_katakana
+>>> to_hiragana("東京タワー")
+'とうきょうたわー'
+>>> to_hiragana("コーヒー", keep_katakana=True)  # (loanwords keep their script)
+'コーヒー'
+>>> to_katakana("日本語")
+'ニホンゴ'
+>>> to_hiragana("私は学生です", segment=True)  # (wakachigaki)
+'わたし は がくせい です'
 
-to_hiragana("東京タワー")                     # 'とうきょうたわー'
-to_hiragana("コーヒー", keep_katakana=True)   # 'コーヒー'   (loanwords keep their script)
-to_katakana("日本語")                         # 'ニホンゴ'
-to_hiragana("私は学生です", segment=True)     # 'わたし は がくせい です'  (wakachigaki)
 ```
 
 `keep_katakana=True` preserves katakana tokens instead of folding them into
@@ -54,11 +58,11 @@ surface forms concatenate back to the input exactly, so consumers that need
 word boundaries or reading-dependent post-processing build on it directly
 instead of re-parsing a joined string:
 
-```python
-from scriptconv import tokens
+```pycon
+>>> from scriptconv import tokens
+>>> [t.orig for t in tokens("私はcoffeeが好き")]
+['私', 'は', 'coffee', 'が', '好き']
 
-[t.orig for t in tokens("私はcoffeeが好き")]
-# ['私', 'は', 'coffee', 'が', '好き']
 ```
 
 ## Chinese, hanzi → pinyin / bopomofo (`pip install scriptconv[zh]`)
@@ -67,14 +71,19 @@ Pinyin and bopomofo (zhuyin) are both kana-like respellings of Chinese:
 standard ways of writing the language phonetically. The phrase dictionary
 decides heteronyms, the characters with several readings:
 
-```python
-from scriptconv import to_pinyin, to_bopomofo
+```pycon
+>>> from scriptconv import to_pinyin, to_bopomofo
+>>> to_pinyin("中国人")
+'zhōng guó rén'
+>>> to_pinyin("银行")  # (行 as in bank)
+'yín háng'
+>>> to_pinyin("行走")  # (行 as in walk)
+'xíng zǒu'
+>>> to_pinyin("中国", tone="number")
+'zhong1 guo2'
+>>> to_bopomofo("中国")
+'ㄓㄨㄥ ㄍㄨㄛˊ'
 
-to_pinyin("中国人")               # 'zhōng guó rén'
-to_pinyin("银行")                 # 'yín háng'   (行 as in bank)
-to_pinyin("行走")                 # 'xíng zǒu'   (行 as in walk)
-to_pinyin("中国", tone="number")  # 'zhong1 guo2'
-to_bopomofo("中国")               # 'ㄓㄨㄥ ㄍㄨㄛˊ'
 ```
 
 Syllables are space-separated, pinyin's own orthographic convention. The

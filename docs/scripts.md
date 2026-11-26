@@ -94,12 +94,19 @@ Returns the ISO-15924 code for a single character, or `None` if the character is
 any registered script's codepoint ranges. ASCII digits (0-9), spaces, and most punctuation
 return `None`.
 
-```python
-char_script("A")   # "Latn"
-char_script("α")   # "Grek"
-char_script("가")  # "Hang"
-char_script(" ")   # None
-char_script("1")   # None
+```pycon
+>>> from scriptconv.scripts import char_script
+>>> char_script("A")
+'Latn'
+>>> char_script("α")
+'Grek'
+>>> char_script("가")
+'Hang'
+>>> print(char_script(" "))
+None
+>>> print(char_script("1"))
+None
+
 ```
 
 **Implementation**: uses O(log n) binary search over a precomputed sorted interval list.
@@ -121,10 +128,15 @@ def script_distribution(text: str) -> dict[str, int]
 Returns character counts per script in `text`, sorted by count descending.
 Only characters assigned to a registered script are counted.
 
-```python
-script_distribution("Hello Привет мир")         # {'Cyrl': 9, 'Latn': 5}
-script_distribution("日本語ひらがなカタカナ")   # {'Hira': 4, 'Kana': 4, 'Hani': 3}
-script_distribution("")                          # {}
+```pycon
+>>> from scriptconv.scripts import script_distribution
+>>> script_distribution("Hello Привет мир")
+{'Cyrl': 9, 'Latn': 5}
+>>> script_distribution("日本語ひらがなカタカナ")
+{'Hira': 4, 'Kana': 4, 'Hani': 3}
+>>> script_distribution("")
+{}
+
 ```
 
 ---
@@ -139,11 +151,17 @@ Detects the base text direction of `text`. Returns `"ltr"` if the majority of
 script-bearing characters belong to left-to-right scripts, `"rtl"` for right-to-left,
 or `"mixed"` when counts are equal or the input has no script-bearing characters.
 
-```python
-base_direction("Hello world")          # "ltr"
-base_direction("مرحبا بالعالم")        # "rtl"
-base_direction("Hello مرحبا")          # "mixed"
-base_direction("")                     # "mixed"
+```pycon
+>>> from scriptconv.scripts import base_direction
+>>> base_direction("Hello world")
+'ltr'
+>>> base_direction("مرحبا بالعالم")
+'rtl'
+>>> base_direction("Hello مرحبا")
+'mixed'
+>>> base_direction("")
+'mixed'
+
 ```
 
 ---
@@ -164,14 +182,23 @@ Returns the ISO-15924 code of the **dominant script** in `text`.
 4. If no script-bearing characters were found (empty string, all digits/punctuation),
    return `None`.
 
-```python
-detect_script("Hello world")          # "Latn"
-detect_script("Привет мир")           # "Cyrl"
-detect_script("مرحبا")               # "Arab"
-detect_script("안녕하세요")            # "Hang"
-detect_script("Hello Привет мир")    # "Cyrl"  (6 Cyrillic > 5 Latin)
-detect_script("")                     # None
-detect_script("123 !!!")             # None
+```pycon
+>>> from scriptconv.scripts import detect_script
+>>> detect_script("Hello world")
+'Latn'
+>>> detect_script("Привет мир")
+'Cyrl'
+>>> detect_script("مرحبا")
+'Arab'
+>>> detect_script("안녕하세요")
+'Hang'
+>>> detect_script("Hello Привет мир")  # (6 Cyrillic > 5 Latin)
+'Cyrl'
+>>> print(detect_script(""))
+None
+>>> print(detect_script("123 !!!"))
+None
+
 ```
 
 **Mixed-script behaviour**: returns whichever script has more characters. Ties are broken
@@ -282,10 +309,15 @@ def script_to_langs(code: str) -> list[str]
 Returns the languages whose default script is `code`. This is the reverse of
 `lang_to_script`. Returns an empty list for unknown scripts.
 
-```python
-script_to_langs("Cyrl")[:7]   # ['av', 'ba', 'be', 'bg', 'bxr', 'ce', 'cv']
-script_to_langs("Latn")[:5]   # ['af', 'ast', 'az', 'br', 'ca']
-script_to_langs("Zzzz")       # []
+```pycon
+>>> from scriptconv.scripts import script_to_langs
+>>> script_to_langs("Cyrl")[:7]
+['av', 'ba', 'be', 'bg', 'bxr', 'ce', 'cv']
+>>> script_to_langs("Latn")[:5]
+['af', 'ast', 'az', 'br', 'ca']
+>>> script_to_langs("Zzzz")
+[]
+
 ```
 
 ---
@@ -314,15 +346,25 @@ Accepts:
   `"ipa"` → `"Latn"`, `"chinese characters"` / `"han characters"` → `"Hani"`,
   `"bangla"` → `"Beng"`, `"punjabi"` → `"Guru"`, `"hangeul"` → `"Hang"`
 
-```python
-normalize_script_tag("latin")      # "Latn"
-normalize_script_tag("Cyrillic")   # "Cyrl"
-normalize_script_tag("syllabics")  # "Cans"
-normalize_script_tag("Korean")     # "Hang"
-normalize_script_tag("latn")       # "Latn"
-normalize_script_tag("Latn")       # "Latn"
-normalize_script_tag("lao")        # "Laoo"   ← label "lao" maps to code "Laoo"
-normalize_script_tag("unknown")    # None
+```pycon
+>>> from scriptconv.scripts import normalize_script_tag
+>>> normalize_script_tag("latin")
+'Latn'
+>>> normalize_script_tag("Cyrillic")
+'Cyrl'
+>>> normalize_script_tag("syllabics")
+'Cans'
+>>> normalize_script_tag("Korean")
+'Hang'
+>>> normalize_script_tag("latn")
+'Latn'
+>>> normalize_script_tag("Latn")
+'Latn'
+>>> normalize_script_tag("lao")  # ← label "lao" maps to code "Laoo"
+'Laoo'
+>>> print(normalize_script_tag("unknown"))
+None
+
 ```
 
 **Gotcha, "lao" vs "Laoo"**: the English name `"lao"` maps to ISO-15924 `"Laoo"`.
@@ -339,10 +381,15 @@ Each `Script` in `SCRIPT_REGISTRY` carries a `script_type`: one of `alphabet`,
 describes how the script encodes sounds structurally, not how any language is
 pronounced.
 
-```python
-SCRIPT_REGISTRY["Arab"].script_type   # "abjad"
-SCRIPT_REGISTRY["Deva"].script_type   # "abugida"
-SCRIPT_REGISTRY["Hani"].script_type   # "logographic"
+```pycon
+>>> from scriptconv.scripts import SCRIPT_REGISTRY
+>>> SCRIPT_REGISTRY["Arab"].script_type
+'abjad'
+>>> SCRIPT_REGISTRY["Deva"].script_type
+'abugida'
+>>> SCRIPT_REGISTRY["Hani"].script_type
+'logographic'
+
 ```
 
 ## Mixed-script segmentation, `script_runs`
@@ -352,11 +399,11 @@ structure by returning contiguous `(script, substring)` runs. Script-neutral
 characters (spaces, punctuation, combining marks) attach to the preceding run,
 following the resolution model of Unicode UAX #24.
 
-```python
-from scriptconv.scripts import script_runs
+```pycon
+>>> from scriptconv.scripts import script_runs
+>>> script_runs("привет hello")
+[('Cyrl', 'привет '), ('Latn', 'hello')]
 
-script_runs("привет hello")
-# [('Cyrl', 'привет '), ('Latn', 'hello')]
 ```
 
 `lang_to_script` honours an explicit ISO-15924 script subtag when present

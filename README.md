@@ -37,14 +37,18 @@ voice.
 uv pip install --prerelease=allow "scriptconv[pt-phonemizers]"
 ```
 
-```python
-from scriptconv import detect_script, convert, strip
-from scriptconv.phonemizers import phonemize
+```pycon
+>>> from scriptconv import detect_script, convert, strip
+>>> from scriptconv.phonemizers import phonemize
+>>> detect_script("Здравствуйте")
+'Cyrl'
+>>> convert("HH AH0 L OW1", "arpa", "ipa")
+'həloʊ'
+>>> strip("مُحَمَّد", "tashkeel")
+'محمد'
+>>> phonemize("Olá mundo", "pt")
+'ɔˈla ˈmũdu'
 
-detect_script("Здравствуйте")             # 'Cyrl'
-convert("HH AH0 L OW1", "arpa", "ipa")    # 'həloʊ'
-strip("مُحَمَّد", "tashkeel")               # 'محمد'
-phonemize("Olá mundo", "pt")              # 'ɔˈla ˈmũdu'
 ```
 
 The first three calls need no extra. The last one needs the extra of its

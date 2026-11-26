@@ -13,13 +13,13 @@ a phonemizer backend in one fixed order, and every method runs that order. A
 TTS stack builds one frontend when it loads a voice, and calls it for each
 text.
 
-```python
-from scriptconv.frontend import FrontendConfig, Stages, TextFrontend
-from scriptconv.phonemizers import Phonemizer
+```pycon
+>>> from scriptconv.frontend import FrontendConfig, Stages, TextFrontend
+>>> from scriptconv.phonemizers import Phonemizer
+>>> frontend = TextFrontend(FrontendConfig("pt-PT", Phonemizer.ESPEAK))
+>>> frontend.phonemize("Olá mundo. Tenho sede.")
+[['ɔ', 'l', 'ˈ', 'a', ' ', 'm', 'ˈ', 'u', '̃', 'ŋ', 'd', 'ʊ'], ['t', 'ˌ', 'e', 'ɲ', 'ʊ', ' ', 's', 'ˈ', 'e', 'd', 'ɨ']]
 
-frontend = TextFrontend(FrontendConfig("pt-PT", Phonemizer.ESPEAK))
-frontend.phonemize("Olá mundo. Tenho sede.")
-# [['ɔ', 'l', 'ˈ', 'a', ' ', 'm', 'ˈ', 'u', '̃', 'ŋ', 'd', 'ʊ'], ['t', 'ˌ', 'e', 'ɲ', 'ʊ', ' ', 's', 'ˈ', 'e', 'd', 'ɨ']]
 ```
 
 The frontend needs the `phonemizers` extra, and the extra of its backend.
@@ -98,12 +98,12 @@ takes 0 in every stream. dizione reads whole text, and with
 `DizionePhonemizer(tokens=True)` its segments are its own tokens, so a voice
 gets the ids and the stress of each chunk:
 
-```python
-from scriptconv.phonemizers.dizione import DizionePhonemizer
+```pycon
+>>> from scriptconv.phonemizers.dizione import DizionePhonemizer
+>>> frontend = TextFrontend(FrontendConfig("en-US"), DizionePhonemizer(tokens=True))
+>>> [(s.phonemes, s.streams["ids"]) for s in frontend.segments("Hi, Bob.", Stages(chunk="clause"))]
+[(('<bos>', 'h', 'aɪ', ',', '<eos>'), (1, 31, 60, 5, 2)), (('<bos>', 'b', 'ɑː', 'b', '.', '<eos>'), (1, 18, 53, 18, 6, 2))]
 
-frontend = TextFrontend(FrontendConfig("en-US"), DizionePhonemizer(tokens=True))
-[(s.phonemes, s.streams["ids"]) for s in frontend.segments("Hi, Bob.", Stages(chunk="clause"))]
-# [(('<bos>', 'h', 'aɪ', ',', '<eos>'), (1, 31, 60, 5, 2)), (('<bos>', 'b', 'ɑː', 'b', '.', '<eos>'), (1, 18, 53, 18, 6, 2))]
 ```
 
 A whole-text read has a size limit, `FrontendConfig.whole_text_limit`. Its
@@ -142,6 +142,7 @@ numeral.
 raises `ValueError`:
 
 ```python
+from scriptconv.frontend import Stages
 Stages(chunk="word")  # ValueError: chunk 'word' is not one of 'sentence', 'clause', 'paragraph', 'none'
 ```
 
@@ -155,14 +156,20 @@ a space after it, as `olá, ` below shows. No chunk starts with a space. So the
 chunks of every size, joined by this rule, are the result of
 `phonemize_flat`, and at `NONE` size the one chunk is that result:
 
-```python
-frontend = TextFrontend(FrontendConfig("pt", Phonemizer.GRAPHEMES, keep_punctuation=True))
-text = "Olá, tudo bem? Sim.\n\nAté logo."
-[''.join(c) for c in frontend.phonemize(text)]                             # ['olá, tudo bem?', 'sim.', 'até logo.']
-[''.join(c) for c in frontend.phonemize(text, Stages(chunk="clause"))]     # ['olá, ', 'tudo bem?', 'sim.', 'até logo.']
-[''.join(c) for c in frontend.phonemize(text, Stages(chunk="paragraph"))]  # ['olá, tudo bem?sim.', 'até logo.']
-[''.join(c) for c in frontend.phonemize(text, Stages(chunk="none"))]       # ['olá, tudo bem?sim.até logo.']
-''.join(frontend.phonemize_flat(text))                                      # 'olá, tudo bem?sim.até logo.'
+```pycon
+>>> frontend = TextFrontend(FrontendConfig("pt", Phonemizer.GRAPHEMES, keep_punctuation=True))
+>>> text = "Olá, tudo bem? Sim.\n\nAté logo."
+>>> [''.join(c) for c in frontend.phonemize(text)]
+['olá, tudo bem?', 'sim.', 'até logo.']
+>>> [''.join(c) for c in frontend.phonemize(text, Stages(chunk="clause"))]
+['olá, ', 'tudo bem?', 'sim.', 'até logo.']
+>>> [''.join(c) for c in frontend.phonemize(text, Stages(chunk="paragraph"))]
+['olá, tudo bem?sim.', 'até logo.']
+>>> [''.join(c) for c in frontend.phonemize(text, Stages(chunk="none"))]
+['olá, tudo bem?sim.até logo.']
+>>> ''.join(frontend.phonemize_flat(text))
+'olá, tudo bem?sim.até logo.'
+
 ```
 
 The examples show each chunk as a string. The frontend cuts the normalised
@@ -327,9 +334,12 @@ from `ar`.
 The graphemes frontend of the chunk example shows what the diacritizer adds.
 With `diacritize=True`, bifonia writes the closed vowel of *sêde* (thirst):
 
-```python
-frontend.phonemize("Tenho sede.", Stages(diacritize=True))   # [['t', 'e', 'n', 'h', 'o', ' ', 's', 'ê', 'd', 'e', '.']]
-frontend.phonemize("hello", Stages(lang="en-GB", diacritize=False))  # [['h', 'e', 'l', 'l', 'o']]
+```pycon
+>>> frontend.phonemize("Tenho sede.", Stages(diacritize=True))
+[['t', 'e', 'n', 'h', 'o', ' ', 's', 'ê', 'd', 'e', '.']]
+>>> frontend.phonemize("hello", Stages(lang="en-GB", diacritize=False))
+[['h', 'e', 'l', 'l', 'o']]
+
 ```
 
 `diacritize=False` means that the frontend adds no diacritizer. A backend that
@@ -360,23 +370,24 @@ after it, nor a mark that comes after such a quote. A block before the first tex
 `sentence` and `clause` size, and it starts the chunk after it at `paragraph`
 and `none` size. A space next to a block in the text becomes a space symbol:
 
-```python
-frontend = TextFrontend(FrontendConfig("en", Phonemizer.UNICODE))
-frontend.phonemize("ab [[xy]] cd")
-# [['a', 'b', ' ', 'x', 'y', ' '], ['c', 'd']]
+```pycon
+>>> frontend = TextFrontend(FrontendConfig("en", Phonemizer.UNICODE))
+>>> frontend.phonemize("ab [[xy]] cd")
+[['a', 'b', ' ', 'x', 'y', ' '], ['c', 'd']]
+
 ```
 
 The edge that `register` adds gives the result of `phonemize_lazy`, not a
 string, so it ends a route. A `stages=` key in the routing context goes to the
 call:
 
-```python
-from scriptconv.graph import ConversionGraph
+```pycon
+>>> from scriptconv.graph import ConversionGraph
+>>> graph = ConversionGraph()
+>>> frontend.register(graph)
+>>> list(graph.convert("ab. cd.", "text", "ipa", stages=Stages(normalize=False)))
+[['a', 'b'], ['c', 'd']]
 
-graph = ConversionGraph()
-frontend.register(graph)
-list(graph.convert("ab. cd.", "text", "ipa", stages=Stages(normalize=False)))
-# [['a', 'b'], ['c', 'd']]
 ```
 
 ## Normalisation
@@ -385,13 +396,13 @@ scriptconv does not normalise text. It reads its input as normalised text. The
 hook is off by default, and the caller sets it. `spoken_normalizer()` returns
 `text2spoken.normalize` for the hook. It needs the `normalize` extra:
 
-```python
-from scriptconv.frontend import spoken_normalizer
+```pycon
+>>> from scriptconv.frontend import spoken_normalizer
+>>> frontend = TextFrontend(FrontendConfig("en", Phonemizer.UNICODE,
+...                                        normalizer=spoken_normalizer()))
+>>> frontend.phonemize("I have 5 cats.")
+[['I', ' ', 'h', 'a', 'v', 'e', ' ', 'f', 'i', 'v', 'e', ' ', 'c', 'a', 't', 's']]
 
-frontend = TextFrontend(FrontendConfig("en", Phonemizer.UNICODE,
-                                       normalizer=spoken_normalizer()))
-frontend.phonemize("I have 5 cats.")
-# [['I', ' ', 'h', 'a', 'v', 'e', ' ', 'f', 'i', 'v', 'e', ' ', 'c', 'a', 't', 's']]
 ```
 
 A backend that always normalises names `normalize` in `owned_stages`, and the
