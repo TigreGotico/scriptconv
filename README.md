@@ -48,35 +48,17 @@ phonemize("Olá mundo", "pt")              # 'ɔˈla ˈmũdu'
 ```
 
 The first three calls need no extra. The last one needs the extra of its
-backend, here `pt-phonemizers` for tugaphone. Every call is also a command:
-
-```bash
-python -m scriptconv detect "안녕하세요"           # Hang
-python -m scriptconv convert arpa ipa "K AE1 T"   # kæt
-python -m scriptconv strip tashkeel "مُحَمَّد"       # محمد
-python -m scriptconv phonemize pt "Olá mundo"     # ɔˈla ˈmũdu
-python -m scriptconv route halabi x-sampa         # the conversion path, hop by hop
-```
-
-## Where this fits
-
-Alone: detect, convert and phonemize text with `from scriptconv import convert` and `from scriptconv.phonemizers import phonemize`.
-In the stack: the one stop for text conversion. The phoonnx voices take their text path from scriptconv alone, through `TextFrontend`. It calls the stage libraries and phonemizer engines as optional backends.
-Through scriptconv: `uv pip install --prerelease=allow "scriptconv[<extra>]"`.
-
-[docs/stack.md](docs/stack.md) shows which library runs each stage,
-[docs/backends.md](docs/backends.md) lists every backend with its extra, and
-[docs/reference.md](docs/reference.md) gives the signature of each name that a voice imports.
+backend, here `pt-phonemizers` for tugaphone. Every call is also a command
+of `python -m scriptconv` ([docs/graph.md](docs/graph.md#cli)).
 
 ## Documentation
 
 | Page | Read it for |
 | --- | --- |
 | [docs/overview.md](docs/overview.md) | the model, a tour of each module, related projects |
-| [docs/stack.md](docs/stack.md) | where scriptconv sits in the speech stack |
+| [docs/stack.md](docs/stack.md) | where scriptconv sits in the speech stack, and which library runs each stage |
 | [docs/install.md](docs/install.md) | the extras and the licences |
 | [docs/backends.md](docs/backends.md) | every phonemizer backend and its extra |
 | [docs/reference.md](docs/reference.md) | the signature of each public name |
 | [docs/index.md](docs/index.md) | every page in reading order |
-
-[AGENTS.md](AGENTS.md) holds the contributor rules.
+| [AGENTS.md](AGENTS.md) | the contributor rules |

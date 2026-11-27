@@ -188,6 +188,10 @@ graph instances, and the engine routes them without knowing the difference.**
 ## CLI
 
 ```bash
+python -m scriptconv detect "안녕하세요"                # Hang
+python -m scriptconv convert arpa ipa "K AE1 T"        # kæt
+python -m scriptconv strip tashkeel "مُحَمَّد"            # محمد
+python -m scriptconv phonemize pt "Olá mundo"          # ɔˈla ˈmũdu
 python -m scriptconv convert hira kana "こんにちは"     # any representation pair
 python -m scriptconv route halabi x-sampa              # show the chosen path
 #   halabi -> ipa  (lossy, cost 10)
