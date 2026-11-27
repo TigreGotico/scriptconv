@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.0.4a187](https://github.com/TigreGotico/scriptconv/tree/0.0.4a187) (2026-11-27)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a186...0.0.4a187)
+
+**Merged pull requests:**
+
+- perf: compile the chunk splitter once per delimiter set [\#499](https://github.com/TigreGotico/scriptconv/pull/499) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- refactor: rename OpenJTaklPhonemizer to OpenJTalkPhonemizer [\#498](https://github.com/TigreGotico/scriptconv/pull/498) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+- docs: shorten the README to a quickstart and a link table [\#497](https://github.com/TigreGotico/scriptconv/pull/497) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a186](https://github.com/TigreGotico/scriptconv/tree/0.0.4a186) (2026-11-27)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a185...0.0.4a186)
@@ -345,25 +355,13 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a138...0.0.4a139)
 
-**Merged pull requests:**
-
-- docs: generate the backend table from the registry, and test it [\#375](https://github.com/TigreGotico/scriptconv/pull/375) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a138](https://github.com/TigreGotico/scriptconv/tree/0.0.4a138) (2026-11-22)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a137...0.0.4a138)
 
-**Merged pull requests:**
-
-- docs: README, docs index, navigation and agent hints [\#374](https://github.com/TigreGotico/scriptconv/pull/374) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a137](https://github.com/TigreGotico/scriptconv/tree/0.0.4a137) (2026-11-22)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a136...0.0.4a137)
-
-**Merged pull requests:**
-
-- feat: Kolokwa \(Liberian English, lir\) phonemizer on kolokwa-g2p [\#376](https://github.com/TigreGotico/scriptconv/pull/376) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a136](https://github.com/TigreGotico/scriptconv/tree/0.0.4a136) (2026-11-22)
 
