@@ -295,7 +295,7 @@ def _without_unread_stress_mark(method: Callable) -> Callable:
     return read
 
 
-@functools.lru_cache(maxsize=None)
+@functools.lru_cache(maxsize=64)
 def _declared(langs: frozenset, lang: str) -> bool:
     """True when linguatag matches *lang* to one of *langs*, as :meth:`BasePhonemizer.match_lang` does."""
     return bool(langs) and BasePhonemizer._match_lang(lang, sorted(langs))[1] <= 10
@@ -712,13 +712,7 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
                 "sentence chunking needs quebra-frases — install with "
                 "`pip install scriptconv[phonemizers]`") from None
 
-        # ":" and ";" cut only before whitespace, so "16:30" and the Bengali "নি:সন্দেহে" stay whole
-        alternatives = []
-        for delimiter in delimiters or [":", ";", "...", "|"]:
-            escaped = re.escape(delimiter)
-            alternatives.append(f"{escaped}(?=\\s|$)" if delimiter in (":", ";")
-                                else f"(?:(?<!\\d){escaped}|{escaped}(?!\\d))")
-        splitter = re.compile(f"({'|'.join(alternatives)})")
+        splitter = _chunk_splitter(tuple(delimiters or (":", ";", "...", "|")))
         results: TextChunks = []
         for sentence in sentence_tokenize(text):
             default_punc = sentence[-1] if sentence and sentence[-1] in string.punctuation else "."
@@ -727,6 +721,17 @@ class BasePhonemizer(metaclass=abc.ABCMeta):
                 delimiter = parts[i + 1] if i + 1 < len(parts) else default_punc
                 results.append((parts[i].strip(), delimiter.strip(), i + 2 >= len(parts)))
         return results
+
+
+@functools.lru_cache(maxsize=64)
+def _chunk_splitter(delimiters: Tuple[str, ...]) -> "re.Pattern[str]":
+    # ":" and ";" cut only before whitespace, so "16:30" and the Bengali "নি:সন্দেহে" stay whole
+    alternatives = []
+    for delimiter in delimiters:
+        escaped = re.escape(delimiter)
+        alternatives.append(f"{escaped}(?=\\s|$)" if delimiter in (":", ";")
+                            else f"(?:(?<!\\d){escaped}|{escaped}(?!\\d))")
+    return re.compile(f"({'|'.join(alternatives)})")
 
 
 class GraphemePhonemizer(BasePhonemizer):
