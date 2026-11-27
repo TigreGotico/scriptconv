@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4a186](https://github.com/TigreGotico/scriptconv/tree/0.0.4a186) (2026-11-27)
+
+[Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a185...0.0.4a186)
+
+**Merged pull requests:**
+
+- docs: leader-language table generated from the registry [\#493](https://github.com/TigreGotico/scriptconv/pull/493) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [0.0.4a185](https://github.com/TigreGotico/scriptconv/tree/0.0.4a185) (2026-11-26)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a184...0.0.4a185)
@@ -361,17 +369,9 @@
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a135...0.0.4a136)
 
-**Merged pull requests:**
-
-- feat: add the Leokani G2P backend for American English [\#373](https://github.com/TigreGotico/scriptconv/pull/373) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
-
 ## [0.0.4a135](https://github.com/TigreGotico/scriptconv/tree/0.0.4a135) (2026-11-21)
 
 [Full Changelog](https://github.com/TigreGotico/scriptconv/compare/0.0.4a134...0.0.4a135)
-
-**Merged pull requests:**
-
-- fix\(identity\): a dependency of a preloaded package counts in the revision [\#372](https://github.com/TigreGotico/scriptconv/pull/372) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
 
 ## [0.0.4a134](https://github.com/TigreGotico/scriptconv/tree/0.0.4a134) (2026-11-21)
 
