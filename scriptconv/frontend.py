@@ -697,7 +697,8 @@ class TextFrontend:
         """What phonemizes this frontend's language, with :data:`FRONTEND_VERSION`.
 
         ``revision`` is the revision of the backend, then ``;keep_punctuation``
-        when the frontend keeps punctuation, then ``;text2spoken==V``
+        when the frontend keeps punctuation, then one ``;<name>==V``
+        for each name in ``text2spoken.distributions(lang)``, text2spoken first,
         when the normaliser is :func:`spoken_normalizer` and normalisation is
         on, then ``;<diacritizer>==V`` when the frontend diacritizes with the
         default model. It is ``None``, so a ``version`` difference shows, when
@@ -718,12 +719,12 @@ class TextFrontend:
             revision += ";keep_punctuation"
         if stages.normalize and self.config.normalizer is not None:
             try:
-                from text2spoken import normalize
+                from text2spoken import distributions, normalize
             except ImportError:
                 return None
             if self.config.normalizer is not normalize:
                 return None
-            revision += f";text2spoken=={metadata.version('text2spoken')}"
+            revision += "".join(f";{d}=={metadata.version(d)}" for d in distributions(stages.lang))
         if stages.diacritize:
             if stages.diacritizer_model is not None:
                 return None
