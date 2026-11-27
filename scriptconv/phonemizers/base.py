@@ -200,7 +200,8 @@ class PhonemizerIdentity:
     first, then the sister package that holds it (scriptconv-copyleft or
     scriptconv-nonfree), then the engine, then the data distributions that
     change its output. With ``frontend`` set, the string ends with
-    ``;text2spoken==V`` when text2spoken normalises the text. It is ``None`` for
+    one ``;<name>==V`` for each name in ``text2spoken.distributions(lang)``
+    (``text2spoken`` first), when text2spoken normalises the text. It is ``None`` for
     a frontend whose stages scriptconv cannot vouch for: another normaliser, a
     casing, or a diacritizer of an unknown distribution or model."""
     frontend: Optional[int] = None

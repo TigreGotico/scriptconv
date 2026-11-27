@@ -7,6 +7,7 @@ from importlib import metadata
 from pathlib import Path
 
 import pytest
+import text2spoken
 import tugaphone.version
 
 from scriptconv.phonemizers import (
@@ -267,7 +268,7 @@ class TestFrontendRevision:
 
     def test_text2spoken_follows_the_backend_when_it_normalises(self):
         revision = frontend(normalizer=spoken_normalizer()).identity().revision
-        assert revision == (f"scriptconv=={metadata.version('scriptconv')}" + installed("text2spoken"))
+        assert revision == (f"scriptconv=={metadata.version('scriptconv')}" + installed(*text2spoken.distributions("pt-PT")))
 
     def test_normalisation_switched_off_leaves_text2spoken_out(self):
         identity = frontend(normalizer=spoken_normalizer(), stages=Stages(normalize=False)).identity()
@@ -295,6 +296,22 @@ class TestFrontendRevision:
         current = TextFrontend(config, backend).identity()
         real = metadata.version
         monkeypatch.setattr(metadata, "version", lambda name: "99.0" if name == "text2spoken" else real(name))
+        assert TextFrontend(config, backend).identity().differs_from(current) == ("revision",)
+
+    def test_the_revision_names_each_text2spoken_distribution(self, monkeypatch):
+        monkeypatch.setattr(text2spoken, "distributions", lambda lang: ("text2spoken", "numtag", "chronologia") if lang == "pt-PT" else ())
+        versions = {"text2spoken": "1.0", "numtag": "2.0", "chronologia": "3.0"}
+        real = metadata.version
+        monkeypatch.setattr(metadata, "version", lambda name: versions.get(name) or real(name))
+        config = FrontendConfig("pt-PT", normalizer=spoken_normalizer())
+        assert TextFrontend(config, GraphemePhonemizer()).identity().revision == (
+            f"scriptconv=={real('scriptconv')};text2spoken==1.0;numtag==2.0;chronologia==3.0")
+
+    def test_a_release_of_numtag_changes_the_frontend_revision(self, monkeypatch):
+        backend, config = GraphemePhonemizer(), FrontendConfig("pt-PT", normalizer=spoken_normalizer())
+        current = TextFrontend(config, backend).identity()
+        real = metadata.version
+        monkeypatch.setattr(metadata, "version", lambda name: "99.0" if name == "numtag" else real(name))
         assert TextFrontend(config, backend).identity().differs_from(current) == ("revision",)
 
 

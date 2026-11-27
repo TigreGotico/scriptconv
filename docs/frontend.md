@@ -429,7 +429,11 @@ The `revision` of a frontend is the `revision` of its backend, then one
 `;name==version` for each stage library that the frontend runs:
 
 - `text2spoken` when the normaliser is `spoken_normalizer()` and normalisation
-  is on. A backend that owns `normalize` adds nothing.
+  is on. The frontend adds each distribution in
+  `text2spoken.distributions(lang)`, in that order: text2spoken itself, then
+  the libraries that write the spoken words, for example numtag and
+  chronologia. A release of one of them changes the revision.
+  A backend that owns `normalize` adds nothing.
 - the diacritizer distribution of the language, when the frontend diacritizes
   with the default model: `text2tashkeel` for Arabic, `stressonnx` for the
   stress languages, `bifonia` for European Portuguese and `phonikud-onnx` for
@@ -437,6 +441,7 @@ The `revision` of a frontend is the `revision` of its backend, then one
 
 ```text
 scriptconv==X;text2tashkeel==Y
+scriptconv==X;text2spoken==A;linguatag==B;quebra-frases==C;unicode-rbnf==D;numtag==E;tugalex==F;chronologia==G
 ```
 
 The `revision` is `None` when scriptconv cannot vouch for a stage, so a
