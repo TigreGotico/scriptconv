@@ -219,4 +219,4 @@ one, run `phonetisaurus.train` on a lexicon such as CMUdict.
 loader error or the missing model otherwise.
 
 ---
-[← Prev](ovos.md) · [Home](index.md) · [Next →](performance.md)
+[← Prev](ovos.md) · [Home](index.md) · [Next →](languages.md)
