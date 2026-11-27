@@ -21,7 +21,7 @@ import pytest
 from packaging.requirements import Requirement
 
 from scriptconv.phonemizers import Alphabet, Phonemizer, get_phonemizer
-from scriptconv.phonemizers.ja import OpenJTaklPhonemizer
+from scriptconv.phonemizers.ja import OpenJTalkPhonemizer
 from scriptconv.phonemizers.openjtalk_engine import module_distribution
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -117,7 +117,7 @@ def test_a_module_with_no_file_has_no_owner():
 def test_refuses_the_pyopenjtalk_module(both_installed, order, alphabet):
     both_installed("pyopenjtalk", order)
     with pytest.raises(ImportError) as refusal:
-        OpenJTaklPhonemizer(alphabet)
+        OpenJTalkPhonemizer(alphabet)
     assert str(refusal.value) == (
         "The OpenJTalk phonemizer needs pyopenjtalk-plus, but the installed pyopenjtalk module comes "
         "from pyopenjtalk. Run 'pip uninstall pyopenjtalk', then "
@@ -130,27 +130,27 @@ def test_refuses_a_pyopenjtalk_namespace_package(monkeypatch):
     """The uninstall of one distribution leaves a namespace package with no ``__file__``."""
     monkeypatch.setattr(pyopenjtalk, "__file__", None)
     with pytest.raises(ImportError, match=r"comes from an unknown distribution\. Run 'pip uninstall pyopenjtalk'"):
-        OpenJTaklPhonemizer()
+        OpenJTalkPhonemizer()
 
 
 def test_refuses_to_run_without_onnxruntime(monkeypatch):
     monkeypatch.setitem(sys.modules, "onnxruntime", None)
     with pytest.raises(ImportError, match=r"needs onnxruntime.*scriptconv\[ja-phonemizers\]"):
-        OpenJTaklPhonemizer()
+        OpenJTalkPhonemizer()
 
 
 @pytest.mark.parametrize("error", ["ImportError", "OSError", "RuntimeError"])
 def test_refuses_an_onnxruntime_that_does_not_import(broken_onnxruntime, error):
     broken_onnxruntime(error)
     with pytest.raises(ImportError, match=r"needs onnxruntime.*does not import") as refusal:
-        OpenJTaklPhonemizer()
+        OpenJTalkPhonemizer()
     assert type(refusal.value.__cause__).__name__ == error
 
 
 @pytest.mark.parametrize("order", ORDERS)
 def test_runs_on_pyopenjtalk_plus(both_installed, order):
     both_installed("pyopenjtalk-plus", order)
-    identity = OpenJTaklPhonemizer().identity("ja")
+    identity = OpenJTalkPhonemizer().identity("ja")
     assert (identity.distribution, identity.version) == ("pyopenjtalk-plus", "0.4.1.post10")
 
 
@@ -163,7 +163,7 @@ def test_the_installed_engine_is_pyopenjtalk_plus():
 
 def test_onnxruntime_reads_nani():
     """Without onnxruntime pyopenjtalk-plus reads 何時 as なにじ."""
-    assert OpenJTaklPhonemizer(Alphabet.KANA).phonemize_string("何時ですか", "ja") == "ナンジデスカ"
+    assert OpenJTalkPhonemizer(Alphabet.KANA).phonemize_string("何時ですか", "ja") == "ナンジデスカ"
 
 
 def test_the_dictionary_comes_with_the_wheel():
@@ -241,7 +241,7 @@ def test_refuses_a_parent_directory_after_a_link(both_installed, foreign_diction
     else:
         monkeypatch.setattr(pyopenjtalk, "OPEN_JTALK_DICT_DIR", value.encode())
     with pytest.raises(ImportError) as refusal:
-        OpenJTaklPhonemizer()
+        OpenJTalkPhonemizer()
     assert str(refusal.value) == _refusal(value, bundled)
 
 
@@ -272,7 +272,7 @@ def test_refuses_a_link_re_pointed_to_the_bundled_dictionary_after_the_import(fo
 def test_refuses_the_variable_set_after_the_import(foreign_dictionary, monkeypatch, alphabet):
     monkeypatch.setenv("OPEN_JTALK_DICT_DIR", str(foreign_dictionary))
     with pytest.raises(ImportError) as refusal:
-        OpenJTaklPhonemizer(alphabet)
+        OpenJTalkPhonemizer(alphabet)
     assert str(refusal.value) == _refusal(foreign_dictionary)
 
 
@@ -280,14 +280,14 @@ def test_refuses_an_empty_value(monkeypatch):
     """pyopenjtalk takes an empty value as a path, and the first reading fails."""
     monkeypatch.setenv("OPEN_JTALK_DICT_DIR", "")
     with pytest.raises(ImportError) as refusal:
-        OpenJTaklPhonemizer()
+        OpenJTalkPhonemizer()
     assert str(refusal.value) == _refusal("")
 
 
 def test_refuses_the_dictionary_that_the_module_read_at_import(foreign_dictionary, monkeypatch):
     monkeypatch.setattr(pyopenjtalk, "OPEN_JTALK_DICT_DIR", str(foreign_dictionary).encode())
     with pytest.raises(ImportError) as refusal:
-        OpenJTaklPhonemizer()
+        OpenJTalkPhonemizer()
     assert str(refusal.value) == _refusal(foreign_dictionary)
 
 
@@ -310,3 +310,11 @@ def test_the_misaki_extra_takes_the_copyleft_alpha_on_pyopenjtalk_plus():
     """scriptconv-copyleft 0.1.2a1 installs pyopenjtalk with its misaki extra, 0.2.0a1 pyopenjtalk-plus."""
     copyleft = [Requirement(r) for r in _extras()["misaki"] if r.startswith("scriptconv-copyleft")]
     assert [str(r.specifier) for r in copyleft] == [">=0.2.0a1"]
+
+
+def test_old_misspelled_name_is_deprecated_alias():
+    import scriptconv.phonemizers.ja as ja
+    ja.__dict__.pop("OpenJTaklPhonemizer", None)
+    with pytest.warns(DeprecationWarning, match="OpenJTalkPhonemizer"):
+        from scriptconv.phonemizers.ja import OpenJTaklPhonemizer
+    assert OpenJTaklPhonemizer is ja.OpenJTalkPhonemizer

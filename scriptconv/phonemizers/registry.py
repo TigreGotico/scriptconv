@@ -65,7 +65,7 @@ PHONEMIZER_REGISTRY: Dict[Phonemizer, Tuple[str, str, Optional[str]]] = {
     _P.AFRICA_G2P: (f"{NONFREE}.africa", "AfricaG2PPhonemizer", "africa"),
     _P.MATOUB_KAB: (f"{_BASE}.ber", "MatoubKabylePhonemizer", None),
     _P.GHANA_G2P: (f"{NONFREE}.ghana", "GhanaG2PPhonemizer", "ghana"),
-    _P.OPENJTALK: (f"{_BASE}.ja", "OpenJTaklPhonemizer", "ja-phonemizers"),
+    _P.OPENJTALK: (f"{_BASE}.ja", "OpenJTalkPhonemizer", "ja-phonemizers"),
     _P.CUTLET: (f"{_BASE}.ja", "CutletPhonemizer", "ja-phonemizers"),
     _P.PYKAKASI: (f"{COPYLEFT}.ja", "PyKakasiPhonemizer", "ja-phonemizers"),
     _P.OPENJTALK_PROSODY: (f"{COPYLEFT}.ja_prosody", "OpenJTalkProsodyPhonemizer", "ja-phonemizers"),
