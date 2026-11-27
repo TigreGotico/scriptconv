@@ -54,6 +54,11 @@ MOVED: Dict[str, Dict[str, Tuple[str, str]]] = {
     "scriptconv.phonemizers.ghana": {"GhanaG2PPhonemizer": (f"{NONFREE}.ghana", "ghana")},
 }
 
+#: old module -> old name -> new name in the same module
+RENAMED: Dict[str, Dict[str, str]] = {
+    "scriptconv.phonemizers.ja": {"OpenJTaklPhonemizer": "OpenJTalkPhonemizer"},
+}
+
 
 def import_moved(module: str, name: str, extra: str):
     """Return *name* from the sister *module*.
@@ -77,9 +82,19 @@ def deprecated_getattr(old_module: str) -> Callable[[str], object]:
     The first use of a name warns and stores the class on *old_module*, so
     each name warns once.
     """
-    moved = MOVED[old_module]
+    moved = MOVED.get(old_module, {})
+    renamed = RENAMED.get(old_module, {})
 
     def __getattr__(name: str):
+        if name in renamed:
+            new_name = renamed[name]
+            warnings.warn(
+                f"{old_module}.{name} is deprecated and will be removed in scriptconv "
+                f"{REMOVAL_VERSION}; use {old_module}.{new_name}",
+                DeprecationWarning, stacklevel=2)
+            value = getattr(sys.modules[old_module], new_name)
+            setattr(sys.modules[old_module], name, value)
+            return value
         if name not in moved:
             raise AttributeError(f"module {old_module!r} has no attribute {name!r}")
         module, extra = moved[name]

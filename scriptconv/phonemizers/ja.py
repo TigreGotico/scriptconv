@@ -4,7 +4,7 @@ from scriptconv.phonemizers.enums import Alphabet
 from scriptconv.phonemizers.openjtalk_engine import ENGINE_DISTRIBUTION, require_pyopenjtalk_plus
 
 
-class OpenJTaklPhonemizer(BasePhonemizer):
+class OpenJTalkPhonemizer(BasePhonemizer):
     """Japanese readings from OpenJTalk, in Hepburn romaji or kana.
 
     The engine is pyopenjtalk-plus with onnxruntime. The backend refuses an

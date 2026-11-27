@@ -84,7 +84,7 @@ last column names each language whose explicit default chain holds the backend.
 | `kolokwa` | `KolokwaPhonemizer` | `lir` | scriptconv | `lir` |
 | `tugaphone` | `TugaphonePhonemizer` | `pt-phonemizers` | scriptconv | `pt` |
 | `g2pfa` | `PersianPhonemizer` | `fa` | scriptconv-copyleft |  |
-| `openjtalk` | `OpenJTaklPhonemizer` | `ja-phonemizers` | scriptconv |  |
+| `openjtalk` | `OpenJTalkPhonemizer` | `ja-phonemizers` | scriptconv |  |
 | `openjtalk_prosody` | `OpenJTalkProsodyPhonemizer` | `ja-phonemizers` | scriptconv-copyleft |  |
 | `cutlet` | `CutletPhonemizer` | `ja-phonemizers` | scriptconv |  |
 | `pykakasi` | `PyKakasiPhonemizer` | `ja-phonemizers` | scriptconv-copyleft |  |
