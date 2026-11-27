@@ -107,9 +107,8 @@ class TestDefaultGraphOrthography(unittest.TestCase):
         ja_edges = [e for e in DEFAULT_GRAPH.edges
                     if e.src == "japanese" and e.dst == "hira"]
         self.assertEqual(ja_edges[0].requires, "ja")
-        import scriptconv.readings as readings
-        with mock.patch.object(readings, "_kakasi", None), \
-                mock.patch.dict(sys.modules, {"pykakasi": None}):
+        # the Japanese readings are in scriptconv-copyleft
+        with mock.patch.dict(sys.modules, {"scriptconv_copyleft": None}):
             with self.assertRaises(ImportError) as ctx:
                 DEFAULT_GRAPH.convert("東京", "japanese", "hira")
             self.assertIn("scriptconv[ja]", str(ctx.exception))

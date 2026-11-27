@@ -1,22 +1,21 @@
 """Phonemizer registry: backend lookup, construction, per-language defaults.
 
-The registry is data: each :class:`~scriptconv.phonemizers.enums.Phonemizer`
-member maps to ``(module, class name, extra)``.  Classes import lazily — a
-missing backing package raises :class:`ImportError` naming the extra to
-install, never a silent gap (a meta-test iterates every member).
+Each :class:`~scriptconv.phonemizers.enums.Phonemizer` member maps to
+``(module, class name, extra)``. Classes import lazily, and a missing backing
+package, scriptconv-copyleft and scriptconv-nonfree included, raises
+:class:`ImportError` naming the extra to install.
 
-Language defaults are org-informed and **filtered by the requested output
-alphabet**: a default is only eligible when the wrapper can emit that
-alphabet (Cotovía emits its own notation, not IPA, so it is the Galician
-default only when Cotovía notation is requested).  ``override=`` always
-wins.  The fallback for any language is espeak — the espeak-ng subprocess
-(or the pure-Python espyak port when the binary is absent).
+A language default is eligible only when it can emit the requested alphabet:
+Cotovía emits its own notation, so it is the Galician default only for that
+notation. ``override=`` always wins, and espeak is the last resort.
 """
 from __future__ import annotations
 
 import importlib
 from typing import Dict, Optional, Tuple
 
+from scriptconv.phonemizers._moved import COPYLEFT, NONFREE
+from scriptconv.phonemizers.base import _primary_subtag
 from scriptconv.phonemizers.enums import Alphabet, Phonemizer
 
 __all__ = ["PHONEMIZER_REGISTRY", "LANG_DEFAULTS", "get_phonemizer",
@@ -25,59 +24,75 @@ __all__ = ["PHONEMIZER_REGISTRY", "LANG_DEFAULTS", "get_phonemizer",
 _P = Phonemizer
 _BASE = "scriptconv.phonemizers"
 
-# member -> (module, class, extra) — the single source of truth
+# member -> (module, class, extra)
 PHONEMIZER_REGISTRY: Dict[Phonemizer, Tuple[str, str, Optional[str]]] = {
     _P.UNICODE: (f"{_BASE}.base", "UnicodeCodepointPhonemizer", None),
     _P.GRAPHEMES: (f"{_BASE}.base", "GraphemePhonemizer", None),
-    _P.ESPEAK: (f"{_BASE}.mul", "EspeakPhonemizer", "espeak"),
+    _P.ESPEAK: (f"{COPYLEFT}.mul", "EspeakPhonemizer", "espeak"),
+    _P.ESPEAK_LT_ACCENT: (f"{COPYLEFT}.lt", "EspeakLithuanianAccentPhonemizer", "espeak"),
     _P.GRUUT: (f"{_BASE}.mul", "GruutPhonemizer", "gruut"),
     _P.GORUUT: (f"{_BASE}.mul", "GoruutPhonemizer", "goruut"),
     _P.EPITRAN: (f"{_BASE}.mul", "EpitranPhonemizer", "epitran"),
-    _P.TRANSPHONE: (f"{_BASE}.mul", "TransphonePhonemizer", "transphone"),
+    _P.TRANSPHONE: (f"{COPYLEFT}.mul", "TransphonePhonemizer", "transphone"),
+    _P.PHONETISAURUS: (f"{_BASE}.mul", "PhonetisaurusPhonemizer", "phonetisaurus"),
     _P.BYT5: (f"{_BASE}.mul", "ByT5Phonemizer", "byt5"),
     _P.CHARSIU: (f"{_BASE}.mul", "CharsiuPhonemizer", "byt5"),
-    _P.MISAKI: (f"{_BASE}.mul", "MisakiPhonemizer", "misaki"),
-    _P.MISAKI_EN: (f"{_BASE}.mul", "MisakiEnPhonemizer", "misaki"),
-    _P.MISAKI_JA: (f"{_BASE}.mul", "MisakiJaPhonemizer", "misaki"),
-    _P.MISAKI_ZH: (f"{_BASE}.mul", "MisakiZhPhonemizer", "misaki"),
-    _P.MISAKI_KO: (f"{_BASE}.mul", "MisakiKoPhonemizer", "misaki"),
-    _P.MISAKI_VI: (f"{_BASE}.mul", "MisakiViPhonemizer", "misaki"),
+    _P.MISAKI: (f"{COPYLEFT}.mul", "MisakiPhonemizer", "misaki"),
+    _P.MISAKI_EN: (f"{COPYLEFT}.mul", "MisakiEnPhonemizer", "misaki"),
+    _P.MISAKI_JA: (f"{COPYLEFT}.mul", "MisakiJaPhonemizer", "misaki"),
+    _P.MISAKI_ZH: (f"{COPYLEFT}.mul", "MisakiZhPhonemizer", "misaki"),
+    _P.MISAKI_KO: (f"{COPYLEFT}.mul", "MisakiKoPhonemizer", "misaki"),
+    _P.MISAKI_VI: (f"{COPYLEFT}.mul", "MisakiViPhonemizer", "misaki"),
     _P.DEEPPHONEMIZER: (f"{_BASE}.en", "DeepPhonemizer", "en-phonemizers"),
     _P.OPENPHONEMIZER: (f"{_BASE}.en", "OpenPhonemizer", "en-phonemizers"),
     _P.G2PEN: (f"{_BASE}.en", "G2PEnPhonemizer", "en-phonemizers"),
+    _P.DIZIONE: (f"{_BASE}.dizione", "DizionePhonemizer", "en-phonemizers"),
+    _P.LEOKANI: (f"{_BASE}.leokani", "LeokaniPhonemizer", "en-phonemizers"),
+    _P.NEMO_IPA: (f"{_BASE}.nemo_ipa", "NemoIpaPhonemizer", "en-phonemizers"),
+    _P.KOLOKWA: (f"{_BASE}.lir", "KolokwaPhonemizer", "lir"),
     _P.TUGAPHONE: (f"{_BASE}.pt", "TugaphonePhonemizer", "pt-phonemizers"),
-    _P.BARRANQUENHO: (f"{_BASE}.pt", "BarranquenhoPhonemizer", "pt-phonemizers"),
-    _P.MIRANDESE: (f"{_BASE}.mwl", "MirandesePhonemizer", "mwl"),
-    _P.COTOVIA: (f"{_BASE}.gl", "CotoviaPhonemizer", "gl"),
-    _P.AHOTTS: (f"{_BASE}.eu", "AhoTTSPhonemizer", "eu"),
+    _P.BARRANQUENHO: (f"{_BASE}.pt", "BarranquenhoPhonemizer", "o2i"),
+    _P.MIRANDESE: (f"{_BASE}.mwl", "MirandesePhonemizer", "o2i"),
+    _P.COTOVIA: (f"{COPYLEFT}.gl", "CotoviaPhonemizer", "gl"),
+    _P.AHOTTS: (f"{COPYLEFT}.eu", "AhoTTSPhonemizer", "eu"),
     _P.EUSKAPHONE: (f"{_BASE}.eu", "EuskaphonePhonemizer", "eu"),
     _P.PHONIKUD: (f"{_BASE}.he", "PhonikudPhonemizer", "he"),
-    _P.G2PFA: (f"{_BASE}.fa", "PersianPhonemizer", "fa"),
-    _P.VIPHONEME: (f"{_BASE}.vi", "VIPhonemePhonemizer", "vi"),
+    _P.HEBREW_IPA: (f"{COPYLEFT}.he", "HebrewIPAPhonemizer", "he"),
+    _P.TLTK: (f"{COPYLEFT}.th", "TLTKPhonemizer", "th"),
+    _P.G2PFA: (f"{COPYLEFT}.fa", "PersianPhonemizer", "fa"),
+    _P.VIPHONEME: (f"{NONFREE}.vi", "VIPhonemePhonemizer", "vi"),
     _P.ORTHOGRAPHY2IPA: (f"{_BASE}.o2ipa", "Orthography2IPAPhonemizer", "o2i"),
-    # ported in the CJK/AR stage; registered here so no member is silently
-    # unmapped — resolution raises ImportError naming the pending extra
-    _P.OPENJTALK: (f"{_BASE}.ja", "OpenJTaklPhonemizer", "ja-phonemizers"),
+    _P.AFRICA_G2P: (f"{NONFREE}.africa", "AfricaG2PPhonemizer", "africa"),
+    _P.MATOUB_KAB: (f"{_BASE}.ber", "MatoubKabylePhonemizer", None),
+    _P.GHANA_G2P: (f"{NONFREE}.ghana", "GhanaG2PPhonemizer", "ghana"),
+    _P.OPENJTALK: (f"{_BASE}.ja", "OpenJTalkPhonemizer", "ja-phonemizers"),
     _P.CUTLET: (f"{_BASE}.ja", "CutletPhonemizer", "ja-phonemizers"),
-    _P.PYKAKASI: (f"{_BASE}.ja", "PyKakasiPhonemizer", "ja-phonemizers"),
-    _P.G2PK: (f"{_BASE}.ko", "G2PKPhonemizer", "ko"),
-    _P.KOG2PK: (f"{_BASE}.ko", "KoG2PPhonemizer", "ko"),
+    _P.PYKAKASI: (f"{COPYLEFT}.ja", "PyKakasiPhonemizer", "ja-phonemizers"),
+    _P.OPENJTALK_PROSODY: (f"{COPYLEFT}.ja_prosody", "OpenJTalkProsodyPhonemizer", "ja-phonemizers"),
+    _P.G2PK: (f"{COPYLEFT}.ko", "G2PKPhonemizer", "ko"),
+    _P.KOG2PK: (f"{COPYLEFT}.ko", "KoG2PPhonemizer", "ko"),
     _P.JIEBA: (f"{_BASE}.zh", "JiebaPhonemizer", "zh-phonemizers"),
+    _P.F5TTS_CHAR: (f"{_BASE}.f5tts", "F5TTSCharPhonemizer", None),
+    _P.F5TTS_PINYIN: (f"{_BASE}.f5tts", "F5TTSPinyinPhonemizer", "zh-phonemizers"),
     _P.G2PC: (f"{_BASE}.zh", "G2pCPhonemizer", "zh-phonemizers"),
     _P.G2PM: (f"{_BASE}.zh", "G2pMPhonemizer", "zh-phonemizers"),
+    _P.G2PW: (f"{_BASE}.g2pw", "G2PWPhonemizer", "zh-phonemizers"),
     _P.PYPINYIN: (f"{_BASE}.zh", "PypinyinPhonemizer", "zh-phonemizers"),
     _P.XPINYIN: (f"{_BASE}.zh", "XpinyinPhonemizer", "zh-phonemizers"),
-    _P.MANTOQ: (f"{_BASE}.ar", "MantoqPhonemizer", "ar-phonemizers"),
+    _P.MANTOQ: (f"{NONFREE}.ar", "MantoqPhonemizer", "ar-phonemizers"),
+    _P.HALABI: (f"{NONFREE}.ar", "HalabiPhonemizer", "ar-phonemizers"),
+    _P.IQRA: (f"{NONFREE}.ar", "IqraPhonemizer", "ar-phonemizers"),
     _P.ARBTOK: (f"{_BASE}.ar", "ArbtokPhonemizer", "ar-phonemizers"),
     _P.SHAMI: (f"{_BASE}.shami", "ShamiPhonemizer", "shami"),
+    _P.VOSK: (f"{_BASE}.ru", "VoskPhonemizer", "phonemizers"),
 }
 
 
 def get_phonemizer_class(phonemizer: Phonemizer):
-    """Resolve a registry member to its class, importing lazily.
+    """The class of a registry member, imported on first use.
 
-    Raises :class:`ImportError` naming the extra to install when the backing
-    package is missing.
+    Raises:
+        ImportError: If the backing package is missing; the message names the extra to install.
     """
     module, cls_name, extra = PHONEMIZER_REGISTRY[Phonemizer(phonemizer)]
     try:
@@ -93,18 +108,18 @@ def get_phonemizer(phonemizer: Phonemizer,
                    alphabet: Alphabet = Alphabet.IPA,
                    model: Optional[str] = None,
                    **kwargs):
-    """Construct a phonemizer instance for the requested backend.
+    """An instance of the *phonemizer* backend.
 
-    ``model`` is forwarded to model-backed phonemizers (ByT5/Charsiu/
-    DeepPhonemizer); ``alphabet`` to those with a selectable output alphabet.
-    Extra ``kwargs`` (e.g. ``normalizer=``) pass to the constructor.
+    *model* goes to the constructor's ``model``, ``engine`` or ``register``
+    parameter, and *alphabet* to its ``alphabet`` parameter, when it has one.
+    A non-empty *model* raises ValueError when the constructor has none of
+    those parameters. Other *kwargs* go to the constructor, except
+    ``normalizer=`` and ``keep_punctuation=``, which are set on the instance.
     """
     phonemizer = Phonemizer(phonemizer)
     cls = get_phonemizer_class(phonemizer)
-    # normalizer/phonikud_model are plain BasePhonemizer attributes; set them
-    # after construction so wrapper __init__ signatures stay untouched
     normalizer = kwargs.pop("normalizer", None)
-    phonikud_model = kwargs.pop("phonikud_model", None)
+    keep_punctuation = kwargs.pop("keep_punctuation", None)
     if phonemizer in (_P.BYT5, _P.CHARSIU, _P.DEEPPHONEMIZER):
         inst = cls(model, **kwargs)
     else:
@@ -113,23 +128,25 @@ def get_phonemizer(phonemizer: Phonemizer,
         if "alphabet" in params:
             kwargs.setdefault("alphabet", alphabet)
         if model is not None:
-            # backends name their variant/model selector differently
-            # (AhoTTS: engine=, arbtok: register=, ...) — forward to whichever
-            # parameter the constructor declares
             for name in ("model", "engine", "register"):
                 if name in params:
                     kwargs.setdefault(name, model)
                     break
+            else:
+                # Voice configs use an empty string for "no model".
+                if model:
+                    raise ValueError(
+                        f"phonemizer {phonemizer.value!r} cannot take model={model!r}: "
+                        f"{cls.__name__} has no model, engine or register parameter")
         inst = cls(**kwargs)
     if normalizer is not None:
         inst.normalizer = normalizer
-    if phonikud_model is not None:
-        inst.phonikud_model = phonikud_model
+    if keep_punctuation is not None:
+        inst.keep_punctuation = keep_punctuation
     return inst
 
 
-# language -> ordered candidate backends; first whose emittable alphabets
-# include the requested one wins.  The alphabets each candidate can emit:
+# The alphabets a language default can emit; a backend not listed emits IPA.
 _EMITS: Dict[Phonemizer, Tuple[Alphabet, ...]] = {
     _P.ARBTOK: (Alphabet.IPA,),
     _P.EUSKAPHONE: (Alphabet.IPA,),
@@ -137,21 +154,23 @@ _EMITS: Dict[Phonemizer, Tuple[Alphabet, ...]] = {
     _P.TUGAPHONE: (Alphabet.IPA,),
     _P.PHONIKUD: (Alphabet.IPA,),
     _P.COTOVIA: (Alphabet.COTOVIA,),
+    _P.VOSK: (Alphabet.VOSK,),
     _P.ESPEAK: (Alphabet.IPA,),
 }
 
+# language -> candidate backends in order; the first that emits the requested alphabet wins
 LANG_DEFAULTS: Dict[str, Tuple[Phonemizer, ...]] = {
-    # Arabic IPA always goes through arbtok (hard org rule — never falls
-    # through to orthography2ipa or espeak)
     "ar": (_P.ARBTOK,),
     "eu": (_P.EUSKAPHONE,),
     "mwl": (_P.MIRANDESE,),
     "pt": (_P.TUGAPHONE,),
     "he": (_P.PHONIKUD,),
+    "lir": (_P.KOLOKWA,),
     "gl": (_P.COTOVIA, _P.ORTHOGRAPHY2IPA, _P.ESPEAK),
+    "ru": (_P.VOSK, _P.ORTHOGRAPHY2IPA, _P.ESPEAK),
 }
 
-# Languages whose explicit entry is exhaustive: no generic fallback beyond it.
+# Languages whose entry is exhaustive: Arabic never falls through to orthography2ipa or espeak.
 _NO_GENERIC_FALLBACK = {"ar"}
 
 
@@ -168,23 +187,18 @@ def _o2i_supports(lang: str) -> bool:
 def phonemizer_for_lang(lang: str, alphabet: Alphabet = Alphabet.IPA,
                         override: Optional[Phonemizer] = None,
                         model: Optional[str] = None, **kwargs):
-    """Construct the default phonemizer for *lang* (or the override).
+    """The default phonemizer for *lang*.
 
-    Resolution order — in-house engines first:
+    The first of: *override*; the first :data:`LANG_DEFAULTS` candidate that
+    emits *alphabet*; orthography2ipa when it supports *lang* and *alphabet*
+    is IPA; espeak. Arabic never leaves its :data:`LANG_DEFAULTS` entry.
 
-    1. ``override=`` when given;
-    2. the language's explicit :data:`LANG_DEFAULTS` chain, filtered by the
-       alphabet each candidate can emit;
-    3. :data:`~Phonemizer.ORTHOGRAPHY2IPA` when orthography2ipa supports the
-       language (the usual default);
-    4. espeak as the last resort.
-
-    Languages in the no-fallback set (Arabic) never leave their explicit
-    chain — a missing arbtok raises rather than silently degrading.
+    Raises:
+        ValueError: If no candidate of an exhaustive entry emits *alphabet*.
     """
     if override is not None:
         return get_phonemizer(override, alphabet, model, **kwargs)
-    key = lang.replace("_", "-").split("-")[0].lower()
+    key = _primary_subtag(lang)
     explicit = LANG_DEFAULTS.get(key, ())
     for candidate in explicit:
         if alphabet in _EMITS.get(candidate, (Alphabet.IPA,)):
@@ -202,24 +216,20 @@ def phonemizer_for_lang(lang: str, alphabet: Alphabet = Alphabet.IPA,
 def phonemize(text: str, lang: str, alphabet: Alphabet = Alphabet.IPA,
               override: Optional[Phonemizer] = None,
               model: Optional[str] = None, **kwargs) -> str:
-    """One-call facade: phonemize *text* with the language's default backend.
+    """``phonemizer_for_lang(...).phonemize_string(text, lang)``.
 
-    Equivalent to ``phonemizer_for_lang(...).phonemize_string(text, lang)``.
-    Construct the phonemizer yourself when phonemizing repeatedly — backends
-    cache models/dictionaries per instance.
+    Each call builds a new backend; keep one from :func:`phonemizer_for_lang` to phonemize repeatedly.
     """
     return phonemizer_for_lang(lang, alphabet, override, model,
                                **kwargs).phonemize_string(text, lang)
 
 
 def register(graph) -> None:
-    """Opt-in graph integration: add the phonemization edge to *graph*.
+    """Add the ``text -> ipa`` and ``text-diacritized -> ipa`` edges to *graph*.
 
-    Adds the ``"text"`` representation — meaningful only with ``lang=``
-    routing context, and present only in graphs that opted in (the
-    :data:`scriptconv.graph.DEFAULT_GRAPH` stays orthography-only by
-    design) — and one dispatching ``text -> ipa`` edge that resolves the
-    per-language default (honouring an ``override=`` context key).
+    The edges phonemize with the default backend for the ``lang=`` context
+    key, or the ``override=`` one, and take ``phonemizer_model=``. The
+    :data:`scriptconv.graph.DEFAULT_GRAPH` holds no phonemizer edge.
 
     Usage::
 
@@ -231,8 +241,10 @@ def register(graph) -> None:
     from scriptconv.graph import Edge
 
     def _text_to_ipa(text: str, lang: str = "und",
-                     override: Optional[Phonemizer] = None, **_):
-        return phonemizer_for_lang(lang, Alphabet.IPA,
-                                   override).phonemize_string(text, lang)
+                     override: Optional[Phonemizer] = None,
+                     phonemizer_model: Optional[str] = None, **_):
+        return phonemizer_for_lang(lang, Alphabet.IPA, override,
+                                   phonemizer_model).phonemize_string(text, lang)
 
     graph.register(Edge("text", "ipa", _text_to_ipa, lossless=False))
+    graph.register(Edge("text-diacritized", "ipa", _text_to_ipa, lossless=False))

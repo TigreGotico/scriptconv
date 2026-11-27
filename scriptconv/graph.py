@@ -38,6 +38,11 @@ from typing import Callable, Dict, List, Optional, Tuple
 __all__ = ["Representation", "Edge", "ConversionGraph", "DEFAULT_GRAPH",
            "REPRESENTATIONS"]
 
+# Chosen so a single lossy hop never wins over a lossless path unless the
+# lossless alternative is at least this many hops longer. A 10-hop lossless
+# chain (cost 10, unit edges) ties a 1-hop lossy edge (cost 10) exactly, and
+# heapq's stable tie-break then decides — a non-issue in practice since real
+# scriptconv graphs are shallow (a handful of hops at most).
 _LOSSY_COST = 10.0
 
 
@@ -56,7 +61,10 @@ class Edge:
     """One registered transform between two representations.
 
     ``fn`` is called as ``fn(text, **context)``; context keys (``lang``,
-    engine-specific options…) pass through the router opaquely.  ``requires``
+    engine-specific options…) pass through the router opaquely.  Every
+    registered ``fn`` MUST accept ``**kwargs`` for this reason — a callable
+    that only takes ``text`` raises :class:`TypeError` the moment routing
+    passes through any context. ``requires``
     names an optional extra the transform needs — metadata only; the
     transform itself raises :class:`ImportError` with an install hint.
     ``cost`` defaults from ``lossless`` so routing prefers lossless paths.
@@ -170,8 +178,10 @@ REPRESENTATIONS: Dict[str, Representation] = {r.id: r for r in (
     Representation("kirshenbaum", "notation", reference="Kirshenbaum ASCII-IPA"),
     Representation("cotovia", "notation", reference="Cotovía (Galician TTS)"),
     Representation("rfe", "notation", reference="Revista de Filología Española"),
-    Representation("mantoq", "notation", system="mantoq",
+    Representation("halabi", "notation", system="halabi",
                    reference="Halabi Arabic-Phonetiser phoneme inventory"),
+    Representation("misaki", "notation", system="misaki",
+                   reference="misaki and Kokoro phoneme codes"),
     Representation("buckwalter", "notation", script="Latn",
                    reference="Buckwalter Arabic transliteration"),
     Representation("arabic", "orthography", script="Arab",
@@ -252,9 +262,11 @@ def _orthography_edges() -> List[Edge]:
         from scriptconv.cangjie import to_cangjie
         return to_cangjie(text)
 
+    # Lossy by the NotationInfo definition: a kana with no counterpart in the
+    # other script, such as ゟ, ヷ or a hentaigana, passes through unchanged.
     return [
-        Edge("hira", "kana", hira_to_kana, lossless=True),
-        Edge("kana", "hira", kana_to_hira, lossless=True),
+        Edge("hira", "kana", hira_to_kana, lossless=False),
+        Edge("kana", "hira", kana_to_hira, lossless=False),
         Edge("hangul", "jamo", hangul_to_jamo, lossless=False),
         Edge("japanese", "hira", japanese_to_hira, requires="ja"),
         Edge("japanese", "kana", japanese_to_kana, requires="ja"),

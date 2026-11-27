@@ -1,6 +1,8 @@
 import unittest
 
 from scriptconv.phonemizers import Phonemizer, get_phonemizer_class
+from scriptconv.phonemizers.enums import Alphabet
+from scriptconv.phonemizers.registry import get_phonemizer
 
 
 class TestVendoredKorean(unittest.TestCase):
@@ -16,10 +18,378 @@ class TestVendoredKorean(unittest.TestCase):
         self.assertTrue(os.path.isfile(os.path.join(tables, "ipa.csv")))
 
 
+
+
 class TestVendoredChinese(unittest.TestCase):
     def test_zh_num(self):
         from scriptconv.phonemizers._thirdparty.zh_num import num2str
         self.assertEqual(num2str("123"), "一百二十三")
+
+    def test_zh_num_fullwidth_digits_normalized(self):
+        # zh_num.DIGITS is keyed by ASCII "0"-"9"; full-width digits (e.g.
+        # "３") must be NFKC-folded before lookup or num2str raises KeyError
+        import unicodedata
+        from scriptconv.phonemizers._thirdparty.zh_num import num2str
+        fullwidth = "１２３"
+        self.assertEqual(
+            num2str(unicodedata.normalize("NFKC", fullwidth)),
+            num2str("123"),
+        )
+
+
+class TestPinyinRetone(unittest.TestCase):
+    def test_retone_tone_marks(self):
+        from scriptconv.phonemizers.zh import BaseChinesePinyinPhonemizer
+        retoned = BaseChinesePinyinPhonemizer._retone("ma˥")
+        self.assertEqual(retoned, "ma→")
+
+    def test_retone_leftover_syllabic_mark_does_not_raise(self):
+        # any pinyin_to_ipa output carrying an unanticipated combining
+        # U+0329 (not attached to ɻ/ɹ) must degrade gracefully, not crash
+        from scriptconv.phonemizers.zh import BaseChinesePinyinPhonemizer
+        leftover = "n" + chr(809)
+        retoned = BaseChinesePinyinPhonemizer._retone(leftover)
+        self.assertEqual(retoned, leftover)
+
+
+class TestPinyinToIpa(unittest.TestCase):
+    """Chinese IPA against Wikipedia, "Standard Chinese phonology",
+    revision 1384691172. Initials come from the consonant table, finals from
+    the five vowel table (Duanmu 2000, p. 37), the nucleus of shi from the
+    section "Syllabic consonants", and tone contours from the tone table
+    (Chao 1968). pinyin_to_ipa writes affricates with no tie bar, so the
+    table's [t͡ɕ] is written tɕ here. Tone 3 is not tested: Chao gives ˨˩˦
+    and pinyin_to_ipa gives ˧˩˧, so the cited table cannot decide it."""
+
+    def _phonemizer(self, retone):
+        from scriptconv.phonemizers.zh import PypinyinPhonemizer
+        p = PypinyinPhonemizer(alphabet=Alphabet.IPA, jieba=False)
+        p.retone = retone
+        return p
+
+    def test_tone_table_examples(self):
+        # 巴 bā, 拔 bá, 爸 bà: b [p], a [a], tones ˥ 55, ˧˥ 35, ˥˩ 51
+        out = self._phonemizer(False).phonemize_string("巴拔爸", "zh")
+        self.assertEqual(out, "pa˥pa˧˥pa˥˩")
+
+    def test_retroflex_and_alveolo_palatal(self):
+        # 世 shì: sh [ʂ], -i [ɻ̩], tone ˥˩; 界 jiè: j [t͡ɕ], -ie [je], tone ˥˩
+        out = self._phonemizer(False).phonemize_string("世界", "zh")
+        self.assertEqual(out, "ʂɻ̩˥˩tɕje˥˩")
+
+    def test_segments_survive_retone(self):
+        # 你 nǐ: n [n], -i [i]; 好 hǎo: h [x], -ao [au̯]. Retone only swaps
+        # tone letters for arrows, so the segments stay as the table gives.
+        out = self._phonemizer(True).phonemize_string("你好", "zh")
+        self.assertEqual(out.replace("↓", ""), "nixau̯")
+
+    def test_punctuation_is_kept(self):
+        # the docstring of to_ipa: a token with no letters or digits, such
+        # as punctuation, is kept as it is
+        out = self._phonemizer(False).phonemize_string("巴，爸", "zh")
+        self.assertEqual(out, "pa˥，pa˥˩")
+
+
+class TestPinyinUmlaut(unittest.TestCase):
+    """ü after n and l, through each pinyin backend.
+
+    Pinyin keeps the dots of ü only after n and l: 女 nǚ, 旅 lǚ, 略 lüè and
+    虐 nüè (Wikipedia, "Pinyin", revision 1384755350, section "The ⟨ü⟩ sound").
+    The backends spell it otherwise: g2pc and g2pM write ``u:`` as CC-CEDICT
+    does, and xpinyin writes ``v`` and ``nue``.
+
+    The expected IPA comes from Wikipedia, "Standard Chinese phonology",
+    revision 1384691172. Initials come from the consonant table, and finals
+    from the five vowel table: -ü [y], -üe [ɥe], -ou [ou̯], -ai [ai̯], -e [ɤ].
+    儿 ér in 女儿 is an independent morpheme, which the section "Rhotic coda"
+    gives as [aɚ̯] in China. Retone writes each tone of the tone table as an
+    arrow: high →, rising ↗, dipping ↓, falling ↘, and none for neutral.
+    """
+
+    SENTENCE = "女儿去旅游了，忽略了虐待。"
+    EXPECTED = "ny↓aɚ̯↗tɕʰy↘ly↓jou̯↗lɤ，xu→lɥe↘lɤnɥe↘tai̯↘。"
+
+    def test_pypinyin(self):
+        from scriptconv.phonemizers.zh import PypinyinPhonemizer
+        p = PypinyinPhonemizer(alphabet=Alphabet.IPA, jieba=False)
+        self.assertEqual(p.phonemize_string(self.SENTENCE, "zh"), self.EXPECTED)
+
+    def test_xpinyin(self):
+        from scriptconv.phonemizers.zh import XpinyinPhonemizer
+        p = XpinyinPhonemizer(alphabet=Alphabet.IPA, jieba=False)
+        self.assertEqual(p.phonemize_string(self.SENTENCE, "zh"), self.EXPECTED)
+
+    def test_g2pm(self):
+        from scriptconv.phonemizers.zh import G2pMPhonemizer
+        p = G2pMPhonemizer(alphabet=Alphabet.IPA, jieba=False)
+        self.assertEqual(p.phonemize_string(self.SENTENCE, "zh"), self.EXPECTED)
+
+    def test_g2pc(self):
+        # g2pc needs pkuseg, whose sdist builds only when numpy, Cython and
+        # setuptools are installed first and build isolation is off. The
+        # test extra cannot do that, so g2pc is replaced by the output that
+        # g2pc 0.9.9.3 gave for SENTENCE.
+        # The pinyin is the fourth field of each word.
+        import sys
+        import types
+        from unittest.mock import patch
+        from scriptconv.phonemizers.zh import G2pCPhonemizer
+        words = [("女儿", "n", "nu:3 er2", "nu:3 er2"), ("去", "v", "qu4", "qu4"),
+                 ("旅游", "v", "lu:3 you2", "lu:3 you2"), ("了", "y", "le5", "le5"),
+                 ("，", "w", "，", "，"), ("忽略", "v", "hu1 lu:e4", "hu1 lu:e4"),
+                 ("了", "u", "le5", "le5"), ("虐待", "i", "nu:e4 dai4", "nu:e4 dai4"),
+                 ("。", "w", "。", "。")]
+        g2pc = types.ModuleType("g2pc")
+        g2pc.G2pC = lambda: lambda text: words
+        with patch.dict(sys.modules, {"g2pc": g2pc}):
+            p = G2pCPhonemizer(alphabet=Alphabet.IPA, jieba=False)
+        self.assertEqual(p.phonemize_string(self.SENTENCE, "zh"), self.EXPECTED)
+
+    def test_er_is_the_mainland_reading(self):
+        # 二 èr: [aɚ̯] in China, section "Rhotic coda"; falling tone ↘
+        from scriptconv.phonemizers.zh import PypinyinPhonemizer
+        p = PypinyinPhonemizer(alphabet=Alphabet.IPA, jieba=False)
+        self.assertEqual(p.phonemize_string("二", "zh"), "aɚ̯↘")
+
+
+class TestErhua(unittest.TestCase):
+    """The erhua suffix 儿 and the independent morpheme 儿 ér.
+
+    Wikipedia, "Standard Chinese phonology", revision 1384691172, section
+    "Rhotic coda": the suffix is written "in pinyin as r" and "combines with
+    the final sound of the syllable". The section "Syllables" writes that coda
+    as ɚ̯, a vocalic coda, so it goes before the tone mark as i̯ and u̯ do in
+    the output. The independent morpheme ér is [aɚ̯] in China. Initials and
+    finals come from the consonant table and the five vowel table: n [n],
+    -a [a], d [t], -ou [ou̯], q [tɕʰ], -ü [y], -e [ɤ], z [ts], -i after z [ɹ̩],
+    which retone writes ɨ, w [w], -an [an], -en [ən], b [p], f [f], -u [u],
+    j [tɕ], -ia [ja], -eng [əŋ], x [ɕ], -iang [jaŋ], -i [i]. Retone writes the
+    high tone →, the dipping tone ↓, the falling tone ↘, the rising tone ↗, and
+    nothing for the neutral tone. A Latin r in the text is not pinyin.
+    """
+
+    BACKENDS = ("PypinyinPhonemizer", "XpinyinPhonemizer", "G2pMPhonemizer")
+
+    def _phonemizer(self, name):
+        from scriptconv.phonemizers import zh
+        return getattr(zh, name)(alphabet=Alphabet.IPA, jieba=False)
+
+    def test_g2pm_suffix_ends_the_syllable_before(self):
+        # g2pM: 哪儿 na3 r5, 逗趣儿 dou4 qu4 r5, 哪儿呢？ na3 r5 ne5 ？
+        from scriptconv.phonemizers.zh import G2pMPhonemizer
+        p = G2pMPhonemizer(alphabet=Alphabet.IPA, jieba=False)
+        for text, expected in (("哪儿", "naɚ̯↓"), ("逗趣儿", "tou̯↘tɕʰyɚ̯↘"),
+                               ("哪儿呢？", "naɚ̯↓nɤ？")):
+            with self.subTest(text=text):
+                self.assertEqual(p.phonemize_string(text, "zh"), expected)
+
+    def test_g2pm_suffix_in_strict_mode(self):
+        from scriptconv.phonemizers.zh import G2pMPhonemizer
+        p = G2pMPhonemizer(alphabet=Alphabet.IPA, jieba=False)
+        p.strict = True
+        self.assertEqual(p.phonemize_string("哪儿", "zh"), "naɚ̯↓")
+
+    def test_g2pm_pinyin_output_keeps_the_token(self):
+        from scriptconv.phonemizers.zh import G2pMPhonemizer
+        p = G2pMPhonemizer(alphabet=Alphabet.PINYIN, jieba=False)
+        self.assertEqual(p.phonemize_to_list("哪儿", "zh"), ["na3", "r5"])
+
+    def test_latin_r_raises_in_strict_mode(self):
+        from scriptconv.phonemizers import UnreadTextError
+        for name in self.BACKENDS:
+            p = self._phonemizer(name)
+            p.strict = True
+            with self.subTest(backend=name):
+                with self.assertRaises(UnreadTextError) as ctx:
+                    p.phonemize_string("我用r写代码", "zh")
+                self.assertEqual(ctx.exception.unread, ("r",))
+
+    def test_latin_r_with_a_digit_gives_no_ipa(self):
+        # 相 is xiàng in pypinyin and g2pM here, and xiang1 in xpinyin
+        xiang = {"PypinyinPhonemizer": "ɕja↘ŋ", "XpinyinPhonemizer": "ɕja→ŋ",
+                 "G2pMPhonemizer": "ɕja↘ŋ"}
+        for name in self.BACKENDS:
+            p = self._phonemizer(name)
+            with self.subTest(backend=name):
+                with self.assertLogs("scriptconv.phonemizers.zh", "WARNING") as logs:
+                    self.assertEqual(p.phonemize_string("版本r1发布", "zh"), "pa↓npə↓nfa→pu↘")
+                    self.assertEqual(p.phonemize_string("佳能r5相机", "zh"),
+                                     f"tɕja→nə↗ŋ{xiang[name]}tɕi→")
+                self.assertIn("'r1'", logs.output[0])
+                self.assertIn("'r5'", logs.output[1])
+
+    def test_latin_r_after_er_adds_no_coda(self):
+        # 玩儿r: wan2 er2 r in every backend; 哪儿r: g2pM na3 r5 r
+        for name in self.BACKENDS:
+            p = self._phonemizer(name)
+            with self.subTest(backend=name):
+                self.assertEqual(p.phonemize_string("玩儿r", "zh"), "wa↗naɚ̯↗")
+        g2pm = self._phonemizer("G2pMPhonemizer")
+        self.assertEqual(g2pm.phonemize_string("哪儿r", "zh"), "naɚ̯↓")
+
+    def test_independent_er_is_a_full_syllable(self):
+        # 儿子 érzi and 女儿 nǚ'ér; the backends give 子 different tones
+        from scriptconv.phonemizers.zh import (G2pMPhonemizer, PypinyinPhonemizer,
+                                               XpinyinPhonemizer)
+        cases = {PypinyinPhonemizer: "aɚ̯↗tsɨ", XpinyinPhonemizer: "aɚ̯↗tsɨ↓",
+                 G2pMPhonemizer: "aɚ̯↗tsɨ"}
+        for cls, erzi in cases.items():
+            p = cls(alphabet=Alphabet.IPA, jieba=False)
+            with self.subTest(backend=cls.__name__):
+                self.assertEqual(p.phonemize_string("儿子", "zh"), erzi)
+                self.assertEqual(p.phonemize_string("女儿", "zh"), "ny↓aɚ̯↗")
+
+    def _strict_g2pm(self, **kwargs):
+        from scriptconv.phonemizers.zh import G2pMPhonemizer
+        p = G2pMPhonemizer(alphabet=Alphabet.IPA, jieba=False, **kwargs)
+        p.strict = True
+        return p
+
+    def _assert_unread(self, p, text, unread):
+        from scriptconv.phonemizers import UnreadTextError
+        with self.subTest(text=text):
+            with self.assertRaises(UnreadTextError) as ctx:
+                p.phonemize_string(text, "zh")
+            self.assertEqual(ctx.exception.unread, (unread,))
+
+    def test_g2pm_pipe_gives_no_token(self):
+        # g2pM gives 标题|哪儿r biao1 ti2 '' na3 er2 r: the "|" has no token
+        p = self._strict_g2pm()
+        for text in ("标题|哪儿r", "选项A|选项B儿r", "女儿|儿r", "|哪儿r", "|儿r",
+                     "哪||儿儿r", "||儿儿r", "哪儿r|"):
+            self._assert_unread(p, text, "r")
+        self._assert_unread(p, "哪|儿r5", "r5")
+        self.assertEqual(p.phonemize_string("哪儿|", "zh"), "naɚ̯↓")
+        self.assertEqual(p.phonemize_string("哪儿||", "zh"), "naɚ̯↓")
+
+    def test_g2pm_char_split_keeps_the_pipe_token(self):
+        from scriptconv.phonemizers.zh import G2pMPhonemizer
+        pinyin = G2pMPhonemizer(alphabet=Alphabet.PINYIN, jieba=False, char_split=True)
+        self.assertEqual(pinyin.phonemize_to_list("哪|儿", "zh"), ["na3", "|", "er2"])
+        p = self._strict_g2pm(char_split=True)
+        self.assertEqual(p.phonemize_string("哪|儿", "zh"), "na↓|aɚ̯↗")
+        self._assert_unread(p, "标题|哪儿r", "r")
+
+    def test_g2pm_one_letter_reading_gives_no_coda(self):
+        # g2pM reads A as "a" and joins it to the characters next to it: xA儿r
+        # gives xa er2 r, and A 哪儿 gives "a " na3 r5. With tone=False it reads
+        # 饿 as "e": x饿儿r gives xe er r, and 哪儿 gives na r
+        p = self._strict_g2pm()
+        self._assert_unread(p, "xA儿r", "r")
+        self._assert_unread(p, "A 哪儿", "r5")
+        toneless = self._strict_g2pm(tone=False)
+        self._assert_unread(toneless, "x饿儿r", "r")
+        self._assert_unread(toneless, "哪儿", "r")
+
+    def test_g2pm_suffix_after_no_syllable_gives_no_coda(self):
+        # g2pM reads the 儿 of 逗趣 儿呢 after the space as r5
+        self._assert_unread(self._strict_g2pm(), "逗趣 儿呢", "r5")
+
+    def test_g2pm_r_reading_of_another_character_gives_no_coda(self):
+        # The g2pM model picks a class from all its readings, r5 included, for
+        # each character that has more than one reading, such as 了
+        import numpy as np
+        from unittest.mock import patch
+        p = self._strict_g2pm()
+        r5 = next(idx for idx, reading in p.g2p.idx2class.items() if reading == "r5")
+        with patch.object(p.g2p, "predict", lambda inputs, target_idx: np.full(len(target_idx), r5)):
+            self.assertEqual(p.g2p("你了"), ["ni3", "r5"])
+            self._assert_unread(p, "你了", "r5")
+
+
+class TestPinyinUnreadSyllable(unittest.TestCase):
+    """A syllable that is not pinyin gives no IPA. It warns, or raises in strict mode."""
+
+    def _phonemizer(self):
+        from scriptconv.phonemizers.zh import PypinyinPhonemizer
+        return PypinyinPhonemizer(alphabet=Alphabet.IPA, jieba=False)
+
+    def test_warns_and_gives_no_latin(self):
+        # 你 nǐ: n [n], -i [i]; 好 hǎo: h [x], -ao [au̯]; dipping tone ↓
+        with self.assertLogs("scriptconv.phonemizers.zh", "WARNING") as logs:
+            out = self._phonemizer().phonemize_string("你好Hello", "zh")
+        self.assertEqual(out, "ni↓xau̯↓")
+        self.assertIn("'Hello'", logs.output[0])
+
+    def test_strict_raises(self):
+        from scriptconv.phonemizers import UnreadTextError
+        p = self._phonemizer()
+        p.strict = True
+        with self.assertRaises(UnreadTextError) as ctx:
+            p.phonemize_string("你好Hello", "zh")
+        self.assertEqual(ctx.exception.unread, ("Hello",))
+
+    def test_frontend_strict_reaches_the_backend(self):
+        from scriptconv.frontend import FrontendConfig, TextFrontend
+        from scriptconv.phonemizers import UnreadTextError
+        backend = self._phonemizer()
+        frontend = TextFrontend(FrontendConfig(lang="zh", strict=True), backend)
+        with self.assertRaises(UnreadTextError):
+            frontend.phonemize("你好Hello")
+        self.assertFalse(backend.strict)
+
+
+class TestZhBackendFriendlyImportErrors(unittest.TestCase):
+    def _assert_friendly(self, module_name, cls, extra):
+        # sys.modules[name] = None makes the `import` statement raise
+        # ImportError regardless of whether the package is actually
+        # installed, so this simulates the missing-dependency case cleanly
+        import sys
+        from unittest.mock import patch
+        with patch.dict(sys.modules, {module_name: None}):
+            with self.assertRaises(ImportError) as ctx:
+                cls()
+        self.assertIn(f"scriptconv[{extra}]", str(ctx.exception))
+
+    def test_pypinyin_missing_dep_message(self):
+        from scriptconv.phonemizers.zh import PypinyinPhonemizer
+        self._assert_friendly("pypinyin", PypinyinPhonemizer, "zh")
+
+    def test_xpinyin_missing_dep_message(self):
+        from scriptconv.phonemizers.zh import XpinyinPhonemizer
+        self._assert_friendly("xpinyin", XpinyinPhonemizer, "zh-phonemizers")
+
+    def test_g2pm_missing_dep_message(self):
+        from scriptconv.phonemizers.zh import G2pMPhonemizer
+        self._assert_friendly("g2pM", G2pMPhonemizer, "zh-phonemizers")
+
+    def test_g2pc_missing_dep_message_gives_the_install_that_works(self):
+        # g2pc needs pkuseg, and PyPI has pkuseg wheels for CPython 3.5 to
+        # 3.8 only. The pkuseg sdist builds when numpy, Cython and setuptools
+        # are installed first and build isolation is off. An extra cannot
+        # do that, so the message gives the two commands.
+        import sys
+        from unittest.mock import patch
+        from scriptconv.phonemizers.zh import G2pCPhonemizer
+        with patch.dict(sys.modules, {"g2pc": None}):
+            with self.assertRaises(ImportError) as ctx:
+                G2pCPhonemizer()
+        message = str(ctx.exception)
+        self.assertIn("pkuseg", message)
+        self.assertIn("CPython 3.5 to 3.8", message)
+        self.assertIn("'pip install numpy cython setuptools'", message)
+        self.assertIn("'pip install --no-build-isolation g2pc'", message)
+        self.assertNotIn("fails to build", message)
+        self.assertNotIn("scriptconv[", message)
+
+    def test_zh_phonemizers_extra_installs_numpy_for_g2pm(self):
+        # g2pM 0.1.2.5 imports numpy in g2pM/g2pM.py and declares no
+        # dependencies on PyPI, so the extra that installs g2pM must
+        # also install numpy.
+        import re
+        import tomllib
+        from pathlib import Path
+        pyproject = Path(__file__).resolve().parent.parent / "pyproject.toml"
+        extra = tomllib.loads(pyproject.read_text(encoding="utf-8"))[
+            "project"]["optional-dependencies"]["zh-phonemizers"]
+        names = {re.match(r"[A-Za-z0-9_.-]+", req).group(0).lower()
+                 for req in extra}
+        self.assertIn("g2pm", names)
+        self.assertIn("numpy", names)
+
+    def test_pinyin_to_ipa_missing_dep_message(self):
+        from scriptconv.phonemizers.zh import PypinyinPhonemizer
+        self._assert_friendly("pinyin_to_ipa", PypinyinPhonemizer, "zh-phonemizers")
 
 
 class TestShamiFrontend(unittest.TestCase):
@@ -39,20 +409,49 @@ class TestShamiFrontend(unittest.TestCase):
         lazy = list(p.phonemize_with_language_ids_lazy(text, "ar"))
         self.assertEqual(eager[0], [ph for ph, _ in lazy])
 
+    def test_phonemize_lazy_matches_phonemize(self):
+        """phoonnx (and any streaming caller) consumes phonemize_lazy only."""
+        from scriptconv.phonemizers.shami import ShamiPhonemizer
+        p = ShamiPhonemizer()
+        text = "\u0627\u0644\u062c\u0648 \u062d\u0644\u0648 \u0627\u0644\u064a\u0648\u0645. \u0627\u0644\u0634\u062c\u0631\u0629 \u0643\u0628\u064a\u0631\u0629."
+        self.assertEqual(p.phonemize(text, "ar"),
+                         list(p.phonemize_lazy(text, "ar")))
+
+    def test_phonemize_lazy_keeps_multichar_symbols_whole(self):
+        """Every yielded token is a whole inventory symbol, never a shredded
+        fragment. The exact phoneme sequence depends on which optional Arabic
+        diacritizer backend is installed, so the assertions are invariants over
+        the inventory, not a hardcoded transcription: a bare length mark can
+        only appear if a long-vowel symbol was split, and every token must be
+        a real ShamiVITS symbol."""
+        from scriptconv.phonemizers.shami import ShamiPhonemizer, SYMBOL_TO_ID
+        p = ShamiPhonemizer()
+        tokens = [t for sent in p.phonemize_lazy("\u0627\u0644\u0634\u062c\u0631\u0629 \u0643\u0628\u064a\u0631\u0629.", "ar")
+                  for t in sent]
+        self.assertNotIn("\u02d0", tokens)
+        for t in tokens:
+            self.assertIn(t, SYMBOL_TO_ID, f"{t!r} is not a ShamiVITS symbol")
+        # If any multi-character symbol was produced, it survived whole.
+        multi = [t for t in tokens if len(t) > 1 and not t.startswith("<")]
+        for t in multi:
+            self.assertIn(t, SYMBOL_TO_ID)
+
+    def test_frontend_symbols_are_public(self):
+        from scriptconv.phonemizers.shami import (
+            TextFrontend,
+            SYMBOL_TO_ID,
+            ID_TO_SYMBOL,
+            VOCAB_SIZE,
+            get_default_frontend,
+        )
+        self.assertTrue(callable(TextFrontend))
+        self.assertTrue(callable(get_default_frontend))
+        self.assertIsInstance(SYMBOL_TO_ID, dict)
+        self.assertTrue(SYMBOL_TO_ID)
+        self.assertEqual(VOCAB_SIZE, len(ID_TO_SYMBOL))
+
 
 class TestLicensingStubs(unittest.TestCase):
-    def test_mantoq_wrapper_constructs_from_vendored_copy(self):
-        cls = get_phonemizer_class(Phonemizer.MANTOQ)
-        p = cls()
-        out = p.phonemize_string("مرحبا", "ar")
-        self.assertTrue(out)
-        self.assertNotIn("_", out)
-
-    def test_kog2p_wrapper_constructs_from_vendored_copy(self):
-        cls = get_phonemizer_class(Phonemizer.KOG2PK)
-        p = cls()
-        self.assertTrue(callable(p.g2p))
-
     def test_encumbered_licenses_only_inside_quarantine(self):
         import pathlib, re
         root = pathlib.Path("scriptconv")
@@ -65,12 +464,6 @@ class TestLicensingStubs(unittest.TestCase):
                          r"|creativecommons\.org/licenses/by-nc", head):
                 offenders.append(str(f))
         self.assertEqual(offenders, [])
-
-    def test_quarantine_carries_license_notices(self):
-        import pathlib
-        base = pathlib.Path("scriptconv/phonemizers/_vendored")
-        self.assertTrue((base / "mantoq" / "LICENSE.md").is_file())
-        self.assertTrue((base / "kog2p" / "LICENSE.md").is_file())
 
     def test_quarantine_not_imported_at_package_import(self):
         import subprocess, sys
@@ -89,15 +482,47 @@ if __name__ == "__main__":
 class TestMantoqTokensToIpa(unittest.TestCase):
     def test_pretokenized_sequence_accepted(self):
         # the mantoq package's g2p returns a token LIST; joining is ambiguous
-        # so mantoq_to_ipa consumes sequences directly
-        from scriptconv.notation import mantoq_to_ipa
+        # so halabi_to_ipa consumes sequences directly
+        from scriptconv.notation import halabi_to_ipa
         tokens = ["m", "a", "r", "H", "a", "b", "a", "n", "aa",
                   "_+_", "b", "i", "l", "E", "aa", "l", "a", "m", "i"]
-        out = mantoq_to_ipa(tokens)
+        out = halabi_to_ipa(tokens)
         self.assertIn("ħ", out)
         self.assertIn(" ", out)
         self.assertNotIn("_", out)
 
     def test_pretokenized_dbl_geminate(self):
-        from scriptconv.notation import mantoq_to_ipa
-        self.assertEqual(mantoq_to_ipa(["b", "_dbl_", "a"]), "bːa")
+        from scriptconv.notation import halabi_to_ipa
+        self.assertEqual(halabi_to_ipa(["b", "_dbl_", "a"]), "bːa")
+
+
+class TestUnsupportedAlphabetIsAClearError(unittest.TestCase):
+    """A wrapper asked for an alphabet it cannot emit must say so.
+
+    ``get_phonemizer`` injects its own ``alphabet=`` default (IPA) into every
+    constructor declaring the parameter, so the Japanese wrappers — which emit
+    romanizations, never IPA — were hit by ordinary registry use and raised a
+    bare ``AssertionError`` with an empty message.
+    """
+
+    def test_registry_default_raises_valueerror_naming_the_alphabets(self):
+        from scriptconv.phonemizers.enums import Alphabet
+        for member in (Phonemizer.OPENJTALK, Phonemizer.CUTLET,
+                       Phonemizer.PYKAKASI):
+            with self.subTest(phonemizer=member.value):
+                try:
+                    get_phonemizer(member)
+                except ImportError:
+                    self.skipTest(f"{member.value} backend not installed")
+                except ValueError as e:
+                    self.assertIn("ipa", str(e))
+                    self.assertIn(Alphabet.HEPBURN.value, str(e))
+                else:
+                    self.fail("expected ValueError for an unemittable alphabet")
+
+    def test_openjtalk_default_alphabet_is_one_it_can_emit(self):
+        cls = get_phonemizer_class(Phonemizer.OPENJTALK)
+        import inspect
+        from scriptconv.phonemizers.enums import Alphabet
+        default = inspect.signature(cls.__init__).parameters["alphabet"].default
+        self.assertIn(default, (Alphabet.HEPBURN, Alphabet.KANA))
